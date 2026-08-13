@@ -26,6 +26,11 @@
 | Public HTML reflects committed change | public curl contained `Baseline proof` | PASS |
 | Visual marker visibly rendered | not observed in browser | UNRESOLVED |
 | Host `just obs sessions` | Windows host lacks `sqlite3` | NOT PROVEN |
+| Operator-owned canonical repository | `origin` resolves to `sbracewell64/inkwell-agent-sandboxes-and-software-factory` | PASS |
+| Upstream retained as reference | `upstream/main` remains `92f1701...`; push URL disabled | PASS |
+| Canonical accepted branch | local `main` tracks `origin/main` at proven B1 commit | PASS |
+| Proven B0/B1 refs survived publication | remote branches/tags resolve to exact recorded commits | PASS |
+| Sandbox clones canonical evolving source | current FILL still hard-codes Disler upstream | NOT PROVEN |
 
 ## Rule
 

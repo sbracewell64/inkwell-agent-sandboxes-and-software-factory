@@ -22,3 +22,8 @@ required_agent_entrypoints:
   - docs/README.md
   - docs/baseline/BASELINE.md
   - docs/development/INCREMENT_PROTOCOL.md
+repository:
+  canonical: https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+  upstream: https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git
+  accepted_branch: main
+  development_branch_pattern: increment/*

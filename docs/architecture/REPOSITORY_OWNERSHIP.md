@@ -52,3 +52,21 @@ Without canonical source ownership, the host can say “current SSSF” while th
 That destroys reproducibility.
 
 The repository source and exact commit therefore become explicit inputs to every post-baseline sandbox proof.
+
+## Proven ownership state — B2-001
+
+Canonical evolving repository:
+
+`https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git`
+
+Remote roles:
+
+- `origin` — operator-owned canonical repository; writable.
+- `upstream` — Disler's repository; reference-only.
+- `main` — latest accepted/proven platform line.
+- `increment/*` — bounded development increments.
+- `sssf-*` — immutable proven milestones and evidence.
+
+Accepted increments are proved on increment branches, then canonical `main` is fast-forwarded to the exact accepted commit.
+
+This does not yet solve sandbox source ownership. The current FILL implementation still clones Disler's repository. B2-002 will make repository URL and exact source revision explicit sandbox inputs.
