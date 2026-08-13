@@ -13,6 +13,10 @@ SSSF is being developed in **proven increments**. A change is not part of the tr
 5. the documentation is updated,
 6. the accepted state is frozen with an immutable Git reference.
 
+## Agent bootstrap
+
+Repository-level agents enter through `AGENTS.md`; Claude Code additionally receives `CLAUDE.md`. Both route here rather than duplicating the system record. This file is the documentation router: read the frozen baseline, then lazy-load only task-relevant references.
+
 ## Start here
 
 Read in this order:

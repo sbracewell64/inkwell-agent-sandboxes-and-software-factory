@@ -10,6 +10,10 @@ Drives the **out-of-sandbox** half of this repo: the `sbx` namespace under `just
 take a blank exe.dev VM to a health-checked, running factory in ~10s, run work inside it, expose it
 to a browser, and — only when a human says so — tear it down.
 
+## Local system record
+
+In a repository containing `docs/README.md`, read that file and `docs/baseline/BASELINE.md` once in a fresh context before operating the sandbox. Use the docs index to lazy-load only task-relevant architecture or operations references. The frozen baseline and proof matrix supersede stale historical claims in older plans or measured notes; executable code and current evidence remain authoritative.
+
 ## The one governing principle: THIN SKILL, FAT RECIPES
 
 **Every action you take should be a `just` command a human could type.** The recipes hold the

@@ -10,6 +10,8 @@ Reusable combination of **agents plus code**: deterministic Python ADW scripts o
 
 ## Startup
 
+If `docs/README.md` exists in the repository root, read it and `docs/baseline/BASELINE.md` first. Treat `docs/README.md` as a router: lazy-load only the documentation relevant to the current request. Do not recursively inventory `docs/`.
+
 Three steps. Then stop.
 
 1. Read [cookbooks/sssf_overview.md](cookbooks/sssf_overview.md) — the system map.
@@ -73,4 +75,4 @@ Deep specs, when needed: [references/config.md](references/config.md) · [refere
 
 ## v1 scope
 
-Pi coding agent only (`coding_agent: pi`), default model `gemini-3.6-flash` via openrouter, thinking `medium`. `claude_code` is schema-valid but stubbed until v2. The visualizer app ships in a later pass — observe via sqlite queries until then.
+Pi coding agent only (`coding_agent: pi`) for ADW agents in v1; model selection is roster-driven through `adws/adw_sssf_config/`. `claude_code` is schema-valid but stubbed until v2. The visualizer is present and reads the SQLite trace; CLI/SQLite observation remains available.

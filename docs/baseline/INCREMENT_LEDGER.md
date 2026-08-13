@@ -14,6 +14,8 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B0-008 | PASS | Free North Mini Code end-to-end ADW | ADW `5573998b`, 5/5, commit `042dfb9` |
 | B0-009 | PASS | Archive/freeze baseline | `sssf-local-b0` + `sssf-proof-b0` created |
 
+| B1-001 | PASS | Agent documentation discovery | bootstrap validator PASS; frozen B0 tags unchanged |
+
 ## Future increments
 
 Use IDs `B1-001`, `B1-002`, etc. after the B0 freeze. Every row should point to an ADR, proof record, test/trace, or immutable Git object when applicable.

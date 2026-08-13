@@ -17,6 +17,8 @@ baseline:
   proof_adw_id: 5573998b
   proof_commit: 042dfb9
 required_agent_entrypoints:
+  - AGENTS.md
+  - CLAUDE.md
   - docs/README.md
   - docs/baseline/BASELINE.md
   - docs/development/INCREMENT_PROTOCOL.md

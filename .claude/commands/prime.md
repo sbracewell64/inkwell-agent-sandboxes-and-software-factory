@@ -6,9 +6,13 @@ description: Prime context for Inkwell — the app, the Super Simple Software Fa
 
 Orient yourself in a three-layer system: **Inkwell** (a small blog-writing app), the **Super Simple Software Factory** (deterministic Python owns the graph, coding agents are bounded phases inside it), and the **sandbox mount system** (six host-side phases that stand the whole thing up on a disposable exe.dev VM, run it, and watch it from outside). The app is the payload; the point is the loop that ships it without a human in the middle.
 
+## Durable system record
+
+Before surveying the repository, read `docs/README.md` and `docs/baseline/BASELINE.md`. The docs index is the router for the evolving local SSSF. Load only task-relevant references after those two files. Historical specs, README material, TREE.md, skills, and measured notes remain useful evidence, but they must not override the current frozen baseline or executable behavior.
+
 ## Workflow
 
-1. Map the surface first, because it is the fastest way to see the shape: `just` (four namespaces, nothing else), then `just --list sbx`, `just --list adw`, `just --list obs`, `just --list local`. The namespace answers *where the work happens*: `sbx` orchestrates VMs from the host, `adw` runs the workflows, `local` boots an orchestrator agent on this machine, `obs` reads the trace db. Then `git ls-files | head -60` and `ls sandbox_mount/host sandbox_mount/guest just/sandbox`.
+1. Map the surface first, because it is the fastest way to see the shape: `just` (five namespaces), then `just --list inkwell`, `just --list sbx`, `just --list adw`, `just --list obs`, `just --list local`. The namespace answers *where the work happens*: `inkwell` runs and tests the app, `sbx` orchestrates VMs from the host, `adw` runs the workflows, `local` boots an orchestrator agent on this machine, and `obs` reads the trace db. Then `git ls-files | head -60` and `ls sandbox_mount/host sandbox_mount/guest just/sandbox`.
 
 2. Read `TREE.md` — every file that matters and why it exists, grouped by layer, ending with the
    five things that will bite you. It is the map; the rest of this workflow is the territory. Then
@@ -24,6 +28,6 @@ Orient yourself in a three-layer system: **Inkwell** (a small blog-writing app),
 
 7. Read `.claude/skills/sssf/SKILL.md` and `adws/adw_sssf_config/sssf.config.yaml` for the factory itself and its roster. Every model is `openrouter/<id>`; the roster runs entirely through OpenRouter on a disposable per-sandbox key (`$50` default, revoked at teardown). Models carry a **four-field** `cost` block — a partial one fails schema validation and pi silently drops the entire roster, and with no rates pi reports `$0.0000` forever while genuinely spending.
 
-8. Check live state before acting: `just sbx manage doctor` (host prerequisites), `just sbx manage list` (sandboxes and whether their VMs are alive), and `ssh exe.dev ls --json` (ground truth). A sandbox hosts **many** ADW runs — `just sbx manage list` counts sandboxes, `just obs sessions` counts runs inside one. Never run `just sbx lifecycle teardown` unless asked: it is always an explicit human decision, and it is the one phase not yet exercised.
+8. Check live state before acting: `just sbx manage doctor` (host prerequisites), `just sbx manage list` (sandboxes and whether their VMs are alive), and `ssh exe.dev ls --json` (ground truth). A sandbox hosts **many** ADW runs — `just sbx manage list` counts sandboxes, `just obs sessions` counts runs inside one. Never run `just sbx lifecycle teardown` unless asked: it is always an explicit human decision. The frozen B0 baseline records successful harvest, key revocation, VM destruction, and run closure.
 
-9. Summarize your understanding: the three layers, the four namespaces, what the credential boundary protects, what is verified versus outstanding, and the entry points you would use next. Then stop and wait for a request rather than surveying further.
+9. Summarize your understanding: the three layers, the five namespaces, what the credential boundary protects, what is verified versus outstanding, and the entry points you would use next. Then stop and wait for a request rather than surveying further.
