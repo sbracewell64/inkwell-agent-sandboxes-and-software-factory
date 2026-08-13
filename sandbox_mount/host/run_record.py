@@ -48,6 +48,8 @@ FIELDS = (
     "limit",
     "spend",
     "session_id",
+    "source_repo",
+    "source_sha",
     "commit_sha",
     "ports",
     "pid",

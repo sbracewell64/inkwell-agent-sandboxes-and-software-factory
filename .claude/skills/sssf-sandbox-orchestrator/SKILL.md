@@ -90,7 +90,7 @@ their own contents when run bare.
 |---|---|
 | `just sbx mount RUN_ID [--limit N]` | create → fill → setup → observe. **Never teardown.** Prints the resolved run id and both URLs. |
 | `just sbx lifecycle create RUN_ID [--limit N]` | mint `sbx-<run-id>` (\$50 default) + boot the VM, in record → VM → key order |
-| `just sbx lifecycle fill RUN_ID [SHA]` | public `git clone` (2.61s, no auth), optional SHA pin, write `.env` with the runtime key |
+| `just sbx lifecycle fill RUN_ID [SHA]` | clone the host checkout's public `origin`, pin exact host `HEAD` by default (or the explicit SHA), record and gate source provenance, write `.env` with the runtime key |
 | `just sbx lifecycle setup RUN_ID` | `provision.sh` + the five-assertion gate |
 | `just sbx lifecycle execute RUN_ID "PROMPT"` | full SDLC detached inside the box; returns a pid, records it |
 | `just sbx run cmd RUN_ID '<cmd>'` | generic escape hatch, synchronous, runs in `app/`. Your inspection tool. |

@@ -16,13 +16,51 @@ fill RUN_ID *SHA:
     cd "{{justfile_directory()}}"
     RR="sandbox_mount/host/run_record.py"
 
-    # Public repo: no auth, no GitHub integration, no exe.dev git integration.
-    REPO="https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git"
+    # Source authority comes from the host checkout, not a repository hard-coded
+    # into this recipe. `origin` is the canonical evolving SSSF repository.
+    REPO="$(git remote get-url origin 2>/dev/null || true)"
+    [ -n "$REPO" ] || {
+        echo "fill: host checkout has no origin remote — cannot determine sandbox source repository" >&2
+        exit 1
+    }
 
-    # *SHA is variadic: it interpolates to "" when unpinned, space-joined otherwise.
-    # Only the first token is meaningful; extra words are a caller mistake we ignore.
+    # FILL is intentionally credential-free. The sandbox must clone a public
+    # HTTPS source; never forward an SSH URL or credential-bearing host remote.
+    case "$REPO" in
+        https://github.com/*) ;;
+        *)
+            echo "fill: origin must be a public https://github.com/... repository URL; got '$REPO'" >&2
+            exit 1
+            ;;
+    esac
+
+    # Every run is pinned to an exact commit. An explicit SHA remains supported;
+    # otherwise the current host HEAD is the source revision.
     SHA_ARGS="{{SHA}}"
-    PIN="${SHA_ARGS%% *}"
+    REQUESTED_SHA="${SHA_ARGS%% *}"
+    if [ -n "$REQUESTED_SHA" ]; then
+        if ! PIN="$(git rev-parse --verify "$REQUESTED_SHA^{commit}" 2>/dev/null)"; then
+            echo "fill: source '$REQUESTED_SHA' does not resolve to a commit in the host checkout" >&2
+            exit 1
+        fi
+    else
+        # Uncommitted host files cannot cross a public Git clone. Refuse to
+        # silently run an older committed tree than the engineer is looking at.
+        if [ -n "$(git status --porcelain)" ]; then
+            echo "fill: host working tree is dirty — commit or stash changes before mounting the current HEAD" >&2
+            echo "      or call FILL explicitly with an exact committed SHA" >&2
+            exit 1
+        fi
+        PIN="$(git rev-parse HEAD)"
+    fi
+
+    if ! [[ "$PIN" =~ ^[0-9a-f]{40}$ ]]; then
+        echo "fill: resolved source revision is not an exact 40-character commit SHA: $PIN" >&2
+        exit 1
+    fi
+
+    echo "==> fill: source repo $REPO"
+    echo "==> fill: source sha  $PIN"
 
     VM=$("$RR" get {{RUN_ID}} vm_name)
     if [ -z "$VM" ]; then
@@ -126,7 +164,10 @@ fill RUN_ID *SHA:
 
     # commit_sha is what makes N runs comparable, so record the sha that is actually
     # checked out, never the one that was asked for.
-    "$RR" set {{RUN_ID}} commit_sha="$HEAD_SHA"
+    "$RR" set {{RUN_ID}} \
+        source_repo="$REPO" \
+        source_sha="$PIN" \
+        commit_sha="$HEAD_SHA"
 
     # .env lands here, not at CREATE: it lives inside app/, which does not exist
     # until the clone does. `new --env` is useless for it anyway — that lands in

@@ -16,9 +16,14 @@ Why:
 
 ## Phase 2 — fill
 
-- clone the public repo into the sandbox,
+- resolve the host checkout's public `origin` as `source_repo`,
+- require a clean host tree when using the default current source,
+- resolve an exact 40-character `source_sha` (host `HEAD` by default),
+- clone that repository into the sandbox,
+- checkout the exact source commit,
 - create the run branch,
-- record the base SHA,
+- gate actual guest HEAD against `source_sha`,
+- persist `source_repo`, `source_sha`, and actual `commit_sha`,
 - inject the disposable runtime OpenRouter key,
 - never inject the host provisioning key.
 
@@ -34,6 +39,12 @@ Guest provisioning:
 - trace DB initialization
 - uv cache warming
 - health gate
+
+Git integrity additionally proves:
+
+- guest `origin` equals recorded `source_repo`,
+- guest HEAD equals recorded `source_sha` / `commit_sha`,
+- the guest working tree is clean.
 
 ## Phase 4 — execute
 

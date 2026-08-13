@@ -30,19 +30,35 @@ setup RUN_ID CONFIG="":
 
     RR="sandbox_mount/host/run_record.py"
     VM=$("$RR" get {{RUN_ID}} vm_name)
+    SOURCE_REPO=$("$RR" get {{RUN_ID}} source_repo)
+    SOURCE_SHA=$("$RR" get {{RUN_ID}} source_sha)
     SHA=$("$RR" get {{RUN_ID}} commit_sha)
 
     # run_record prints an empty line for an unset field, so emptiness is the
     # real check — a missing vm_name means CREATE never finished.
     [ -n "$VM" ]  || { echo "[setup] run record {{RUN_ID}} has no vm_name — run: just sbx lifecycle create {{RUN_ID}}" >&2; exit 1; }
     [ -n "$SHA" ] || { echo "[setup] run record {{RUN_ID}} has no commit_sha — run: just sbx lifecycle fill {{RUN_ID}}" >&2; exit 1; }
+    [ -n "$SOURCE_REPO" ] || {
+        echo "[setup] run record {{RUN_ID}} has no source_repo — run FILL again" >&2
+        exit 1
+    }
+    [ -n "$SOURCE_SHA" ] || {
+        echo "[setup] run record {{RUN_ID}} has no source_sha — run FILL again" >&2
+        exit 1
+    }
+    [ "$SOURCE_SHA" = "$SHA" ] || {
+        echo "[setup] source_sha $SOURCE_SHA != commit_sha $SHA" >&2
+        exit 1
+    }
 
     HOST="$VM.exe.xyz"
     # ConnectTimeout only: every *.exe.xyz shares one host key and the wildcard
     # known_hosts entry is already installed, so ssh is non-interactive already.
     SSH=(ssh -o ConnectTimeout=15 "$HOST")
 
-    echo "[setup] run {{RUN_ID}}  vm ${VM}  sha ${SHA}"
+    echo "[setup] run {{RUN_ID}}  vm ${VM}"
+    echo "[setup] source repo ${SOURCE_REPO}"
+    echo "[setup] source sha  ${SOURCE_SHA}"
 
     # Every failure below routes through here: report, hand over the debug
     # command, exit non-zero. NEVER destroy — teardown stays an explicit choice.
@@ -94,11 +110,22 @@ setup RUN_ID CONFIG="":
     # clones the repo and provisions around it, so any porcelain line at all
     # means something wrote where it should not have.
     echo "[gate] A git integrity"
-    if "${SSH[@]}" 'bash -s' "$SHA" <<'REMOTE_A'; then
+    if "${SSH[@]}" 'bash -s' "$SHA" "$SOURCE_REPO" <<'REMOTE_A'; then
     set -uo pipefail
     cd "$HOME/app" || { echo "   no ~/app on this VM — FILL never ran"; exit 1; }
     want="${1:-}"
+    want_repo="${2:-}"
     head="$(git rev-parse HEAD)" || { echo "   git rev-parse failed — .git is damaged"; exit 1; }
+    origin="$(git remote get-url origin)" || {
+      echo "   git remote get-url origin failed"
+      exit 1
+    }
+    echo "   origin   ${origin}"
+    echo "   expected ${want_repo}"
+    [ "$origin" = "$want_repo" ] || {
+      echo "   origin does not match recorded source_repo"
+      exit 1
+    }
     echo "   HEAD     ${head}"
     echo "   expected ${want}"
     case "$head" in

@@ -11,7 +11,7 @@ before any toolchain exists and must never be the reason a teardown cannot start
 
 ---
 
-## The twelve fields
+## The fourteen fields
 
 The schema is **closed**. Every field is referenced by name somewhere in the six phases, so a
 typo in a `set` would be silent data loss — unknown keys are rejected rather than written.
@@ -25,11 +25,13 @@ typo in a `set` would be silent data loss — unknown keys are rejected rather t
 | 5 | `limit` | create | operator, teardown math | float | Dollars on the OpenRouter key. Default `50.00`, per-run via `just sbx lifecycle create <id> --limit N` |
 | 6 | `spend` | teardown | compare | float | What the key actually cost, read back from OpenRouter **before** revoking. This is what makes best-of-N comparable: same prompt, N models, cost beside result |
 | 7 | `session_id` | create | agent | str (UUID) | `claude --session-id` demands a UUID and `--resume` needs the same one on every later turn, so it is minted once at create |
-| 8 | `commit_sha` | fill | setup gate A, compare | str | Pins the run. Always the sha **actually checked out**, never the one that was asked for. Not coerced — `5734129` is a string that happens to parse as a number |
-| 9 | `ports` | observe | operator | JSON (`{"app":4501,"obs":4600}`) | Which surface is on which port |
-| 10 | `pid` | execute | operator | int | The detached SDLC's remote pid |
-| 11 | `created_at` | create | list ordering | str, **immutable** | Identity, not state |
-| 12 | `closed_at` | teardown (`close`) | reap | str or null | **Non-null means the key is revoked.** This is what distinguishes a live run from an orphan |
+| 8 | `source_repo` | fill | setup, operator | str | Exact public repository URL cloned for this run |
+| 9 | `source_sha` | fill | setup, operator | str | Exact 40-character source commit selected by the host |
+| 10 | `commit_sha` | fill | setup gate A, compare | str | Pins the run. Always the sha **actually checked out**, never the one that was asked for. Not coerced — `5734129` is a string that happens to parse as a number |
+| 11 | `ports` | observe | operator | JSON (`{"app":4501,"obs":4600}`) | Which surface is on which port |
+| 12 | `pid` | execute | operator | int | The detached SDLC's remote pid |
+| 13 | `created_at` | create | list ordering | str, **immutable** | Identity, not state |
+| 14 | `closed_at` | teardown (`close`) | reap | str or null | **Non-null means the key is revoked.** This is what distinguishes a live run from an orphan |
 
 `run_id` and `created_at` are immutable: `set` refuses them.
 
@@ -106,6 +108,8 @@ keeps spending.
   "limit": 50.0,
   "spend": null,
   "session_id": "8941a9f0-ac02-4678-be96-d578ac224c3b",
+  "source_repo": "https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git",
+  "source_sha": "<exact 40-character commit>",
   "commit_sha": "30c962bcd4fe37dd451dc529043920317f6a5db4",
   "ports": { "app": 4501, "obs": 4600 },
   "pid": 1542,
