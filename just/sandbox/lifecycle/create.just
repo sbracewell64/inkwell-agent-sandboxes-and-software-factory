@@ -117,6 +117,8 @@ create RUN_ID *FLAGS:
     ' "$RUN_ID")"
         { read -r VM_NAME || true; read -r HTTPS_URL || true; } <<< "$PARSED"
     fi
+    VM_NAME="${VM_NAME%$'\r'}"
+    HTTPS_URL="${HTTPS_URL%$'\r'}"
     [ -n "${VM_NAME:-}" ] || { echo "create: could not determine the VM name for $RUN_ID" >&2; exit 1; }
     # Measured: --name becomes the public hostname, so this derivation is safe.
     [ -n "${HTTPS_URL:-}" ] || HTTPS_URL="https://${VM_NAME}.exe.xyz"
