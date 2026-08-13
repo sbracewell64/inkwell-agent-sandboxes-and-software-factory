@@ -1,0 +1,20 @@
+schema_version: 1
+documentation_root: docs
+purpose: durable system reference for incremental SSSF evolution
+authority_order:
+  - executable_code_and_tests
+  - immutable_run_evidence_and_git_objects
+  - current_configuration
+  - docs
+  - readme_tree_skills_generated_narrative
+baseline:
+  id: SSSF-LOCAL-B0
+  status: PROVEN_WITH_RECORDED_LIMITATIONS
+  upstream_sha: 92f1701810993b8303562265ba04c727468fe070
+  proof_sandbox_run: baseline-proof-20260813-d38790
+  proof_adw_id: 5573998b
+  proof_commit: 042dfb9
+required_agent_entrypoints:
+  - docs/README.md
+  - docs/baseline/BASELINE.md
+  - docs/development/INCREMENT_PROTOCOL.md

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "baseline_id": "SSSF-LOCAL-B0",
+  "status": "PROVEN_WITH_RECORDED_LIMITATIONS",
+  "proven_date": "2026-08-13",
+  "upstream_sha": "92f1701810993b8303562265ba04c727468fe070",
+  "proof": {
+    "sandbox_run_id": "baseline-proof-20260813-d38790",
+    "adw_id": "5573998b",
+    "proof_commit": "042dfb9",
+    "phases_passed": "5/5",
+    "tests": {
+      "passed": 30,
+      "failed": 0
+    },
+    "inference_model": "openrouter/cohere/north-mini-code:free",
+    "reported_cost_usd": 0.0,
+    "reported_tokens": 420217
+  },
+  "host_compatibility_overlay": [
+    "create.just CRLF normalization for VM metadata",
+    "teardown.just mktemp XXXXXX template",
+    "SSH wildcard identity + accept-new",
+    "Git bin/usr-bin PATH for sh and cygpath"
+  ],
+  "known_open_items": [
+    "setup gate can report pass while inference probes report insufficient credits",
+    "Windows host obs sessions lacks sqlite3",
+    "visual Baseline proof label not observed although public HTML contains it",
+    "exe.dev replacement not implemented"
+  ]
+}
