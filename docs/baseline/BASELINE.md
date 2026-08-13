@@ -1,7 +1,7 @@
 # Baseline — SSSF-LOCAL-B0
 
-**Status:** PROVEN WITH RECORDED LIMITATIONS  
-**Date proven:** 2026-08-13  
+**Status:** FROZEN — PROVEN WITH RECORDED LIMITATIONS
+**Date proven:** 2026-08-13
 **Purpose:** Establish a reproducible reference point before architectural augmentation.
 
 ## Source baseline
@@ -122,3 +122,13 @@ These are **not silently treated as solved**:
 ## Baseline acceptance rule
 
 `SSSF-LOCAL-B0` is frozen only after the freeze procedure in `FREEZE_PROCEDURE.md` is completed and its immutable Git refs are recorded here.
+
+## Freeze record
+
+- Baseline tag: `sssf-local-b0`
+- Proof tag: `sssf-proof-b0`
+- Upstream source: `92f1701810993b8303562265ba04c727468fe070`
+- End-to-end proof commit: `042dfb9d34a14fe5952538fedddbd136b334947e`
+- End-to-end proof ADW: `5573998b`
+- Proof sandbox: `baseline-proof-20260813-d38790`
+- Successful proof sandbox was harvested, its runtime key revoked, VM destroyed, and run record closed before baseline publication.

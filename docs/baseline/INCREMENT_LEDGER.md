@@ -12,7 +12,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B0-006 | PASS | Full sandbox mount | `baseline-proof-20260813-d38790` mounted |
 | B0-007 | REJECTED | Free Nemotron planner proof | artifact gates correctly failed |
 | B0-008 | PASS | Free North Mini Code end-to-end ADW | ADW `5573998b`, 5/5, commit `042dfb9` |
-| B0-009 | OPEN | Archive/freeze baseline | complete `FREEZE_PROCEDURE.md` |
+| B0-009 | PASS | Archive/freeze baseline | `sssf-local-b0` + `sssf-proof-b0` created |
 
 ## Future increments
 

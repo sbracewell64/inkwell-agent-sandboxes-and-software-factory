@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "baseline_id": "SSSF-LOCAL-B0",
-  "status": "PROVEN_WITH_RECORDED_LIMITATIONS",
+  "status": "FROZEN_PROVEN_WITH_RECORDED_LIMITATIONS",
   "proven_date": "2026-08-13",
   "upstream_sha": "92f1701810993b8303562265ba04c727468fe070",
   "proof": {
@@ -28,5 +28,7 @@
     "Windows host obs sessions lacks sqlite3",
     "visual Baseline proof label not observed although public HTML contains it",
     "exe.dev replacement not implemented"
-  ]
+  ],
+  "baseline_tag": "sssf-local-b0",
+  "proof_tag": "sssf-proof-b0"
 }
