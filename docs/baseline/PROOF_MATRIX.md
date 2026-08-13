@@ -31,6 +31,11 @@
 | Canonical accepted branch | local `main` tracks `origin/main` at proven B1 commit | PASS |
 | Proven B0/B1 refs survived publication | remote branches/tags resolve to exact recorded commits | PASS |
 | Sandbox clones canonical evolving source | current FILL still hard-codes Disler upstream | NOT PROVEN |
+| Sandbox default source authority | FILL resolved operator-owned canonical `origin` automatically | PASS |
+| Exact sandbox source pin | FILL selected `0ad16d939366ad0b6bb9c2bdb28eea7799a8e8df` and guest HEAD matched exactly | PASS |
+| Durable sandbox provenance | run record retained `source_repo`, `source_sha`, and matching `commit_sha` | PASS |
+| Independent SETUP provenance gate | Gate A verified guest origin, exact HEAD, and clean tree | PASS |
+| B2-002 cleanup | runtime key revoked, VM destroyed, run record closed, exe.dev fleet empty | PASS |
 
 ## Rule
 

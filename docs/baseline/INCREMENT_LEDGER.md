@@ -18,6 +18,8 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 
 | B2-001 | PASS | Canonical repository ownership | validator PASS; origin canonical; upstream reference-only; B0/B1 refs preserved |
 
+| B2-002 | PASS | Sandbox source provenance contract | live sandbox proved canonical repo + exact SHA + independent SETUP gate + teardown |
+
 ## Future increments
 
 Use IDs `B1-001`, `B1-002`, etc. after the B0 freeze. Every row should point to an ADR, proof record, test/trace, or immutable Git object when applicable.
