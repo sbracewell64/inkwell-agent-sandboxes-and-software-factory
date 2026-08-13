@@ -102,7 +102,7 @@ teardown RUN_ID *FLAGS:
     # ── 2. artifacts ------------------------------------------------------------
     if [ "$VM_ALIVE" = 1 ]; then
         mkdir -p "$ART"
-        TAR_TMP=$(mktemp -t "sbx-$RUN_ID")
+        TAR_TMP=$(mktemp -t "sbx-$RUN_ID.XXXXXX")
         # One round trip, and `ls -d` filters to what actually exists so a run that
         # died before writing app_docs/ is not an error.
         ssh "${SSH_OPTS[@]}" "$VM".exe.xyz \
