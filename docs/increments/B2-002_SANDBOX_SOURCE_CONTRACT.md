@@ -1,6 +1,6 @@
 # B2-002 — Sandbox Source Contract
 
-**Status:** PROVEN  
+**Status:** PROVEN
 **Starts from:** `sssf-b2-001-canonical-repository`
 
 ## Problem
@@ -85,7 +85,9 @@ Result: PASS.
 
 `git diff --check`
 
-Result: no whitespace errors.
+Candidate implementation gate before live proof: PASS with no whitespace errors.
+
+During final documentation closure, `git diff --check` detected trailing whitespace on the `**Status:** PROVEN` line. The B2-002 closure was nevertheless committed and published. B2-003 records and corrects that documentation-hygiene deviation without moving or rewriting the immutable B2-002 tag.
 
 ## Live proof
 

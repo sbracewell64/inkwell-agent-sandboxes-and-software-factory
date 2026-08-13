@@ -36,6 +36,7 @@
 | Durable sandbox provenance | run record retained `source_repo`, `source_sha`, and matching `commit_sha` | PASS |
 | Independent SETUP provenance gate | Gate A verified guest origin, exact HEAD, and clean tree | PASS |
 | B2-002 cleanup | runtime key revoked, VM destroyed, run record closed, exe.dev fleet empty | PASS |
+| B2-002 closure documentation hygiene | final closure had one trailing-whitespace finding; runtime proof unaffected | CORRECTED BY B2-003 |
 
 ## Rule
 
