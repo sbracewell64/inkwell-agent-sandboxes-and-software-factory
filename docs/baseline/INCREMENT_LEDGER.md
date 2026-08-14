@@ -16,7 +16,8 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B1-001 | PASS | Agent documentation discovery | bootstrap validator PASS; frozen B0 tags unchanged |
 | B2-001 | PASS | Canonical repository ownership | validator PASS; origin canonical; upstream reference-only; B0/B1 refs preserved |
 | B2-002 | PASS | Sandbox source provenance contract | live sandbox proved canonical repo + exact SHA + independent SETUP gate + teardown |
-| B2-003 | IN_PROGRESS | Proof record hygiene | correct B2-002 closure evidence without moving immutable tag |
+| B2-003 | PASS | Proof record hygiene | B2-002 closure evidence corrected; immutable B2-002 tag preserved |
+| B2-004 | PASS | B2-003 ledger closure | published ledger reconciled with proven B2-003 state without moving immutable tags |
 
 ## Future increments
 
