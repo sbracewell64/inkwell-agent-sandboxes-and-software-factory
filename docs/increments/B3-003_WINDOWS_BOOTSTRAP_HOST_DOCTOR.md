@@ -1,7 +1,9 @@
 # B3-003 — Windows Bootstrap and Host Doctor
 
-**Status:** IN_PROGRESS
+**Status:** PROVEN
 **Starts from:** `sssf-b3-002-line-ending-contract`
+**Accepted candidate:** `d5c53e871b32902ee76cd082a944afa4cdfc218d`
+**Proof date:** 2026-08-14
 
 ## Problem
 
@@ -15,7 +17,7 @@ On the Windows host:
 
 reported no executable.
 
-As a result:
+Before B3-003:
 
 `just`
 
@@ -29,17 +31,13 @@ At the same time:
 
 `just sbx manage doctor`
 
-passed.
+passed because its doctor recipe has an explicit Bash shebang and therefore bypasses the root linewise-shell setting.
 
-That difference existed because the sandbox doctor recipe has an explicit Bash shebang and therefore bypasses the root linewise-shell setting.
+## Persistent PATH finding
 
-## PATH finding
+The persistent Windows environment did not contain the two Git Bash paths required by the existing SSSF shell workflows.
 
-The persistent Windows environment does not contain the two Git Bash paths required by SSSF.
-
-The persistent user PATH contains the user-installed Python, Bun, uv/just, GitHub CLI, and other tools.
-
-The persistent machine PATH contains:
+The persistent machine PATH contained:
 
 `C:\Program Files\Git\cmd`
 
@@ -48,9 +46,9 @@ but not:
 - `C:\Program Files\Git\bin`
 - `C:\Program Files\Git\usr\bin`
 
-The pre-B3-003 interactive Command Prompt contained those Git paths repeatedly because they had been prepended manually during earlier SSSF work.
+The working Command Prompt used during earlier SSSF development contained those two paths repeatedly because they had been prepended manually.
 
-Therefore the working session was functional but not reproducible.
+The working session was therefore functional but not reproducible from persistent Windows state.
 
 ## Executable-selection finding
 
@@ -58,13 +56,13 @@ Multiple implementations or versions are simultaneously installed.
 
 Observed examples:
 
-- Git resolves from both `Git\bin` and `Git\cmd`.
-- SSH resolves from Git for Windows and Windows OpenSSH.
-- `python` resolves first to Python 3.11.
-- `python3` resolves through WindowsApps to Python 3.13.
+- Git resolves from both `Git\bin` and `Git\cmd` after bootstrap.
+- SSH exists as both Git for Windows OpenSSH and Windows OpenSSH.
+- `python` resolves to Python 3.11.
+- `python3` resolves to Python 3.13 through WindowsApps.
 - zsh is absent.
 
-SSSF must not depend on accidental PATH ordering when several acceptable or incompatible executables coexist.
+SSSF must not depend on accidental PATH ordering when multiple implementations coexist.
 
 ## Desired outcome
 
@@ -98,9 +96,11 @@ for linewise recipes in:
 - the root justfile;
 - `just/local.just`.
 
-The first Windows implementation retained `set positional-arguments` in those files.
+Recipes with explicit shebangs continue to bypass the linewise-shell setting.
 
-That caused the nested listing recipes to receive `default` as an unwanted positional argument, producing:
+The first Windows implementation retained `set positional-arguments` in the root and local modules.
+
+That caused nested listing recipes to receive `default` as an unwanted positional argument, producing:
 
 `justfile does not contain submodule default`
 
@@ -112,11 +112,11 @@ The root and local modules do not require positional arguments themselves, so th
 
 The ADW module retains its own independent positional-argument contract.
 
-After that correction:
+After correction:
 
 `just`
 
-listed all six root namespaces successfully.
+listed the root namespaces successfully.
 
 `just local`
 
@@ -134,9 +134,7 @@ continued to report no executable.
 
 Therefore zsh is no longer a Windows front-door dependency.
 
-Recipes with explicit shebangs continue to bypass the linewise-shell setting.
-
-The `ipi` local recipe remains Unix-only because the existing contract defines it as a zsh function rather than a Windows executable.
+The `ipi` local recipe remains Unix-only because the current contract defines it as a zsh function rather than a Windows executable.
 
 ## Bootstrap contract
 
@@ -147,115 +145,15 @@ The Windows bootstrap entrypoint is:
 It:
 
 1. resolves the repository root from its own location;
-2. requires an already-installed compatible Python;
+2. requires an already-installed Python command;
 3. asks deterministic Python code to construct the session PATH;
 4. deduplicates PATH entries case-insensitively;
 5. prepends the discovered Git for Windows `bin` and `usr\bin`;
-6. ensures `.local\bin` and `.bun\bin` are available when present;
+6. ensures `.local\bin` and `.bun\bin` are present when those directories exist;
 7. changes only the current Command Prompt environment;
 8. exports `SSSF_ROOT` for that session;
 9. runs the host doctor;
 10. reports the session ready only if required checks pass.
-
-## First bootstrap proof
-
-The bootstrap was run against the deliberately duplicated working-session PATH.
-
-The host doctor reported:
-
-- Windows host: PASS
-- repository checkout: PASS
-- Git for Windows root: PASS
-- PATH uniqueness: PASS
-- Git `bin` present: PASS
-- Git `usr\bin` present: PASS
-- Git: PASS
-- Bash/sh: PASS
-- cygpath: PASS
-- Git SSH: PASS
-- Python: PASS
-- python3: PASS
-- Bun: PASS
-- uv: PASS
-- just: PASS
-- GitHub CLI: PASS
-- Git Bash selection: PASS
-- cygpath selection: PASS
-- SSH selection: PASS
-- Python compatibility: PASS
-- python3 compatibility: PASS
-- just compatibility: PASS
-- canonical origin: PASS
-- B3-002 line-ending contract: PASS
-- root `just` front door: PASS
-- `just local` front door: PASS
-- effective `exe.dev` SSH config: PASS
-- effective synthetic `*.exe.xyz` SSH config: PASS
-
-External sqlite3 was reported as a non-fatal warning.
-
-zsh was reported absent and non-required on Windows.
-
-The host doctor result was:
-
-`SSSF Windows host doctor: OK`
-
-The bootstrap then reported:
-
-`SSSF Windows session ready.`
-
-## PATH normalization proof
-
-After bootstrap:
-
-- Git `bin` count = 1
-- Git `usr\bin` count = 1
-- all PATH entries were unique
-
-The effective executable order was:
-
-- Git from `C:\Program Files\Git\bin`
-- Bash from `C:\Program Files\Git\bin`
-- cygpath from `C:\Program Files\Git\usr\bin`
-- SSH from `C:\Program Files\Git\usr\bin`
-
-Windows OpenSSH remained installed but no longer won resolution precedence.
-
-## Idempotence proof
-
-The PATH after the first successful bootstrap was captured.
-
-The bootstrap was then run a second time with:
-
-`--sandbox`
-
-The second host doctor again passed.
-
-The composed sandbox doctor reported:
-
-`sbx doctor: OK`
-
-The PATH after the second bootstrap was byte-for-byte identical to the PATH after the first bootstrap.
-
-Observed result:
-
-`PASS: bootstrap PATH idempotent`
-
-## Persistent-state proof
-
-The post-bootstrap HKCU PATH was re-read from the Windows registry.
-
-It remained the previously observed persistent user PATH and was not rewritten by B3-003.
-
-The post-bootstrap HKLM PATH is independently re-checked before the B3-003 candidate commit.
-
-B3-003 does not intentionally write:
-
-- `HKCU\Environment\Path`
-- machine PATH
-- Git global configuration
-- SSH private keys
-- permanent shell aliases
 
 ## Host-doctor contract
 
@@ -305,9 +203,188 @@ When requested, it additionally runs:
 
 `just sbx manage doctor`
 
-This retains the existing sandbox-specific checks rather than duplicating them.
+This composes the existing sandbox-specific checks rather than duplicating them.
 
-The composed sandbox doctor passed during the B3-003 bootstrap proof.
+## Pre-candidate bootstrap proof
+
+The bootstrap was first run against the deliberately duplicated working-session PATH.
+
+The host doctor passed all required checks.
+
+After bootstrap:
+
+- Git `bin` count = 1
+- Git `usr\bin` count = 1
+- every PATH entry was unique
+- Git resolved from `C:\Program Files\Git\bin`
+- Bash resolved from `C:\Program Files\Git\bin`
+- cygpath resolved from `C:\Program Files\Git\usr\bin`
+- SSH resolved first from `C:\Program Files\Git\usr\bin`
+
+The bootstrap was then run a second time with:
+
+`--sandbox`
+
+The composed sandbox doctor passed.
+
+The PATH after the second bootstrap was byte-for-byte identical to the PATH after the first bootstrap.
+
+Observed result:
+
+`PASS: bootstrap PATH idempotent`
+
+## Persistent-state boundary proof
+
+After bootstrap, the persistent HKCU PATH remained unchanged.
+
+The persistent HKLM PATH also remained unchanged.
+
+HKLM continued to contain:
+
+`C:\Program Files\Git\cmd`
+
+and did not gain persistent:
+
+- `C:\Program Files\Git\bin`
+- `C:\Program Files\Git\usr\bin`
+
+B3-003 therefore changes the current Command Prompt session only.
+
+It does not write:
+
+- `HKCU\Environment\Path`
+- machine PATH
+- Git global configuration
+- SSH private keys
+- permanent shell aliases
+
+## Candidate commit
+
+The exact implementation candidate is:
+
+`d5c53e871b32902ee76cd082a944afa4cdfc218d`
+
+The candidate contains:
+
+- `bin/sssf-windows.cmd`
+- `tools/windows_host.py`
+- Windows/Unix shell selection in `justfile`
+- Windows/Unix shell selection in `just/local.just`
+- this increment record
+
+Before commit:
+
+`git diff --cached --check`
+
+passed.
+
+After commit:
+
+`git show --check --oneline HEAD`
+
+passed.
+
+The candidate was pushed to:
+
+`increment/b3-003-windows-bootstrap-host-doctor`
+
+Local and remote branch SHAs both resolved to:
+
+`d5c53e871b32902ee76cd082a944afa4cdfc218d`
+
+## Fresh Command Prompt exact-candidate proof
+
+A genuinely new Windows Command Prompt was opened from persistent Windows state rather than from the already-bootstrapped SSSF session.
+
+Before bootstrap:
+
+`git rev-parse HEAD`
+
+reported:
+
+`d5c53e871b32902ee76cd082a944afa4cdfc218d`
+
+The working tree was clean.
+
+The new Command Prompt PATH contained neither:
+
+- `C:\Program Files\Git\bin`
+- `C:\Program Files\Git\usr\bin`
+
+Before bootstrap:
+
+`where sh`
+
+reported no executable.
+
+`where cygpath`
+
+reported no executable.
+
+`where ssh`
+
+resolved only:
+
+`C:\Windows\System32\OpenSSH\ssh.exe`
+
+`where zsh`
+
+reported no executable.
+
+Despite zsh being absent and Git Bash not yet being on PATH:
+
+`just`
+
+worked.
+
+`just local`
+
+worked.
+
+This independently proved the new Windows-native just front doors.
+
+## Exact committed bootstrap reconstruction proof
+
+From that same fresh Command Prompt:
+
+`bin\sssf-windows.cmd --sandbox`
+
+was run against candidate:
+
+`d5c53e871b32902ee76cd082a944afa4cdfc218d`
+
+The host doctor passed.
+
+The composed sandbox doctor reported:
+
+`sbx doctor: OK`
+
+The bootstrap reported:
+
+`SSSF Windows host doctor: OK`
+
+and:
+
+`SSSF Windows session ready.`
+
+After bootstrap:
+
+- Git `bin` count = 1
+- Git `usr\bin` count = 1
+- all PATH entries were unique
+
+Executable resolution then showed:
+
+- `sh` from `C:\Program Files\Git\bin`
+- `cygpath` from `C:\Program Files\Git\usr\bin`
+- SSH first from `C:\Program Files\Git\usr\bin`
+- Windows OpenSSH still installed as the secondary SSH implementation
+
+zsh remained absent.
+
+The working tree remained clean.
+
+This proves that the committed repository bootstrap reconstructs the required SSSF Windows session from persistent host state rather than relying on prior manual PATH edits.
 
 ## Line-ending boundary
 
@@ -319,9 +396,23 @@ B3-003 does not weaken that policy.
 
 The B3-002 line-ending validator passed after the Windows shell and bootstrap changes.
 
-The new `.cmd` bootstrap remains governed by the repository LF policy because actual Windows execution succeeded with that representation.
+The `.cmd` bootstrap executed successfully under the repository LF policy.
 
 No CRLF exception was required.
+
+## Known remaining portability gap
+
+External sqlite3 remains absent.
+
+The host doctor reports that condition as:
+
+`WARN`
+
+rather than failure.
+
+B3-004 owns removal of the external sqlite3 dependency from Windows host observability.
+
+The final fresh-clone/mount/teardown integration proof remains B3-005 scope.
 
 ## Non-goals
 
@@ -347,23 +438,31 @@ No CRLF exception was required.
 8. `cygpath` resolves from Git `usr\bin`.
 9. SSH resolves to Git for Windows rather than Windows OpenSSH after bootstrap.
 10. Python and python3 both satisfy the declared compatibility floor.
-11. just satisfies the compatibility floor required by the conditional shell settings.
+11. just satisfies the declared compatibility floor.
 12. Bun, uv, just, GitHub CLI, and Git resolve.
 13. Effective SSH policy for `exe.dev` and a synthetic `*.exe.xyz` host passes.
 14. The B3-002 line-ending validator passes.
 15. External sqlite3 absence is non-fatal and remains assigned to B3-004.
-16. `--sandbox` composes and passes the existing sandbox doctor on the proven host.
-17. Persistent user and machine PATH values are unchanged.
+16. `--sandbox` composes and passes the existing sandbox doctor.
+17. Persistent user and machine PATH values remain unchanged.
 18. `git diff --check` passes.
 19. Python source compiles.
 20. B3-002 remains frozen at `8df2a9bc535bc8f5be50742053dc6ebf520c54ee`.
+21. A fresh Command Prompt begins without Git Bash paths and successfully reconstructs them using the committed bootstrap.
+22. The exact committed and remotely published candidate is the one used for the fresh Command Prompt proof.
 
-## Evidence
-
-Pre-candidate Windows execution proof: PASS.
-
-Candidate commit and exact-candidate Windows proof: pending.
+All B3-003 acceptance criteria are satisfied.
 
 ## Result
 
-Pending exact candidate proof.
+B3-003 establishes a repository-owned Windows bootstrap and host-doctor contract.
+
+Windows SSSF no longer requires manual Git PATH prepending or a local zsh installation merely to use the root and local front doors.
+
+A fresh Command Prompt beginning from persistent Windows PATH successfully reconstructed the required Git Bash, cygpath, Git SSH, toolchain, line-ending, repository, and sandbox prerequisites using the exact committed candidate.
+
+Persistent Windows PATH state was not modified.
+
+External sqlite3 remains the next explicit Windows portability defect.
+
+**Result: PASS**

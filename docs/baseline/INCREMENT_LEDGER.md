@@ -20,6 +20,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B2-004 | PASS | B2-003 ledger closure | published ledger reconciled with proven B2-003 state without moving immutable tags |
 | B3-001 | PASS | Windows host portability baseline | host toolchain, PATH, line endings, SSH, sqlite3 gap, doctor, and follow-up increments audited |
 | B3-002 | PASS | Repository line-ending contract | `* text=auto eol=lf`; corrected candidate `090fbff`; fresh Windows checkout passed with `core.autocrlf=true` |
+| B3-003 | PASS | Windows bootstrap and host doctor | candidate `d5c53e8`; fresh CMD reconstructed deterministic PATH, Git Bash/SSH, front doors, and sandbox doctor without zsh or persistent PATH mutation |
 
 ## Future increments
 
