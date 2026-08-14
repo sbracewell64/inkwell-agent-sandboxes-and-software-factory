@@ -1,23 +1,22 @@
 set dotenv-load
-set positional-arguments
 
-# Recipes run through an INTERACTIVE zsh so the engineer's own profile is live.
-# just's default is a bare non-interactive `sh`, which never sources ~/.zshrc —
-# so any harness installed as a shell function rather than a binary on PATH
-# (`ipi`) failed with "command not found", while real binaries (`pi`, `claude`)
-# happened to work. Same principle as adw_modules/utils.operator_env: what runs
-# here should see exactly what the engineer sees.
+# Unix keeps the engineer's interactive zsh environment so shell functions
+# such as ipi remain available there.
 #
-# Two things to know: `.env` still wins over the profile (dotenv-load is applied
-# to the recipe's environment), and a recipe with its own `#!` shebang bypasses
-# this setting entirely — `kill` below runs as a bash script and only calls real
-# binaries, which is why that is fine.
+# Windows deliberately uses cmd.exe for linewise root recipes. Windows SSSF
+# must not require zsh merely to enter the factory or list its commands.
+# Recipes with their own shebang bypass this setting entirely.
+[unix]
 set shell := ["zsh", "-ic"]
+
+[windows]
+set shell := ["cmd.exe", "/d", "/c"]
 
 # Silences macOS's "Saving session..." on every interactive shell exit.
 export SHELL_SESSIONS_DISABLE := "1"
 
-# default config every run uses — override: SSSF_CONFIG=other.yaml just adw sdlc "..."  (or pass --config in args)
+# default config every run uses — override: SSSF_CONFIG=other.yaml just adw sdlc "..."
+# (or pass --config in args)
 # Still needed at root: the observability recipes below read the same roster/db.
 config := env_var_or_default("SSSF_CONFIG", "adws/adw_sssf_config/sssf.config.yaml")
 

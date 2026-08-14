@@ -2,19 +2,24 @@
 # on THIS machine.
 #
 # `just local cc` drives the factory (the ADWs in `just adw`) right here.
-# `just sbx  ...` drives sandboxes, where the factory runs on a throwaway VM.
+# `just sbx ...` drives sandboxes, where the factory runs on a throwaway VM.
 # The namespace is the answer to "where does the work happen".
 #
-# Meant to run inside a sandbox: there this is exactly how you boot an
-# orchestrator onto that sandbox's own factory.
+# A MODULE inherits NOTHING from the root justfile, so shell and working
+# directory settings are repeated deliberately.
 #
-# A MODULE inherits NOTHING from the root justfile, so the settings below are
-# repeated deliberately. `shell` matters most: `ipi` is a zsh FUNCTION, not a
-# binary, so it only resolves through an interactive zsh. Drop this line and
-# `just local ipi` fails with "command not found" while cc and pi keep working.
+# Unix preserves the original interactive-zsh behavior because ipi is a zsh
+# function in the engineer environment.
+#
+# Windows uses cmd.exe so `just local`, `just local cc`, and `just local pi`
+# do not require zsh. ipi is intentionally Unix-only.
+[unix]
 set shell := ["zsh", "-ic"]
+
+[windows]
+set shell := ["cmd.exe", "/d", "/c"]
+
 set working-directory := '..'
-set positional-arguments
 
 export SHELL_SESSIONS_DISABLE := "1"
 
@@ -30,6 +35,7 @@ cc:
 pi:
     pi "Read and Execute .claude/skills/sssf/SKILL.md"
 
-# ipi orchestrator — same posture, ipi harness
+# ipi is a zsh function rather than a Windows binary.
+[unix]
 ipi:
     ipi "Read and Execute .claude/skills/sssf/SKILL.md" --no-skills
