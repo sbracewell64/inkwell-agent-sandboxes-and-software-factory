@@ -25,7 +25,6 @@
 | Commit gate | commit created after tests passed | PASS |
 | Public HTML reflects committed change | public curl contained `Baseline proof` | PASS |
 | Visual marker visibly rendered | not observed in browser | UNRESOLVED |
-| Host `just obs sessions` | Windows host lacks external `sqlite3` | NOT PROVEN |
 | Operator-owned canonical repository | `origin` resolves to `sbracewell64/inkwell-agent-sandboxes-and-software-factory` | PASS |
 | Upstream retained as reference | upstream retained; push disabled | PASS |
 | Canonical accepted branch | local `main` tracks canonical `origin/main` | PASS |
@@ -58,8 +57,20 @@
 | B3-003 sandbox composition | `bin\sssf-windows.cmd --sandbox` composed and passed `sbx doctor` | PASS |
 | B3-003 exact candidate | local and remote branch both `d5c53e871b32902ee76cd082a944afa4cdfc218d` | PASS |
 | B3-003 fresh CMD reconstruction | persistent Windows state lacked Git Bash paths; committed bootstrap reconstructed complete required session | PASS |
-| External Windows sqlite3 | absent and non-fatal under B3-003 host doctor | ABSENT |
-| Windows host observability without sqlite3 | assigned to B3-004 | NOT PROVEN |
+| External Windows sqlite3 | `where sqlite3` reports no executable | ABSENT |
+| B3-004 stdlib SQLite helper | `tools/obs_query.py` serves trace reads through Python standard-library sqlite3 | PASS |
+| B3-004 sessions query | deterministic fixture through direct helper and real `just obs sessions` path | PASS |
+| B3-004 phases query | deterministic fixture through direct helper and real `just obs phases` path | PASS |
+| B3-004 tail query | deterministic fixture through direct helper and real `just obs tail` path | PASS |
+| B3-004 procs query | deterministic fixture through direct helper and real `just obs procs` path | PASS |
+| B3-004 live PID query | deterministic fixture returned only believed-live processes in kill order | PASS |
+| B3-004 ADW-ID parameterization | injection-shaped ADW ID returned no unrelated rows | PASS |
+| B3-004 missing DB safety | read-only query failed explicitly and did not create `sssf.db` | PASS |
+| B3-004 external sqlite3 independence | full validator passed with `--require-no-external-sqlite3` | PASS |
+| Windows host observability without sqlite3 | B3-004 deterministic fixture and Windows host-doctor contract passed | PASS |
+| B3-004 host-doctor integration | Windows doctor reported `observability query contract — B3-004 validator PASS` | PASS |
+| B3-004 corrected candidate hygiene | amended candidate `9d160bb` passed `git show --check` | PASS |
+| B3-004 exact candidate publication | local and remote branch both `9d160bb21ae15283acaca5fa98aa56587c3db414` | PASS |
 | B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual intervention | NOT PROVEN |
 
 ## Rule

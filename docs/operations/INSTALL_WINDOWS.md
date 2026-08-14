@@ -1,6 +1,6 @@
 # Windows Installation Runbook
 
-This runbook describes the supported Windows Command Prompt path after B3-003.
+This runbook describes the supported Windows Command Prompt path after B3-004.
 
 ## Repository
 

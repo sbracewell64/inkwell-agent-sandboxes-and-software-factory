@@ -1,471 +1,405 @@
-\# B3-004 — SQLite-Free Windows Host Observability
+# B3-004 — SQLite-Free Windows Host Observability
 
+**Status:** PROVEN  
+**Starts from:** `sssf-b3-003-windows-bootstrap-host-doctor`  
+**Accepted candidate:** `9d160bb21ae15283acaca5fa98aa56587c3db414`  
+**Proof date:** 2026-08-14
 
-
-\*\*Status:\*\* IN\_PROGRESS
-
-\*\*Starts from:\*\* `sssf-b3-003-windows-bootstrap-host-doctor`
-
-
-
-\## Problem
-
-
+## Problem
 
 The Windows host does not have an external `sqlite3` executable.
 
-
-
 Before B3-004:
 
-
-
 `where sqlite3`
-
-
 
 reported no executable.
 
-
-
 `just obs sessions`
 
+therefore failed because `just/obs.just` directly invoked the external sqlite3 CLI.
 
+The same external dependency existed in:
 
-therefore failed with:
+- `sessions`
+- `phases`
+- `tail`
+- `procs`
+- the live-process lookup used by `kill`
 
+`just obs rosters` remained operational because it does not query SQLite.
 
-
-`sqlite3: command not found`
-
-
-
-The same external CLI dependency existed in:
-
-
-
-\- `sessions`
-
-\- `phases`
-
-\- `tail`
-
-\- `procs`
-
-\- the live-process lookup used by `kill`
-
-
-
-The roster command remained operational because it does not query SQLite.
-
-
-
-\## Existing owned capability
-
-
+## Existing owned capability
 
 SSSF already uses Python's standard-library `sqlite3` module for its trace database.
 
+Adding a separate host SQLite executable solely for read queries would unnecessarily expand the Windows prerequisite surface.
 
+B3-004 therefore reuses the Python standard library that SSSF already depends on.
 
-Adding a second host SQLite implementation solely for read queries would unnecessarily expand the Windows prerequisite surface.
-
-
-
-B3-004 therefore reuses Python standard-library SQLite.
-
-
-
-\## Diagnostic finding
-
-
+## Diagnostic finding
 
 The canonical checkout does not normally contain:
 
-
-
-`adws/adw\_data/sssf.db`
-
-
+`adws/adw_data/sssf.db`
 
 Trace databases are runtime state and are ignored by Git.
 
-
-
-During B3-004 probing, a diagnostic call to:
-
-
+During initial B3-004 probing, a diagnostic call using ordinary:
 
 `sqlite3.connect(...)`
 
-
-
 against the missing path created an empty zero-byte database before the subsequent table query failed.
 
+The artifact was identified as:
 
+`adws/adw_data/sssf.db`
 
-That diagnostic artifact was identified and deleted before B3-004 implementation began.
+with size:
 
+`0 bytes`
 
+It was deleted before implementation began.
 
-This finding strengthens the observability contract:
+After deletion:
 
+`dir /a adws\adw_data\sssf.db*`
 
+reported:
 
-read-only inspection must never create a missing trace database.
+`File Not Found`
 
+and the Git working tree remained clean.
 
+This strengthened the B3-004 contract: an observability read must never create runtime state merely because the operator asked to inspect it.
 
-\## Desired outcome
+## Desired outcome
 
-
-
-Host observability queries must work without an external `sqlite3` executable.
-
-
+Host observability must work without an external sqlite3 executable.
 
 The replacement must:
 
+1. use Python standard-library `sqlite3`;
+2. open observability databases read-only;
+3. never create a missing DB;
+4. preserve existing query semantics;
+5. preserve pipe-delimited output;
+6. parameterize ADW IDs;
+7. permit deterministic fixture databases through `SSSF_DB`;
+8. preserve the normal runtime database location;
+9. preserve the existing `kill` PID-reuse safety behavior;
+10. make external sqlite3 optional rather than required.
 
-
-1\. use Python standard-library `sqlite3`;
-
-2\. open observability databases read-only;
-
-3\. never create a missing DB;
-
-4\. preserve the existing query semantics;
-
-5\. preserve pipe-delimited query output;
-
-6\. parameterize ADW IDs;
-
-7\. permit deterministic fixture databases through `SSSF\_DB`;
-
-8\. preserve runtime default DB location;
-
-9\. preserve the existing `kill` PID-reuse safety behavior.
-
-
-
-\## Query helper
-
-
+## Implementation
 
 B3-004 adds:
 
+`tools/obs_query.py`
 
+Supported commands are:
 
-`tools/obs\_query.py`
+- `sessions`
+- `phases ADW_ID`
+- `tail ADW_ID`
+- `procs ADW_ID`
+- `live-pids ADW_ID`
 
-
-
-Supported commands:
-
-
-
-\- `sessions`
-
-\- `phases ADW\_ID`
-
-\- `tail ADW\_ID`
-
-\- `procs ADW\_ID`
-
-\- `live-pids ADW\_ID`
-
-
-
-The helper opens SQLite using URI:
-
-
+The helper opens SQLite using a URI with:
 
 `mode=ro`
 
-
-
 and enables:
 
+`PRAGMA query_only=ON`
 
+It also applies a bounded SQLite busy timeout suitable for reading a live WAL-backed trace database.
 
-`PRAGMA query\_only=ON`
+## Database path contract
 
+The default database remains:
 
+`adws/adw_data/sssf.db`
 
-It also retains a bounded SQLite busy timeout for live WAL readers.
+The observability Just module accepts:
 
-
-
-\## Database path contract
-
-
-
-The default remains:
-
-
-
-`adws/adw\_data/sssf.db`
-
-
-
-The observability Just module also accepts:
-
-
-
-`SSSF\_DB`
-
-
+`SSSF_DB`
 
 as an override.
 
+This provides a deterministic validation seam and permits an explicitly selected runtime database without changing the normal default.
 
-
-This allows deterministic fixtures and explicit alternate runtime databases without changing normal SSSF behavior.
-
-
-
-\## Parameterization
-
-
+## Parameterization
 
 ADW-scoped queries use SQLite parameter binding:
 
+`WHERE adw_id = ?`
 
+The requested ADW ID is passed separately from SQL text.
 
-`WHERE adw\_id = ?`
+The validator supplies an injection-shaped ADW ID and requires it to return no unrelated records.
 
-
-
-rather than interpolating the requested ID into SQL text.
-
-
-
-The validator includes an injection-shaped ADW ID and requires it to return no unrelated rows.
-
-
-
-\## Missing-database contract
-
-
+## Missing-database contract
 
 A missing database must:
 
+- return non-zero;
+- report `database not found`;
+- remain absent after the command.
 
+This behavior is enforced by the read-only open path.
 
-\- return a non-zero result;
-
-\- report `database not found`;
-
-\- remain absent after the query.
-
-
-
-Observability reads must never create an empty trace DB merely because an operator asked for status.
-
-
-
-\## Just namespace migration
-
-
+## Just namespace migration
 
 B3-004 routes:
 
+- `just obs sessions`
+- `just obs phases`
+- `just obs tail`
+- `just obs procs`
 
+through:
 
-\- `just obs sessions`
-
-\- `just obs phases`
-
-\- `just obs tail`
-
-\- `just obs procs`
-
-
-
-through `tools/obs\_query.py`.
-
-
+`tools/obs_query.py`
 
 The PID lookup inside:
 
-
-
 `just obs kill`
 
+also uses the helper.
 
+The subsequent PID validation and process-kill logic is otherwise unchanged.
 
-also uses the same read-only helper.
-
-
-
-The destructive process-validation and kill behavior itself is otherwise unchanged.
-
-
-
-\## Deterministic validation
-
-
+## Deterministic validator
 
 B3-004 adds:
 
+`docs/validation/check_obs_query.py`
 
+The validator creates a disposable temporary SQLite fixture containing deterministic:
 
-`docs/validation/check\_obs\_query.py`
+- session
+- phase
+- event
+- live-process
+- ended-process
 
+records.
 
+It verifies:
 
-The validator creates a temporary fixture database containing deterministic:
+- direct Python helper queries;
+- `sessions`;
+- `phases`;
+- `tail`;
+- `procs`;
+- live PID lookup;
+- parameterized ADW-ID handling;
+- the real `just obs` recipes through `SSSF_DB`;
+- missing-database non-creation.
 
+The fixture does not enter normal runtime state.
 
+## Pre-candidate proof
 
-\- session
-
-\- phase
-
-\- event
-
-\- live-process
-
-\- ended-process
-
-
-
-rows.
-
-
-
-It verifies both:
-
-
-
-\- direct Python helper behavior;
-
-\- the real `just obs` recipes through `SSSF\_DB`.
-
-
-
-The fixture is temporary and is not placed in runtime state.
-
-
-
-\## External sqlite3 acceptance condition
-
-
-
-On the proven Windows host:
-
-
+Before the implementation candidate was committed:
 
 `where sqlite3`
 
+continued to report no executable.
 
-
-must continue to report no executable.
-
-
-
-The B3-004 validator is run with:
-
-
+The validator was run with:
 
 `--require-no-external-sqlite3`
 
+and reported:
 
+`B3-004 sqlite-free observability: PASS`
 
-and must still pass all observability query fixtures.
+with:
 
+- stdlib sqlite3 serving sessions/phases/tail/procs;
+- ADW-ID queries parameterized;
+- missing databases failing read-only without creation;
+- external sqlite3 CLI absent.
 
+`just obs sessions`
 
-\## Host doctor integration
+against the absent normal runtime DB failed explicitly with:
 
+`obs_query: database not found`
 
+Immediately afterward:
 
-The B3-003 Windows host doctor is extended to run the B3-004 observability validator.
+`dir /a adws\adw_data\sssf.db*`
 
+reported:
 
+`File Not Found`
 
-After B3-004, external sqlite3 becomes informational only.
+`just obs rosters`
 
+continued to work.
 
+The B3-002 line-ending validator passed.
 
-Its absence is no longer a portability defect.
+The Windows host doctor reported:
 
+`observability query contract — B3-004 validator PASS`
 
+and:
 
-\## Non-goals
+`external sqlite3 — absent; host observability uses Python stdlib sqlite3`
 
+The host doctor ended:
 
+`SSSF Windows host doctor: OK`
 
-\- Change trace schema.
+## First candidate hygiene rejection
 
-\- Change tracer write behavior.
+The first local candidate commit was:
 
-\- Commit a runtime trace DB.
+`1cf6c9c4198794a9181f40d442cace1793c9cd59`
 
-\- Change the observability UI.
+Its substantive B3-004 tests passed.
 
-\- Change process-kill semantics beyond its SQLite lookup.
+However, the pre-commit whitespace gate had reported:
 
-\- Replace exe.dev.
+`docs/increments/B3-004_SQLITE_FREE_OBSERVABILITY.md:472: new blank line at EOF.`
 
-\- Change ADW behavior.
+The commit was mistakenly created despite that failed hygiene gate.
 
-\- Add a third-party SQLite dependency.
+`git show --check`
 
+reproduced the same finding.
 
+The candidate had not been pushed.
 
-\## Acceptance
+It was therefore rejected before acceptance.
 
+## Corrected candidate
 
+The increment record EOF was normalized and staged.
 
-1\. `where sqlite3` reports no external executable on the proof host.
+`git diff --cached --check`
 
-2\. `just/obs.just` no longer invokes the external sqlite3 CLI.
+then passed with no output.
 
-3\. `sessions` works against the deterministic fixture.
+The unpublished candidate was amended.
 
-4\. `phases` works against the deterministic fixture.
+The corrected implementation candidate is:
 
-5\. `tail` works against the deterministic fixture.
+`9d160bb21ae15283acaca5fa98aa56587c3db414`
 
-6\. `procs` works against the deterministic fixture.
+`git show --check --oneline HEAD`
 
-7\. live PID lookup works through the Python helper.
+reported the candidate with no whitespace finding.
 
-8\. ADW-scoped queries are parameterized.
+The working tree was clean.
 
-9\. missing DB queries fail explicitly.
+## Exact-candidate proof
 
-10\. missing DB queries do not create a database.
+All core B3-004 gates were rerun against exact candidate:
 
-11\. `SSSF\_DB` overrides the default DB for deterministic testing.
+`9d160bb21ae15283acaca5fa98aa56587c3db414`
 
-12\. the default runtime DB path remains unchanged.
+Results:
 
-13\. `rosters` remains operational.
+- external sqlite3 remained absent;
+- deterministic B3-004 validator: PASS;
+- B3-002 line-ending validator: PASS;
+- Windows host doctor: PASS;
+- B3-004 observability-query contract: PASS;
+- stdlib sqlite3 selected for host observability;
+- missing normal runtime DB produced an explicit error;
+- missing DB remained absent after inspection;
+- no direct `sqlite3 ` CLI call remained in `just/obs.just`;
+- `git diff --check` passed;
+- working tree remained clean.
 
-14\. Python sources compile.
+## Remote candidate identity
 
-15\. B3-002 line-ending validation still passes.
+The corrected candidate was pushed to:
 
-16\. the Windows host doctor includes the observability contract.
+`increment/b3-004-sqlite-free-observability`
 
-17\. `git diff --check` passes.
+Local:
 
-18\. B3-003 remains frozen at `97858ca5b0e16333a0136b6d9652e501be699115`.
+`git rev-parse HEAD`
 
+resolved:
 
+`9d160bb21ae15283acaca5fa98aa56587c3db414`
 
-\## Evidence
+Remote:
 
+`git ls-remote --heads origin increment/b3-004-sqlite-free-observability`
 
+resolved the same SHA.
 
-Pending implementation validation.
+The implementation proven locally is therefore the exact implementation published remotely.
 
+## Host doctor integration
 
+The Windows host doctor now executes the B3-004 validator as part of its deterministic checks.
 
-\## Result
+The doctor reports external sqlite3 only as information.
 
+Its absence is no longer a Windows portability defect.
 
+## Documentation normalization
 
-Pending.
+The initial implementation commit contained an increment record whose Markdown characters had been escaped during editing.
+
+That formatting defect did not affect executable behavior or the exact-candidate proof.
+
+The documentation-only B3-004 closure normalizes this record to ordinary Markdown before the increment is frozen.
+
+The implementation candidate remains unchanged.
+
+## Non-goals
+
+- Change trace schema.
+- Change tracer write behavior.
+- Commit a runtime trace DB.
+- Change the observability UI.
+- Change process-kill semantics beyond its database lookup.
+- Replace exe.dev.
+- Change ADW workflow behavior.
+- Add a third-party SQLite dependency.
+
+## Acceptance
+
+1. External sqlite3 is absent on the proven Windows host.
+2. `just/obs.just` no longer invokes the external sqlite3 CLI.
+3. `sessions` passes against the deterministic fixture.
+4. `phases` passes against the deterministic fixture.
+5. `tail` passes against the deterministic fixture.
+6. `procs` passes against the deterministic fixture.
+7. live PID lookup passes through the Python helper.
+8. ADW-scoped queries are parameterized.
+9. missing DB queries fail explicitly.
+10. missing DB queries do not create a database.
+11. `SSSF_DB` overrides the default DB for deterministic validation.
+12. the normal runtime DB location is unchanged.
+13. `rosters` remains operational.
+14. Python sources compile.
+15. B3-002 line-ending validation passes.
+16. the Windows host doctor enforces the B3-004 observability contract.
+17. `git diff --check` passes.
+18. the corrected candidate itself passes `git show --check`.
+19. local and remote candidate SHAs match exactly.
+20. external sqlite3 is informational rather than a required Windows dependency.
+21. B3-003 remains frozen at `97858ca5b0e16333a0136b6d9652e501be699115`.
+22. the malformed implementation-stage Markdown is normalized only in the documentation closure.
+
+All B3-004 acceptance criteria are satisfied.
+
+## Result
+
+B3-004 removes the external sqlite3 CLI from the Windows host observability dependency surface.
+
+SSSF now uses its already-owned Python standard-library SQLite capability for host trace queries.
+
+Observability reads are explicitly read-only, missing databases cannot be silently created, ADW identifiers are parameterized, and deterministic fixture validation exercises the real Just front doors without requiring live runtime state.
+
+**Result: PASS**
