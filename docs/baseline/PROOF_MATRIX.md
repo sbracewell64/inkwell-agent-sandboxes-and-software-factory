@@ -71,9 +71,11 @@
 | B3-004 host-doctor integration | Windows doctor reported `observability query contract — B3-004 validator PASS` | PASS |
 | B3-004 corrected implementation-candidate hygiene | amended implementation candidate `9d160bb` passed `git show --check` | PASS |
 | B3-004 exact implementation-candidate publication | local and remote candidate branch both `9d160bb21ae15283acaca5fa98aa56587c3db414` before documentation closure | PASS |
-| B3-004 first published closure hygiene | closure `15bbea9` contains three trailing-whitespace violations despite failed pre-commit hygiene gates | FAILED; CORRECTION REQUIRED |
-| B3-004 original closure tag immutability | `sssf-b3-004-sqlite-free-observability` remains fixed at the originally published closure and will not be moved | PASS |
-| B3-004-H1 clean closure correction | separate correction commit/tag must pass `git diff --check` and `git show --check` | NOT PROVEN |
+| B3-004 first published closure hygiene | closure `15bbea9` contains three trailing-whitespace violations despite failed pre-commit hygiene gates | FAILED; CORRECTED BY B3-004-H1 |
+| B3-004 original closure tag immutability | `sssf-b3-004-sqlite-free-observability` remains fixed at `15bbea9bbf94d4b1491da47d9032707af77c2b04` and was not moved | PASS |
+| B3-004-H1 correction candidate hygiene | candidate `1b892ab084bc4785c6f31f8999b586534d9e477b` passed both staged `git diff --cached --check` and committed `git show --check` | PASS |
+| B3-004-H1 correction isolation | only ledger, proof matrix, and B3-004 increment record differ from flawed closure `15bbea9` | PASS |
+| B3-004-H1 clean closure correction | original B3-004 tag preserved; separate correction state establishes the clean base for subsequent B3 work | PASS |
 | B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual intervention | NOT PROVEN |
 
 ## Rule

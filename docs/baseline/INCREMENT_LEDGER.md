@@ -22,7 +22,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B3-002 | PASS | Repository line-ending contract | `* text=auto eol=lf`; corrected candidate `090fbff`; fresh Windows checkout passed with `core.autocrlf=true` |
 | B3-003 | PASS | Windows bootstrap and host doctor | candidate `d5c53e8`; fresh CMD reconstructed deterministic PATH, Git Bash/SSH, front doors, and sandbox doctor without zsh or persistent PATH mutation |
 | B3-004 | PASS | SQLite-free Windows host observability | implementation candidate `9d160bb` passed runtime/validator proof without external sqlite3; first published closure `15bbea9` later found to contain three trailing-whitespace violations |
-| B3-004-H1 | IN_PROGRESS | Post-freeze B3-004 closure hygiene correction | preserve immutable original B3-004 tag; remove closure-only trailing whitespace and establish a clean correction tag |
+| B3-004-H1 | PASS | Post-freeze B3-004 closure hygiene correction | candidate `1b892ab` passed staged and committed whitespace gates; original B3-004 tag preserved; clean correction state frozen separately |
 
 ## Future increments
 

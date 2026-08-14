@@ -386,7 +386,45 @@ is immutable and is not moved or deleted.
 
 It therefore remains the durable historical record of the first published B3-004 closure, including its documentation-hygiene defect.
 
-A subsequent correction removes only that trailing whitespace, records this incident explicitly, and is frozen under the separate tag:
+A subsequent correction removed the trailing whitespace and recorded this incident explicitly.
+
+The correction candidate is:
+
+`1b892ab084bc4785c6f31f8999b586534d9e477b`
+
+Before that candidate was committed:
+
+`git diff --cached --check`
+
+passed with no findings.
+
+Against the exact committed candidate:
+
+`git show --check --oneline HEAD`
+
+also passed with no findings.
+
+The working tree was clean.
+
+A comparison from the flawed published closure:
+
+`15bbea9bbf94d4b1491da47d9032707af77c2b04`
+
+to the correction candidate changed only:
+
+- `docs/baseline/INCREMENT_LEDGER.md`
+- `docs/baseline/PROOF_MATRIX.md`
+- `docs/increments/B3-004_SQLITE_FREE_OBSERVABILITY.md`
+
+The original tag:
+
+`sssf-b3-004-sqlite-free-observability`
+
+remained unchanged at:
+
+`15bbea9bbf94d4b1491da47d9032707af77c2b04`
+
+The clean correction state is frozen separately under:
 
 `sssf-b3-004-closure-hygiene-correction`
 
@@ -396,8 +434,7 @@ The executable B3-004 implementation candidate remains:
 
 No B3-004 runtime behavior is changed by the hygiene correction.
 
-The clean correction state, rather than the original closure tag, is the base for subsequent B3 work.
-
+The clean correction state, rather than the original flawed closure tag, is the base for subsequent B3 work.
 ## Non-goals
 
 - Change trace schema.
