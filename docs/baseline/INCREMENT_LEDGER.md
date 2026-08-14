@@ -19,6 +19,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B2-003 | PASS | Proof record hygiene | B2-002 closure evidence corrected; immutable B2-002 tag preserved |
 | B2-004 | PASS | B2-003 ledger closure | published ledger reconciled with proven B2-003 state without moving immutable tags |
 | B3-001 | PASS | Windows host portability baseline | host toolchain, PATH, line endings, SSH, sqlite3 gap, doctor, and follow-up increments audited |
+| B3-002 | PASS | Repository line-ending contract | `* text=auto eol=lf`; corrected candidate `090fbff`; fresh Windows checkout passed with `core.autocrlf=true` |
 
 ## Future increments
 

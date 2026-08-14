@@ -1,17 +1,19 @@
 # B3-002 — Repository Line-Ending Contract
 
-**Status:** IN_PROGRESS
+**Status:** PROVEN
 **Starts from:** `sssf-b3-001-windows-portability-baseline`
+**Accepted candidate:** `090fbfffda88b9c0d17f63e663c83a1e0979a606`
+**Proof date:** 2026-08-14
 
 ## Problem
 
 B3-001 proved that the repository did not own its line-ending behavior.
 
-The Windows host has:
+The Windows host had:
 
 `core.autocrlf=true`
 
-and the repository previously had no `.gitattributes`.
+while the repository had no `.gitattributes`.
 
 The Git index already stored representative source files as LF, but the Windows working tree materialized many tracked text files as CRLF.
 
@@ -23,7 +25,7 @@ Execution-sensitive source therefore depended on operator-level Git configuratio
 
 Make line-ending behavior deterministic from repository state.
 
-All files Git classifies as text should:
+All files Git classifies as text must:
 
 - be normalized as LF in the index;
 - be checked out as LF on every platform;
@@ -31,9 +33,9 @@ All files Git classifies as text should:
 
 Binary files remain subject to Git's normal binary detection rather than being forced through text conversion.
 
-## Policy
+## Repository policy
 
-The repository-owned policy is:
+B3-002 establishes:
 
 `* text=auto eol=lf`
 
@@ -46,9 +48,7 @@ Meaning:
 
 ## Why the policy is repository-wide
 
-The B3-001/B3-002 inventory found CRLF working-tree materialization across far more than shell files.
-
-Affected text classes included:
+The B3 inventory found CRLF working-tree materialization across many text classes, including:
 
 - `.just`
 - `.sh`
@@ -61,9 +61,9 @@ Affected text classes included:
 - `.html`
 - other text assets
 
-Limiting the policy only to shell files would preserve the underlying portability ambiguity for the rest of the repository.
+Limiting the policy only to shell files would leave the underlying portability ambiguity in the remainder of the repository.
 
-A single repository-wide text rule is smaller and more deterministic than maintaining a growing extension list.
+The repository-wide text rule is smaller and more deterministic than maintaining a growing extension list.
 
 ## Windows-native scripts
 
@@ -75,25 +75,25 @@ At B3-002 start, the repository contained no tracked:
 
 files.
 
-No CRLF exception is introduced speculatively.
+No CRLF exception was introduced speculatively.
 
-If a future Windows-native file genuinely requires CRLF, that requirement must be added explicitly and proven when the file is introduced.
+If a future Windows-native file genuinely requires CRLF, that requirement must be introduced explicitly and proven with that file.
 
 ## Existing defensive runtime handling
 
 B3-002 does not remove the previously proven CR-stripping protection in the sandbox lifecycle.
 
-Repository line-ending policy prevents one source of CRLF materialization, but the defensive runtime normalization protects a separate process-boundary condition.
+Repository line-ending policy prevents one source of CRLF materialization, while the existing defensive normalization protects a separate process-boundary condition.
 
-Removing it would require independent evidence and is outside this increment.
+Removing that defensive handling would require independent evidence and is outside B3-002.
 
 ## Implementation
 
 B3-002 adds:
 
-- repository-root `.gitattributes`;
-- `docs/validation/check_line_endings.py`;
-- this increment record.
+- `.gitattributes`
+- `docs/validation/check_line_endings.py`
+- this increment record
 
 The validator checks:
 
@@ -104,89 +104,165 @@ The validator checks:
 
 ## Renormalization proof
 
-Before the candidate commit:
+Before the first candidate commit:
 
 `git add --renormalize .`
 
 produced no modifications to existing tracked files.
 
-This proves the existing Git index was already normalized and the new policy did not create a mass source rewrite.
+The only changes remained the three newly introduced B3-002 files.
+
+This proved that the existing Git index was already normalized to LF and that introducing the repository policy did not create an unrelated mass source rewrite.
 
 ## First candidate
 
-The first candidate commit was:
+The first candidate was:
 
 `51dd23c01328a013aa6df3ed8bfcde170d377632`
 
-The line-ending behavior itself passed a fresh Windows checkout proof with:
+Its semantic line-ending behavior passed a fresh Windows checkout proof with:
 
 `core.autocrlf=true`
 
-Observed representative files reported:
+Representative execution-sensitive files reported:
 
 `i/lf w/lf attr/text=auto eol=lf`
 
 and the fresh checkout was clean.
 
-However, that candidate is not accepted as the final B3-002 closure candidate because its staged hygiene gate reported:
+However, the candidate was not accepted because:
+
+`git diff --cached --check`
+
+had reported:
 
 `docs/increments/B3-002_LINE_ENDING_CONTRACT.md:306: new blank line at EOF.`
 
-The commit was made despite that failed check.
+The commit was made despite that failed hygiene gate.
 
-Inspection also showed that the Markdown record had been saved with escaped Markdown syntax and excessive blank lines.
+Inspection also showed that the Markdown increment record contained escaped Markdown syntax and excessive blank lines.
 
-Because B3-002 had not been tagged or advanced to canonical `main`, these candidate-artifact defects are being corrected within B3-002 rather than hidden or repaired in a later increment.
+B3-002 had not been tagged and had not been advanced to canonical `main`, so these candidate-artifact defects were corrected inside the still-open increment.
 
-The first candidate remains part of Git history and remains useful evidence that the semantic line-ending policy worked.
+The failed first candidate remains in Git history and remains recorded here rather than being hidden.
 
-## Corrected candidate strategy
+## Corrected candidate
 
-After correcting the candidate artifacts:
+The corrected candidate is:
 
-1. `git diff --check` must pass before commit.
-2. The validator must pass.
-3. The corrected candidate must be committed and pushed.
-4. A second fresh Windows checkout must be made with `core.autocrlf=true`.
-5. The strict validator must require LF working-tree state.
-6. Representative execution-sensitive files must report `i/lf` and `w/lf`.
-7. The second fresh checkout must be clean.
+`090fbfffda88b9c0d17f63e663c83a1e0979a606`
 
-The corrected candidate SHA will become the final runtime-independent proof target for B3-002.
+Before committing the correction:
 
-## Non-goals
+`git diff --cached --check`
 
-- Change runtime semantics.
-- Rewrite unrelated source files.
-- Remove existing CR defensive handling.
-- Modify the user's global Git configuration.
-- Add Windows bootstrap behavior.
-- Fix host observability.
-- Replace exe.dev.
-- Introduce Windows-native scripts.
-- Add speculative CRLF exceptions.
+passed.
+
+After committing:
+
+`git show --check --oneline HEAD`
+
+reported no whitespace defect.
+
+The corrected candidate was pushed to:
+
+`increment/b3-002-line-ending-contract`
+
+Remote and local candidate SHAs both resolved to:
+
+`090fbfffda88b9c0d17f63e663c83a1e0979a606`
+
+## Independent fresh Windows checkout proof
+
+A second, separate checkout was cloned from the corrected candidate into:
+
+`E:\SSSF-B3-002-PROOF-2`
+
+The proof checkout was explicitly configured with:
+
+`core.autocrlf=true`
+
+The proof checkout HEAD resolved to:
+
+`090fbfffda88b9c0d17f63e663c83a1e0979a606`
+
+The strict validator was run:
+
+`python docs\validation\check_line_endings.py --require-worktree-lf`
+
+Result:
+
+`B3-002 line-ending contract: PASS`
+
+It additionally reported:
+
+- representative tracked text files have LF index state;
+- representative working-tree files are LF;
+- observed `core.autocrlf: true`.
+
+Independent `git ls-files --eol` inspection showed:
+
+`just/sandbox/lifecycle/fill.just`
+
+`i/lf w/lf attr/text=auto eol=lf`
+
+`just/sandbox/lifecycle/setup.just`
+
+`i/lf w/lf attr/text=auto eol=lf`
+
+`justfile`
+
+`i/lf w/lf attr/text=auto eol=lf`
+
+`sandbox_mount/guest/provision.sh`
+
+`i/lf w/lf attr/text=auto eol=lf`
+
+`sandbox_mount/host/run_record.py`
+
+`i/lf w/lf attr/text=auto eol=lf`
+
+`git status --short`
+
+produced no output in the second proof checkout.
+
+## Global configuration boundary
+
+B3-002 did not modify the user's global Git configuration.
+
+The fresh proof clone used a clone-local:
+
+`core.autocrlf=true`
+
+setting to prove that repository-owned attributes override the hostile Windows default.
 
 ## Acceptance
 
 1. `.gitattributes` defines `* text=auto eol=lf`.
 2. Representative `.just`, `.sh`, `.py`, and documentation files resolve `text=auto` and `eol=lf`.
 3. Existing representative index content remains LF.
-4. Renormalization produces no unrelated mass source diff.
-5. A fresh Windows checkout made with `core.autocrlf=true` materializes representative text files as LF.
-6. The fresh checkout is clean.
-7. Existing lifecycle compatibility protections remain present.
-8. No global Git configuration is modified.
-9. `git diff --check` passes before the corrected candidate is committed.
-10. Documentation and validator source are valid UTF-8.
-11. B3-001's immutable tag remains unchanged.
-12. The failed hygiene check on the first candidate remains explicitly recorded.
+4. Renormalization produced no unrelated mass source diff.
+5. A fresh Windows checkout with `core.autocrlf=true` materialized representative text files as LF.
+6. The fresh checkout was clean.
+7. Existing lifecycle compatibility protections remained unchanged.
+8. No global Git configuration was modified.
+9. The corrected candidate passed its whitespace gate before commit.
+10. Documentation and validator source validated as UTF-8.
+11. B3-001 remained frozen at `c46c7ba37b94b1926f2d7e4633f66bc305f1c84b`.
+12. The failed hygiene gate on the first candidate remains explicitly recorded.
 
-## Evidence
-
-Semantic line-ending policy proof: PASS on first candidate.
-
-Corrected candidate hygiene and second fresh-checkout proof: pending.
+All B3-002 acceptance criteria are satisfied.
 
 ## Result
 
-Pending corrected candidate proof.
+B3-002 establishes a repository-owned line-ending contract.
+
+Windows checkout behavior for text source is no longer determined by the operator's global `core.autocrlf` setting.
+
+The corrected candidate was independently proven in a fresh Windows checkout with `core.autocrlf=true`, while representative execution-sensitive files remained LF in both the index and working tree.
+
+No existing source file required a content rewrite to establish the policy.
+
+The original defensive Windows lifecycle protections remain intact.
+
+**Result: PASS**

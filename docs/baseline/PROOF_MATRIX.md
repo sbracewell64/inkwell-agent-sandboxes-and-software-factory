@@ -40,7 +40,12 @@
 | Windows `cygpath` availability | `cygpath` resolves from `C:\Program Files\Git\usr\bin` | PASS |
 | Windows required PATH reachability | Git `bin`, Git `usr\bin`, `.local\bin`, and `.bun\bin` are reachable | PASS |
 | Windows PATH reproducibility | Git paths are duplicated and currently depend on manually assembled environment state | NOT PROVEN |
-| Windows line-ending policy | `core.autocrlf=true`, no `.gitattributes`, execution-sensitive `.just` files observed as working-tree CRLF | NOT PROVEN |
+| Repository-owned line-ending policy | `.gitattributes` defines `* text=auto eol=lf` | PASS |
+| Line-ending renormalization safety | `git add --renormalize .` produced no modifications to existing tracked files | PASS |
+| Fresh Windows LF checkout | corrected candidate `090fbff` cloned with `core.autocrlf=true`; representative text files were `i/lf w/lf` | PASS |
+| B3-002 strict validator | `check_line_endings.py --require-worktree-lf` passed in fresh checkout | PASS |
+| B3-002 first candidate hygiene | first candidate passed semantic proof but failed staged whitespace hygiene and had malformed Markdown | CORRECTED BEFORE ACCEPTANCE |
+| B3-002 corrected candidate hygiene | corrected candidate passed `git diff --cached --check` and `git show --check` | PASS |
 | exe.dev effective SSH policy | dedicated identity, `IdentitiesOnly yes`, and `StrictHostKeyChecking accept-new` apply to `exe.dev` | PASS |
 | Dynamic sandbox SSH wildcard | same effective SSH policy applies to synthetic `*.exe.xyz` hostname | PASS |
 | Windows SSH implementation selection | Git OpenSSH currently wins PATH precedence over Windows OpenSSH | OBSERVED |
