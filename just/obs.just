@@ -2,10 +2,14 @@
 #
 # A MODULE, not an import: it inherits nothing, so it declares its own settings.
 # working-directory points at the repo root because every query below is a path
-# relative to it. This namespace is meant to work INSIDE a sandbox too — reading your
-# own traces is exactly what you want inside a sandbox.
+# relative to it. This namespace is meant to work INSIDE a sandbox too — reading
+# your own traces is exactly what you want inside a sandbox.
 set working-directory := '..'
 set positional-arguments
+
+# Runtime DB location. The normal trace DB remains the default; SSSF_DB allows
+# deterministic fixture/proof databases and explicit alternate runtime paths.
+db := env_var_or_default("SSSF_DB", "adws/adw_data/sssf.db")
 
 # list the observability commands
 default:
@@ -33,27 +37,27 @@ rosters:
 
 # recent sessions
 sessions:
-    sqlite3 adws/adw_data/sssf.db "select adw_id, status, substr(request,1,60), total_tokens, round(total_cost,4) from sessions order by started_at desc limit 10;"
+    @python tools/obs_query.py --db "{{db}}" sessions
 
 # phases for one adw: just obs phases <adw_id>
 phases ADW_ID:
-    sqlite3 adws/adw_data/sssf.db "select seq, name, kind, owner, status, attempt from phases where adw_id='{{ADW_ID}}' order by seq;"
+    @python tools/obs_query.py --db "{{db}}" phases "{{ADW_ID}}"
 
 # live event tail for one adw: just obs tail <adw_id>
 tail ADW_ID:
-    sqlite3 adws/adw_data/sssf.db "select rowid, type, name, started_at from events where adw_id='{{ADW_ID}}' order by rowid desc limit 25;"
+    @python tools/obs_query.py --db "{{db}}" tail "{{ADW_ID}}"
 
 # what a run is running right now: just obs procs <adw_id>
 procs ADW_ID:
-    sqlite3 adws/adw_data/sssf.db "select kind, name, pid, command, started_at from processes where adw_id='{{ADW_ID}}' and ended_at is null order by id;"
+    @python tools/obs_query.py --db "{{db}}" procs "{{ADW_ID}}"
 
 # Verifies each pid still looks like the thing we recorded; pids get recycled.
 
 # stop a stuck run — children first, then the workflow
 kill ADW_ID:
     #!/usr/bin/env bash
-    set -uo pipefail
-    rows=$(sqlite3 adws/adw_data/sssf.db "select kind||' '||pid from processes where adw_id='{{ADW_ID}}' and ended_at is null order by case kind when 'agent' then 0 else 1 end, id desc;")
+    set -euo pipefail
+    rows=$(python tools/obs_query.py --db "{{db}}" live-pids "{{ADW_ID}}")
     [ -z "$rows" ] && { echo "no live processes recorded for {{ADW_ID}}"; exit 0; }
     while read -r kind pid; do
         [ -z "${pid:-}" ] && continue

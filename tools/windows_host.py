@@ -656,6 +656,25 @@ def doctor(
             "B3-002 validator PASS",
         )
 
+    obs_query = run(
+        [
+            sys.executable,
+            "docs/validation/"
+            "check_obs_query.py",
+        ]
+    )
+
+    if obs_query.returncode != 0:
+        d.fail(
+            "observability query contract",
+            obs_query.stdout.strip(),
+        )
+    else:
+        d.ok(
+            "observability query contract",
+            "B3-004 validator PASS",
+        )
+
     root_front = run(
         ["just"]
     )
@@ -699,17 +718,25 @@ def doctor(
         "b3-host-probe.exe.xyz",
     )
 
-    if shutil.which("sqlite3"):
+    external_sqlite = shutil.which(
+        "sqlite3"
+    )
+
+    if external_sqlite:
         d.info(
             "external sqlite3",
-            shutil.which("sqlite3")
-            or "",
+            (
+                f"{external_sqlite}; "
+                "optional after B3-004"
+            ),
         )
     else:
-        d.warn(
+        d.info(
             "external sqlite3",
-            "absent; non-fatal until "
-            "B3-004 removes the dependency",
+            (
+                "absent; host observability "
+                "uses Python stdlib sqlite3"
+            ),
         )
 
     if shutil.which("zsh"):
