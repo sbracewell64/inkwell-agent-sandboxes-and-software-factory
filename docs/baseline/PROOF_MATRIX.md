@@ -69,8 +69,11 @@
 | B3-004 external sqlite3 independence | full validator passed with `--require-no-external-sqlite3` | PASS |
 | Windows host observability without sqlite3 | B3-004 deterministic fixture and Windows host-doctor contract passed | PASS |
 | B3-004 host-doctor integration | Windows doctor reported `observability query contract — B3-004 validator PASS` | PASS |
-| B3-004 corrected candidate hygiene | amended candidate `9d160bb` passed `git show --check` | PASS |
-| B3-004 exact candidate publication | local and remote branch both `9d160bb21ae15283acaca5fa98aa56587c3db414` | PASS |
+| B3-004 corrected implementation-candidate hygiene | amended implementation candidate `9d160bb` passed `git show --check` | PASS |
+| B3-004 exact implementation-candidate publication | local and remote candidate branch both `9d160bb21ae15283acaca5fa98aa56587c3db414` before documentation closure | PASS |
+| B3-004 first published closure hygiene | closure `15bbea9` contains three trailing-whitespace violations despite failed pre-commit hygiene gates | FAILED; CORRECTION REQUIRED |
+| B3-004 original closure tag immutability | `sssf-b3-004-sqlite-free-observability` remains fixed at the originally published closure and will not be moved | PASS |
+| B3-004-H1 clean closure correction | separate correction commit/tag must pass `git diff --check` and `git show --check` | NOT PROVEN |
 | B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual intervention | NOT PROVEN |
 
 ## Rule

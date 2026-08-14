@@ -1,8 +1,8 @@
 # B3-004 — SQLite-Free Windows Host Observability
 
-**Status:** PROVEN  
-**Starts from:** `sssf-b3-003-windows-bootstrap-host-doctor`  
-**Accepted candidate:** `9d160bb21ae15283acaca5fa98aa56587c3db414`  
+**Status:** PROVEN
+**Starts from:** `sssf-b3-003-windows-bootstrap-host-doctor`
+**Accepted candidate:** `9d160bb21ae15283acaca5fa98aa56587c3db414`
 **Proof date:** 2026-08-14
 
 ## Problem
@@ -352,9 +352,51 @@ The initial implementation commit contained an increment record whose Markdown c
 
 That formatting defect did not affect executable behavior or the exact-candidate proof.
 
-The documentation-only B3-004 closure normalizes this record to ordinary Markdown before the increment is frozen.
+The documentation-only B3-004 closure normalized this record to ordinary Markdown.
 
-The implementation candidate remains unchanged.
+The implementation candidate remained unchanged.
+
+## Post-freeze closure-hygiene incident
+
+The first published B3-004 closure commit was:
+
+`15bbea9bbf94d4b1491da47d9032707af77c2b04`
+
+Before that commit, both:
+
+`git diff --check`
+
+and:
+
+`git diff --cached --check`
+
+reported trailing whitespace on the `Status`, `Starts from`, and `Accepted candidate` metadata lines in this document.
+
+The closure commit was nevertheless created, tagged, and advanced to `main`.
+
+`git show --check`
+
+then reproduced the same three findings.
+
+The already-published tag:
+
+`sssf-b3-004-sqlite-free-observability`
+
+is immutable and is not moved or deleted.
+
+It therefore remains the durable historical record of the first published B3-004 closure, including its documentation-hygiene defect.
+
+A subsequent correction removes only that trailing whitespace, records this incident explicitly, and is frozen under the separate tag:
+
+`sssf-b3-004-closure-hygiene-correction`
+
+The executable B3-004 implementation candidate remains:
+
+`9d160bb21ae15283acaca5fa98aa56587c3db414`
+
+No B3-004 runtime behavior is changed by the hygiene correction.
+
+The clean correction state, rather than the original closure tag, is the base for subsequent B3 work.
 
 ## Non-goals
 
