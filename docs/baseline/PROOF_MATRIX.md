@@ -25,19 +25,31 @@
 | Commit gate | commit created after tests passed | PASS |
 | Public HTML reflects committed change | public curl contained `Baseline proof` | PASS |
 | Visual marker visibly rendered | not observed in browser | UNRESOLVED |
-| Host `just obs sessions` | Windows host lacks `sqlite3` | NOT PROVEN |
+| Host `just obs sessions` | Windows host lacks external `sqlite3` | NOT PROVEN |
 | Operator-owned canonical repository | `origin` resolves to `sbracewell64/inkwell-agent-sandboxes-and-software-factory` | PASS |
 | Upstream retained as reference | `upstream/main` remains `92f1701...`; push URL disabled | PASS |
-| Canonical accepted branch | local `main` tracks `origin/main` at proven B1 commit | PASS |
+| Canonical accepted branch | local `main` tracks canonical `origin/main` | PASS |
 | Proven B0/B1 refs survived publication | remote branches/tags resolve to exact recorded commits | PASS |
-| Sandbox clones canonical evolving source | current FILL still hard-codes Disler upstream | NOT PROVEN |
 | Sandbox default source authority | FILL resolved operator-owned canonical `origin` automatically | PASS |
 | Exact sandbox source pin | FILL selected `0ad16d939366ad0b6bb9c2bdb28eea7799a8e8df` and guest HEAD matched exactly | PASS |
 | Durable sandbox provenance | run record retained `source_repo`, `source_sha`, and matching `commit_sha` | PASS |
 | Independent SETUP provenance gate | Gate A verified guest origin, exact HEAD, and clean tree | PASS |
 | B2-002 cleanup | runtime key revoked, VM destroyed, run record closed, exe.dev fleet empty | PASS |
 | B2-002 closure documentation hygiene | final closure had one trailing-whitespace finding; runtime proof unaffected | CORRECTED BY B2-003 |
+| Windows Git Bash shell | `sh` resolves from Git for Windows | PASS |
+| Windows `cygpath` availability | `cygpath` resolves from `C:\Program Files\Git\usr\bin` | PASS |
+| Windows required PATH reachability | Git `bin`, Git `usr\bin`, `.local\bin`, and `.bun\bin` are reachable | PASS |
+| Windows PATH reproducibility | Git paths are duplicated and currently depend on manually assembled environment state | NOT PROVEN |
+| Windows line-ending policy | `core.autocrlf=true`, no `.gitattributes`, execution-sensitive `.just` files observed as working-tree CRLF | NOT PROVEN |
+| exe.dev effective SSH policy | dedicated identity, `IdentitiesOnly yes`, and `StrictHostKeyChecking accept-new` apply to `exe.dev` | PASS |
+| Dynamic sandbox SSH wildcard | same effective SSH policy applies to synthetic `*.exe.xyz` hostname | PASS |
+| Windows SSH implementation selection | Git OpenSSH currently wins PATH precedence over Windows OpenSSH | OBSERVED |
+| Windows Python selection | bare `python` resolves to Python 3.11.9 while multiple Python versions are installed | OBSERVED |
+| External Windows sqlite3 | `where sqlite3` found no executable | ABSENT |
+| Windows sandbox doctor after B2 | all six existing doctor checks passed | PASS |
+| B3-001 audit isolation | only `docs/increments/B3-001_WINDOWS_PORTABILITY_BASELINE.md` changed during evidence collection | PASS |
+| B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual compatibility intervention | NOT PROVEN |
 
 ## Rule
 
-A `NOT PROVEN` or `UNRESOLVED` row remains visible until a later increment supplies evidence. Documentation must not convert absence of proof into a pass.
+A `NOT PROVEN`, `UNRESOLVED`, `ABSENT`, or observational row remains visible until a later increment supplies evidence or deliberately changes the contract. Documentation must not convert absence of proof into a pass.
