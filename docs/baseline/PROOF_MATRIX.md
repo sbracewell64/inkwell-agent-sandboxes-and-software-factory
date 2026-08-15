@@ -110,7 +110,7 @@
 | HD-02 ADW surface inventory | validator checked 12 installed, 12 template, and 1 disposable generated ADW; zero surfaces are CNO | PASS |
 | HD-02 static contracts | imported attributes, concrete output types, dependencies, prompt Report fields, and reachable finish paths reconciled | PASS |
 | HD-02 generated import | disposable generated script imported with declared dependencies and no provider call | PASS |
-| HD-02 watched-red controls | missing export/rich/finish, return/match/loop-unreachable finish, reachable-break duplication, nested compound flow, stale `run.succeeded`, and prompt mismatch each made the validator red | PASS |
+| HD-02 watched-red controls | missing export/rich/finish, return/match/guard/loop-unreachable finish, reachable-break duplication, nested compound flow, stale `run.succeeded`, and prompt mismatch each made the validator red | PASS |
 | HD-08 canonical manifest bytes | positive fixture round-trips through the sole serializer byte-for-byte | PASS |
 | HD-08 offline checked inventory | positive fixture verifies every artifact hash/type and bound SQLite ADW row from frozen bytes without network/provider access | PASS |
 | HD-08 nonvacuous qualification | empty directory/database/manifest/inventory, diagnostic-only evidence, and absent phase/dimension controls cannot pass | PASS |

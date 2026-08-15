@@ -26,6 +26,20 @@ PACKAGE_BY_IMPORT = {
     "rich": "rich",
     "yaml": "pyyaml",
 }
+EXPECTED_RED_FIXTURES = frozenset({
+    "exhaustive_match_finish",
+    "infinite_loop_finish",
+    "match-false-guard-unreachable-finish",
+    "missing_export",
+    "missing_finish",
+    "missing_rich",
+    "nested_compound_finish",
+    "prompt_output_mismatch",
+    "reachable_break_finish",
+    "stale_run_succeeded",
+    "unreachable_finish",
+    "while-false-unreachable-finish",
+})
 
 
 @dataclass
@@ -236,9 +250,26 @@ def statement_flow(statement: ast.stmt) -> Flow:
         branches.append(reachable_finish_flow(statement.orelse) if statement.orelse else Flow())
         return merge_flows(branches, test_calls)
     if isinstance(statement, ast.Match):
-        flows = [reachable_finish_flow(case.body) for case in statement.cases]
-        exhaustive = bool(statement.cases) and statement.cases[-1].guard is None \
-            and irrefutable_pattern(statement.cases[-1].pattern)
+        flows: list[Flow] = []
+        exhaustive = False
+        for case in statement.cases:
+            guard_calls = expression_finish_calls(case.guard)
+            if isinstance(case.guard, ast.Constant) and case.guard.value is False:
+                flows.append(Flow(guard_calls))
+                continue
+            if case.guard is not None \
+                    and not (isinstance(case.guard, ast.Constant) and case.guard.value is True):
+                guarded = reachable_finish_flow(case.body)
+                flows.append(Flow(
+                    guard_calls + guarded.finish_calls,
+                    guarded.exits | {"normal"},
+                    True,
+                ))
+                continue
+            flows.append(merge_flows([reachable_finish_flow(case.body)], guard_calls))
+            if irrefutable_pattern(case.pattern):
+                exhaustive = True
+                break
         if not exhaustive:
             flows.append(Flow())
         return merge_flows(flows, expression_finish_calls(statement.subject))
@@ -248,6 +279,11 @@ def statement_flow(statement: ast.stmt) -> Flow:
     if isinstance(statement, (ast.For, ast.AsyncFor, ast.While)):
         control = getattr(statement, "iter", None) or getattr(statement, "test", None)
         control_calls = expression_finish_calls(control)
+        is_never_entered = isinstance(statement, ast.While) \
+            and isinstance(statement.test, ast.Constant) and statement.test.value is False
+        if is_never_entered:
+            else_flow = reachable_finish_flow(statement.orelse)
+            return merge_flows([else_flow], control_calls)
         body = reachable_finish_flow(statement.body)
         is_infinite = isinstance(statement, ast.While) \
             and isinstance(statement.test, ast.Constant) and statement.test.value is True
@@ -561,6 +597,14 @@ def run_red_fixtures(root: Path, errors: list[str], inventory: Inventory) -> Non
     if not fixtures:
         errors.append(f"CNO: no watched-red ADW synchronization fixtures under {fixture_dir}")
         return
+    discovered = {fixture.stem for fixture in fixtures}
+    if discovered != EXPECTED_RED_FIXTURES:
+        errors.append(
+            "CNO: watched-red fixture inventory mismatch: "
+            f"missing={sorted(EXPECTED_RED_FIXTURES - discovered)}, "
+            f"unexpected={sorted(discovered - EXPECTED_RED_FIXTURES)}"
+        )
+        return
     for fixture_path in fixtures:
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory(prefix=f"sssf-hd02-{fixture_path.stem}-") as directory:
@@ -595,6 +639,10 @@ def main() -> int:
     errors, inventory = validate(root)
     if not args.skip_red_fixtures and not errors:
         run_red_fixtures(root, errors, inventory)
+    red_controls_passed = (
+        not args.skip_red_fixtures
+        and inventory.red_fixtures == len(EXPECTED_RED_FIXTURES)
+    )
 
     if errors:
         state = "CNO" if any(error.startswith("CNO:") for error in errors) else "FAIL"
@@ -614,7 +662,8 @@ def main() -> int:
     print(f"- prompt Report contracts: {inventory.prompt_reports}")
     print(f"- generated import-only smokes: {inventory.import_smokes}")
     print(f"- watched-red fixtures: {inventory.red_fixtures}")
-    print("compound-reachability-red-controls: PASS")
+    if red_controls_passed:
+        print("compound-reachability-red-controls: PASS")
     return 0
 
 
