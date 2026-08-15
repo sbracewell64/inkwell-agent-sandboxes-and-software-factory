@@ -100,6 +100,15 @@ function Write-Utf8NoBom([string]$Path, [string]$Text) {
         (New-Object System.Text.UTF8Encoding($false)))
 }
 
+function Protect-EnvironmentValue([string]$Name, [object]$Value) {
+    # Persistent Windows environments can contain unrelated user credentials.
+    # Their presence and registry type are evidence; their secret values are not.
+    if ($Name -match '(?i)(key|token|secret|password|credential|auth)') {
+        return "<REDACTED>"
+    }
+    return [string]$Value
+}
+
 function Format-RegistryEnvironment([Microsoft.Win32.RegistryKey]$Key, [string]$Scope) {
     $lines = New-Object System.Collections.Generic.List[string]
     $lines.Add("[$Scope]")
@@ -110,7 +119,7 @@ function Format-RegistryEnvironment([Microsoft.Win32.RegistryKey]$Key, [string]$
     foreach ($name in @($Key.GetValueNames() | Sort-Object)) {
         $kind = $Key.GetValueKind($name).ToString()
         $value = $Key.GetValue($name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
-        $lines.Add("$name|$kind|$value")
+        $lines.Add("$name|$kind|$(Protect-EnvironmentValue $name $value)")
     }
     return $lines
 }
@@ -176,7 +185,7 @@ $nativeLines = New-Object System.Collections.Generic.List[string]
 $nativeLines.Add("created_by=CreateEnvironmentBlock(current-user-token, inherit=false)")
 $nativeLines.Add("created_utc=$([DateTime]::UtcNow.ToString('o'))")
 foreach ($entry in @($nativeEnvironment.GetEnumerator() | Sort-Object Key)) {
-    $nativeLines.Add("$($entry.Key)=$($entry.Value)")
+    $nativeLines.Add("$($entry.Key)=$(Protect-EnvironmentValue $entry.Key $entry.Value)")
 }
 Write-Utf8NoBom (Join-Path $phaseEvidence "native-process-environment.txt") (($nativeLines -join "`r`n") + "`r`n")
 Capture-PersistentEnvironment (Join-Path $phaseEvidence "persistent-environment-before.txt")
@@ -211,6 +220,7 @@ set "EXPECTED=$ExpectedSha"
 set "RUN_ID=$RunId"
 set "REPO=$SourceRepo"
 set "BRANCH=$Branch"
+set "CONFIG_SOURCE=$ConfigSource"
 echo phase=$Phase
 echo started_utc=%DATE% %TIME%
 echo proof_path=%PROOF%
@@ -261,6 +271,13 @@ call just
 if errorlevel 1 exit /b 52
 call just local
 if errorlevel 1 exit /b 53
+echo --- approved ignored host configuration ---
+%SystemRoot%\System32\findstr.exe /b /c:"OPENROUTER_PROVISIONING_KEY=" "%CONFIG_SOURCE%" > "%PROOF%\.env"
+if errorlevel 1 exit /b 531
+git check-ignore -v .env
+if errorlevel 1 exit /b 532
+echo staged_config_name=OPENROUTER_PROVISIONING_KEY
+echo staged_config_value=REDACTED
 echo --- repository bootstrap and composed doctor ---
 call bin\sssf-windows.cmd --sandbox
 if errorlevel 1 exit /b 54
