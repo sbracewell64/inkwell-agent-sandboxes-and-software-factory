@@ -217,7 +217,10 @@ Two handles, do not confuse them: **`<run-id>`** names the sandbox (it is also t
   <img src="images/14_observe_from_outside.png" alt="Observe from outside only: the out-sandbox orchestrator reads the app and agent view but never reaches in; traces flow up from the agents" width="780">
 </p>
 
-You watch from outside; you never reach in. Every phase, tool call, complete thought, and complete response streams into `sssf.db` as it happens (agents to sqlite to you, WAL so reads never block writers), and the visualizer polls it.
+You watch from outside; you never reach in. Phase progress is recorded in
+`sssf.db` as it happens. For strict Pi attempts, bounded raw output is retained
+durably before complete thoughts, responses, and tool calls are parsed and
+recorded; the visualizer polls the WAL-backed database without blocking writers.
 
 <p align="center">
   <img src="images/value/06_observability.png" alt="A swimlane of engineer, planner, and builder phases over time, every run recorded down into a sqlite store" width="750">

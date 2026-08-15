@@ -1,9 +1,10 @@
 """Validation gates: verify the envelope's CLAIMS, never guesses.
 
 A gate is `gate(envelope, run) -> GateReport` — one check per item it looked at.
-Violations are derived from the failed checks and sent back to the SAME agent
-session as a correction. Every check is recorded either way, so a green gate
-says WHAT it verified instead of only that it passed.
+Violations are derived from the failed checks and sent back to the same agent
+role in a separate bounded no-session correction attempt. Every check is
+recorded either way, so a green gate says WHAT it verified instead of only that
+it passed.
 
 Gates check what is mechanically checkable; plan quality is a reviewer's job.
 """

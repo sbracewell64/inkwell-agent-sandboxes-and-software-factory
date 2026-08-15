@@ -126,7 +126,8 @@ def always_writable(cfg: SSSFConfig) -> list[str]:
     """The session runtime, which EVERY agent must be able to write.
 
     `context_handoff/` is the one place agents hand work to each other, and an
-    agent's own prompts, raw_output.jsonl, and envelope.json land beside it.
+    agent's own prompts, per-attempt raw event evidence, and envelope.json land
+    beside it.
     Scout writes its findings there, the reviewer its review, the planner its
     plan — a read-only agent is read-only with respect to the REPO, never with
     respect to its own report.

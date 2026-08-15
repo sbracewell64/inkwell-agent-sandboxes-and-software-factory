@@ -77,12 +77,15 @@ cover:
 5. observable hidden retry and common-budget charging;
 6. monotonic timeout;
 7. ignored TERM and KILL escalation;
-8. an escaped descendant that must be killed and verified absent;
+8. escaped, immediate-parent-exit, and TERM-handler late-fork descendants that
+   must be killed and verified absent;
 9. stdout and event overflow;
 10. live and late cancellation races;
-11. explicit unsupported-Windows Job Object refusal;
-12. fully qualified target, explicit effort, exact tool policy, and strict Pi
-    argv controls.
+11. custodian startup/IPC, spawn callback, event callback, and evidence-storage
+    failures with typed CNO and retained primary evidence where observable;
+12. explicit unsupported-Windows Job Object refusal;
+13. fully qualified target, explicit effort, exact tool policy, strict Pi argv
+    controls, and immutable requested-versus-resolved target enforcement.
 
 The check is the seventh repository-owned offline CI manifest entry. Linux runs
 all process fixtures. Windows runs the nonempty static/parser/refusal proof and

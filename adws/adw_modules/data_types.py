@@ -375,11 +375,11 @@ class PiRequest(BaseModel):
 
     prompt: str
     system_prompt: str
-    model: str                      # registry pattern, resolved to provider + id
+    model: str                      # exact provider/model target; no catalog lookup
     thinking: str = "medium"
     session_id: str                 # SSSF correlation only; strict Pi gets --no-session
     session_dir: str                # legacy artifact location; not passed to strict Pi
-    raw_output_path: str            # JSONL stream lands here
+    raw_output_path: str            # root for collision-free per-attempt JSONL evidence
     execution_id: str
     phase_id: str
     attempt_number: int

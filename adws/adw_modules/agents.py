@@ -243,7 +243,7 @@ def _as_report(result) -> GateReport:
 def _agent_session_id(run, agent: AgentConfig) -> str:
     entry = run.agent_map.get(agent.name)
     if entry and entry.get("model") == agent.model:
-        return entry["session_id"]           # rejoin the existing context window
+        return entry["session_id"]           # stable SSSF correlation; Pi does not resume it
     return f"sssf-{run.adw_id}-{agent.name}-{new_id(4)}"
 
 
