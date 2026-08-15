@@ -50,7 +50,7 @@ python3 tools/evidence_manifest.py validate ...positive fixture and exact contex
 python3 -m compileall -q tools/evidence_manifest.py docs/validation/check_evidence_manifest.py
 ```
 
-The controls cover positive canonical round-trip, complete offline hash inventory, and a bound SQLite ADW session plus empty directory/database/manifest/inventory, wrong run/ADW/repository/base/candidate/branch/worktree role, unrelated database/session and failed item, diagnostics only, tamper, missing phase/dimension, duplicates/reorder, traversal/symlink, malformed/duplicate-key/noncanonical JSON, and unknown version.
+The controls cover positive canonical round-trip, complete offline hash inventory, and a bound SQLite ADW session plus empty directory/database/manifest/inventory, wrong run/ADW/repository/base/candidate/branch/worktree role/phase, unrelated database/session and failed item, diagnostics only, tamper, missing phase/dimension, duplicates/reorder, traversal/symlink, malformed/duplicate-key/noncanonical JSON, and unknown version.
 
 ### Semantic review
 
@@ -62,7 +62,8 @@ Independent review is delegated to the required no-mistakes pipeline before publ
 - ADW: not applicable
 - fixture: `docs/validation/fixtures/evidence_manifest/positive/manifest.json`
 - pre-fix watched-red capture: `docs/evidence/hd08/intermediate-directory-symlink-swap-red.txt`, bound to `7148f45b5e906e4fcf220d7c9d32212f6fae985a`
-- test result: validator prints `HD-08 evidence manifest controls: PASS` and `intermediate-directory-symlink-swap: PASS`
+- pre-fix wrong-phase coverage capture: `docs/evidence/hd08/wrong-phase-control-red-73d8a831.txt`, bound to `73d8a8313f3a9b70edbba42a9e8862d0e7feb164`
+- test result: validator prints `HD-08 evidence manifest controls: PASS`, `wrong-phase-control: PASS`, and `intermediate-directory-symlink-swap: PASS`
 
 ## Documentation changed
 
