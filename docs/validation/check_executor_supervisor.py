@@ -1,0 +1,298 @@
+#!/usr/bin/env python3
+"""Provider-free positive and watched-red proof for the SSSF executor/Pi seam."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import shlex
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from adws.adw_modules.pi_json_adapter import (  # noqa: E402
+    PI_OWNED_ENV_NAMES,
+    PiAdapterRequest,
+    build_argv,
+    run_pi_json,
+    safe_environment,
+)
+from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
+    AttemptBudget,
+    Observation,
+    TerminalState,
+)
+
+FIXTURE = ROOT / "docs" / "validation" / "fixtures" / "fake_pi_child.py"
+TYPED_TAIL = "typed-parent-tail-marker"
+
+
+def check(condition: bool, message: str, errors: list[str]) -> None:
+    if not condition:
+        errors.append(message)
+
+
+def request(temp: Path, mode: str, **overrides) -> PiAdapterRequest:
+    values = {
+        "prompt": mode,
+        "system_prompt": "fixture system prompt",
+        "provider_model": "fixture/deterministic",
+        "thinking": "high",
+        "tools": ["read"],
+        "cwd": str(ROOT),
+        "raw_event_path": str(temp / f"{mode.replace('/', '_').replace(':', '_')}.jsonl"),
+        "pi_argv0": str(FIXTURE),
+        "timeout_seconds": 2.0,
+        "term_grace_seconds": 0.15,
+        "verification_grace_seconds": 0.6,
+        "max_stdout_bytes": 100_000,
+        "max_stderr_bytes": 20_000,
+        "max_event_bytes": 100_000,
+        "total_attempt_budget": 1,
+        "environment": safe_environment(),
+    }
+    values.update(overrides)
+    return PiAdapterRequest(**values)
+
+
+def assert_reason(result, code: str, observation: Observation, errors: list[str]) -> None:
+    check(result.terminal_state != TerminalState.SUCCEEDED, f"{code}: unexpectedly succeeded", errors)
+    check(result.reason is not None, f"{code}: missing typed reason", errors)
+    if result.reason:
+        check(result.reason.code == code, f"{code}: got reason {result.reason.code}", errors)
+        check(result.reason.observation == observation, f"{code}: wrong observation {result.reason.observation}", errors)
+
+
+def process_absent(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return False
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+
+
+def run_heredoc_parent(unsafe: bool) -> int:
+    """Act like a line-driven heredoc parent whose unread tail must survive."""
+    with tempfile.TemporaryDirectory(prefix="sssf-stdin-parent-") as directory:
+        temp = Path(directory)
+        if unsafe:
+            subprocess.run(
+                [str(FIXTURE), "--print", "--mode", "json", "stdin-consumption"],
+                cwd=ROOT,
+                env=safe_environment(),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        else:
+            result = run_pi_json(request(temp, "stdin-consumption"))
+            if result.terminal_state != TerminalState.SUCCEEDED or result.text != "typed-success-marker":
+                return 3
+        tail = sys.stdin.buffer.readline().decode(errors="replace").strip()
+        if tail == TYPED_TAIL:
+            print(f"typed-marker:{TYPED_TAIL}")
+            return 0
+        print("typed-marker:missing")
+        return 4
+
+
+def stdin_regression(errors: list[str]) -> None:
+    command = f"{shlex.quote(sys.executable)} {shlex.quote(str(Path(__file__).resolve()))} --heredoc-parent"
+
+    def drive(mode: str) -> subprocess.CompletedProcess[bytes]:
+        # The tested parent itself is fed by a real shell heredoc. Its child is
+        # one level beneath that driver, matching the original failure shape.
+        script = f"{command} {mode} <<'SSSF_PARENT_TAIL'\n{TYPED_TAIL}\nSSSF_PARENT_TAIL\n"
+        return subprocess.run(
+            ["sh", "-c", script],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=5,
+            cwd=ROOT,
+        )
+
+    unsafe = drive("unsafe")
+    check(unsafe.returncode != 0, "stdin watched-red control did not suppress the parent tail", errors)
+    check(b"typed-marker:missing" in unsafe.stdout, "stdin watched-red control lacked missing typed marker", errors)
+
+    safe = drive("safe")
+    check(safe.returncode == 0, f"closed-stdin regression failed: {safe.stderr.decode(errors='replace')}", errors)
+    check(f"typed-marker:{TYPED_TAIL}".encode() in safe.stdout, "closed stdin suppressed the required typed marker", errors)
+
+
+def static_contract(errors: list[str]) -> None:
+    with tempfile.TemporaryDirectory(prefix="sssf-static-") as directory:
+        temp = Path(directory)
+        candidate = request(temp, "success", tools=[])
+        argv, refusal = build_argv(candidate)
+        check(refusal is None and argv is not None, "strict Pi argv was refused", errors)
+        if argv:
+            required = {
+                "--print",
+                "--no-session",
+                "--no-extensions",
+                "--no-skills",
+                "--no-prompt-templates",
+                "--no-context-files",
+                "--no-approve",
+                "--no-tools",
+            }
+            check(required <= set(argv), f"strict Pi argv missing {sorted(required - set(argv))}", errors)
+            check(argv[argv.index("--mode") + 1] == "json", "Pi mode is not JSON", errors)
+            check(argv[argv.index("--provider") + 1] == "fixture", "Pi provider drifted", errors)
+            check(argv[argv.index("--model") + 1] == "deterministic", "Pi model drifted", errors)
+            check(argv[argv.index("--thinking") + 1] == "high", "Pi effort drifted", errors)
+            check("--models" not in argv and "--continue" not in argv and "--resume" not in argv, "Pi fallback/session flag present", errors)
+        forbidden = ("KEY", "TOKEN", "CREDENTIAL", "AUTH", "COOKIE", "HOME")
+        exposed_names = set(candidate.environment) | set(candidate.environment_allowlist) | set(PI_OWNED_ENV_NAMES)
+        check(not [name for name in exposed_names if any(word in name.upper() for word in forbidden)], "credential/auth-home environment name entered adapter contract", errors)
+        check(all("secret" not in arg.lower() for arg in (argv or [])), "credential-like value entered argv", errors)
+
+        for bad, code in (
+            (request(temp, "success", provider_model="deterministic"), "pi-target-not-fully-qualified"),
+            (request(temp, "success", provider_model="fixture/*"), "pi-target-not-fully-qualified"),
+            (request(temp, "success", thinking="default"), "pi-thinking-not-explicit"),
+            (request(temp, "success", tools=None), "pi-tool-policy-not-exact"),
+            (request(temp, "success", tools=["read", "read"]), "pi-tool-policy-not-exact"),
+            (
+                request(
+                    temp,
+                    "success",
+                    environment={"PROVIDER_TOKEN": "fixture-not-a-secret"},
+                    environment_allowlist=frozenset({"PROVIDER_TOKEN"}),
+                ),
+                "pi-sensitive-environment-refused",
+            ),
+        ):
+            result = run_pi_json(bad)
+            assert_reason(result, code, Observation.COULD_NOT_OBSERVE, errors)
+            check(result.process is None, f"{code}: refusal launched a child", errors)
+
+
+def platform_refusal(errors: list[str]) -> None:
+    with tempfile.TemporaryDirectory(prefix="sssf-windows-refusal-") as directory:
+        result = run_pi_json(request(Path(directory), "success", platform_name="windows"))
+    assert_reason(result, "windows-job-object-unavailable", Observation.COULD_NOT_OBSERVE, errors)
+    check(result.process is None, "Windows refusal launched an uncontained process", errors)
+
+
+def runtime_fixtures(errors: list[str]) -> None:
+    with tempfile.TemporaryDirectory(prefix="sssf-executor-") as directory:
+        temp = Path(directory)
+        success = run_pi_json(request(temp, "success"))
+        check(success.terminal_state == TerminalState.SUCCEEDED, f"success fixture failed: {success.reason}", errors)
+        check(success.text == "typed-success-marker", "success text marker missing", errors)
+        check(success.requested_provider == "fixture" and success.requested_model == "deterministic", "requested target missing", errors)
+        check(success.resolved_provider == "fixture" and success.resolved_model == "deterministic", "resolved target missing", errors)
+        check(success.requested_effort == "high" and success.resolved_effort == "high", "effort evidence missing", errors)
+        check(success.terminal_stop == "stop" and success.terminal_error is None, "terminal stop evidence wrong", errors)
+        check(success.usage.usage_source_class == "provider-reported", "usage source class missing", errors)
+        check(success.usage.cost_source_class == "provider-reported" and success.usage.total_cost == 0.125, "cost source class missing", errors)
+        check(success.attempts.native_attempts == 1 and success.attempts.budget == 1, "native attempt accounting wrong", errors)
+        check(success.process is not None and success.cleanup.reaped and success.cleanup.group_absent is True, "process identity/cleanup proof missing", errors)
+        check(success.evidence.stdout_sha256 == success.evidence.raw_events_sha256, "raw event digest does not reconcile", errors)
+        raw = Path(request(temp, "success").raw_event_path)
+        check(raw.is_file() and raw.stat().st_size > 0, "bounded raw events were not preserved", errors)
+
+        structured = run_pi_json(request(temp, "structured-error"))
+        assert_reason(structured, "structured-provider-error", Observation.OBSERVED_BAD, errors)
+        check(structured.returncode == 0, "structured error fixture did not exit shell zero", errors)
+        check(structured.terminal_error == "deterministic provider rejection", "structured terminal error missing", errors)
+
+        for mode, code, observation in (
+            ("malformed", "malformed-json-event", Observation.COULD_NOT_OBSERVE),
+            ("missing-terminal", "missing-terminal-event", Observation.COULD_NOT_OBSERVE),
+            ("duplicate-terminal", "duplicate-terminal-event", Observation.OBSERVED_BAD),
+        ):
+            assert_reason(run_pi_json(request(temp, mode)), code, observation, errors)
+
+        retry = run_pi_json(request(temp, "hidden-retry", total_attempt_budget=2))
+        assert_reason(retry, "native-retry-policy-violation", Observation.OBSERVED_BAD, errors)
+        check(retry.attempts.native_attempts == 2 and retry.attempts.native_retry_events == 1, "hidden retry was not individually observed/charged", errors)
+
+        shared_budget = AttemptBudget(1)
+        first = run_pi_json(request(temp, "success"), budget=shared_budget)
+        second = run_pi_json(request(temp, "success"), budget=shared_budget)
+        check(first.terminal_state == TerminalState.SUCCEEDED, "shared-budget first attempt failed", errors)
+        assert_reason(second, "attempt-budget-exhausted", Observation.COULD_NOT_OBSERVE, errors)
+        check(second.process is None and shared_budget.used == 1, "spent total attempt budget launched again", errors)
+
+        timeout = run_pi_json(request(temp, "timeout", timeout_seconds=0.15))
+        assert_reason(timeout, "wall-timeout", Observation.COULD_NOT_OBSERVE, errors)
+        check(timeout.timed_out and timeout.cleanup.reaped and timeout.cleanup.group_absent is True, "timeout cleanup incomplete", errors)
+
+        ignored = run_pi_json(request(temp, "ignored-term", timeout_seconds=0.15))
+        assert_reason(ignored, "wall-timeout", Observation.COULD_NOT_OBSERVE, errors)
+        check(ignored.cleanup.term_sent and ignored.cleanup.kill_sent, "ignored TERM did not escalate to KILL", errors)
+
+        pid_path = temp / "descendant.pid"
+        descendant = run_pi_json(request(temp, f"descendant:{pid_path}"))
+        assert_reason(descendant, "descendant-outlived-parent", Observation.OBSERVED_BAD, errors)
+        check(descendant.cleanup.descendants_seen and not descendant.cleanup.survivors, "descendant was not tracked and verified absent", errors)
+        if pid_path.is_file():
+            child_pid = int(pid_path.read_text())
+            check(process_absent(child_pid), "escaped descendant survived cleanup", errors)
+        else:
+            errors.append("descendant fixture did not record its PID")
+
+        overflow = run_pi_json(request(temp, "overflow", max_stdout_bytes=4096, max_event_bytes=4096))
+        assert_reason(overflow, "output-overflow", Observation.COULD_NOT_OBSERVE, errors)
+        check(overflow.stdout_bytes_seen > 4096 and overflow.event_bytes_preserved == 4096, "output bound was not enforced", errors)
+
+        event_overflow = run_pi_json(request(temp, "success", max_event_bytes=100))
+        assert_reason(event_overflow, "event-overflow", Observation.COULD_NOT_OBSERVE, errors)
+
+        live_cancel = threading.Event()
+        timer = threading.Timer(0.08, live_cancel.set)
+        timer.start()
+        cancelled = run_pi_json(request(temp, "slow-success"), cancel_event=live_cancel)
+        timer.join()
+        assert_reason(cancelled, "cancelled", Observation.COULD_NOT_OBSERVE, errors)
+        check(cancelled.cancelled and cancelled.cleanup.reaped, "live cancellation cleanup incomplete", errors)
+
+        late_cancel = threading.Event()
+        timer = threading.Timer(0.25, late_cancel.set)
+        timer.start()
+        completed = run_pi_json(request(temp, "success"), cancel_event=late_cancel)
+        timer.join()
+        check(completed.terminal_state == TerminalState.SUCCEEDED and not completed.cancelled, "late cancellation overrode completed process", errors)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--heredoc-parent", choices=("safe", "unsafe"))
+    args = parser.parse_args()
+    if args.heredoc_parent:
+        return run_heredoc_parent(args.heredoc_parent == "unsafe")
+
+    errors: list[str] = []
+    static_contract(errors)
+    platform_refusal(errors)
+    if os.name == "posix":
+        stdin_regression(errors)
+        runtime_fixtures(errors)
+    else:
+        # This is an explicit CNO/refusal, not a skipped claim: Windows CI runs
+        # static/parser controls and proves that no uncontained child launches.
+        print("windows-runtime: could-not-observe; Job Object path unavailable and launch refused")
+
+    if errors:
+        for error in errors:
+            print(f"FAIL: {error}")
+        return 1
+    print("executor-supervisor: PASS")
+    print("watched-red: inherited stdin, malformed/missing/duplicate terminal, structured shell-zero error, hidden retry, timeout, overflow, cancellation")
+    print("provider-calls: 0")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -84,6 +84,13 @@
 | B4-001 Windows GitHub execution | run `31907345967`, `windows-2022`, exact reviewed head: 6/6 observed-good; Inkwell 30 pass, 0 fail, 230 assertions | PASS |
 | B4-001 closure successor execution | provenance-only successor must complete the same nonempty Linux/Windows checks on its own exact head | CNO UNTIL OBSERVED |
 | B4-001 default-branch push execution | accepted successor must trigger the same nonempty Linux/Windows checks after merge | CNO UNTIL OBSERVED |
+| B4-002 strict launch surface | exact provider/model, effort, tools, JSON print, no session/resources/approval/fallback, closed stdin, allowlisted env | PASS — LOCAL FIXTURE |
+| B4-002 shell-zero structured error precedence | deterministic child exits zero with provider error; typed result remains observed-bad | PASS — LOCAL FIXTURE |
+| B4-002 process bounds and cleanup | timeout, cancellation, ignored TERM, output overflow, reap, Unix group and escaped-descendant absence verification | PASS — LOCAL LINUX FIXTURE |
+| B4-002 stdin parent-tail regression | inherited-stdin control suppresses marker; owned supervisor preserves required typed parent-tail marker | PASS — WATCHED RED + LOCAL FIXTURE |
+| B4-002 protocol and attempt accounting | malformed/missing/duplicate terminal events and hidden retry are typed and charged against common budget | PASS — LOCAL FIXTURE |
+| B4-002 Windows descendant containment | Job Object path is not implemented; launch returns typed CNO before spawn | CNO — HONEST REFUSAL |
+| B4-002 exact PR-head projection | seventh provider-free check must be discovered/executed in nonempty Linux and Windows jobs on exact PR head | CNO UNTIL OBSERVED |
 
 ## Rule
 

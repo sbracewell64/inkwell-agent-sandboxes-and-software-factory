@@ -23,9 +23,15 @@ When subscription quota is available, use Claude Code for repository-aware orche
 
 ### Pi inside SSSF
 
-Pi is the v1 coding-agent harness for ADW phases.
+Pi is the v1 coding-agent harness for ADW phases. Its strict execution seam is
+`adws/adw_modules/pi_json_adapter.py`, backed by the provider-neutral owned
+supervisor. The adapter requires exact provider/model, effort, and tool policy;
+disables ambient sessions/resources/approval and fallback; and preserves a
+typed terminal result. Refusal conditions and the current Windows execution
+CNO are recorded in `docs/increments/B4-002_EXECUTOR_SUPERVISOR.md`.
 
-The baseline proved Pi with a free OpenRouter model.
+The baseline proved Pi with a free OpenRouter model. B4-002 itself is
+provider-free and does not re-qualify a model, credential transport, or roster.
 
 ## Recommended authority split
 

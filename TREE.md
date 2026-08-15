@@ -83,9 +83,11 @@ guest/models.json.tmpl  10 models, each with a FOUR-field cost block. A partial 
 adws/adw_*.py         12 workflows. Each opens with a `Phases:` docstring that is its chain
                       in one line. Thin on purpose: logic lives in adw_modules/.
 adws/adw_modules/     agents.py (roster + validation), agent_pi.py / agent_cc.py (harness
-                      adapters), data_types.py (typed envelopes), gates.py, quality.py
-                      (deterministic checks incl. the test suite), tracer.py (the trace db),
-                      session.py, runner.py, permissions.py, git_helper.py.
+                      adapters), pi_json_adapter.py (strict Pi JSON/print contract),
+                      subprocess_supervisor.py (bounded native process owner), data_types.py
+                      (typed envelopes), gates.py, quality.py (deterministic checks incl. the
+                      test suite), tracer.py (the trace db), session.py, runner.py,
+                      permissions.py, git_helper.py.
 adws/adw_sssf_config/ sssf.config.yaml (cheap roster) and sssf.frontier.config.yaml.
                       Every model is `openrouter/<id>`; the first slash splits provider
                       from model id.
@@ -111,6 +113,9 @@ ci/checks.json            authoritative enumeration of checks run by that gate.
 tools/ci_gate.py          non-vacuous runner and three-valued JSON evidence writer.
 docs/validation/check_ci_contract.py
                           workflow/manifest contract validator and watched-red controls.
+docs/validation/check_executor_supervisor.py
+                          provider-free process/Pi adapter fixtures, including watched-red
+                          stdin inheritance and explicit Windows cleanup refusal.
 ```
 
 ## `.claude/skills/` — the three skills

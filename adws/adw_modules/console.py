@@ -105,7 +105,7 @@ class Console:
 
     def retry(self, name: str, attempt: int, limit: int, reason: str) -> None:
         self._emit(f"  [yellow]⟳[/yellow] {escape(name)} retry {attempt}/{limit} "
-                   f"[dim]— same session · {escape(_clip(reason))}[/dim]", level="warn")
+                   f"[dim]— budgeted attempt · {escape(_clip(reason))}[/dim]", level="warn")
 
     # ── verification ────────────────────────────────────────────────────────
     def gate_result(self, name: str, report) -> None:

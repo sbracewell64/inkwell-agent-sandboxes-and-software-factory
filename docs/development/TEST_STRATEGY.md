@@ -58,6 +58,15 @@ GitHub success is projected only when discovery is nonempty, all discovered
 checks execute, and every result is `observed-good`. The calibrated negative
 controls live in `docs/validation/check_ci_contract.py`.
 
+The B4-002 provider-free process contract is
+`docs/validation/check_executor_supervisor.py`. Its deterministic fake Pi child
+covers successful typed evidence plus watched-red stdin inheritance,
+structured shell-zero errors, protocol corruption, hidden retry, timeout,
+ignored TERM, escaped descendants, output bounds, cancellation races, and
+unsupported Windows cleanup. Linux executes process behavior; Windows executes
+static/parser controls and proves typed refusal before launch rather than
+turning missing Job Object containment into a pass.
+
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and
 sandbox source invariants that do not need the network remain enumerated.

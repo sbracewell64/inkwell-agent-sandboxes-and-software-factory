@@ -2,9 +2,8 @@
 
 Every ADW validates its agents before running (fail fast, nothing spawns
 against a half-valid config). Every agent call parses against a concrete
-output type; parse failures and gate violations re-prompt the SAME session
-with a correction — context intact, bounded retries. Agent proposes, code
-disposes.
+output type; parse failures and gate violations launch bounded no-session
+correction attempts under one total budget. Agent proposes, code disposes.
 """
 
 from __future__ import annotations
@@ -103,11 +102,16 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                           "harness_engineering": agent.harness_engineering}))
     run.console.agent_started(agent.name, agent.model, session_id)
 
-    # Parse retries and gate corrections re-enter the SAME pi session, so the
-    # last send is the one whose context occupancy is current — while spend is
-    # the opposite: every send costs, so usage accumulates across all of them.
+    # Parse retries and gate corrections are distinct no-session Pi attempts.
+    # Spend accumulates across all of them under one native-attempt budget;
+    # there is deliberately no inherited context occupancy to report.
     latest: agent_pi.PiResult | None = None
     spent = UsageBreakdown()
+    # Parse and gate correction sends share one native-attempt ceiling. In the
+    # worst case each of (retries + 1) gate rounds can consume the same number
+    # of structured-output attempts; native retries inside Pi are charged here
+    # too by the strict adapter.
+    attempt_budget = agent_pi.AttemptBudget(total=(max(0, phase.params.retries) + 1) ** 2)
 
     def send(prompt_text: str) -> agent_pi.PiResult:
         nonlocal latest
@@ -123,6 +127,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             tools=agent.tools,
             extensions=agent.harness_engineering,
             cwd=str(run.repo_root),
+            total_attempt_budget=attempt_budget.total,
         )
         result = agent_pi.run(
             request,
@@ -130,7 +135,8 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             on_spawn=lambda pid: run.tracer.process_start(
                 run.adw_id, "agent", agent.name, pid,
                 f"{agent.coding_agent} {agent.name} {agent.model}"),
-            on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid))
+            on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid),
+            budget=attempt_budget)
         run.add_usage(result.tokens, result.cost)
         spent.merge(result.usage)
         latest = result
@@ -148,7 +154,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     result = send(user_text)
     envelope, attempt = _parse_with_retries(run, phase, call, result, send)
 
-    # claim gates — violations flow back into the SAME session as corrections
+    # Claim-gate violations become separately budgeted correction attempts.
     for gate_attempt in range(1, max(1, phase.params.retries + 1) + 1):
         violations = []
         for gate in call.gates:
@@ -278,8 +284,7 @@ def _extract_json(text: str) -> dict:
 
 
 def _parse_with_retries(run, phase: Phase, call: AgentCall, result, send):
-    """Parse the final response against the declared output type; on failure,
-    continue the SAME session with a correction (bounded)."""
+    """Parse the declared output; failures launch bounded correction attempts."""
     for attempt in range(1, JSON_FIX_ATTEMPTS + 2):
         try:
             payload = _extract_json(result.text)

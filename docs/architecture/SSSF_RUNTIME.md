@@ -9,7 +9,9 @@ Low-level behavior belongs in `adws/adw_modules/`.
 ## Core modules
 
 - `agents.py` — roster loading, required-agent validation, agent execution
-- `agent_pi.py` / harness adapters — model/harness invocation
+- `agent_pi.py` / harness adapters — typed harness invocation
+- `pi_json_adapter.py` — strict no-session Pi JSON/print contract
+- `subprocess_supervisor.py` — bounded provider-neutral native process ownership
 - `data_types.py` — typed envelopes
 - `gates.py` — claim verification
 - `quality.py` — deterministic quality commands
@@ -34,15 +36,16 @@ A phase has:
 
 ## Correction semantics
 
-Malformed typed output is corrected in the **same agent session** when possible.
+The frozen baseline builder proof used same-session correction: its first
+`BuildOutput` was invalid and its second response parsed and passed. B4-002
+changes current execution semantics deliberately. Malformed output and gate
+violations now launch separate strict no-session attempts, all charged to one
+explicit total native-attempt budget. Typed envelopes and correction prompts
+carry only the context SSSF chooses; no ambient Pi session is resumed.
 
-The baseline builder proof demonstrated:
-
-- first builder response: invalid `BuildOutput` JSON,
-- SSSF re-prompted the same session,
-- second response parsed and passed.
-
-This is preferred to restarting because the correction keeps accumulated task context.
+This tradeoff removes an unbounded/ambient sequencing authority from Pi. The
+historical baseline proof remains historical evidence rather than a claim
+about the current adapter.
 
 ## Acceptance
 

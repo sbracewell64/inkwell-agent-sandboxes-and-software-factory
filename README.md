@@ -139,7 +139,7 @@ just inkwell test     # the suite the factory runs
   <img src="images/01_factory_spine.svg" alt="The factory spine: a deterministic ADW script sequencing plan, build, and test phases with agents as bounded nodes" width="750">
 </p>
 
-Twelve ADWs (AI Developer Workflows) under `adws/`, each a thin `uv run` script whose docstring is its chain: `adw_simple_sdlc` runs plan, build, test, review, document with three separate commits. Typed envelopes carry context between phases; gates validate every claim, and a failure re-enters the same session as a correction, never a restart. **Agent proposes, code disposes.**
+Twelve ADWs (AI Developer Workflows) under `adws/`, each a thin `uv run` script whose docstring is its chain: `adw_simple_sdlc` runs plan, build, test, review, document with three separate commits. Typed envelopes carry context between phases; gates validate every claim, and a failure launches a bounded no-session correction attempt charged to the same total budget. **Agent proposes, code disposes.**
 
 <p align="center">
   <img src="images/value/03_core_four.png" alt="An agent is four things: a model, a harness, tools, and a prompt, wired around a central agent node" width="750">
