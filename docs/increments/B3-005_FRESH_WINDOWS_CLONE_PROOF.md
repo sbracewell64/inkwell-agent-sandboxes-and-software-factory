@@ -62,13 +62,19 @@ The successful clone at `E:\SSSF-B3-005-PROOF-20260815-154222` began without Git
 
 `bin\sssf-windows.cmd --sandbox` then reconstructed the session PATH, passed host doctor, passed composed sandbox doctor, and passed B3-004 observability without external sqlite3. Persistent HKCU/HKLM environment values remained unchanged.
 
-### Review-required equivalence seam
+### Browser Sol environment-freshness ruling
 
-The actual method/evidence was routed through FirstMate and posted to control issue #3:
+The method/evidence submission is:
 
 `https://github.com/sbracewell64/firstmate-sol-control/issues/3#issuecomment-5302981383`
 
-Browser Sol had not ruled at closure preparation. This dimension remains `CNO / HOLD` and is not represented as PASS.
+Browser Sol ruled `WINDOWS_NATIVE_EQUIVALENCE = PASS` for the commissioned environment-freshness condition:
+
+- ruling: `https://github.com/sbracewell64/firstmate-sol-control/issues/3#issuecomment-5303198972`
+- PR review: `https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory/pull/1#pullrequestreview-4944257620`
+- exact reviewed head: `63bc5792e0db4d6fb152a947648e161ae47f1b14`
+
+The PASS proves only a native current-user process environment independent of inherited FirstMate/WSL/previous-SSSF augmentation. It does not assert equivalence for every GUI, Explorer, Start-menu, desktop, or interactive-session property. The provenance-only successor recording the ruling still requires applicability confirmation or exact-successor review before stronger use.
 
 ### Exactly one sandbox
 
@@ -111,8 +117,8 @@ Closed run record:
 - Merge the contribution branch.
 - Advance canonical `main`.
 - Create, move, or rewrite a final B3 freeze tag.
-- Self-approve Windows-native equivalence.
-- Repair the pre-existing setup model-probe gate.
+- Broaden Windows-native equivalence beyond the ruled environment-freshness scope.
+- Treat Browser Sol's exact-head review as automatically binding a provenance-only successor for stronger use.
 - Purchase credits or enable a metered path.
 - Execute an ADW or create guest commits.
 - Commit a runtime SQLite database.
@@ -123,14 +129,15 @@ Closed run record:
 
 The detailed proof record contains the authoritative dimension-by-dimension table. In summary:
 
-- fresh clone/bootstrap/front doors/persistent boundary: PASS except equivalence review seam;
-- Windows-native equivalence: CNO / HOLD;
-- exactly one sandbox lifecycle and source custody: PASS;
+- fresh clone/bootstrap/front doors/persistent boundary: PASS;
+- Windows-native equivalence: PASS for environment freshness only at exact reviewed head `63bc5792e0db4d6fb152a947648e161ae47f1b14`;
+- source acceptance correction: PASS / fail-closed;
 - Windows sqlite-free observability: PASS;
-- contradictory setup roster probe: FAIL / UNRESOLVED;
-- ordered teardown and residual-resource controls: PASS;
-- proof-clone no-edit and disposal: PASS;
-- merge, main advancement, and final B3 freeze: HOLD / NOT PERFORMED.
+- roster availability and typed final C/D/E marker: CNO / HOLD;
+- OBSERVE and end-to-end B3-005: CNO / HOLD;
+- GitHub CI: CNO because no checks are configured;
+- ordered teardown, residual-resource controls, proof-clone no-edit, and disposal: PASS;
+- merge, main advancement, tag creation, and final B3 freeze: HOLD / NOT PERFORMED.
 
 ## Reopened acceptance defect
 
@@ -167,6 +174,6 @@ Detailed correction/reproof evidence:
 
 ## Result
 
-The source acceptance defect is repaired and proved fail-closed from a new fresh Windows clone. Credits remained unavailable, so SETUP, OBSERVE, and end-to-end completion cannot be observed and remain CNO/HOLD. The first proof remains rejected as final evidence.
+The source acceptance defect is repaired and proved fail-closed from a new fresh Windows clone. Browser Sol passed Windows-native equivalence only for the commissioned environment-freshness scope at exact reviewed head `63bc5792e0db4d6fb152a947648e161ae47f1b14`. Credits remained unavailable, so SETUP completion, OBSERVE, and end-to-end completion remain CNO/HOLD. CI is CNO, and merge/main/tag/freeze remain held.
 
-**Result: ACCEPTANCE CORRECTION PASS; END-TO-END CNO/HOLD — NOT CERTIFIED**
+**Result: ENVIRONMENT FRESHNESS + ACCEPTANCE CORRECTION PASS; OVERALL B3-005 CNO/HOLD — NOT CERTIFIED**

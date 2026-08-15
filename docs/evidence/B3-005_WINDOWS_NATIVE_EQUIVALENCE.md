@@ -1,8 +1,9 @@
 # B3-005 Windows-Native Environment Equivalence Evidence
 
-**Gate:** `REQUIRED_REVIEW_BEFORE_PASS`
-**Current classification:** `CNO / HOLD — Browser Sol review pending`
+**Gate:** `PASS — Browser Sol; commissioned environment-freshness scope only`
+**Current classification:** `WINDOWS_NATIVE_EQUIVALENCE = PASS` at exact reviewed head `63bc5792e0db4d6fb152a947648e161ae47f1b14`
 **Successful proof candidate:** `efd84ab02fee4cb4c8e1e116616e039ba84a0546`
+**Repaired reproof candidate:** `7aedae1c3e8e7d3683ffea11f60d54458efb3cc6`
 **Proof clone:** `E:\SSSF-B3-005-PROOF-20260815-154222`
 **Evidence:** `docs/evidence/b3-005/bootstrap/`
 
@@ -18,7 +19,7 @@ The worker invoked Windows PowerShell only as a transport into Windows. The proo
 4. clears `ProcessStartInfo.EnvironmentVariables` completely;
 5. populates the child environment only from the independently created native user environment block.
 
-This is intended to reproduce the environment Windows constructs for the logged-on user without accepting any WSL worker PATH or prior SSSF bootstrap state. It is proposed as an automatable equivalent to a Start-menu Command Prompt; it is not self-approved.
+This reproduces a native current-user process environment without accepting any WSL worker PATH or prior SSSF bootstrap state. Browser Sol later accepted it as an automatable equivalent for that commissioned environment-freshness condition only. The ruling does not claim equivalence for every GUI, Explorer, Start-menu, desktop, or interactive-session property.
 
 The exact process-creation record is:
 
@@ -108,14 +109,20 @@ The defect was repaired only on the contribution branch in `efd84ab02fee4cb4c8e1
 
 The failed clone was then discarded, and the successful proof used the newly allocated `...154222` path.
 
-## Requested ruling
+## Browser Sol ruling
 
-Please rule only on whether the documented `CreateEnvironmentBlock(inherit=false)` plus cleared child environment is equivalent to the commissioned fresh Windows-native Command Prompt condition.
+Provenance:
+
+- equivalence submission: https://github.com/sbracewell64/firstmate-sol-control/issues/3#issuecomment-5302981383
+- ruling: https://github.com/sbracewell64/firstmate-sol-control/issues/3#issuecomment-5303198972
+- exact-head PR review: https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory/pull/1#pullrequestreview-4944257620
+
+Browser Sol ruled `WINDOWS_NATIVE_EQUIVALENCE = PASS` for the commissioned environment-freshness condition at exact reviewed head `63bc5792e0db4d6fb152a947648e161ae47f1b14`.
 
 ## Acceptance-correction reproof supplement
 
 After the first proof was rejected for an independent setup acceptance defect, repaired candidate `7aedae1c3e8e7d3683ffea11f60d54458efb3cc6` was cloned into newly allocated `E:\SSSF-B3-005-REPROOF-20260815-160826` using the same `CreateEnvironmentBlock(inherit=false)` method. It repeated the pre-bootstrap negative controls, root front doors, bootstrap reconstruction, and persistent-environment boundary. Supplementary evidence is under `docs/evidence/b3-005/reproof/bootstrap/`.
 
-The method did not change, and no ruling had arrived. Until that ruling, this dimension remains exactly:
+The method did not change. The later ruling applies PASS only to environment freshness and binds exact reviewed head `63bc5792e0db4d6fb152a947648e161ae47f1b14`.
 
-`CNO / HOLD — REQUIRED_REVIEW_BEFORE_PASS`
+The provenance-only successor that records the ruling still requires applicability confirmation or exact-successor review before stronger use. `OVERALL_B3_005 = CNO / HOLD`; roster availability, typed final C/D/E marker, OBSERVE/end-to-end, and no-CI remain CNO, while merge/main/tag/freeze remain `HOLD / NOT PERFORMED`.

@@ -50,7 +50,7 @@ The method/evidence proposal was posted by FirstMate to control issue #3:
 
 `https://github.com/sbracewell64/firstmate-sol-control/issues/3#issuecomment-5302981383`
 
-Browser Sol had not ruled when this record was prepared. Windows-native equivalence therefore remains `CNO / HOLD`, not PASS.
+Browser Sol had not ruled when this first-proof record was prepared. It later ruled `WINDOWS_NATIVE_EQUIVALENCE = PASS` for environment freshness only at exact reviewed successor head `63bc5792e0db4d6fb152a947648e161ae47f1b14`; see `B3-005_BROWSER_SOL_RULING.md`. The first proof remains rejected for its independent setup acceptance defect.
 
 ## Bootstrap restart discipline
 
@@ -147,7 +147,7 @@ The disposable proof clone, including its ignored host configuration, was then r
 |---|---|---|
 | Exact base, branch, and proof SHA | PASS | immutable Git identities above |
 | Fresh proof-clone creation and cleanliness | PASS | bootstrap output + final clone state |
-| Worker-independent native process environment | CNO / HOLD | posted evidence; Browser Sol ruling pending |
+| Worker-independent native process environment | PASS — environment freshness only | Browser Sol ruling 5303198972 + submission 5302981383 + PR review 4944257620 bind exact head `63bc5792e0db4d6fb152a947648e161ae47f1b14` |
 | Pre-bootstrap Git Bash PATH absence | PASS | bootstrap native environment + negative controls |
 | Pre-bootstrap accidental Git Bash executable absence | PASS | `where sh/cygpath/zsh` controls |
 | Root `just` and `just local` before bootstrap | PASS | bootstrap output |

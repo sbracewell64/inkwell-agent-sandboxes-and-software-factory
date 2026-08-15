@@ -64,7 +64,7 @@ Evidence:
 
 `docs/evidence/b3-005/reproof/bootstrap/`
 
-Windows-native equivalence itself remains `CNO / HOLD` pending the already-requested Browser Sol ruling; this reproof does not self-approve it.
+Browser Sol later ruled `WINDOWS_NATIVE_EQUIVALENCE = PASS` for environment freshness only at exact reviewed head `63bc5792e0db4d6fb152a947648e161ae47f1b14`; provenance is recorded in `B3-005_BROWSER_SOL_RULING.md`. The PASS does not extend to GUI/Explorer/session properties, and the provenance-only successor requires applicability confirmation or exact-successor review before stronger use.
 
 ## Fresh live lifecycle reproof
 
@@ -178,9 +178,9 @@ Evidence:
 | VM absence / closed run record | PASS |
 | Proof clone clean/no patch-and-continue | PASS |
 | Proof clone/config disposal | PASS |
-| Windows-native equivalence review | CNO / HOLD — Browser Sol ruling pending |
+| Windows-native equivalence | PASS — environment freshness only; Browser Sol ruling 5303198972 and PR review 4944257620 bind exact head `63bc5792e0db4d6fb152a947648e161ae47f1b14` |
 | Merge/main/final B3 freeze | HOLD / NOT PERFORMED |
 
 ## Result
 
-The acceptance defect is repaired and proved fail-closed from a newly allocated fresh Windows clone and sandbox. Credits remained unavailable, so the lawful result is `CNO / HOLD`. This PR must not claim end-to-end PASS and remains non-mergeable/non-freezable under PRE_CERTIFICATION.
+The acceptance defect is repaired and proved fail-closed from a newly allocated fresh Windows clone and sandbox. Browser Sol passed only the independent Windows environment-freshness equivalence dimension. Credits remained unavailable, so `OVERALL_B3_005` lawfully remains `CNO / HOLD`. CI remains CNO, and this PR remains non-mergeable/non-freezable under PRE_CERTIFICATION.

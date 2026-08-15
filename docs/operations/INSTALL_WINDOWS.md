@@ -136,7 +136,7 @@ A failed or unavailable control is CNO, never PASS.
 
 ## B3-005 PRE_CERTIFICATION note
 
-B3-005's first sandbox exposed a contradictory setup acceptance defect and was rejected as final evidence. A repaired candidate was then proved from a new fresh clone and sandbox: unavailable credits correctly stopped SETUP as CNO/HOLD with no downstream PASS, and teardown completed cleanly. OBSERVE/end-to-end and automated Windows-native equivalence remain `CNO / HOLD`. Do not use the PRE_CERTIFICATION record to merge, advance canonical `main`, or establish a final B3 freeze tag.
+B3-005's first sandbox exposed a contradictory setup acceptance defect and was rejected as final evidence. A repaired candidate was then proved from a new fresh clone and sandbox: unavailable credits correctly stopped SETUP as CNO/HOLD with no downstream PASS, and teardown completed cleanly. Browser Sol passed the automated Windows-native method only for proving environment freshness at exact reviewed head `63bc5792e0db4d6fb152a947648e161ae47f1b14`; it does not prove GUI/Explorer/session equivalence. Roster, typed final C/D/E marker, OBSERVE/end-to-end, and no-CI remain CNO/HOLD, while merge/main/tag/freeze remain held. Do not use the PRE_CERTIFICATION record to merge, advance canonical `main`, or establish a final B3 freeze tag.
 
 Detailed evidence:
 
@@ -144,3 +144,4 @@ Detailed evidence:
 - `docs/evidence/B3-005_FRESH_CLONE_PROOF.md`
 - `docs/evidence/B3-005_ACCEPTANCE_CORRECTION_REPROOF.md`
 - `docs/evidence/B3-005_WINDOWS_NATIVE_EQUIVALENCE.md`
+- `docs/evidence/B3-005_BROWSER_SOL_RULING.md`

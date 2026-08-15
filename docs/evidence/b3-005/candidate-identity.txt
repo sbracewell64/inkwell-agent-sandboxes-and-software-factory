@@ -94,6 +94,7 @@ validators_tests_end
 calibrated_control_log=docs/evidence/b3-005/validation.txt
 exact_candidate_validation_log=docs/evidence/b3-005/candidate-validation.txt
 unresolved_rows=docs/evidence/B3-005_FRESH_CLONE_PROOF.md#acceptance-table
-windows_native_equivalence=CNO/HOLD pending Browser Sol ruling
+windows_native_equivalence=PASS environment-freshness-only under later Browser Sol review of exact successor head 63bc5792e0db4d6fb152a947648e161ae47f1b14
+windows_native_equivalence_provenance=issuecomment-5303198972 submission-5302981383 pullrequestreview-4944257620
 setup_roster_probe=FAIL/UNRESOLVED
 merge_main_freeze=HOLD/NOT_PERFORMED

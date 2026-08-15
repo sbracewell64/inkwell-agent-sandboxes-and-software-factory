@@ -77,7 +77,8 @@
 | B3-004-H1 correction isolation | only ledger, proof matrix, and B3-004 increment record differ from flawed closure `15bbea9` | PASS |
 | B3-004-H1 clean closure correction | original B3-004 tag preserved; separate correction state establishes the clean base for subsequent B3 work | PASS |
 | B3-005 first-proof exact source | first fresh clone, guest, and closed run record agree on canonical repository and `efd84ab02fee4cb4c8e1e116616e039ba84a0546` | PASS DIAGNOSTIC; FIRST ACCEPTANCE REJECTED |
-| B3-005 fresh native environment equivalence | `CreateEnvironmentBlock(inherit=false)` method/evidence posted to control issue #3 | CNO / HOLD — BROWSER SOL RULING PENDING |
+| B3-005 Windows-native environment equivalence | Browser Sol ruling [5303198972](https://github.com/sbracewell64/firstmate-sol-control/issues/3#issuecomment-5303198972), submission [5302981383](https://github.com/sbracewell64/firstmate-sol-control/issues/3#issuecomment-5302981383), and PR review [4944257620](https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory/pull/1#pullrequestreview-4944257620) bind exact reviewed head `63bc5792e0db4d6fb152a947648e161ae47f1b14` | PASS — ENVIRONMENT FRESHNESS ONLY |
+| B3-005 exact-candidate Browser Sol review | source/equivalence review found no blocking correction defect at exact head `63bc5792e0db4d6fb152a947648e161ae47f1b14` | PASS FOR PRE_CERTIFICATION ONLY; SUCCESSOR NEEDS APPLICABILITY CONFIRMATION |
 | B3-005 pre-bootstrap Git Bash absence | native PATH excluded Git `bin`/`usr\\bin`; `sh`, `cygpath`, and `zsh` did not resolve | PASS |
 | B3-005 Windows root front doors | fresh native child ran root `just` and `just local` before bootstrap | PASS |
 | B3-005 bootstrap reconstruction | repository bootstrap introduced required session paths and complete host + composed sandbox doctor passed | PASS |
@@ -99,7 +100,7 @@
 | B3-005 proof clone source custody | first failed clone stopped/discarded; restarted clone had exact clean HEAD and no tracked diff | PASS |
 | B3-005 disposable clone cleanup | successful proof clone and ignored host config removed after evidence capture | PASS |
 | B3-005 merge/freeze authority | PRE_CERTIFICATION forbids merge, main advancement, and final B3 tag | HOLD / NOT PERFORMED |
-| B3 portability complete | acceptance correction proved fail-closed, but unavailable credits held SETUP and made OBSERVE/end-to-end unobservable; native equivalence and certification also remain held | CNO / HOLD — NOT CERTIFIED |
+| B3 portability complete | native environment freshness passed Browser Sol review, but unavailable credits held SETUP, typed final C/D/E evidence, and OBSERVE/end-to-end; CI has no checks and certification remains held | CNO / HOLD — NOT CERTIFIED |
 | B4-001 offline check discovery | run `31907345967` at `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: each OS discovered and executed 6/6 checks | PASS |
 | B4-001 non-vacuous projection | each job retained 6 observed-good, 0 observed-bad, and 0 could-not-observe results | PASS |
 | B4-001 watched-red controls | empty checks/matrix, validator failure, missing tool, cancellation/timeout, workflow path/trigger drift, and exact-head ref drift each observed red | PASS |
