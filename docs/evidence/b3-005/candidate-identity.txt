@@ -1,0 +1,98 @@
+B3-005 closure candidate identity
+captured_utc=2026-08-15T15:56:48Z
+repository=https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+branch=increment/b3-005-fresh-windows-clone-proof
+base=04e5484a6190f033d25e1626b96a4cca93b7f755
+candidate=f1e955051b7a0971d808bd0588fbe4551d7e5d62
+tree=50d5cc083e56f4b12df24786ff1c85d6cc893bb6
+local_branch_sha=f1e955051b7a0971d808bd0588fbe4551d7e5d62
+local_tracking_sha=f1e955051b7a0971d808bd0588fbe4551d7e5d62
+remote_branch_sha_observed_via_gh_axi=f1e955051b7a0971d808bd0588fbe4551d7e5d62
+remote_main_sha_observed_via_gh_axi=04e5484a6190f033d25e1626b96a4cca93b7f755
+base_tag_object_observed_via_gh_axi=0f9505b68b47b40751a172ceb58ee83d5fc78112
+base_tag_peeled_sha_observed_via_gh_axi=04e5484a6190f033d25e1626b96a4cca93b7f755
+remote_ref_verifier=UNDECLARED_GAP; exact API observations retained in task execution
+candidate_status_at_validation_and_remote_observation=clean
+candidate_branch_tracking_delta=+0/-0
+publication_attestation_note=this file is added after candidate publication and is not part of candidate tree
+changed_files_begin
+M	docs/baseline/INCREMENT_LEDGER.md
+M	docs/baseline/PROOF_MATRIX.md
+A	docs/evidence/B3-005_FRESH_CLONE_PROOF.md
+A	docs/evidence/B3-005_WINDOWS_NATIVE_EQUIVALENCE.md
+A	docs/evidence/B3-005_WINDOWS_NATIVE_PROOF.ps1
+A	docs/evidence/b3-005/artifact-sha256-manifest.txt
+A	docs/evidence/b3-005/bootstrap/exit-code.txt
+A	docs/evidence/b3-005/bootstrap/native-process-environment.txt
+A	docs/evidence/b3-005/bootstrap/persistent-environment-after.txt
+A	docs/evidence/b3-005/bootstrap/persistent-environment-before.txt
+A	docs/evidence/b3-005/bootstrap/persistent-environment-comparison.txt
+A	docs/evidence/b3-005/bootstrap/persistent-environment-diff.txt
+A	docs/evidence/b3-005/bootstrap/process-creation.txt
+A	docs/evidence/b3-005/bootstrap/proof-driver.cmd
+A	docs/evidence/b3-005/bootstrap/sha256-manifest.txt
+A	docs/evidence/b3-005/bootstrap/stderr.txt
+A	docs/evidence/b3-005/bootstrap/stdout.txt
+A	docs/evidence/b3-005/closed-run-record.json
+A	docs/evidence/b3-005/failed-bootstrap/exit-code.txt
+A	docs/evidence/b3-005/failed-bootstrap/failed-proof-state.txt
+A	docs/evidence/b3-005/failed-bootstrap/native-process-environment.txt
+A	docs/evidence/b3-005/failed-bootstrap/persistent-environment-after.txt
+A	docs/evidence/b3-005/failed-bootstrap/persistent-environment-before.txt
+A	docs/evidence/b3-005/failed-bootstrap/process-creation.txt
+A	docs/evidence/b3-005/failed-bootstrap/proof-driver.cmd
+A	docs/evidence/b3-005/failed-bootstrap/sha256-manifest.txt
+A	docs/evidence/b3-005/failed-bootstrap/stderr.txt
+A	docs/evidence/b3-005/failed-bootstrap/stdout.txt
+A	docs/evidence/b3-005/final-proof-clone-state.txt
+A	docs/evidence/b3-005/lifecycle/exit-code.txt
+A	docs/evidence/b3-005/lifecycle/native-process-environment.txt
+A	docs/evidence/b3-005/lifecycle/persistent-environment-after.txt
+A	docs/evidence/b3-005/lifecycle/persistent-environment-before.txt
+A	docs/evidence/b3-005/lifecycle/persistent-environment-comparison.txt
+A	docs/evidence/b3-005/lifecycle/persistent-environment-diff.txt
+A	docs/evidence/b3-005/lifecycle/process-creation.txt
+A	docs/evidence/b3-005/lifecycle/proof-driver.cmd
+A	docs/evidence/b3-005/lifecycle/sha256-manifest.txt
+A	docs/evidence/b3-005/lifecycle/stderr.txt
+A	docs/evidence/b3-005/lifecycle/stdout.txt
+A	docs/evidence/b3-005/proof-clone-disposal.txt
+A	docs/evidence/b3-005/teardown/exit-code.txt
+A	docs/evidence/b3-005/teardown/fleet-after.json
+A	docs/evidence/b3-005/teardown/native-process-environment.txt
+A	docs/evidence/b3-005/teardown/persistent-environment-after.txt
+A	docs/evidence/b3-005/teardown/persistent-environment-before.txt
+A	docs/evidence/b3-005/teardown/persistent-environment-comparison.txt
+A	docs/evidence/b3-005/teardown/persistent-environment-diff.txt
+A	docs/evidence/b3-005/teardown/process-creation.txt
+A	docs/evidence/b3-005/teardown/proof-driver.cmd
+A	docs/evidence/b3-005/teardown/sha256-manifest.txt
+A	docs/evidence/b3-005/teardown/stderr.txt
+A	docs/evidence/b3-005/teardown/stdout.txt
+A	docs/evidence/b3-005/validation.txt
+A	docs/increments/B3-005_FRESH_WINDOWS_CLONE_PROOF.md
+M	docs/operations/INSTALL_WINDOWS.md
+changed_files_end
+validators_tests_begin
+calibrated line-ending red control: RED as expected
+B3-002 line-ending validator --require-worktree-lf: PASS
+calibrated sandbox source-contract red control: RED as expected
+B2-002 sandbox source contract: PASS
+B1 agent bootstrap: PASS
+B2-001 repository ownership (isolated complete-ref clone): PASS
+evidence SHA-256 manifests and closed JSON: PASS (40 manifest entries)
+calibrated manifest wrong-digest control: RED as expected
+PowerShell parser reached invalid-parameter control without parser error: PASS
+Windows B3-004 --require-no-external-sqlite3: PASS
+calibrated Bun missing-test control: RED as expected
+Bun Inkwell: 30 pass, 0 fail, 230 expect calls
+Python compile: PASS
+git diff/show whitespace checks: PASS
+tracked evidence sensitive-value scan: PASS
+validators_tests_end
+calibrated_control_log=docs/evidence/b3-005/validation.txt
+exact_candidate_validation_log=docs/evidence/b3-005/candidate-validation.txt
+unresolved_rows=docs/evidence/B3-005_FRESH_CLONE_PROOF.md#acceptance-table
+windows_native_equivalence=CNO/HOLD pending Browser Sol ruling
+setup_roster_probe=FAIL/UNRESOLVED
+merge_main_freeze=HOLD/NOT_PERFORMED
