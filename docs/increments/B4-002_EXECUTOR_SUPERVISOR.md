@@ -1,7 +1,10 @@
 # B4-002 — Owned Executor Supervisor and Strict Pi Adapter
 
-**Status:** CANDIDATE — LOCAL PROVIDER-FREE PROOF COMPLETE; EXACT-HEAD CI CNO
+**Status:** PROVEN AT REVIEWED IMPLEMENTATION HEAD; CLOSURE SUCCESSOR CI CNO
 **Starts from:** `a984f6cf0a89503d3db8855ccd820b83e9ee60a1`
+**Reviewed implementation:** `2291725cf0782b40ce01a17d29b6415a51b130de`
+**Proof workflow run:** `31911734134`
+**Supervisory ruling:** Browser Sol `5304605032`
 **Decision:** `docs/decisions/ADR-0003-OWNED-SUBPROCESS-SUPERVISION.md`
 
 ## Problem
@@ -80,6 +83,27 @@ The check is the seventh repository-owned offline CI manifest entry. Linux runs
 all process fixtures. Windows runs the nonempty static/parser/refusal proof and
 reports runtime execution as CNO; it does not skip into a false pass.
 
+## Exact reviewed pull-request proof
+
+Browser Sol ruling `5304605032` rechecked canonical `main` at
+`a984f6cf0a89503d3db8855ccd820b83e9ee60a1` and PR 7 as open, non-draft,
+unmerged, and clean at exact reviewed head
+`2291725cf0782b40ce01a17d29b6415a51b130de`. Workflow run `31911734134`
+completed the required nonempty Linux and Windows checks successfully on that
+exact head.
+
+The Linux result projects the full provider-free process fixtures. The green
+Windows result proves that the static/parser controls execute and unsupported
+provider execution fails closed with the required typed refusal. It does
+**not** prove Windows provider execution or descendant containment:
+`WINDOWS_PROVIDER_EXECUTION` remains `CNO/REFUSED` until a proven Job Object
+path lands.
+
+This closure successor changes only this increment record, the increment
+ledger, and the proof matrix. Its own exact head still requires fresh nonempty
+Linux and Windows checks before landing; neither check may be inferred from run
+`31911734134`.
+
 ## Refusal conditions
 
 Launch refuses, without a child, for invalid argv/cwd/environment bounds,
@@ -118,7 +142,13 @@ no-tools/read-only transport and accounting adapters remain separate.
 
 ## Acceptance state
 
-Local focused fixtures and the full provider-free project gate must pass.
-Acceptance additionally requires nonempty Linux and Windows checks on the exact
-PR head. Until those checks exist and match, this increment remains CNO and
-must not land.
+Local focused fixtures and the full provider-free project gate passed for the
+reviewed implementation. Browser Sol ruling `5304605032` accepts workflow run
+`31911734134` as nonempty exact-head Linux and Windows proof for
+`2291725cf0782b40ce01a17d29b6415a51b130de`, while preserving Windows provider
+execution as `CNO/REFUSED`.
+
+This provenance-only successor remains CNO until fresh nonempty Linux and
+Windows checks complete successfully on its own exact head. An absent, pending,
+mismatched, skipped, cancelled, neutral, timed-out, or failing check is not
+PASS and does not authorize landing.

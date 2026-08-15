@@ -90,7 +90,10 @@
 | B4-002 stdin parent-tail regression | inherited-stdin control suppresses marker; owned supervisor preserves required typed parent-tail marker | PASS — WATCHED RED + LOCAL FIXTURE |
 | B4-002 protocol and attempt accounting | malformed/missing/duplicate terminal events and hidden retry are typed and charged against common budget | PASS — LOCAL FIXTURE |
 | B4-002 Windows descendant containment | Job Object path is not implemented; launch returns typed CNO before spawn | CNO — HONEST REFUSAL |
-| B4-002 exact PR-head projection | seventh provider-free check must be discovered/executed in nonempty Linux and Windows jobs on exact PR head | CNO UNTIL OBSERVED |
+| B4-002 reviewed Linux PR-head projection | run `31911734134` completed the nonempty Linux checks on exact reviewed head `2291725cf0782b40ce01a17d29b6415a51b130de` | PASS — RULING `5304605032` |
+| B4-002 reviewed Windows PR-head projection | run `31911734134` completed the nonempty Windows static/parser/refusal checks on the same exact reviewed head | PASS — FAIL-CLOSED REFUSAL PROJECTION |
+| WINDOWS_PROVIDER_EXECUTION | green Windows CI proves refusal, not provider launch, Job Object custody, or descendant cleanup | CNO/REFUSED |
+| B4-002 closure successor execution | provenance-only successor must complete fresh nonempty Linux and Windows checks on its own exact head | CNO UNTIL OBSERVED |
 
 ## Rule
 
