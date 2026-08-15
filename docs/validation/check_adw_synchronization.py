@@ -202,6 +202,101 @@ def is_run_finish_call(node: ast.AST | None) -> bool:
     )
 
 
+def constant_truth(node: ast.AST) -> bool | None:
+    if isinstance(node, ast.Constant):
+        return bool(node.value)
+    return None
+
+
+def block_may_fall_through(statements: list[ast.stmt]) -> bool | None:
+    for statement in statements:
+        result = statement_may_fall_through(statement)
+        if result is not True:
+            return result
+    return True
+
+
+def block_reaches_break(statements: list[ast.stmt]) -> bool | None:
+    for statement in statements:
+        reaches = statement_reaches_break(statement)
+        if reaches is not False:
+            return reaches
+        falls_through = statement_may_fall_through(statement)
+        if falls_through is not True:
+            return falls_through
+    return False
+
+
+def statement_reaches_break(statement: ast.stmt) -> bool | None:
+    if isinstance(statement, ast.Break):
+        return True
+    if isinstance(statement, ast.If):
+        truth = constant_truth(statement.test)
+        if truth is True:
+            return block_reaches_break(statement.body)
+        if truth is False:
+            return block_reaches_break(statement.orelse)
+        body = block_reaches_break(statement.body)
+        otherwise = block_reaches_break(statement.orelse)
+        if body is True or otherwise is True:
+            return True
+        if body is None or otherwise is None:
+            return None
+        return False
+    if isinstance(statement, (ast.With, ast.AsyncWith)):
+        return block_reaches_break(statement.body)
+    if isinstance(statement, (ast.For, ast.AsyncFor, ast.While)):
+        return False
+    if isinstance(statement, (ast.Match, ast.Try, ast.TryStar)):
+        return None
+    return False
+
+
+def statement_may_fall_through(statement: ast.stmt) -> bool | None:
+    if isinstance(statement, (ast.Return, ast.Raise, ast.Break, ast.Continue)):
+        return False
+    if isinstance(statement, ast.If):
+        truth = constant_truth(statement.test)
+        if truth is True:
+            return block_may_fall_through(statement.body)
+        if truth is False:
+            return block_may_fall_through(statement.orelse)
+        body = block_may_fall_through(statement.body)
+        otherwise = block_may_fall_through(statement.orelse) if statement.orelse else True
+        if body is True or otherwise is True:
+            return True
+        if body is None or otherwise is None:
+            return None
+        return False
+    if isinstance(statement, (ast.With, ast.AsyncWith)):
+        return block_may_fall_through(statement.body)
+    if isinstance(statement, (ast.For, ast.AsyncFor)):
+        if not statement.orelse:
+            return True
+        exhausted = block_may_fall_through(statement.orelse)
+        breaks = block_reaches_break(statement.body)
+        if exhausted is True or breaks is True:
+            return True
+        if exhausted is None or breaks is None:
+            return None
+        return False
+    if isinstance(statement, ast.While):
+        truth = constant_truth(statement.test)
+        if truth is None:
+            return None
+        if truth is False:
+            return block_may_fall_through(statement.orelse) if statement.orelse else True
+        return block_reaches_break(statement.body)
+    if isinstance(statement, (ast.Match, ast.Try, ast.TryStar)):
+        return None
+    simple = (
+        ast.Assign, ast.AnnAssign, ast.AugAssign, ast.Assert, ast.Delete, ast.Expr,
+        ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Global, ast.Import,
+        ast.ImportFrom, ast.Nonlocal, ast.Pass,
+    )
+    return True if isinstance(statement, simple) else None
+
+
 def class_fields(
     tree: ast.Module,
 ) -> tuple[dict[str, ast.ClassDef], Callable[[str, set[str] | None], set[str]]]:
@@ -320,10 +415,17 @@ def check_script(
         finish_calls = [node for node in ast.walk(main) if is_run_finish_call(node)]
         final = main.body[-1] if main.body else None
         final_call = final.value if isinstance(final, ast.Return) else None
-        if len(finish_calls) != 1 or not is_run_finish_call(final_call):
+        final_contract = len(finish_calls) == 1 and is_run_finish_call(final_call)
+        prefix_falls_through = block_may_fall_through(main.body[:-1])
+        if not final_contract:
             errors.append(
                 f"CNO: {path}: main() must contain exactly one run.finish() call as its "
                 "final top-level return"
+            )
+        elif prefix_falls_through is not True:
+            errors.append(
+                f"CNO: {path}: main() prefix does not provably fall through to final "
+                "run.finish()"
             )
         else:
             inventory.finish_calls += 1
@@ -523,6 +625,7 @@ def main() -> int:
     if red_controls_passed:
         print("compound-reachability-red-controls: PASS")
         print("top-level-final-return-finish-contract: PASS")
+        print("prefix-fallthrough-contract: PASS")
     return 0
 
 

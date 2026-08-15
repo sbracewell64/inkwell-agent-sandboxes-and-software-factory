@@ -18,7 +18,7 @@ Non-goals are provider execution, sandbox lifecycle, migration/expansion, gate s
 
 - resolves imports and imported module attributes against the matching `adw_modules` tree;
 - requires every `AgentCall` to name a concrete `EnvelopeBase` subclass as `output_type`;
-- requires exactly one `run.finish()` call as the final top-level `return` in `main()` and rejects any other or nested finish and removed `run.succeeded` use;
+- requires exactly one `run.finish()` call as the final top-level `return` in `main()`, proves the bounded statement prefix can fall through to it, and rejects any other or nested finish and removed `run.succeeded` use;
 - recursively derives third-party imports and compares them with each script's PEP 723 dependencies;
 - compares every prompt `Report` JSON object's fields with its named output type, including inherited fields;
 - imports the disposable generated script with its declared dependencies without calling `main()` or any provider.
@@ -57,4 +57,4 @@ Accepted inventory at implementation time:
 - 1 generated import-only smoke;
 - 16 watched-red fixtures.
 
-The validator printed `HD-02 ADW synchronization: PASS`, `compound-reachability-red-controls: PASS`, and `top-level-final-return-finish-contract: PASS`. No provider/model or sandbox was invoked.
+The validator printed `HD-02 ADW synchronization: PASS`, `compound-reachability-red-controls: PASS`, `top-level-final-return-finish-contract: PASS`, and `prefix-fallthrough-contract: PASS`. No provider/model or sandbox was invoked.
