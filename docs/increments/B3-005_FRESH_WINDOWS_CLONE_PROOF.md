@@ -1,6 +1,6 @@
 # B3-005 — Fresh Windows Clone End-to-End Proof
 
-**Status:** PRE_CERTIFICATION — REVERSIBLE PROOF COMPLETE; HOLDS OPEN
+**Status:** PRE_CERTIFICATION — REOPENED; ACCEPTANCE CORRECTION AWAITS FRESH REPROOF
 **Commission:** `SOL-FM-SSSF-B3-005-001`
 **Starts from:** `sssf-b3-004-closure-hygiene-correction`
 **Base SHA:** `04e5484a6190f033d25e1626b96a4cca93b7f755`
@@ -130,10 +130,23 @@ The detailed proof record contains the authoritative dimension-by-dimension tabl
 - proof-clone no-edit and disposal: PASS;
 - merge, main advancement, and final B3 freeze: HOLD / NOT PERFORMED.
 
+## Reopened acceptance defect
+
+Independent PR review rejected the first proof as final evidence. Four insufficient-credit roster failures were followed by unconditional Gate C/D/E PASS lines because host acceptance trusted the remote transport result without requiring typed subgate evidence or reconciling the captured diagnostics. The contradiction is a source-level acceptance defect, not merely a known limitation.
+
+The bounded correction adds:
+
+- one typed remote `SSSF_CDE_RESULT` marker;
+- explicit `PASS` / `FAIL` / `CNO` states for roster, live cost, and runtime-key evidence;
+- host capture of complete remote output and remote exit status;
+- deterministic reconciliation in `tools/setup_cde_acceptance.py`;
+- regression validation in `docs/validation/check_setup_cde_acceptance.py`;
+- Windows host-doctor composition of that validator.
+
+The old insufficient-credit output now classifies `CNO/HOLD`; it cannot reach downstream PASS. A repaired candidate must be published and proved from another newly allocated fresh Windows clone. No proof-clone patch-and-continue is permitted.
+
 ## Result
 
-B3-005 completed every independent reversible PRE_CERTIFICATION action and retained the required source, environment, lifecycle, observability, custody, cleanup, and three-valued evidence.
+The first proof and its cleanup remain durable diagnostic evidence, but they are not final B3-005 acceptance evidence. B3-005 is reopened pending the required fresh-clone proof of the acceptance correction.
 
-It does not certify B3. Windows-native equivalence and formal merge/freeze authority remain held, and the contradictory model-probe gate remains visible.
-
-**Result: PRE_CERTIFICATION PROOF COMPLETE — CNO/HOLD DIMENSIONS OPEN**
+**Result: REOPENED — FRESH REPROOF REQUIRED**

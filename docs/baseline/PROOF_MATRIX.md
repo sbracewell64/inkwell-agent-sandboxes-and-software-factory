@@ -85,7 +85,8 @@
 | B3-005 Windows sqlite-free observability | external sqlite3 absent; explicit B3-004 no-external validator passed | PASS |
 | B3-005 exactly one sandbox | `b3-005-proof-20260815-b30005` completed create/fill/setup/observe | PASS |
 | B3-005 guest provenance | FILL, SETUP Gate A, independent guest inspection, and run record agree on repo/SHA/cleanliness | PASS |
-| B3-005 setup roster probe | four insufficient-credit failures were followed by contradictory Gate C/D/E PASS | FAIL / UNRESOLVED |
+| B3-005 first-proof setup acceptance | four insufficient-credit failures were followed by contradictory Gate C/D/E PASS | FAILED ACCEPTANCE; FIRST PROOF REJECTED |
+| B3-005 typed C/D/E reconciliation | deterministic helper rejects contradictory diagnostics and classifies missing/unavailable evidence CNO/HOLD | PASS STATIC; LIVE REPROOF PENDING |
 | B3-005 Linux guest sqlite absence | `/bin/sqlite3` exists; Windows-only executable-absence assertion was over-scoped to guest | NOT APPLICABLE; REJECTED OVER-SCOPE |
 | B3-005 observe services | public app HTTP 200; owner-gated observability HTTP 307 | PASS |
 | B3-005 teardown custody and order | spend, artifacts, harvest preceded revoke/destroy; artifact hash inventory retained | PASS |
@@ -93,7 +94,7 @@
 | B3-005 proof clone source custody | first failed clone stopped/discarded; restarted clone had exact clean HEAD and no tracked diff | PASS |
 | B3-005 disposable clone cleanup | successful proof clone and ignored host config removed after evidence capture | PASS |
 | B3-005 merge/freeze authority | PRE_CERTIFICATION forbids merge, main advancement, and final B3 tag | HOLD / NOT PERFORMED |
-| B3 portability complete | reversible proof prepared, but Windows-native equivalence and formal certification remain held | CNO / HOLD — NOT CERTIFIED |
+| B3 portability complete | first proof rejected after acceptance defect; repaired candidate requires a new fresh clone and live lifecycle reproof | REOPENED / NOT CERTIFIED |
 | B4-001 offline check discovery | run `31907345967` at `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: each OS discovered and executed 6/6 checks | PASS |
 | B4-001 non-vacuous projection | each job retained 6 observed-good, 0 observed-bad, and 0 could-not-observe results | PASS |
 | B4-001 watched-red controls | empty checks/matrix, validator failure, missing tool, cancellation/timeout, workflow path/trigger drift, and exact-head ref drift each observed red | PASS |

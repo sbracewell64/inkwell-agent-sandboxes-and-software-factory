@@ -4,7 +4,11 @@
 **Mode:** `PRE_CERTIFICATION`
 **Proof candidate:** `efd84ab02fee4cb4c8e1e116616e039ba84a0546`
 **Run ID:** `b3-005-proof-20260815-b30005`
-**Disposition:** reversible proof complete; certification dimensions held
+**Disposition:** REJECTED AS FINAL ACCEPTANCE; retained as diagnostic and cleanup evidence
+
+## Reopened source-level defect
+
+PR review determined that the four insufficient-credit diagnostics followed by Gate C/D/E PASS expose a source acceptance defect. This record remains authoritative for what the first proof observed and for its successful lifecycle teardown, but it cannot close B3-005. A repaired candidate and newly allocated fresh proof clone are required. The correction/reproof evidence is retained separately and no row below is promoted by reinterpretation.
 
 ## Source identities
 
