@@ -68,7 +68,7 @@ for required in (
         errors.append(f"setup.just missing provenance gate: {required}")
 
 origin = git("remote", "get-url", "origin")
-if origin != CANONICAL:
+if origin.removesuffix(".git") != CANONICAL.removesuffix(".git"):
     errors.append(
         f"origin is {origin!r}, expected canonical repository"
     )

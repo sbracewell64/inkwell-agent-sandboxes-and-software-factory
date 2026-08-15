@@ -38,6 +38,11 @@ canonical remote and GitHub CLI. It is not provider-free/offline. No ADW,
 model, sandbox, host lifecycle, B3 acceptance, DSH, migration, or expansion
 path is invoked.
 
+The B2-002 validator treats the optional trailing `.git` in an HTTPS remote
+URL as syntax, not repository identity. This preserves its exact canonical
+owner/repository check while allowing the equivalent `origin` URL installed
+by `actions/checkout`.
+
 The validators use repository files and disposable local fixtures. The Inkwell
 suite uses a temporary SQLite database and loopback server and removes its
 files after completion.
