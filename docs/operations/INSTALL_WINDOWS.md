@@ -108,7 +108,7 @@ just sbx run cmd <run-id> "git remote get-url origin && git rev-parse HEAD && gi
 
 Repository, exact SHA, and clean status must agree with the host run record and SETUP Gate A.
 
-A model probe that prints failures and later claims PASS is contradictory evidence. Record that dimension as failed/unresolved; do not use the later PASS line alone.
+SETUP C/D/E acceptance requires one typed result marker reconciled against complete remote output and transport status. A failure diagnostic, missing marker, malformed marker, unavailable model/cost observation, or transport contradiction cannot produce downstream PASS. Unavailable credits classify the gate CNO/HOLD and stop setup; do not purchase credits merely to make a portability proof green.
 
 ## Teardown
 
@@ -136,10 +136,11 @@ A failed or unavailable control is CNO, never PASS.
 
 ## B3-005 PRE_CERTIFICATION note
 
-B3-005 demonstrated this flow from a fresh clone through exactly one disposable sandbox and full teardown. Its automated Windows-native environment equivalence remains `CNO / HOLD` pending Browser Sol review. Do not use the PRE_CERTIFICATION record to merge, advance canonical `main`, or establish a final B3 freeze tag.
+B3-005's first sandbox exposed a contradictory setup acceptance defect and was rejected as final evidence. A repaired candidate was then proved from a new fresh clone and sandbox: unavailable credits correctly stopped SETUP as CNO/HOLD with no downstream PASS, and teardown completed cleanly. OBSERVE/end-to-end and automated Windows-native equivalence remain `CNO / HOLD`. Do not use the PRE_CERTIFICATION record to merge, advance canonical `main`, or establish a final B3 freeze tag.
 
 Detailed evidence:
 
 - `docs/increments/B3-005_FRESH_WINDOWS_CLONE_PROOF.md`
 - `docs/evidence/B3-005_FRESH_CLONE_PROOF.md`
+- `docs/evidence/B3-005_ACCEPTANCE_CORRECTION_REPROOF.md`
 - `docs/evidence/B3-005_WINDOWS_NATIVE_EQUIVALENCE.md`

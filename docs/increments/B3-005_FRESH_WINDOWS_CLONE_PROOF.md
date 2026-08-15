@@ -1,12 +1,14 @@
 # B3-005 — Fresh Windows Clone End-to-End Proof
 
-**Status:** PRE_CERTIFICATION — REOPENED; ACCEPTANCE CORRECTION AWAITS FRESH REPROOF
+**Status:** PRE_CERTIFICATION — ACCEPTANCE CORRECTED; END-TO-END CNO/HOLD
 **Commission:** `SOL-FM-SSSF-B3-005-001`
 **Starts from:** `sssf-b3-004-closure-hygiene-correction`
 **Base SHA:** `04e5484a6190f033d25e1626b96a4cca93b7f755`
 **Branch:** `increment/b3-005-fresh-windows-clone-proof`
 **Proof candidate:** `efd84ab02fee4cb4c8e1e116616e039ba84a0546`
-**Proof run:** `b3-005-proof-20260815-b30005`
+**Proof run:** `b3-005-proof-20260815-b30005` (rejected as final acceptance)
+**Acceptance repair candidate:** `7aedae1c3e8e7d3683ffea11f60d54458efb3cc6`
+**Fresh reproof run:** `b3-005-reproof-20260815-b30006`
 
 ## Problem
 
@@ -143,10 +145,28 @@ The bounded correction adds:
 - regression validation in `docs/validation/check_setup_cde_acceptance.py`;
 - Windows host-doctor composition of that validator.
 
-The old insufficient-credit output now classifies `CNO/HOLD`; it cannot reach downstream PASS. A repaired candidate must be published and proved from another newly allocated fresh Windows clone. No proof-clone patch-and-continue is permitted.
+The old insufficient-credit output now classifies `CNO/HOLD`; it cannot reach downstream PASS.
+
+## Fresh acceptance-correction reproof
+
+Repaired candidate `7aedae1c3e8e7d3683ffea11f60d54458efb3cc6` was pushed before proof and cloned into newly allocated path:
+
+`E:\SSSF-B3-005-REPROOF-20260815-160826`
+
+The fresh clone repeated pre-bootstrap native controls, root front doors, bootstrap, complete host doctor, composed sandbox doctor, B3-002, and B3-004. The host doctor included the new B3-005 acceptance validator. Persistent environment captures remained unchanged.
+
+New run `b3-005-reproof-20260815-b30006` completed CREATE, FILL, provisioning, SETUP Gate A, and Gate B with exact canonical source and clean guest state. The roster remained unavailable due insufficient credits.
+
+The repaired acceptance path reported the roster evidence as CNO, required a typed final marker, observed no marker, classified the result CNO/HOLD, and stopped SETUP. It printed no downstream C/D/E PASS and no overall setup PASS.
+
+OBSERVE was therefore not lawfully reachable and is CNO/HOLD. No paid or new credential path was used. Teardown then preserved artifacts/harvest ordering, recorded zero spend, revoked and shredded the runtime key, destroyed the VM, closed the record, and proved an empty fleet and key-list absence.
+
+Detailed correction/reproof evidence:
+
+`docs/evidence/B3-005_ACCEPTANCE_CORRECTION_REPROOF.md`
 
 ## Result
 
-The first proof and its cleanup remain durable diagnostic evidence, but they are not final B3-005 acceptance evidence. B3-005 is reopened pending the required fresh-clone proof of the acceptance correction.
+The source acceptance defect is repaired and proved fail-closed from a new fresh Windows clone. Credits remained unavailable, so SETUP, OBSERVE, and end-to-end completion cannot be observed and remain CNO/HOLD. The first proof remains rejected as final evidence.
 
-**Result: REOPENED — FRESH REPROOF REQUIRED**
+**Result: ACCEPTANCE CORRECTION PASS; END-TO-END CNO/HOLD — NOT CERTIFIED**

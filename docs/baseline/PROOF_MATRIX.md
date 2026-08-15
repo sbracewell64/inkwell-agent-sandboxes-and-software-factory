@@ -76,25 +76,30 @@
 | B3-004-H1 correction candidate hygiene | candidate `1b892ab084bc4785c6f31f8999b586534d9e477b` passed both staged `git diff --cached --check` and committed `git show --check` | PASS |
 | B3-004-H1 correction isolation | only ledger, proof matrix, and B3-004 increment record differ from flawed closure `15bbea9` | PASS |
 | B3-004-H1 clean closure correction | original B3-004 tag preserved; separate correction state establishes the clean base for subsequent B3 work | PASS |
-| B3-005 exact proof source | fresh clone, guest, and closed run record agree on canonical repository and `efd84ab02fee4cb4c8e1e116616e039ba84a0546` | PASS |
+| B3-005 first-proof exact source | first fresh clone, guest, and closed run record agree on canonical repository and `efd84ab02fee4cb4c8e1e116616e039ba84a0546` | PASS DIAGNOSTIC; FIRST ACCEPTANCE REJECTED |
 | B3-005 fresh native environment equivalence | `CreateEnvironmentBlock(inherit=false)` method/evidence posted to control issue #3 | CNO / HOLD — BROWSER SOL RULING PENDING |
 | B3-005 pre-bootstrap Git Bash absence | native PATH excluded Git `bin`/`usr\\bin`; `sh`, `cygpath`, and `zsh` did not resolve | PASS |
 | B3-005 Windows root front doors | fresh native child ran root `just` and `just local` before bootstrap | PASS |
 | B3-005 bootstrap reconstruction | repository bootstrap introduced required session paths and complete host + composed sandbox doctor passed | PASS |
 | B3-005 persistent Windows environment boundary | HKCU/HKLM values were unchanged across bootstrap, lifecycle, and teardown child processes | PASS |
 | B3-005 Windows sqlite-free observability | external sqlite3 absent; explicit B3-004 no-external validator passed | PASS |
-| B3-005 exactly one sandbox | `b3-005-proof-20260815-b30005` completed create/fill/setup/observe | PASS |
+| B3-005 first-proof sandbox | `b3-005-proof-20260815-b30005` completed create/fill/setup/observe before its acceptance contradiction was found | PASS DIAGNOSTIC; FIRST ACCEPTANCE REJECTED |
 | B3-005 guest provenance | FILL, SETUP Gate A, independent guest inspection, and run record agree on repo/SHA/cleanliness | PASS |
 | B3-005 first-proof setup acceptance | four insufficient-credit failures were followed by contradictory Gate C/D/E PASS | FAILED ACCEPTANCE; FIRST PROOF REJECTED |
-| B3-005 typed C/D/E reconciliation | deterministic helper rejects contradictory diagnostics and classifies missing/unavailable evidence CNO/HOLD | PASS STATIC; LIVE REPROOF PENDING |
+| B3-005 typed C/D/E reconciliation | deterministic fixtures and fresh run `b3-005-reproof-20260815-b30006` classify insufficient-credit/missing-marker evidence CNO/HOLD with no downstream PASS | PASS |
+| B3-005 repaired exact source | new fresh clone, FILL, SETUP Gate A, and closed record agree on canonical repository and `7aedae1c3e8e7d3683ffea11f60d54458efb3cc6` | PASS |
+| B3-005 repaired SETUP acceptance | roster unavailable from insufficient credits; typed reconciler stopped SETUP CNO/HOLD and emitted no C/D/E/setup PASS | PASS FAIL-CLOSED; ROSTER CNO/HOLD |
+| B3-005 repaired OBSERVE | corrected SETUP refusal made OBSERVE lawfully unreachable | CNO / HOLD — NOT RUN |
+| B3-005 repaired runtime cleanup | artifact/harvest custody, zero spend, key revocation/file absence, VM absence, and closed record all proved | PASS |
+| B3-005 repaired proof-clone custody | new proof clone stayed exact/clean, was never patched, and was disposed with ignored host config | PASS |
 | B3-005 Linux guest sqlite absence | `/bin/sqlite3` exists; Windows-only executable-absence assertion was over-scoped to guest | NOT APPLICABLE; REJECTED OVER-SCOPE |
-| B3-005 observe services | public app HTTP 200; owner-gated observability HTTP 307 | PASS |
+| B3-005 first-proof observe services | public app HTTP 200; owner-gated observability HTTP 307 | PASS DIAGNOSTIC; NOT FINAL END-TO-END EVIDENCE |
 | B3-005 teardown custody and order | spend, artifacts, harvest preceded revoke/destroy; artifact hash inventory retained | PASS |
 | B3-005 runtime cleanup | key absent from authoritative list, key file shredded, fleet empty, run record closed | PASS |
 | B3-005 proof clone source custody | first failed clone stopped/discarded; restarted clone had exact clean HEAD and no tracked diff | PASS |
 | B3-005 disposable clone cleanup | successful proof clone and ignored host config removed after evidence capture | PASS |
 | B3-005 merge/freeze authority | PRE_CERTIFICATION forbids merge, main advancement, and final B3 tag | HOLD / NOT PERFORMED |
-| B3 portability complete | first proof rejected after acceptance defect; repaired candidate requires a new fresh clone and live lifecycle reproof | REOPENED / NOT CERTIFIED |
+| B3 portability complete | acceptance correction proved fail-closed, but unavailable credits held SETUP and made OBSERVE/end-to-end unobservable; native equivalence and certification also remain held | CNO / HOLD — NOT CERTIFIED |
 | B4-001 offline check discovery | run `31907345967` at `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: each OS discovered and executed 6/6 checks | PASS |
 | B4-001 non-vacuous projection | each job retained 6 observed-good, 0 observed-bad, and 0 could-not-observe results | PASS |
 | B4-001 watched-red controls | empty checks/matrix, validator failure, missing tool, cancellation/timeout, workflow path/trigger drift, and exact-head ref drift each observed red | PASS |

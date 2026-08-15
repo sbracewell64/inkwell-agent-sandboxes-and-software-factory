@@ -112,6 +112,10 @@ The failed clone was then discarded, and the successful proof used the newly all
 
 Please rule only on whether the documented `CreateEnvironmentBlock(inherit=false)` plus cleared child environment is equivalent to the commissioned fresh Windows-native Command Prompt condition.
 
-Until that ruling, this dimension remains exactly:
+## Acceptance-correction reproof supplement
+
+After the first proof was rejected for an independent setup acceptance defect, repaired candidate `7aedae1c3e8e7d3683ffea11f60d54458efb3cc6` was cloned into newly allocated `E:\SSSF-B3-005-REPROOF-20260815-160826` using the same `CreateEnvironmentBlock(inherit=false)` method. It repeated the pre-bootstrap negative controls, root front doors, bootstrap reconstruction, and persistent-environment boundary. Supplementary evidence is under `docs/evidence/b3-005/reproof/bootstrap/`.
+
+The method did not change, and no ruling had arrived. Until that ruling, this dimension remains exactly:
 
 `CNO / HOLD — REQUIRED_REVIEW_BEFORE_PASS`

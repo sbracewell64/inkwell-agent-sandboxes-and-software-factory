@@ -1,4 +1,5 @@
-B3-005 closure candidate identity
+B3-005 first closure candidate identity — REJECTED AS FINAL ACCEPTANCE
+superseded_by=docs/evidence/B3-005_ACCEPTANCE_CORRECTION_REPROOF.md
 captured_utc=2026-08-15T15:56:48Z
 repository=https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
 branch=increment/b3-005-fresh-windows-clone-proof

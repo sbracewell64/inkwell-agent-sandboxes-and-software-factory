@@ -173,4 +173,4 @@ The disposable proof clone, including its ignored host configuration, was then r
 
 ## Disposition
 
-All independent reversible B3-005 PRE_CERTIFICATION gates are complete. The PR may be reviewed but must not merge or establish a final B3 freeze while the commissioned equivalence/certification holds remain unresolved.
+These rows describe the first proof exactly, but its contradictory setup acceptance makes it ineligible as final end-to-end evidence. The repaired fresh-clone result and current CNO/HOLD disposition are authoritative in `B3-005_ACCEPTANCE_CORRECTION_REPROOF.md`.
