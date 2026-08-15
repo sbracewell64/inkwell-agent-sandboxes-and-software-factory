@@ -84,6 +84,17 @@ def main():
         with open(pid_path, "w", encoding="utf-8") as handle:
             handle.write(str(child.pid))
         time.sleep(0.3)
+    elif mode.startswith("instant-descendant:"):
+        pid_path = mode.split(":", 1)[1]
+        child = subprocess.Popen(
+            [sys.executable, "-c", "import os,time; os.setsid(); time.sleep(30)"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+        with open(pid_path, "w", encoding="utf-8") as handle:
+            handle.write(str(child.pid))
     elif mode == "overflow":
         sys.stdout.buffer.write(b"x" * 200000)
         sys.stdout.buffer.flush()

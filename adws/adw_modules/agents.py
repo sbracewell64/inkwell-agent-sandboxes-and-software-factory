@@ -18,6 +18,7 @@ from . import agent_pi, permissions, prompts
 from .data_types import (AgentCall, AgentConfig, EnvelopeBase, EventRecord,
                          GateCheck, GateReport, Phase, PiRequest, SSSFConfig,
                          UsageBreakdown)
+from .subprocess_supervisor import correction_attempt_budget
 from .utils import new_id
 
 JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSON
@@ -107,14 +108,14 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     # there is deliberately no inherited context occupancy to report.
     latest: agent_pi.PiResult | None = None
     spent = UsageBreakdown()
-    # Parse and gate correction sends share one native-attempt ceiling. In the
-    # worst case each of (retries + 1) gate rounds can consume the same number
-    # of structured-output attempts; native retries inside Pi are charged here
-    # too by the strict adapter.
-    attempt_budget = agent_pi.AttemptBudget(total=(max(0, phase.params.retries) + 1) ** 2)
+    # Every gate round can launch one initial send and two JSON corrections.
+    # Native retries inside Pi are charged here too by the strict adapter.
+    attempt_budget = agent_pi.AttemptBudget(total=correction_attempt_budget(phase.params.retries))
+    send_number = 0
 
     def send(prompt_text: str) -> agent_pi.PiResult:
-        nonlocal latest
+        nonlocal latest, send_number
+        send_number += 1
         request = PiRequest(
             prompt=prompt_text,
             system_prompt=system_text,
@@ -123,7 +124,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             session_id=session_id,
             # absolute: these are read by the pi subprocess, which runs in repo_root
             session_dir=str((agent_dir / "pi_sessions").resolve()),
-            raw_output_path=str((agent_dir / "raw_output.jsonl").resolve()),
+            raw_output_path=str((agent_dir / f"raw_output.attempt-{send_number:03d}.jsonl").resolve()),
             tools=agent.tools,
             extensions=agent.harness_engineering,
             cwd=str(run.repo_root),

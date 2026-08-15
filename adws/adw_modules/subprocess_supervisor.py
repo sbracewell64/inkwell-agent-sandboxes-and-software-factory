@@ -9,6 +9,7 @@ implementation can make the same descendant-cleanup claim honestly.
 from __future__ import annotations
 
 import errno
+import ctypes
 import hashlib
 import os
 import re
@@ -126,6 +127,10 @@ class AttemptBudget:
             return self._used <= self.total
 
 
+def correction_attempt_budget(retries: int) -> int:
+    return 3 * (max(0, retries) + 1)
+
+
 @dataclass(frozen=True)
 class SupervisorRequest:
     argv: Sequence[str]
@@ -145,6 +150,9 @@ class SupervisorRequest:
 
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _EMPTY_DIGEST = hashlib.sha256(b"").hexdigest()
+_CUSTODY_LOCK = threading.Lock()
+_PR_SET_CHILD_SUBREAPER = 36
+_PR_GET_CHILD_SUBREAPER = 37
 
 
 def _digest(data: bytes) -> str:
@@ -270,6 +278,35 @@ def _descendants(root_pid: int) -> list[ProcessIdentity]:
     return [identity for pid in sorted(child_pids) if (identity := _linux_identity(pid))]
 
 
+def _custodied_descendants(root_pid: int, prior_children: frozenset[int]) -> list[ProcessIdentity]:
+    identities = {(item.pid, item.start_token): item for item in _descendants(root_pid)}
+    for pid, ppid in _linux_ppids().items():
+        if ppid == os.getpid() and pid not in prior_children and pid != root_pid:
+            identity = _linux_identity(pid)
+            if identity is not None:
+                identities[(identity.pid, identity.start_token)] = identity
+    return list(identities.values())
+
+
+def _set_subreaper(enabled: bool) -> bool:
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        return libc.prctl(_PR_SET_CHILD_SUBREAPER, int(enabled), 0, 0, 0) == 0
+    except (AttributeError, OSError):
+        return False
+
+
+def _get_subreaper() -> bool | None:
+    try:
+        value = ctypes.c_int()
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(_PR_GET_CHILD_SUBREAPER, ctypes.byref(value), 0, 0, 0) != 0:
+            return None
+        return bool(value.value)
+    except (AttributeError, OSError):
+        return None
+
+
 def sys_platform_linux() -> bool:
     return os.name == "posix" and Path("/proc/self/stat").exists()
 
@@ -319,6 +356,13 @@ def _cleanup(
     kill_sent = False
     attempted = required
 
+    def reap_custodied() -> None:
+        for item in descendants.values():
+            try:
+                os.waitpid(item.pid, os.WNOHANG)
+            except (ChildProcessError, OSError):
+                pass
+
     def live_descendants() -> list[ProcessIdentity]:
         return [item for item in descendants.values() if _same_process(item)]
 
@@ -363,11 +407,13 @@ def _cleanup(
 
     verify_deadline = time.monotonic() + request.verification_grace_seconds
     while time.monotonic() < verify_deadline:
+        reap_custodied()
         group_absent = pgid is None or not _group_alive(pgid)
         survivors = live_descendants()
         if group_absent and not survivors:
             break
         time.sleep(min(request.poll_interval_seconds, max(0.0, verify_deadline - time.monotonic())))
+    reap_custodied()
     group_absent = pgid is None or not _group_alive(pgid)
     survivors = live_descendants()
     detail = "cleanup verified" if reaped and group_absent and not survivors else "cleanup could not verify an empty process tree"
@@ -383,26 +429,17 @@ def _cleanup(
     )
 
 
-def supervise(
+def _supervise_linux(
     request: SupervisorRequest,
     *,
     budget: AttemptBudget,
     cancel_event: threading.Event | None = None,
     on_spawn: Callable[[int], None] | None = None,
     on_exit: Callable[[int], None] | None = None,
+    prior_children: frozenset[int] = frozenset(),
 ) -> SupervisedResult:
     """Launch and fully account for one native child attempt."""
     started = time.monotonic()
-    platform_name = request.platform_name or ("windows" if os.name == "nt" else "unix")
-    if platform_name == "windows":
-        return _refusal(
-            "windows-job-object-unavailable",
-            "Windows launch refused: SSSF has no proven Job Object assign/kill/verify path",
-            started,
-            budget,
-        )
-    if os.name != "posix":
-        return _refusal("unsupported-process-platform", f"unsupported process platform: {os.name}", started, budget)
     invalid = _validate(request)
     if invalid:
         return _refusal("invalid-launch-contract", invalid, started, budget)
@@ -463,7 +500,7 @@ def supervise(
         # Completion wins a same-tick cancellation race: no live process remains
         # for cancellation to affect.
         returncode = process.poll()
-        for item in _descendants(process.pid):
+        for item in _custodied_descendants(process.pid, prior_children):
             descendants[(item.pid, item.start_token)] = item
         if returncode is not None:
             break
@@ -539,3 +576,36 @@ def supervise(
         cleanup,
         EvidenceDigests(_digest(stdout), _digest(stderr)),
     )
+
+
+def supervise(
+    request: SupervisorRequest,
+    *,
+    budget: AttemptBudget,
+    cancel_event: threading.Event | None = None,
+    on_spawn: Callable[[int], None] | None = None,
+    on_exit: Callable[[int], None] | None = None,
+) -> SupervisedResult:
+    started = time.monotonic()
+    platform_name = request.platform_name or ("windows" if os.name == "nt" else "unix")
+    if platform_name == "windows":
+        return _refusal("windows-job-object-unavailable", "Windows launch refused: SSSF has no proven Job Object assign/kill/verify path", started, budget)
+    if not sys_platform_linux():
+        return _refusal("linux-subprocess-custody-unavailable", "launch refused: proven descendant custody requires Linux subreaper support", started, budget)
+    with _CUSTODY_LOCK:
+        previous = _get_subreaper()
+        if previous is None or (not previous and not _set_subreaper(True)):
+            return _refusal("linux-subprocess-custody-unavailable", "launch refused: child subreaper custody could not be established", started, budget)
+        prior_children = frozenset(pid for pid, ppid in _linux_ppids().items() if ppid == os.getpid())
+        try:
+            return _supervise_linux(
+                request,
+                budget=budget,
+                cancel_event=cancel_event,
+                on_spawn=on_spawn,
+                on_exit=on_exit,
+                prior_children=prior_children,
+            )
+        finally:
+            if not previous:
+                _set_subreaper(False)

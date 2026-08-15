@@ -579,6 +579,12 @@ def run_pi_json(
         elif parsed.terminal_stop != "stop":
             state = TerminalState.FAILED
             reason = FailureReason("terminal-stop-unverified", Observation.COULD_NOT_OBSERVE, f"unexpected terminal stop: {parsed.terminal_stop!r}")
+        elif parsed.resolved_provider is None or parsed.resolved_model is None or parsed.resolved_effort is None:
+            state = TerminalState.FAILED
+            reason = FailureReason("resolved-target-unverified", Observation.COULD_NOT_OBSERVE, "Pi did not report the resolved provider, model, and effort")
+        elif (parsed.resolved_provider, parsed.resolved_model, parsed.resolved_effort) != (provider, model, request.thinking):
+            state = TerminalState.FAILED
+            reason = FailureReason("resolved-target-mismatch", Observation.OBSERVED_BAD, "Pi resolved a provider, model, or effort different from the exact request")
 
     return PiTerminalResult(
         state,

@@ -21,6 +21,10 @@ budget, reap, Unix process-group termination, bounded TERM-to-KILL escalation,
 tracked descendant cleanup, identity-aware verification, typed evidence, and
 three-valued failure reasons.
 
+Linux execution establishes child-subreaper custody before launch so an
+escaped descendant remains attributable after its original parent exits. If
+that custody cannot be established, execution refuses as could-not-observe.
+
 `adws/adw_modules/pi_json_adapter.py` is the strict Pi JSON/print projection.
 It requires an exact provider/model, explicit thinking and tool allowlist, and
 passes flags that disable sessions, extensions, skills, prompt templates,

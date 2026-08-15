@@ -27,6 +27,7 @@ from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
     AttemptBudget,
     Observation,
     TerminalState,
+    correction_attempt_budget,
 )
 
 FIXTURE = ROOT / "docs" / "validation" / "fixtures" / "fake_pi_child.py"
@@ -129,6 +130,8 @@ def stdin_regression(errors: list[str]) -> None:
 
 
 def static_contract(errors: list[str]) -> None:
+    check(correction_attempt_budget(0) == 3, "zero-retry correction budget is not three launches", errors)
+    check(correction_attempt_budget(2) == 9, "multi-round correction budget does not bound every send", errors)
     with tempfile.TemporaryDirectory(prefix="sssf-static-") as directory:
         temp = Path(directory)
         candidate = request(temp, "success", tools=[])
@@ -207,6 +210,9 @@ def runtime_fixtures(errors: list[str]) -> None:
         check(structured.returncode == 0, "structured error fixture did not exit shell zero", errors)
         check(structured.terminal_error == "deterministic provider rejection", "structured terminal error missing", errors)
 
+        mismatch = run_pi_json(request(temp, "success", provider_model="fixture/other"))
+        assert_reason(mismatch, "resolved-target-mismatch", Observation.OBSERVED_BAD, errors)
+
         for mode, code, observation in (
             ("malformed", "malformed-json-event", Observation.COULD_NOT_OBSERVE),
             ("missing-terminal", "missing-terminal-event", Observation.COULD_NOT_OBSERVE),
@@ -242,6 +248,15 @@ def runtime_fixtures(errors: list[str]) -> None:
             check(process_absent(child_pid), "escaped descendant survived cleanup", errors)
         else:
             errors.append("descendant fixture did not record its PID")
+
+        instant_pid_path = temp / "instant-descendant.pid"
+        instant = run_pi_json(request(temp, f"instant-descendant:{instant_pid_path}"))
+        assert_reason(instant, "descendant-outlived-parent", Observation.OBSERVED_BAD, errors)
+        check(instant.cleanup.descendants_seen and not instant.cleanup.survivors, "immediate-parent-exit descendant escaped custody", errors)
+        if instant_pid_path.is_file():
+            check(process_absent(int(instant_pid_path.read_text())), "immediate-parent-exit descendant survived cleanup", errors)
+        else:
+            errors.append("immediate-parent-exit fixture did not record its PID")
 
         overflow = run_pi_json(request(temp, "overflow", max_stdout_bytes=4096, max_event_bytes=4096))
         assert_reason(overflow, "output-overflow", Observation.COULD_NOT_OBSERVE, errors)

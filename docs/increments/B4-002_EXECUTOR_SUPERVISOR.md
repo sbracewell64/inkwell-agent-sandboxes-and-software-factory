@@ -100,9 +100,9 @@ no-tools/read-only transport and accounting adapters remain separate.
 ## Residual limitations
 
 - Windows child execution is CNO until a proven Job Object path lands.
-- Linux escaped-descendant discovery relies on `/proc` polling before
-  reparenting; cleanup verification is bounded and returns CNO rather than
-  claiming certainty when identity or absence cannot be established.
+- Linux launch uses child-subreaper custody so descendants remain discoverable
+  after their original parent exits; launch refuses as CNO if custody cannot be
+  established.
 - No credential transport is part of this increment, so it does not by itself
   authorize a live provider call.
 - Raw callbacks occur after bounded output is durably retained, not live during
