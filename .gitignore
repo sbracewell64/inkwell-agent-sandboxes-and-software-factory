@@ -32,6 +32,7 @@ env.bak/
 venv.bak/
 
 # Testing / coverage
+/ci-evidence*.json
 .pytest_cache/
 .coverage
 .coverage.*

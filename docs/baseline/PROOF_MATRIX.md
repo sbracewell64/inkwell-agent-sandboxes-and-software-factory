@@ -77,6 +77,13 @@
 | B3-004-H1 correction isolation | only ledger, proof matrix, and B3-004 increment record differ from flawed closure `15bbea9` | PASS |
 | B3-004-H1 clean closure correction | original B3-004 tag preserved; separate correction state establishes the clean base for subsequent B3 work | PASS |
 | B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual intervention | NOT PROVEN |
+| B4-001 offline check discovery | run `31907345967` at `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: each OS discovered and executed 6/6 checks | PASS |
+| B4-001 non-vacuous projection | each job retained 6 observed-good, 0 observed-bad, and 0 could-not-observe results | PASS |
+| B4-001 watched-red controls | empty checks/matrix, validator failure, missing tool, cancellation/timeout, workflow path/trigger drift, and exact-head ref drift each observed red | PASS |
+| B4-001 Linux GitHub execution | run `31907345967`, `ubuntu-24.04`, exact reviewed head: 6/6 observed-good; Inkwell 30 pass, 0 fail, 230 assertions | PASS |
+| B4-001 Windows GitHub execution | run `31907345967`, `windows-2022`, exact reviewed head: 6/6 observed-good; Inkwell 30 pass, 0 fail, 230 assertions | PASS |
+| B4-001 closure successor execution | provenance-only successor must complete the same nonempty Linux/Windows checks on its own exact head | CNO UNTIL OBSERVED |
+| B4-001 default-branch push execution | accepted successor must trigger the same nonempty Linux/Windows checks after merge | CNO UNTIL OBSERVED |
 
 ## Rule
 

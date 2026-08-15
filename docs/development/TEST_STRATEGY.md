@@ -42,6 +42,26 @@ Examples:
 - VM liveness: Level B control plane + SSH
 - free model role suitability: representative agent fixture plus deterministic gates
 
+## GitHub projection
+
+The ordinary pull-request and `main` push gate is `.github/workflows/ci.yml`.
+It runs the repository-owned manifest on Linux and Windows without provider,
+credential, or sandbox access. `tools/ci_gate.py` retains one of three statuses
+for every attempted check:
+
+- `observed-good` — the check executed and returned success;
+- `observed-bad` — the check executed and returned failure;
+- `could-not-observe` — discovery, tooling, timeout, or cancellation prevented
+  a result.
+
+GitHub success is projected only when discovery is nonempty, all discovered
+checks execute, and every result is `observed-good`. The calibrated negative
+controls live in `docs/validation/check_ci_contract.py`.
+
+`docs/validation/check_repository_ownership.py` is intentionally not in this
+offline gate because it queries GitHub and the canonical remote. Repository and
+sandbox source invariants that do not need the network remain enumerated.
+
 ## Anti-pattern
 
 Do not add an LLM judge for a claim code can settle exactly.
