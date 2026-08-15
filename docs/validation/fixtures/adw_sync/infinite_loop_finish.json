@@ -1,0 +1,6 @@
+{
+  "path": "adws/adw_quality.py",
+  "old": "    return run.finish()",
+  "new": "    while True:\n        continue\n    return run.finish()",
+  "expected": "reachable run.finish() calls: expected 1, found 0"
+}

@@ -195,58 +195,121 @@ def expression_finish_calls(node: ast.AST | None) -> int:
     return visitor.count
 
 
-def reachable_finish_calls(statements: list[ast.stmt]) -> tuple[int, bool]:
+@dataclass(frozen=True)
+class Flow:
+    finish_calls: int = 0
+    exits: frozenset[str] = frozenset({"normal"})
+    ambiguous: bool = False
+
+
+def merge_flows(flows: list[Flow], prefix_calls: int = 0) -> Flow:
+    return Flow(
+        prefix_calls + sum(flow.finish_calls for flow in flows),
+        frozenset().union(*(flow.exits for flow in flows)),
+        any(flow.ambiguous for flow in flows),
+    )
+
+
+def irrefutable_pattern(pattern: ast.pattern) -> bool:
+    return isinstance(pattern, ast.MatchAs) and pattern.pattern is None
+
+
+def statement_flow(statement: ast.stmt) -> Flow:
+    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return Flow()
+    if isinstance(statement, ast.Return):
+        return Flow(expression_finish_calls(statement.value), frozenset({"return"}))
+    if isinstance(statement, ast.Raise):
+        return Flow(expression_finish_calls(statement.exc), frozenset({"raise"}))
+    if isinstance(statement, ast.Break):
+        return Flow(exits=frozenset({"break"}))
+    if isinstance(statement, ast.Continue):
+        return Flow(exits=frozenset({"continue"}))
+    if isinstance(statement, ast.If):
+        test_calls = expression_finish_calls(statement.test)
+        constant = statement.test.value if isinstance(statement.test, ast.Constant) else None
+        if constant is True:
+            return merge_flows([reachable_finish_flow(statement.body)], test_calls)
+        if constant is False:
+            return merge_flows([reachable_finish_flow(statement.orelse)], test_calls)
+        branches = [reachable_finish_flow(statement.body)]
+        branches.append(reachable_finish_flow(statement.orelse) if statement.orelse else Flow())
+        return merge_flows(branches, test_calls)
+    if isinstance(statement, ast.Match):
+        flows = [reachable_finish_flow(case.body) for case in statement.cases]
+        exhaustive = bool(statement.cases) and statement.cases[-1].guard is None \
+            and irrefutable_pattern(statement.cases[-1].pattern)
+        if not exhaustive:
+            flows.append(Flow())
+        return merge_flows(flows, expression_finish_calls(statement.subject))
+    if isinstance(statement, (ast.With, ast.AsyncWith)):
+        calls = sum(expression_finish_calls(item.context_expr) for item in statement.items)
+        return merge_flows([reachable_finish_flow(statement.body)], calls)
+    if isinstance(statement, (ast.For, ast.AsyncFor, ast.While)):
+        control = getattr(statement, "iter", None) or getattr(statement, "test", None)
+        control_calls = expression_finish_calls(control)
+        body = reachable_finish_flow(statement.body)
+        is_infinite = isinstance(statement, ast.While) \
+            and isinstance(statement.test, ast.Constant) and statement.test.value is True
+        can_exhaust = not is_infinite
+        else_flow = reachable_finish_flow(statement.orelse) if can_exhaust else Flow(exits=frozenset())
+        exits = set(body.exits - {"normal", "continue", "break"}) | set(else_flow.exits)
+        if "break" in body.exits:
+            exits.add("normal")
+        if can_exhaust and not statement.orelse:
+            exits.add("normal")
+        return Flow(
+            control_calls + body.finish_calls + else_flow.finish_calls,
+            frozenset(exits),
+            body.ambiguous or else_flow.ambiguous,
+        )
+    if isinstance(statement, (ast.Try, ast.TryStar)):
+        body = reachable_finish_flow(statement.body)
+        normal_body = Flow(body.finish_calls, frozenset({"normal"}) if "normal" in body.exits else frozenset(), body.ambiguous)
+        else_flow = reachable_finish_flow(statement.orelse) if "normal" in body.exits else Flow(exits=frozenset())
+        handlers = [reachable_finish_flow(handler.body) for handler in statement.handlers]
+        pre_final = merge_flows([
+            Flow(0, body.exits - {"normal", "raise"}, body.ambiguous),
+            merge_flows([normal_body, else_flow]) if statement.orelse else normal_body,
+            *handlers,
+            Flow(exits=frozenset({"raise"})),
+        ])
+        if not statement.finalbody:
+            return pre_final
+        final = reachable_finish_flow(statement.finalbody)
+        exits = set(final.exits - {"normal"})
+        if "normal" in final.exits:
+            exits.update(pre_final.exits)
+        return Flow(
+            pre_final.finish_calls + final.finish_calls,
+            frozenset(exits),
+            pre_final.ambiguous or final.ambiguous,
+        )
+    simple = (
+        ast.Assign, ast.AnnAssign, ast.AugAssign, ast.Assert, ast.Delete, ast.Expr,
+        ast.Global, ast.Import, ast.ImportFrom, ast.Nonlocal, ast.Pass,
+    )
+    if isinstance(statement, simple):
+        return Flow(expression_finish_calls(statement))
+    return Flow(exits=frozenset(), ambiguous=True)
+
+
+def reachable_finish_flow(statements: list[ast.stmt]) -> Flow:
     count = 0
-    continuing = True
+    exits: set[str] = set()
+    normal = True
+    ambiguous = False
     for statement in statements:
-        if not continuing:
+        if not normal:
             break
-        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            continue
-        if isinstance(statement, ast.Return):
-            count += expression_finish_calls(statement.value)
-            continuing = False
-        elif isinstance(statement, ast.Raise):
-            count += expression_finish_calls(statement.exc)
-            continuing = False
-        elif isinstance(statement, ast.If):
-            count += expression_finish_calls(statement.test)
-            constant = statement.test.value if isinstance(statement.test, ast.Constant) else None
-            if constant is True:
-                branch_count, continuing = reachable_finish_calls(statement.body)
-                count += branch_count
-            elif constant is False:
-                branch_count, continuing = reachable_finish_calls(statement.orelse)
-                count += branch_count
-            else:
-                body_count, body_continues = reachable_finish_calls(statement.body)
-                else_count, else_continues = reachable_finish_calls(statement.orelse)
-                count += body_count + else_count
-                continuing = body_continues or else_continues or not statement.orelse
-        elif isinstance(statement, (ast.With, ast.AsyncWith)):
-            for item in statement.items:
-                count += expression_finish_calls(item.context_expr)
-            body_count, continuing = reachable_finish_calls(statement.body)
-            count += body_count
-        elif isinstance(statement, (ast.For, ast.AsyncFor, ast.While)):
-            count += expression_finish_calls(getattr(statement, "iter", None))
-            count += expression_finish_calls(getattr(statement, "test", None))
-            body_count, _ = reachable_finish_calls(statement.body)
-            else_count, _ = reachable_finish_calls(statement.orelse)
-            count += body_count + else_count
-            continuing = True
-        elif isinstance(statement, ast.Try):
-            body_count, body_continues = reachable_finish_calls(statement.body)
-            branch_counts = [reachable_finish_calls(handler.body) for handler in statement.handlers]
-            else_count, else_continues = reachable_finish_calls(statement.orelse)
-            final_count, final_continues = reachable_finish_calls(statement.finalbody)
-            count += body_count + sum(item[0] for item in branch_counts) + else_count + final_count
-            continuing = final_continues and (
-                body_continues or else_continues or any(item[1] for item in branch_counts)
-            )
-        else:
-            count += expression_finish_calls(statement)
-    return count, continuing
+        flow = statement_flow(statement)
+        count += flow.finish_calls
+        exits.update(flow.exits - {"normal"})
+        normal = "normal" in flow.exits
+        ambiguous = ambiguous or flow.ambiguous
+    if normal:
+        exits.add("normal")
+    return Flow(count, frozenset(exits), ambiguous)
 
 
 def class_fields(
@@ -363,10 +426,14 @@ def check_script(
     if len(mains) != 1:
         errors.append(f"{path}: expected exactly one main(), found {len(mains)}")
     else:
-        finish_count, _ = reachable_finish_calls(mains[0].body)
-        inventory.finish_calls += finish_count
-        if finish_count != 1:
-            errors.append(f"{path}: reachable run.finish() calls: expected 1, found {finish_count}")
+        flow = reachable_finish_flow(mains[0].body)
+        inventory.finish_calls += flow.finish_calls
+        if flow.ambiguous:
+            errors.append(f"CNO: {path}: unsupported or ambiguous control flow in main()")
+        elif flow.finish_calls != 1:
+            errors.append(
+                f"{path}: reachable run.finish() calls: expected 1, found {flow.finish_calls}"
+            )
     for node in ast.walk(tree):
         if (isinstance(node, ast.Attribute) and node.attr == "succeeded"
                 and isinstance(node.value, ast.Name) and node.value.id == "run"):
@@ -547,6 +614,7 @@ def main() -> int:
     print(f"- prompt Report contracts: {inventory.prompt_reports}")
     print(f"- generated import-only smokes: {inventory.import_smokes}")
     print(f"- watched-red fixtures: {inventory.red_fixtures}")
+    print("compound-reachability-red-controls: PASS")
     return 0
 
 

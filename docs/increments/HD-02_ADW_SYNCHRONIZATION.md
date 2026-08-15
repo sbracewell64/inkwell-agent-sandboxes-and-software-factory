@@ -35,7 +35,7 @@ No claim is made that all prior ADWs were broken: all twelve installed ADWs alre
 
 ## Watched-red controls
 
-Mutation fixtures under `docs/validation/fixtures/adw_sync/` remove a quality export, remove `rich`, restore `run.succeeded`, remove finish, move finish behind an unconditional return, and mismatch a prompt field. The validator copies the bounded surfaces to disposable roots and requires every mutation to turn that same validator red for its expected reason.
+Mutation fixtures under `docs/validation/fixtures/adw_sync/` remove a quality export, remove `rich`, restore `run.succeeded`, remove or make finish unreachable through returns, exhaustive match, and infinite loops, exercise reachable break and nested compound flow, and mismatch a prompt field. The validator copies the bounded surfaces to disposable roots and requires every mutation to turn that same validator red for its expected reason.
 
 ## Deterministic acceptance
 
@@ -55,6 +55,6 @@ Accepted inventory at implementation time:
 - 25 dependency/import sets;
 - 10 prompt Report contracts;
 - 1 generated import-only smoke;
-- 6 watched-red fixtures.
+- 10 watched-red fixtures.
 
-The validator printed `HD-02 ADW synchronization: PASS`. No provider/model or sandbox was invoked.
+The validator printed `HD-02 ADW synchronization: PASS` and `compound-reachability-red-controls: PASS`. No provider/model or sandbox was invoked.
