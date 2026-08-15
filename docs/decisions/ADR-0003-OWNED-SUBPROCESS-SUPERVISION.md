@@ -1,7 +1,7 @@
 # ADR-0003 — SSSF-Owned Subprocess Supervision
 
 **Status:** Accepted for B4-002 candidate
-**Date:** 2026-08-17
+**Date:** 2026-08-15
 
 ## Context
 
