@@ -380,6 +380,9 @@ class PiRequest(BaseModel):
     session_id: str                 # SSSF correlation only; strict Pi gets --no-session
     session_dir: str                # legacy artifact location; not passed to strict Pi
     raw_output_path: str            # JSONL stream lands here
+    execution_id: str
+    phase_id: str
+    attempt_number: int
     tools: Optional[list[str]] = None
     extensions: list[str] = Field(default_factory=list)
     cwd: str = "."                  # set from run.repo_root — the codebase root agents work in

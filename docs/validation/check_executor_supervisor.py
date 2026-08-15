@@ -48,6 +48,9 @@ def request(temp: Path, mode: str, **overrides) -> PiAdapterRequest:
         "tools": ["read"],
         "cwd": str(ROOT),
         "raw_event_path": str(temp / f"{mode.replace('/', '_').replace(':', '_')}.jsonl"),
+        "execution_id": "fixture-run",
+        "phase_id": mode.replace("/", "_").replace(":", "_")[:128],
+        "attempt_number": 1,
         "pi_argv0": str(FIXTURE),
         "timeout_seconds": 2.0,
         "term_grace_seconds": 0.15,
@@ -60,6 +63,10 @@ def request(temp: Path, mode: str, **overrides) -> PiAdapterRequest:
     }
     values.update(overrides)
     return PiAdapterRequest(**values)
+
+
+def evidence_path(candidate: PiAdapterRequest) -> Path:
+    return Path(candidate.raw_event_path) / candidate.execution_id / candidate.phase_id / f"attempt-{candidate.attempt_number:03d}.jsonl"
 
 
 def assert_reason(result, code: str, observation: Observation, errors: list[str]) -> None:
@@ -190,7 +197,8 @@ def platform_refusal(errors: list[str]) -> None:
 def runtime_fixtures(errors: list[str]) -> None:
     with tempfile.TemporaryDirectory(prefix="sssf-executor-") as directory:
         temp = Path(directory)
-        success = run_pi_json(request(temp, "success"))
+        success_request = request(temp, "success")
+        success = run_pi_json(success_request)
         check(success.terminal_state == TerminalState.SUCCEEDED, f"success fixture failed: {success.reason}", errors)
         check(success.text == "typed-success-marker", "success text marker missing", errors)
         check(success.requested_provider == "fixture" and success.requested_model == "deterministic", "requested target missing", errors)
@@ -202,7 +210,7 @@ def runtime_fixtures(errors: list[str]) -> None:
         check(success.attempts.native_attempts == 1 and success.attempts.budget == 1, "native attempt accounting wrong", errors)
         check(success.process is not None and success.cleanup.reaped and success.cleanup.group_absent is True, "process identity/cleanup proof missing", errors)
         check(success.evidence.stdout_sha256 == success.evidence.raw_events_sha256, "raw event digest does not reconcile", errors)
-        raw = Path(request(temp, "success").raw_event_path)
+        raw = evidence_path(success_request)
         check(raw.is_file() and raw.stat().st_size > 0, "bounded raw events were not preserved", errors)
 
         structured = run_pi_json(request(temp, "structured-error"))
@@ -210,8 +218,14 @@ def runtime_fixtures(errors: list[str]) -> None:
         check(structured.returncode == 0, "structured error fixture did not exit shell zero", errors)
         check(structured.terminal_error == "deterministic provider rejection", "structured terminal error missing", errors)
 
-        mismatch = run_pi_json(request(temp, "success", provider_model="fixture/other"))
+        mismatch = run_pi_json(request(temp, "success", provider_model="fixture/other", phase_id="target-mismatch"))
         assert_reason(mismatch, "resolved-target-mismatch", Observation.OBSERVED_BAD, errors)
+
+        collision = run_pi_json(success_request)
+        assert_reason(collision, "raw-evidence-identity-collision", Observation.COULD_NOT_OBSERVE, errors)
+        other_phase = request(temp, "success", phase_id="other-phase")
+        check(run_pi_json(other_phase).terminal_state == TerminalState.SUCCEEDED, "phase-scoped evidence identity collided", errors)
+        check(evidence_path(other_phase) != raw and evidence_path(other_phase).is_file(), "multi-phase evidence was not preserved separately", errors)
 
         for mode, code, observation in (
             ("malformed", "malformed-json-event", Observation.COULD_NOT_OBSERVE),
@@ -225,8 +239,8 @@ def runtime_fixtures(errors: list[str]) -> None:
         check(retry.attempts.native_attempts == 2 and retry.attempts.native_retry_events == 1, "hidden retry was not individually observed/charged", errors)
 
         shared_budget = AttemptBudget(1)
-        first = run_pi_json(request(temp, "success"), budget=shared_budget)
-        second = run_pi_json(request(temp, "success"), budget=shared_budget)
+        first = run_pi_json(request(temp, "success", phase_id="shared-budget", attempt_number=1), budget=shared_budget)
+        second = run_pi_json(request(temp, "success", phase_id="shared-budget", attempt_number=2), budget=shared_budget)
         check(first.terminal_state == TerminalState.SUCCEEDED, "shared-budget first attempt failed", errors)
         assert_reason(second, "attempt-budget-exhausted", Observation.COULD_NOT_OBSERVE, errors)
         check(second.process is None and shared_budget.used == 1, "spent total attempt budget launched again", errors)
@@ -258,11 +272,20 @@ def runtime_fixtures(errors: list[str]) -> None:
         else:
             errors.append("immediate-parent-exit fixture did not record its PID")
 
+        late_pid_path = temp / "late-fork.pid"
+        late_fork = run_pi_json(request(temp, f"late-fork:{late_pid_path}", timeout_seconds=0.15))
+        assert_reason(late_fork, "wall-timeout", Observation.COULD_NOT_OBSERVE, errors)
+        check(late_fork.cleanup.descendants_seen and not late_fork.cleanup.survivors, "TERM-handler descendant escaped cleanup rescan", errors)
+        if late_pid_path.is_file():
+            check(process_absent(int(late_pid_path.read_text())), "late-forked descendant survived cleanup", errors)
+        else:
+            errors.append("late-fork fixture did not record its PID")
+
         overflow = run_pi_json(request(temp, "overflow", max_stdout_bytes=4096, max_event_bytes=4096))
         assert_reason(overflow, "output-overflow", Observation.COULD_NOT_OBSERVE, errors)
         check(overflow.stdout_bytes_seen > 4096 and overflow.event_bytes_preserved == 4096, "output bound was not enforced", errors)
 
-        event_overflow = run_pi_json(request(temp, "success", max_event_bytes=100))
+        event_overflow = run_pi_json(request(temp, "success", phase_id="event-overflow", max_event_bytes=100))
         assert_reason(event_overflow, "event-overflow", Observation.COULD_NOT_OBSERVE, errors)
 
         live_cancel = threading.Event()
@@ -276,9 +299,18 @@ def runtime_fixtures(errors: list[str]) -> None:
         late_cancel = threading.Event()
         timer = threading.Timer(0.25, late_cancel.set)
         timer.start()
-        completed = run_pi_json(request(temp, "success"), cancel_event=late_cancel)
+        completed = run_pi_json(request(temp, "success", phase_id="late-cancel"), cancel_event=late_cancel)
         timer.join()
         check(completed.terminal_state == TerminalState.SUCCEEDED and not completed.cancelled, "late cancellation overrode completed process", errors)
+
+        unrelated = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            isolated = run_pi_json(request(temp, "slow-success", phase_id="unrelated-control"))
+            check(isolated.terminal_state == TerminalState.SUCCEEDED, "custodian isolation control failed", errors)
+            check(unrelated.poll() is None, "supervisor captured an unrelated coordinator child", errors)
+        finally:
+            unrelated.terminate()
+            unrelated.wait(timeout=2)
 
 
 def main() -> int:

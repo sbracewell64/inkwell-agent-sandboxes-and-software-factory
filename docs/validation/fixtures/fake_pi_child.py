@@ -95,6 +95,23 @@ def main():
         )
         with open(pid_path, "w", encoding="utf-8") as handle:
             handle.write(str(child.pid))
+    elif mode.startswith("late-fork:"):
+        pid_path = mode.split(":", 1)[1]
+
+        def fork_on_term(_signum, _frame):
+            child = subprocess.Popen(
+                [sys.executable, "-c", "import os,time; os.setsid(); time.sleep(30)"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+            )
+            with open(pid_path, "w", encoding="utf-8") as handle:
+                handle.write(str(child.pid))
+            raise SystemExit(0)
+
+        signal.signal(signal.SIGTERM, fork_on_term)
+        time.sleep(30)
     elif mode == "overflow":
         sys.stdout.buffer.write(b"x" * 200000)
         sys.stdout.buffer.flush()

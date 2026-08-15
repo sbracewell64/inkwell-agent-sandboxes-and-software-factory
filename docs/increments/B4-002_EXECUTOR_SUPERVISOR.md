@@ -100,9 +100,10 @@ no-tools/read-only transport and accounting adapters remain separate.
 ## Residual limitations
 
 - Windows child execution is CNO until a proven Job Object path lands.
-- Linux launch uses child-subreaper custody so descendants remain discoverable
-  after their original parent exits; launch refuses as CNO if custody cannot be
-  established.
+- Linux launch delegates child-subreaper custody to a dedicated spawned helper
+  so descendants remain discoverable after their original parent exits without
+  capturing coordinator-thread children; launch refuses as CNO if custody or
+  bounded terminal IPC cannot be verified.
 - No credential transport is part of this increment, so it does not by itself
   authorize a live provider call.
 - Raw callbacks occur after bounded output is durably retained, not live during

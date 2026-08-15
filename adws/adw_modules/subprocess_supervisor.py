@@ -11,6 +11,7 @@ from __future__ import annotations
 import errno
 import ctypes
 import hashlib
+import multiprocessing
 import os
 import re
 import signal
@@ -150,7 +151,6 @@ class SupervisorRequest:
 
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _EMPTY_DIGEST = hashlib.sha256(b"").hexdigest()
-_CUSTODY_LOCK = threading.Lock()
 _PR_SET_CHILD_SUBREAPER = 36
 _PR_GET_CHILD_SUBREAPER = 37
 
@@ -278,10 +278,10 @@ def _descendants(root_pid: int) -> list[ProcessIdentity]:
     return [identity for pid in sorted(child_pids) if (identity := _linux_identity(pid))]
 
 
-def _custodied_descendants(root_pid: int, prior_children: frozenset[int]) -> list[ProcessIdentity]:
+def _custodied_descendants(root_pid: int) -> list[ProcessIdentity]:
     identities = {(item.pid, item.start_token): item for item in _descendants(root_pid)}
     for pid, ppid in _linux_ppids().items():
-        if ppid == os.getpid() and pid not in prior_children and pid != root_pid:
+        if ppid == os.getpid() and pid != root_pid:
             identity = _linux_identity(pid)
             if identity is not None:
                 identities[(identity.pid, identity.start_token)] = identity
@@ -350,6 +350,7 @@ def _cleanup(
     descendants: dict[tuple[int, str | None], ProcessIdentity],
     request: SupervisorRequest,
     required: bool,
+    rescan: Callable[[], list[ProcessIdentity]],
 ) -> CleanupResult:
     pgid = identity.process_group_id
     term_sent = False
@@ -363,10 +364,15 @@ def _cleanup(
             except (ChildProcessError, OSError):
                 pass
 
+    def refresh() -> None:
+        for item in rescan():
+            descendants[(item.pid, item.start_token)] = item
+
     def live_descendants() -> list[ProcessIdentity]:
         return [item for item in descendants.values() if _same_process(item)]
 
     if required:
+        refresh()
         if pgid is not None and _group_alive(pgid):
             try:
                 os.killpg(pgid, signal.SIGTERM)
@@ -378,6 +384,7 @@ def _cleanup(
             term_sent = _signal_identity(item, signal.SIGTERM) or term_sent
         deadline = time.monotonic() + request.term_grace_seconds
         while time.monotonic() < deadline:
+            refresh()
             if process.poll() is not None and (pgid is None or not _group_alive(pgid)) and not live_descendants():
                 break
             time.sleep(min(request.poll_interval_seconds, max(0.0, deadline - time.monotonic())))
@@ -406,13 +413,20 @@ def _cleanup(
             reaped = False
 
     verify_deadline = time.monotonic() + request.verification_grace_seconds
+    empty_scans = 0
     while time.monotonic() < verify_deadline:
+        refresh()
         reap_custodied()
         group_absent = pgid is None or not _group_alive(pgid)
         survivors = live_descendants()
         if group_absent and not survivors:
-            break
+            empty_scans += 1
+            if empty_scans >= 2:
+                break
+        else:
+            empty_scans = 0
         time.sleep(min(request.poll_interval_seconds, max(0.0, verify_deadline - time.monotonic())))
+    refresh()
     reap_custodied()
     group_absent = pgid is None or not _group_alive(pgid)
     survivors = live_descendants()
@@ -436,14 +450,14 @@ def _supervise_linux(
     cancel_event: threading.Event | None = None,
     on_spawn: Callable[[int], None] | None = None,
     on_exit: Callable[[int], None] | None = None,
-    prior_children: frozenset[int] = frozenset(),
+    claimed_attempt: int | None = None,
 ) -> SupervisedResult:
     """Launch and fully account for one native child attempt."""
     started = time.monotonic()
     invalid = _validate(request)
     if invalid:
         return _refusal("invalid-launch-contract", invalid, started, budget)
-    attempt_number = budget.claim()
+    attempt_number = claimed_attempt if claimed_attempt is not None else budget.claim()
     if attempt_number is None:
         return _refusal("attempt-budget-exhausted", "total native attempt budget was already spent", started, budget)
 
@@ -500,7 +514,7 @@ def _supervise_linux(
         # Completion wins a same-tick cancellation race: no live process remains
         # for cancellation to affect.
         returncode = process.poll()
-        for item in _custodied_descendants(process.pid, prior_children):
+        for item in _custodied_descendants(process.pid):
             descendants[(item.pid, item.start_token)] = item
         if returncode is not None:
             break
@@ -521,7 +535,14 @@ def _supervise_linux(
         _same_process(item) for item in descendants.values()
     )
     descendant_leak = trigger is None and tree_remains
-    cleanup = _cleanup(process, process_identity, descendants, request, trigger is not None or descendant_leak)
+    cleanup = _cleanup(
+        process,
+        process_identity,
+        descendants,
+        request,
+        trigger is not None or descendant_leak,
+        lambda: _custodied_descendants(process.pid),
+    )
     stdout_thread.join(timeout=max(0.1, request.verification_grace_seconds))
     stderr_thread.join(timeout=max(0.1, request.verification_grace_seconds))
     if on_exit:
@@ -578,6 +599,27 @@ def _supervise_linux(
     )
 
 
+def _custodian_main(connection, request: SupervisorRequest, total: int, attempt_number: int, cancel_event) -> None:
+    budget = AttemptBudget(total)
+    if not _set_subreaper(True):
+        connection.send(("error", "child subreaper custody could not be established"))
+        connection.close()
+        return
+    try:
+        result = _supervise_linux(
+            request,
+            budget=budget,
+            cancel_event=cancel_event,
+            on_spawn=lambda pid: connection.send(("spawn", pid)),
+            claimed_attempt=attempt_number,
+        )
+        connection.send(("result", result))
+    except BaseException as error:
+        connection.send(("error", f"{type(error).__name__}: {error}"))
+    finally:
+        connection.close()
+
+
 def supervise(
     request: SupervisorRequest,
     *,
@@ -592,20 +634,47 @@ def supervise(
         return _refusal("windows-job-object-unavailable", "Windows launch refused: SSSF has no proven Job Object assign/kill/verify path", started, budget)
     if not sys_platform_linux():
         return _refusal("linux-subprocess-custody-unavailable", "launch refused: proven descendant custody requires Linux subreaper support", started, budget)
-    with _CUSTODY_LOCK:
-        previous = _get_subreaper()
-        if previous is None or (not previous and not _set_subreaper(True)):
-            return _refusal("linux-subprocess-custody-unavailable", "launch refused: child subreaper custody could not be established", started, budget)
-        prior_children = frozenset(pid for pid, ppid in _linux_ppids().items() if ppid == os.getpid())
-        try:
-            return _supervise_linux(
-                request,
-                budget=budget,
-                cancel_event=cancel_event,
-                on_spawn=on_spawn,
-                on_exit=on_exit,
-                prior_children=prior_children,
-            )
-        finally:
-            if not previous:
-                _set_subreaper(False)
+    invalid = _validate(request)
+    if invalid:
+        return _refusal("invalid-launch-contract", invalid, started, budget)
+    attempt_number = budget.claim()
+    if attempt_number is None:
+        return _refusal("attempt-budget-exhausted", "total native attempt budget was already spent", started, budget)
+    context = multiprocessing.get_context("spawn")
+    parent_connection, child_connection = context.Pipe(duplex=False)
+    helper_cancel = context.Event()
+    helper = context.Process(
+        target=_custodian_main,
+        args=(child_connection, request, budget.total, attempt_number, helper_cancel),
+        daemon=False,
+    )
+    helper.start()
+    child_connection.close()
+    result = None
+    error = None
+    helper_deadline = started + request.timeout_seconds + request.term_grace_seconds + request.verification_grace_seconds + 2.0
+    while time.monotonic() < helper_deadline:
+        if cancel_event is not None and cancel_event.is_set():
+            helper_cancel.set()
+        if parent_connection.poll(request.poll_interval_seconds):
+            message = parent_connection.recv()
+            if message[0] == "spawn" and on_spawn:
+                on_spawn(message[1])
+            elif message[0] == "result":
+                result = message[1]
+                break
+            elif message[0] == "error":
+                error = message[1]
+                break
+        if not helper.is_alive() and not parent_connection.poll():
+            error = "custodian exited without a terminal IPC result"
+            break
+    if result is None and helper.is_alive():
+        helper.terminate()
+    helper.join(timeout=max(0.1, request.verification_grace_seconds))
+    parent_connection.close()
+    if result is None:
+        return _refusal("linux-custodian-unverified", error or "custodian IPC deadline expired", started, budget)
+    if result.process is not None and on_exit:
+        on_exit(result.process.pid)
+    return result

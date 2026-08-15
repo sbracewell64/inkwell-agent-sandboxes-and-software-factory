@@ -58,6 +58,7 @@ PI_OWNED_ENV_NAMES = frozenset(
     }
 )
 _PROVIDER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_EVIDENCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _SENSITIVE_ENV_FRAGMENTS = ("KEY", "TOKEN", "CREDENTIAL", "AUTH", "COOKIE", "HOME")
 
 
@@ -70,6 +71,9 @@ class PiAdapterRequest:
     tools: Sequence[str] | None
     cwd: str
     raw_event_path: str
+    execution_id: str
+    phase_id: str
+    attempt_number: int
     pi_argv0: str = "pi"
     timeout_seconds: float = 120.0
     term_grace_seconds: float = 1.0
@@ -491,8 +495,25 @@ def run_pi_json(
             ),
         )
 
-    raw_path = Path(request.raw_event_path)
+    if (
+        not _EVIDENCE_ID.fullmatch(request.execution_id)
+        or not _EVIDENCE_ID.fullmatch(request.phase_id)
+        or not isinstance(request.attempt_number, int)
+        or request.attempt_number < 1
+    ):
+        return _refused_result(
+            request,
+            FailureReason("invalid-raw-evidence-identity", Observation.COULD_NOT_OBSERVE, "execution, phase, and attempt evidence identities must be explicit and valid"),
+        )
+    raw_path = Path(request.raw_event_path) / request.execution_id / request.phase_id / f"attempt-{request.attempt_number:03d}.jsonl"
     raw_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        raw_path.open("xb").close()
+    except FileExistsError:
+        return _refused_result(
+            request,
+            FailureReason("raw-evidence-identity-collision", Observation.COULD_NOT_OBSERVE, "raw event evidence target already exists"),
+        )
     with tempfile.TemporaryDirectory(prefix="sssf-pi-", dir=str(raw_path.parent)) as temporary:
         runtime_dir = Path(temporary) / "runtime"
         _settings(runtime_dir)
@@ -526,7 +547,7 @@ def run_pi_json(
         )
 
     # Raw bounded bytes are made durable before the first parse or callback.
-    with raw_path.open("wb") as raw_file:
+    with raw_path.open("r+b") as raw_file:
         raw_file.write(process_result.stdout)
         raw_file.flush()
         os.fsync(raw_file.fileno())

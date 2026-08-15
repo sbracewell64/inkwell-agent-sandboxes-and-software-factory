@@ -124,7 +124,10 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             session_id=session_id,
             # absolute: these are read by the pi subprocess, which runs in repo_root
             session_dir=str((agent_dir / "pi_sessions").resolve()),
-            raw_output_path=str((agent_dir / f"raw_output.attempt-{send_number:03d}.jsonl").resolve()),
+            raw_output_path=str((agent_dir / "raw_events").resolve()),
+            execution_id=run.adw_id,
+            phase_id=phase.phase_id,
+            attempt_number=send_number,
             tools=agent.tools,
             extensions=agent.harness_engineering,
             cwd=str(run.repo_root),
