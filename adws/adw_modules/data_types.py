@@ -355,8 +355,10 @@ class GateReport(BaseModel):
     @model_validator(mode="after")
     def _complete_explicit_cno(self) -> "GateReport":
         fields = (self.cno_reason, self.cno_source)
-        if any(value is not None for value in fields) and not all(value is not None for value in fields):
-            raise ValueError("an explicit CNO report requires both reason and source")
+        cno_present = any(value is not None for value in fields) or bool(self.cno_detail)
+        if cno_present and not all(value is not None for value in fields):
+            self.cno_reason = GateCNOReason.MALFORMED_TYPED_OUTCOME
+            self.cno_source = GateCNOSource.GATE_REPORT
         return self
 
     @classmethod

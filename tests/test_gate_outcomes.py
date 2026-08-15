@@ -52,6 +52,26 @@ def test_gate_evidence_requirement_must_be_explicit_boolean() -> None:
         GateReport.model_validate({"nonempty_required": "false", "checks": []})
 
 
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"cno_detail": "unavailable"},
+        {"cno_reason": "GATE_RAISED"},
+        {"cno_source": "GATE_EXECUTION"},
+    ],
+)
+def test_incomplete_cno_metadata_is_cno(metadata: dict[str, str]) -> None:
+    report = GateReport.model_validate({
+        "nonempty_required": True,
+        "checks": [{"item": "positive", "ok": True}],
+        **metadata,
+    })
+
+    assert report.outcome.status == GateStatus.COULD_NOT_OBSERVE
+    assert report.outcome.reason == GateCNOReason.MALFORMED_TYPED_OUTCOME
+    assert report.outcome.source == GateCNOSource.GATE_REPORT
+
+
 def test_nonempty_exact_positive_artifact_is_pass(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     artifact = Path("result.txt")
@@ -251,3 +271,38 @@ def test_partial_typed_migration_normalizes_unknown_and_vacuous_rows(tmp_path: P
     )
     assert rows[0] == ("unknown", *expected)
     assert rows[1] == ("vacuous", *expected)
+
+
+def test_malformed_migrated_typed_outcome_is_cno(tmp_path: Path) -> None:
+    db_path = tmp_path / "malformed-typed.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE gate_results ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, passed INTEGER, outcome TEXT, "
+        "cno_reason TEXT, cno_source TEXT, nonempty_required INTEGER, checks_json TEXT)"
+    )
+    insert = (
+        "INSERT INTO gate_results "
+        "(passed, outcome, cno_reason, cno_source, nonempty_required, checks_json) "
+        "VALUES (?,?,?,?,?,?)"
+    )
+    conn.execute(insert, (1, "PASS", "GATE_RAISED", None, 0, "[]"))
+    conn.execute(insert, (0, "FAIL", None, None, 0, "[]"))
+    conn.execute(insert, (1, "PASS", None, None, 0, "[]"))
+    conn.commit()
+    conn.close()
+
+    tracer = Tracer(db_path, tmp_path / "malformed-typed-events.jsonl")
+    rows = tracer.conn.execute(
+        "SELECT outcome, passed, cno_reason, cno_source FROM gate_results ORDER BY id"
+    ).fetchall()
+    tracer.conn.close()
+
+    assert rows[0] == (
+        "COULD_NOT_OBSERVE",
+        None,
+        "MALFORMED_TYPED_OUTCOME",
+        "SCHEMA_MIGRATION",
+    )
+    assert rows[1] == ("FAIL", 0, None, None)
+    assert rows[2] == ("PASS", 1, None, None)

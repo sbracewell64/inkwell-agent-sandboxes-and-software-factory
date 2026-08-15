@@ -145,32 +145,34 @@ class Tracer:
         # been the vacuous `not violations` result. Preserve explicit old
         # negatives as FAIL and downgrade every old/unknown positive to CNO.
         self.conn.execute(
-            "UPDATE gate_results SET outcome = CASE WHEN passed=0 THEN ? ELSE ? END "
-            "WHERE outcome IS NULL OR outcome NOT IN (?,?,?)",
+            "UPDATE gate_results SET outcome=CASE WHEN passed=0 THEN ? ELSE ? END, "
+            "cno_reason=CASE WHEN passed=0 THEN NULL ELSE ? END, "
+            "cno_source=CASE WHEN passed=0 THEN NULL ELSE ? END "
+            "WHERE outcome IS NULL AND cno_reason IS NULL AND cno_source IS NULL",
             (GateStatus.FAIL.value, GateStatus.COULD_NOT_OBSERVE.value,
-             GateStatus.PASS.value, GateStatus.FAIL.value,
+             GateCNOReason.LEGACY_BOOLEAN_ONLY.value,
+             GateCNOSource.SCHEMA_MIGRATION.value),
+        )
+        malformed = (
+            GateStatus.COULD_NOT_OBSERVE.value,
+            GateCNOReason.MALFORMED_TYPED_OUTCOME.value,
+            GateCNOSource.SCHEMA_MIGRATION.value,
+        )
+        self.conn.execute(
+            "UPDATE gate_results SET outcome=?, cno_reason=?, cno_source=? "
+            "WHERE outcome IS NULL OR outcome NOT IN (?,?,?)",
+            (*malformed, GateStatus.PASS.value, GateStatus.FAIL.value,
              GateStatus.COULD_NOT_OBSERVE.value),
         )
         self.conn.execute(
-            "UPDATE gate_results SET cno_reason=?, cno_source=? "
-            "WHERE outcome=? AND (cno_reason IS NULL OR cno_source IS NULL)",
-            (GateCNOReason.LEGACY_BOOLEAN_ONLY.value,
-             GateCNOSource.SCHEMA_MIGRATION.value,
-             GateStatus.COULD_NOT_OBSERVE.value),
-        )
-        self.conn.execute(
-            "UPDATE gate_results SET cno_reason=?, cno_source=? WHERE outcome=? "
-            "AND (cno_reason NOT IN (?,?,?,?,?,?) OR cno_source NOT IN (?,?,?,?,?,?))",
-            (GateCNOReason.MALFORMED_TYPED_OUTCOME.value,
-             GateCNOSource.SCHEMA_MIGRATION.value,
+            "UPDATE gate_results SET outcome=?, cno_reason=?, cno_source=? "
+            "WHERE (outcome IN (?,?) AND (cno_reason IS NOT NULL OR cno_source IS NOT NULL)) "
+            "OR (outcome=? AND (cno_reason IS NULL OR cno_source IS NULL "
+            "OR cno_reason NOT IN (?,?,?,?,?,?) OR cno_source NOT IN (?,?,?,?,?,?)))",
+            (*malformed, GateStatus.PASS.value, GateStatus.FAIL.value,
              GateStatus.COULD_NOT_OBSERVE.value,
              *(reason.value for reason in GateCNOReason),
              *(source.value for source in GateCNOSource)),
-        )
-        self.conn.execute(
-            "UPDATE gate_results SET cno_reason=NULL, cno_source=NULL "
-            "WHERE outcome<>?",
-            (GateStatus.COULD_NOT_OBSERVE.value,),
         )
         self.conn.execute(
             "UPDATE gate_results SET nonempty_required=1 "
