@@ -57,6 +57,8 @@ bounded and deterministic without calling a provider.
 - immutable per-`message_end` resolved-target evidence with event/message
   identity, rejecting the first incomplete or drifting tuple so later matching
   output cannot cure earlier fallback evidence.
+- structured provider errors remain the primary verdict while any incomplete
+  or drifting target tuples remain attached as secondary typed observations.
 
 The legacy `agent_pi.run` now delegates native execution to this adapter. It no
 longer reads Pi's user model catalog or launches a separate list-models process.

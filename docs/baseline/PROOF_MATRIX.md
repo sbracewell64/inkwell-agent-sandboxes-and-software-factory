@@ -85,7 +85,7 @@
 | B4-001 closure successor execution | provenance-only successor must complete the same nonempty Linux/Windows checks on its own exact head | CNO UNTIL OBSERVED |
 | B4-001 default-branch push execution | accepted successor must trigger the same nonempty Linux/Windows checks after merge | CNO UNTIL OBSERVED |
 | B4-002 strict launch surface | exact provider/model, effort, tools, JSON print, no session/resources/approval/fallback, closed stdin, allowlisted env | PASS — LOCAL FIXTURE |
-| B4-002 shell-zero structured error precedence | deterministic child exits zero with provider error; typed result remains observed-bad | PASS — LOCAL FIXTURE |
+| B4-002 shell-zero structured error precedence | deterministic children exit zero with provider error; missing, incomplete, and drifting target metadata remains secondary typed evidence while provider error remains primary | LOCAL FIXTURE REQUIRED; EXACT-CANDIDATE REVIEW CNO |
 | B4-002 process bounds and cleanup | timeout, cancellation, ignored TERM, output overflow, reap, Unix group and escaped-descendant absence verification | PASS — LOCAL LINUX FIXTURE |
 | B4-002 stdin parent-tail regression | inherited-stdin control suppresses marker; owned supervisor preserves required typed parent-tail marker | PASS — WATCHED RED + LOCAL FIXTURE |
 | B4-002 protocol and attempt accounting | malformed/missing/duplicate terminal events and hidden retry are typed and charged against common budget | PASS — LOCAL FIXTURE |

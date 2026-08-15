@@ -126,6 +126,7 @@ class ResolvedTargetEvidence:
     provider: str | None
     model: str | None
     effort: str | None
+    failure: FailureReason | None
 
 
 @dataclass(frozen=True)
@@ -345,22 +346,23 @@ def _parse_events(raw: bytes, expected_target: tuple[str, str, str]) -> _ParsedE
                         message.get("thinkingLevel"),
                     )
                 )
-                evidence = ResolvedTargetEvidence(event_index, message_index, *values)
-                resolved_targets.append(evidence)
+                failure = None
+                if None in values:
+                    failure = FailureReason(
+                        "resolved-target-unverified",
+                        Observation.COULD_NOT_OBSERVE,
+                        f"Pi message_end target was incomplete at event {event_index}, message {message_index}",
+                    )
+                elif values != expected_target:
+                    failure = FailureReason(
+                        "resolved-target-mismatch",
+                        Observation.OBSERVED_BAD,
+                        f"Pi message_end target drifted at event {event_index}, message {message_index}",
+                    )
+                resolved_targets.append(ResolvedTargetEvidence(event_index, message_index, *values, failure))
                 resolved_provider, resolved_model, resolved_effort = values
-                if target_failure is None:
-                    if None in values:
-                        target_failure = FailureReason(
-                            "resolved-target-unverified",
-                            Observation.COULD_NOT_OBSERVE,
-                            f"Pi message_end target was incomplete at event {event_index}, message {message_index}",
-                        )
-                    elif values != expected_target:
-                        target_failure = FailureReason(
-                            "resolved-target-mismatch",
-                            Observation.OBSERVED_BAD,
-                            f"Pi message_end target drifted at event {event_index}, message {message_index}",
-                        )
+                if target_failure is None and failure is not None:
+                    target_failure = failure
                 usage = message.get("usage")
                 if isinstance(usage, dict):
                     fields = {
@@ -731,9 +733,6 @@ def run_pi_json(
         elif not within_budget:
             state = TerminalState.FAILED
             reason = FailureReason("attempt-budget-exhausted", Observation.OBSERVED_BAD, "observed native attempts exceeded the common budget")
-        elif parsed.target_failure is not None:
-            state = TerminalState.FAILED
-            reason = parsed.target_failure
         elif parsed.terminal_stop in {"error", "aborted"} or parsed.terminal_error:
             state = TerminalState.FAILED
             reason = FailureReason(
@@ -741,6 +740,9 @@ def run_pi_json(
                 Observation.OBSERVED_BAD,
                 parsed.terminal_error or f"Pi terminal stop was {parsed.terminal_stop}",
             )
+        elif parsed.target_failure is not None:
+            state = TerminalState.FAILED
+            reason = parsed.target_failure
         elif parsed.terminal_stop != "stop":
             state = TerminalState.FAILED
             reason = FailureReason("terminal-stop-unverified", Observation.COULD_NOT_OBSERVE, f"unexpected terminal stop: {parsed.terminal_stop!r}")

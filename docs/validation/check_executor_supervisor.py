@@ -218,6 +218,29 @@ def runtime_fixtures(errors: list[str]) -> None:
         check(structured.returncode == 0, "structured error fixture did not exit shell zero", errors)
         check(structured.terminal_error == "deterministic provider rejection", "structured terminal error missing", errors)
 
+        for target_mode, target_code, target_observation in (
+            ("missing", "resolved-target-unverified", Observation.COULD_NOT_OBSERVE),
+            ("incomplete", "resolved-target-unverified", Observation.COULD_NOT_OBSERVE),
+            ("drifting", "resolved-target-mismatch", Observation.OBSERVED_BAD),
+        ):
+            provider_error = run_pi_json(request(temp, f"structured-error-{target_mode}"))
+            assert_reason(provider_error, "structured-provider-error", Observation.OBSERVED_BAD, errors)
+            check(provider_error.returncode == 0, f"structured-error-{target_mode}: shell exit was not zero", errors)
+            check(
+                provider_error.primary_reason is not None
+                and provider_error.primary_reason.code == "structured-provider-error",
+                f"structured-error-{target_mode}: provider error was not the primary verdict",
+                errors,
+            )
+            check(
+                len(provider_error.resolved_targets) == 1
+                and provider_error.resolved_targets[0].failure is not None
+                and provider_error.resolved_targets[0].failure.code == target_code
+                and provider_error.resolved_targets[0].failure.observation == target_observation,
+                f"structured-error-{target_mode}: secondary target evidence was not retained",
+                errors,
+            )
+
         mismatch = run_pi_json(request(temp, "success", provider_model="fixture/other", phase_id="target-mismatch"))
         assert_reason(mismatch, "resolved-target-mismatch", Observation.OBSERVED_BAD, errors)
 
@@ -227,6 +250,8 @@ def runtime_fixtures(errors: list[str]) -> None:
         check(
             fallback.resolved_targets[0].event_index == 0
             and fallback.resolved_targets[0].provider == "fallback"
+            and fallback.resolved_targets[0].failure is not None
+            and fallback.resolved_targets[0].failure.code == "resolved-target-mismatch"
             and fallback.resolved_targets[1].event_index == 2
             and fallback.resolved_targets[1].provider == "fixture",
             "later matching target overwrote earlier drift evidence",
@@ -238,6 +263,8 @@ def runtime_fixtures(errors: list[str]) -> None:
         check(
             len(incomplete.resolved_targets) == 2
             and incomplete.resolved_targets[0].effort is None
+            and incomplete.resolved_targets[0].failure is not None
+            and incomplete.resolved_targets[0].failure.code == "resolved-target-unverified"
             and incomplete.resolved_targets[1].effort == "high",
             "later complete target cured or erased incomplete target evidence",
             errors,

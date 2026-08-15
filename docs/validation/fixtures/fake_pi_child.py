@@ -76,6 +76,23 @@ def incomplete_then_success():
     success()
 
 
+def structured_error(target_mode):
+    message = {
+        "role": "assistant",
+        "content": [],
+        "stopReason": "error",
+        "errorMessage": "deterministic provider rejection",
+    }
+    if target_mode != "missing":
+        message["provider"] = "fallback" if target_mode == "drifting" else "fixture"
+    if target_mode != "missing":
+        message["model"] = "substitute" if target_mode == "drifting" else "deterministic"
+    if target_mode not in {"missing", "incomplete"}:
+        message["thinkingLevel"] = "low" if target_mode == "drifting" else "high"
+    emit({"type": "message_end", "message": message})
+    emit({"type": "agent_end", "messages": [message]})
+
+
 def main():
     mode = sys.argv[-1]
     if mode in {"success", "stdin-consumption"}:
@@ -85,17 +102,9 @@ def main():
             sys.stdin.buffer.read()
         success()
     elif mode == "structured-error":
-        message = {
-            "role": "assistant",
-            "provider": "fixture",
-            "model": "deterministic",
-            "thinkingLevel": "high",
-            "content": [],
-            "stopReason": "error",
-            "errorMessage": "deterministic provider rejection",
-        }
-        emit({"type": "message_end", "message": message})
-        emit({"type": "agent_end", "messages": [message]})
+        structured_error("complete")
+    elif mode.startswith("structured-error-"):
+        structured_error(mode.removeprefix("structured-error-"))
     elif mode == "terminal-first-success":
         terminal_first_success()
     elif mode == "early-fallback-then-success":
