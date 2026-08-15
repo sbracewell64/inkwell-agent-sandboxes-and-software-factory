@@ -51,6 +51,31 @@ def terminal_first_success():
     emit({"type": "status", "status": "post-terminal"})
 
 
+def early_fallback_then_success():
+    fallback = {
+        "role": "assistant",
+        "provider": "fallback",
+        "model": "substitute",
+        "thinkingLevel": "low",
+        "content": [{"type": "text", "text": "fallback-marker"}],
+        "stopReason": "stop",
+    }
+    emit({"type": "message_end", "message": fallback})
+    success()
+
+
+def incomplete_then_success():
+    incomplete = {
+        "role": "assistant",
+        "provider": "fixture",
+        "model": "deterministic",
+        "content": [{"type": "text", "text": "incomplete-marker"}],
+        "stopReason": "stop",
+    }
+    emit({"type": "message_end", "message": incomplete})
+    success()
+
+
 def main():
     mode = sys.argv[-1]
     if mode in {"success", "stdin-consumption"}:
@@ -64,6 +89,7 @@ def main():
             "role": "assistant",
             "provider": "fixture",
             "model": "deterministic",
+            "thinkingLevel": "high",
             "content": [],
             "stopReason": "error",
             "errorMessage": "deterministic provider rejection",
@@ -72,6 +98,10 @@ def main():
         emit({"type": "agent_end", "messages": [message]})
     elif mode == "terminal-first-success":
         terminal_first_success()
+    elif mode == "early-fallback-then-success":
+        early_fallback_then_success()
+    elif mode == "incomplete-then-success":
+        incomplete_then_success()
     elif mode == "malformed":
         print("{not-json", flush=True)
         emit({"type": "agent_end", "messages": []})

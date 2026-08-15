@@ -221,6 +221,28 @@ def runtime_fixtures(errors: list[str]) -> None:
         mismatch = run_pi_json(request(temp, "success", provider_model="fixture/other", phase_id="target-mismatch"))
         assert_reason(mismatch, "resolved-target-mismatch", Observation.OBSERVED_BAD, errors)
 
+        fallback = run_pi_json(request(temp, "early-fallback-then-success"))
+        assert_reason(fallback, "resolved-target-mismatch", Observation.OBSERVED_BAD, errors)
+        check(len(fallback.resolved_targets) == 2, "target drift did not retain both message_end identities", errors)
+        check(
+            fallback.resolved_targets[0].event_index == 0
+            and fallback.resolved_targets[0].provider == "fallback"
+            and fallback.resolved_targets[1].event_index == 2
+            and fallback.resolved_targets[1].provider == "fixture",
+            "later matching target overwrote earlier drift evidence",
+            errors,
+        )
+
+        incomplete = run_pi_json(request(temp, "incomplete-then-success"))
+        assert_reason(incomplete, "resolved-target-unverified", Observation.COULD_NOT_OBSERVE, errors)
+        check(
+            len(incomplete.resolved_targets) == 2
+            and incomplete.resolved_targets[0].effort is None
+            and incomplete.resolved_targets[1].effort == "high",
+            "later complete target cured or erased incomplete target evidence",
+            errors,
+        )
+
         collision = run_pi_json(success_request)
         assert_reason(collision, "raw-evidence-identity-collision", Observation.COULD_NOT_OBSERVE, errors)
         other_phase = request(temp, "success", phase_id="other-phase")

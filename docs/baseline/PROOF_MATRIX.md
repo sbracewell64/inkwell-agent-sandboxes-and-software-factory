@@ -89,11 +89,12 @@
 | B4-002 process bounds and cleanup | timeout, cancellation, ignored TERM, output overflow, reap, Unix group and escaped-descendant absence verification | PASS — LOCAL LINUX FIXTURE |
 | B4-002 stdin parent-tail regression | inherited-stdin control suppresses marker; owned supervisor preserves required typed parent-tail marker | PASS — WATCHED RED + LOCAL FIXTURE |
 | B4-002 protocol and attempt accounting | malformed/missing/duplicate terminal events and hidden retry are typed and charged against common budget | PASS — LOCAL FIXTURE |
+| B4-002 immutable resolved-target enforcement | every assistant `message_end` retains event/message identity; incomplete or drifting tuples remain terminal despite later matching output | LOCAL FIXTURE REQUIRED; EXACT-CANDIDATE REVIEW CNO |
 | B4-002 Windows descendant containment | Job Object path is not implemented; launch returns typed CNO before spawn | CNO — HONEST REFUSAL |
 | B4-002 reviewed Linux PR-head projection | run `31911734134` completed the nonempty Linux checks on exact reviewed head `2291725cf0782b40ce01a17d29b6415a51b130de` | PASS — RULING `5304605032` |
 | B4-002 reviewed Windows PR-head projection | run `31911734134` completed the nonempty Windows static/parser/refusal checks on the same exact reviewed head | PASS — FAIL-CLOSED REFUSAL PROJECTION |
 | WINDOWS_PROVIDER_EXECUTION | green Windows CI proves refusal, not provider launch, Job Object custody, or descendant cleanup | CNO/REFUSED |
-| B4-002 closure successor execution | provenance-only successor must complete fresh nonempty Linux and Windows checks on its own exact head | CNO UNTIL OBSERVED |
+| B4-002 corrected candidate execution | executable corrections require fresh exact-candidate review and fresh nonempty Linux and Windows checks on the corrected exact head; ruling `5304605032` is provenance only | CNO UNTIL OBSERVED |
 
 ## Rule
 

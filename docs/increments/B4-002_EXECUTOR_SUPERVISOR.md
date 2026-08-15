@@ -1,6 +1,6 @@
 # B4-002 — Owned Executor Supervisor and Strict Pi Adapter
 
-**Status:** PROVEN AT REVIEWED IMPLEMENTATION HEAD; CLOSURE SUCCESSOR CI CNO
+**Status:** CORRECTED CANDIDATE; FRESH EXACT-HEAD REVIEW AND CI REQUIRED
 **Starts from:** `a984f6cf0a89503d3db8855ccd820b83e9ee60a1`
 **Reviewed implementation:** `2291725cf0782b40ce01a17d29b6415a51b130de`
 **Proof workflow run:** `31911734134`
@@ -54,6 +54,9 @@ bounded and deterministic without calling a provider.
 - observable native-retry accounting against the common budget;
 - requested/resolved target and effort, terminal stop/error, source-classed
   usage/cost, timeout/cancel, process/cleanup, attempts and evidence digests.
+- immutable per-`message_end` resolved-target evidence with event/message
+  identity, rejecting the first incomplete or drifting tuple so later matching
+  output cannot cure earlier fallback evidence.
 
 The legacy `agent_pi.run` now delegates native execution to this adapter. It no
 longer reads Pi's user model catalog or launches a separate list-models process.
@@ -99,10 +102,10 @@ provider execution fails closed with the required typed refusal. It does
 `WINDOWS_PROVIDER_EXECUTION` remains `CNO/REFUSED` until a proven Job Object
 path lands.
 
-This closure successor changes only this increment record, the increment
-ledger, and the proof matrix. Its own exact head still requires fresh nonempty
-Linux and Windows checks before landing; neither check may be inferred from run
-`31911734134`.
+Subsequent executable corrections make this ruling provenance only. The current
+candidate requires fresh exact-candidate review and fresh nonempty Linux and
+Windows checks before landing; neither acceptance nor checks may be inferred
+from ruling `5304605032` or run `31911734134`.
 
 ## Refusal conditions
 
@@ -143,12 +146,13 @@ no-tools/read-only transport and accounting adapters remain separate.
 ## Acceptance state
 
 Local focused fixtures and the full provider-free project gate passed for the
-reviewed implementation. Browser Sol ruling `5304605032` accepts workflow run
+reviewed implementation. Browser Sol ruling `5304605032` accepted workflow run
 `31911734134` as nonempty exact-head Linux and Windows proof for
 `2291725cf0782b40ce01a17d29b6415a51b130de`, while preserving Windows provider
 execution as `CNO/REFUSED`.
 
-This provenance-only successor remains CNO until fresh nonempty Linux and
-Windows checks complete successfully on its own exact head. An absent, pending,
-mismatched, skipped, cancelled, neutral, timed-out, or failing check is not
-PASS and does not authorize landing.
+That ruling is stale for landing after executable corrections. The corrected
+candidate remains CNO until fresh exact-candidate review and fresh nonempty
+Linux and Windows checks complete successfully on its own exact head. An
+absent, pending, mismatched, skipped, cancelled, neutral, timed-out, or failing
+review or check is not PASS and does not authorize landing.

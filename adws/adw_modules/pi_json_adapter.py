@@ -120,6 +120,15 @@ class PiEvidenceDigests:
 
 
 @dataclass(frozen=True)
+class ResolvedTargetEvidence:
+    event_index: int
+    message_index: int
+    provider: str | None
+    model: str | None
+    effort: str | None
+
+
+@dataclass(frozen=True)
 class PiTerminalResult:
     terminal_state: TerminalState
     reason: FailureReason | None
@@ -150,6 +159,7 @@ class PiTerminalResult:
     evidence_persisted: bool = False
     provider_launched: bool = False
     evidence_error: str | None = None
+    resolved_targets: tuple[ResolvedTargetEvidence, ...] = ()
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -169,6 +179,8 @@ class _ParsedEvents:
     resolved_provider: str | None
     resolved_model: str | None
     resolved_effort: str | None
+    resolved_targets: tuple[ResolvedTargetEvidence, ...]
+    target_failure: FailureReason | None
 
 
 def safe_environment(source: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -277,7 +289,7 @@ def _message_text(message: dict) -> str:
     )
 
 
-def _parse_events(raw: bytes) -> _ParsedEvents:
+def _parse_events(raw: bytes, expected_target: tuple[str, str, str]) -> _ParsedEvents:
     events: list[dict] = []
     malformed = 0
     for line in raw.splitlines():
@@ -303,6 +315,8 @@ def _parse_events(raw: bytes) -> _ParsedEvents:
     resolved_provider = None
     resolved_model = None
     resolved_effort = None
+    resolved_targets: list[ResolvedTargetEvidence] = []
+    target_failure = None
     input_tokens = output_tokens = cache_read = cache_write = reasoning = total_tokens = 0
     total_cost = 0.0
     usage_seen = False
@@ -310,10 +324,10 @@ def _parse_events(raw: bytes) -> _ParsedEvents:
 
     # message_end is the accounting source. agent_end repeats message history
     # and must not double-charge it.
-    for event in events:
+    for event_index, event in enumerate(events):
         if event.get("type") == "message_end":
             messages = _assistant_messages(event)
-            for message in messages:
+            for message_index, message in enumerate(messages):
                 stop = message.get("stopReason")
                 if isinstance(stop, str):
                     terminal_stop = stop
@@ -323,19 +337,30 @@ def _parse_events(raw: bytes) -> _ParsedEvents:
                 body = _message_text(message)
                 if body:
                     text = body
-                for key, destination in (
-                    ("provider", "provider"),
-                    ("model", "model"),
-                    ("thinkingLevel", "effort"),
-                ):
-                    value = message.get(key)
-                    if isinstance(value, str) and value:
-                        if destination == "provider":
-                            resolved_provider = value
-                        elif destination == "model":
-                            resolved_model = value
-                        else:
-                            resolved_effort = value
+                values = tuple(
+                    value if isinstance(value, str) and value else None
+                    for value in (
+                        message.get("provider"),
+                        message.get("model"),
+                        message.get("thinkingLevel"),
+                    )
+                )
+                evidence = ResolvedTargetEvidence(event_index, message_index, *values)
+                resolved_targets.append(evidence)
+                resolved_provider, resolved_model, resolved_effort = values
+                if target_failure is None:
+                    if None in values:
+                        target_failure = FailureReason(
+                            "resolved-target-unverified",
+                            Observation.COULD_NOT_OBSERVE,
+                            f"Pi message_end target was incomplete at event {event_index}, message {message_index}",
+                        )
+                    elif values != expected_target:
+                        target_failure = FailureReason(
+                            "resolved-target-mismatch",
+                            Observation.OBSERVED_BAD,
+                            f"Pi message_end target drifted at event {event_index}, message {message_index}",
+                        )
                 usage = message.get("usage")
                 if isinstance(usage, dict):
                     fields = {
@@ -360,6 +385,13 @@ def _parse_events(raw: bytes) -> _ParsedEvents:
                         if value is not None:
                             cost_seen = True
                             total_cost += value
+
+    if target_failure is None and not resolved_targets:
+        target_failure = FailureReason(
+            "resolved-target-unverified",
+            Observation.COULD_NOT_OBSERVE,
+            "Pi emitted no assistant message_end target evidence",
+        )
 
     # A terminal agent_end can carry the only final error in a fixture or a
     # future Pi version. It affects verdict/text but never usage accounting.
@@ -401,6 +433,8 @@ def _parse_events(raw: bytes) -> _ParsedEvents:
         resolved_provider,
         resolved_model,
         resolved_effort,
+        tuple(resolved_targets),
+        target_failure,
     )
 
 
@@ -655,7 +689,7 @@ def run_pi_json(
                 pass
         return _evidence_persistence_failure(request, process_result, budget, error)
     raw_digest = hashlib.sha256(process_result.stdout).hexdigest()
-    parsed = _parse_events(process_result.stdout)
+    parsed = _parse_events(process_result.stdout, (provider, model, request.thinking))
     callback_error = None
     for event in parsed.events:
         if on_event and callback_error is None:
@@ -697,6 +731,9 @@ def run_pi_json(
         elif not within_budget:
             state = TerminalState.FAILED
             reason = FailureReason("attempt-budget-exhausted", Observation.OBSERVED_BAD, "observed native attempts exceeded the common budget")
+        elif parsed.target_failure is not None:
+            state = TerminalState.FAILED
+            reason = parsed.target_failure
         elif parsed.terminal_stop in {"error", "aborted"} or parsed.terminal_error:
             state = TerminalState.FAILED
             reason = FailureReason(
@@ -707,12 +744,6 @@ def run_pi_json(
         elif parsed.terminal_stop != "stop":
             state = TerminalState.FAILED
             reason = FailureReason("terminal-stop-unverified", Observation.COULD_NOT_OBSERVE, f"unexpected terminal stop: {parsed.terminal_stop!r}")
-        elif parsed.resolved_provider is None or parsed.resolved_model is None or parsed.resolved_effort is None:
-            state = TerminalState.FAILED
-            reason = FailureReason("resolved-target-unverified", Observation.COULD_NOT_OBSERVE, "Pi did not report the resolved provider, model, and effort")
-        elif (parsed.resolved_provider, parsed.resolved_model, parsed.resolved_effort) != (provider, model, request.thinking):
-            state = TerminalState.FAILED
-            reason = FailureReason("resolved-target-mismatch", Observation.OBSERVED_BAD, "Pi resolved a provider, model, or effort different from the exact request")
 
     primary_state = state
     primary_reason = reason
@@ -754,4 +785,5 @@ def run_pi_json(
         True,
         process_result.process is not None,
         None,
+        parsed.resolved_targets,
     )
