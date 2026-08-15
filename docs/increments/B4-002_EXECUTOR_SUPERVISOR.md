@@ -44,6 +44,8 @@ bounded and deterministic without calling a provider.
 - durable bounded raw events before parsing;
 - typed observation-delivery CNO that preserves the primary provider outcome
   and cleanup evidence when a post-capture callback fails;
+- typed evidence reservation/persistence CNO for every filesystem stage, with
+  no parsing, callback, durable-digest claim, or partial-target reuse;
 - strict malformed/missing/duplicate terminal-event handling;
 - shell-zero structured-error precedence;
 - observable native-retry accounting against the common budget;

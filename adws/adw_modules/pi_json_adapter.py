@@ -14,7 +14,7 @@ import os
 import re
 import tempfile
 import threading
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
@@ -60,6 +60,7 @@ PI_OWNED_ENV_NAMES = frozenset(
 _PROVIDER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _EVIDENCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _SENSITIVE_ENV_FRAGMENTS = ("KEY", "TOKEN", "CREDENTIAL", "AUTH", "COOKIE", "HOME")
+_EMPTY_DIGEST = hashlib.sha256(b"").hexdigest()
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,7 @@ class PiAdapterRequest:
     environment_allowlist: frozenset[str] = SAFE_INHERITED_ENV_NAMES
     platform_name: str | None = None
     custodian_fault: str | None = None
+    evidence_fault: str | None = None
 
 
 @dataclass(frozen=True)
@@ -114,7 +116,7 @@ class AttemptAccounting:
 class PiEvidenceDigests:
     stdout_sha256: str
     stderr_sha256: str
-    raw_events_sha256: str
+    raw_events_sha256: str | None
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,9 @@ class PiTerminalResult:
     primary_terminal_state: TerminalState | None = None
     primary_reason: FailureReason | None = None
     observation_delivery_error: str | None = None
+    evidence_persisted: bool = False
+    provider_launched: bool = False
+    evidence_error: str | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -447,6 +452,64 @@ def _refused_result(request: PiAdapterRequest, reason: FailureReason) -> PiTermi
     )
 
 
+def _evidence_setup_failure(request: PiAdapterRequest, error: OSError) -> PiTerminalResult:
+    return replace(
+        _refused_result(
+            request,
+            FailureReason("evidence-setup-unobservable", Observation.COULD_NOT_OBSERVE, f"raw evidence reservation failed: {type(error).__name__}: {error}"),
+        ),
+        evidence=PiEvidenceDigests(_EMPTY_DIGEST, _EMPTY_DIGEST, None),
+        evidence_error=f"{type(error).__name__}: {error}",
+    )
+
+
+def _evidence_persistence_failure(
+    request: PiAdapterRequest,
+    process_result,
+    budget: AttemptBudget,
+    error: OSError,
+) -> PiTerminalResult:
+    target = _split_provider_model(request.provider_model) or ("", "")
+    detail = f"raw evidence persistence failed: {type(error).__name__}: {error}"
+    return PiTerminalResult(
+        TerminalState.FAILED,
+        FailureReason("evidence-persistence-unobservable", Observation.COULD_NOT_OBSERVE, detail),
+        process_result.returncode,
+        "",
+        target[0],
+        target[1],
+        request.thinking,
+        None,
+        None,
+        None,
+        None,
+        None,
+        UsageCost(),
+        AttemptAccounting(
+            budget.total,
+            1 if process_result.attempt_number is not None else 0,
+            process_result.attempt_number,
+            0,
+            False,
+        ),
+        process_result.timed_out,
+        process_result.cancelled,
+        process_result.process,
+        process_result.cleanup,
+        PiEvidenceDigests(process_result.evidence.stdout_sha256, process_result.evidence.stderr_sha256, None),
+        process_result.stdout_bytes_seen,
+        process_result.stderr_bytes_seen,
+        0,
+        (),
+        process_result.terminal_state,
+        process_result.reason,
+        None,
+        False,
+        process_result.process is not None,
+        f"{type(error).__name__}: {error}",
+    )
+
+
 def run_pi_json(
     request: PiAdapterRequest,
     *,
@@ -510,52 +573,87 @@ def run_pi_json(
             FailureReason("invalid-raw-evidence-identity", Observation.COULD_NOT_OBSERVE, "execution, phase, and attempt evidence identities must be explicit and valid"),
         )
     raw_path = Path(request.raw_event_path) / request.execution_id / request.phase_id / f"attempt-{request.attempt_number:03d}.jsonl"
-    raw_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        raw_path.open("xb").close()
+        if request.evidence_fault == "mkdir":
+            raise OSError("injected evidence mkdir failure")
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        if request.evidence_fault == "create":
+            raise OSError("injected evidence create failure")
+        reservation = raw_path.open("xb")
+        reservation.close()
+        if request.evidence_fault == "reserve-close":
+            raise OSError("injected evidence reservation close failure")
     except FileExistsError:
         return _refused_result(
             request,
             FailureReason("raw-evidence-identity-collision", Observation.COULD_NOT_OBSERVE, "raw event evidence target already exists"),
         )
-    with tempfile.TemporaryDirectory(prefix="sssf-pi-", dir=str(raw_path.parent)) as temporary:
-        runtime_dir = Path(temporary) / "runtime"
-        _settings(runtime_dir)
-        environment = dict(request.environment)
-        environment.update(
-            {
-                "PI_CODING_AGENT_DIR": str(runtime_dir),
-                "PI_OFFLINE": "1",
-                "PI_SKIP_VERSION_CHECK": "1",
-                "PI_TELEMETRY": "0",
-            }
-        )
-        allowlist = frozenset(request.environment_allowlist | PI_OWNED_ENV_NAMES)
-        process_result = supervise(
-            SupervisorRequest(
-                argv=argv,
-                cwd=request.cwd,
-                environment=environment,
-                environment_allowlist=allowlist,
-                timeout_seconds=request.timeout_seconds,
-                term_grace_seconds=request.term_grace_seconds,
-                verification_grace_seconds=request.verification_grace_seconds,
-                max_stdout_bytes=request.max_stdout_bytes,
-                max_stderr_bytes=request.max_stderr_bytes,
-                platform_name=request.platform_name,
-                custodian_fault=request.custodian_fault,
-            ),
-            budget=budget,
-            cancel_event=cancel_event,
-            on_spawn=on_spawn,
-            on_exit=on_exit,
-        )
+    except OSError as error:
+        return _evidence_setup_failure(request, error)
+    process_result = None
+    try:
+        with tempfile.TemporaryDirectory(prefix="sssf-pi-", dir=str(raw_path.parent)) as temporary:
+            runtime_dir = Path(temporary) / "runtime"
+            _settings(runtime_dir)
+            environment = dict(request.environment)
+            environment.update(
+                {
+                    "PI_CODING_AGENT_DIR": str(runtime_dir),
+                    "PI_OFFLINE": "1",
+                    "PI_SKIP_VERSION_CHECK": "1",
+                    "PI_TELEMETRY": "0",
+                }
+            )
+            allowlist = frozenset(request.environment_allowlist | PI_OWNED_ENV_NAMES)
+            process_result = supervise(
+                SupervisorRequest(
+                    argv=argv,
+                    cwd=request.cwd,
+                    environment=environment,
+                    environment_allowlist=allowlist,
+                    timeout_seconds=request.timeout_seconds,
+                    term_grace_seconds=request.term_grace_seconds,
+                    verification_grace_seconds=request.verification_grace_seconds,
+                    max_stdout_bytes=request.max_stdout_bytes,
+                    max_stderr_bytes=request.max_stderr_bytes,
+                    platform_name=request.platform_name,
+                    custodian_fault=request.custodian_fault,
+                ),
+                budget=budget,
+                cancel_event=cancel_event,
+                on_spawn=on_spawn,
+                on_exit=on_exit,
+            )
+    except OSError as error:
+        if process_result is None:
+            return _evidence_setup_failure(request, error)
+        return _evidence_persistence_failure(request, process_result, budget, error)
 
-    # Raw bounded bytes are made durable before the first parse or callback.
-    with raw_path.open("r+b") as raw_file:
+    raw_file = None
+    try:
+        if request.evidence_fault == "reopen":
+            raise OSError("injected evidence reopen failure")
+        raw_file = raw_path.open("r+b")
+        if request.evidence_fault == "write":
+            raise OSError("injected evidence write failure")
         raw_file.write(process_result.stdout)
+        if request.evidence_fault == "flush":
+            raise OSError("injected evidence flush failure")
         raw_file.flush()
+        if request.evidence_fault == "fsync":
+            raise OSError("injected evidence fsync failure")
         os.fsync(raw_file.fileno())
+        raw_file.close()
+        raw_file = None
+        if request.evidence_fault == "final-close":
+            raise OSError("injected evidence final close failure")
+    except OSError as error:
+        if raw_file is not None:
+            try:
+                raw_file.close()
+            except OSError:
+                pass
+        return _evidence_persistence_failure(request, process_result, budget, error)
     raw_digest = hashlib.sha256(process_result.stdout).hexdigest()
     parsed = _parse_events(process_result.stdout)
     callback_error = None
@@ -653,4 +751,7 @@ def run_pi_json(
         primary_state,
         primary_reason,
         callback_error,
+        True,
+        process_result.process is not None,
+        None,
     )

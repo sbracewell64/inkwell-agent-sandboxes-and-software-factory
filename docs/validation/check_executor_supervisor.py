@@ -353,6 +353,26 @@ def runtime_fixtures(errors: list[str]) -> None:
         check(delivered == ["message_end", "agent_end"], "post-terminal events were delivered after callback failure", errors)
         check(after_terminal.primary_terminal_state == TerminalState.SUCCEEDED and after_terminal.terminal_stop == "stop", "terminal callback CNO erased provider outcome", errors)
 
+        for fault in ("mkdir", "create", "reserve-close"):
+            setup_request = request(temp, "success", phase_id=f"evidence-setup-{fault}", evidence_fault=fault)
+            setup_failure = run_pi_json(setup_request)
+            assert_reason(setup_failure, "evidence-setup-unobservable", Observation.COULD_NOT_OBSERVE, errors)
+            check(not setup_failure.provider_launched and setup_failure.process is None, f"{fault}: evidence setup failure launched provider", errors)
+            check(setup_failure.attempts.native_attempts == 0 and setup_failure.evidence.raw_events_sha256 is None, f"{fault}: evidence setup accounting was dishonest", errors)
+
+        for fault in ("reopen", "write", "flush", "fsync", "final-close"):
+            delivered.clear()
+            persistence_request = request(temp, "success", phase_id=f"evidence-persistence-{fault}", evidence_fault=fault)
+            persistence_failure = run_pi_json(persistence_request, on_event=lambda event: delivered.append(event["type"]))
+            assert_reason(persistence_failure, "evidence-persistence-unobservable", Observation.COULD_NOT_OBSERVE, errors)
+            check(persistence_failure.provider_launched and persistence_failure.process is not None, f"{fault}: completed provider identity was lost", errors)
+            check(persistence_failure.primary_terminal_state == TerminalState.SUCCEEDED and persistence_failure.cleanup.group_absent is True, f"{fault}: primary process or cleanup evidence was lost", errors)
+            check(not persistence_failure.evidence_persisted and persistence_failure.evidence.raw_events_sha256 is None, f"{fault}: partial evidence claimed a durable digest", errors)
+            check(persistence_failure.attempts.native_attempts == 1 and not persistence_failure.attempts.fully_observable, f"{fault}: persistence attempt accounting was dishonest", errors)
+            check(not delivered, f"{fault}: callback ran without durable evidence", errors)
+            collision_after_partial = run_pi_json(persistence_request)
+            assert_reason(collision_after_partial, "raw-evidence-identity-collision", Observation.COULD_NOT_OBSERVE, errors)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()

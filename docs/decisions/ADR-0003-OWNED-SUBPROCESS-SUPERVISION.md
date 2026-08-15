@@ -42,6 +42,10 @@ structured provider error remains failure regardless of process exit status.
 Event callback exceptions disable further delivery and return typed
 observation-delivery CNO while retaining the separately classified provider
 outcome, raw digest, process result, and cleanup evidence.
+Evidence reservation and durable commit are typed phases. Any directory,
+exclusive-create, reopen, write, flush, fsync, or close failure returns CNO;
+post-launch failures preserve process and cleanup evidence but expose no raw
+digest, perform no parsing or callbacks, and leave the identity reserved.
 Observable native retry events are counted and charged to the same budget; a
 retry despite the disabled policy fails.
 
