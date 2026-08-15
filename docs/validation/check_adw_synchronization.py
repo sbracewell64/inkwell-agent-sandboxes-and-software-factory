@@ -30,15 +30,19 @@ EXPECTED_RED_FIXTURES = frozenset({
     "exhaustive_match_finish",
     "infinite_loop_finish",
     "match-false-guard-unreachable-finish",
+    "match-zero-guard-unreachable-finish",
     "missing_export",
     "missing_finish",
     "missing_rich",
     "nested_compound_finish",
+    "nested-non-boolean-finish",
     "prompt_output_mismatch",
     "reachable_break_finish",
     "stale_run_succeeded",
     "unreachable_finish",
     "while-false-unreachable-finish",
+    "while-one-unreachable-finish",
+    "while-zero-unreachable-finish",
 })
 
 
@@ -188,164 +192,14 @@ def dependencies(path: Path, errors: list[str]) -> set[str]:
         return set()
 
 
-def expression_finish_calls(node: ast.AST | None) -> int:
-    if node is None:
-        return 0
-
-    class Calls(ast.NodeVisitor):
-        count = 0
-
-        def visit_Call(self, call: ast.Call) -> None:
-            if (isinstance(call.func, ast.Attribute) and call.func.attr == "finish"
-                    and isinstance(call.func.value, ast.Name) and call.func.value.id == "run"):
-                self.count += 1
-            self.generic_visit(call)
-
-        def visit_Lambda(self, _node: ast.Lambda) -> None:
-            return
-
-    visitor = Calls()
-    visitor.visit(node)
-    return visitor.count
-
-
-@dataclass(frozen=True)
-class Flow:
-    finish_calls: int = 0
-    exits: frozenset[str] = frozenset({"normal"})
-    ambiguous: bool = False
-
-
-def merge_flows(flows: list[Flow], prefix_calls: int = 0) -> Flow:
-    return Flow(
-        prefix_calls + sum(flow.finish_calls for flow in flows),
-        frozenset().union(*(flow.exits for flow in flows)),
-        any(flow.ambiguous for flow in flows),
+def is_run_finish_call(node: ast.AST | None) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "finish"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "run"
     )
-
-
-def irrefutable_pattern(pattern: ast.pattern) -> bool:
-    return isinstance(pattern, ast.MatchAs) and pattern.pattern is None
-
-
-def statement_flow(statement: ast.stmt) -> Flow:
-    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-        return Flow()
-    if isinstance(statement, ast.Return):
-        return Flow(expression_finish_calls(statement.value), frozenset({"return"}))
-    if isinstance(statement, ast.Raise):
-        return Flow(expression_finish_calls(statement.exc), frozenset({"raise"}))
-    if isinstance(statement, ast.Break):
-        return Flow(exits=frozenset({"break"}))
-    if isinstance(statement, ast.Continue):
-        return Flow(exits=frozenset({"continue"}))
-    if isinstance(statement, ast.If):
-        test_calls = expression_finish_calls(statement.test)
-        constant = statement.test.value if isinstance(statement.test, ast.Constant) else None
-        if constant is True:
-            return merge_flows([reachable_finish_flow(statement.body)], test_calls)
-        if constant is False:
-            return merge_flows([reachable_finish_flow(statement.orelse)], test_calls)
-        branches = [reachable_finish_flow(statement.body)]
-        branches.append(reachable_finish_flow(statement.orelse) if statement.orelse else Flow())
-        return merge_flows(branches, test_calls)
-    if isinstance(statement, ast.Match):
-        flows: list[Flow] = []
-        exhaustive = False
-        for case in statement.cases:
-            guard_calls = expression_finish_calls(case.guard)
-            if isinstance(case.guard, ast.Constant) and case.guard.value is False:
-                flows.append(Flow(guard_calls))
-                continue
-            if case.guard is not None \
-                    and not (isinstance(case.guard, ast.Constant) and case.guard.value is True):
-                guarded = reachable_finish_flow(case.body)
-                flows.append(Flow(
-                    guard_calls + guarded.finish_calls,
-                    guarded.exits | {"normal"},
-                    True,
-                ))
-                continue
-            flows.append(merge_flows([reachable_finish_flow(case.body)], guard_calls))
-            if irrefutable_pattern(case.pattern):
-                exhaustive = True
-                break
-        if not exhaustive:
-            flows.append(Flow())
-        return merge_flows(flows, expression_finish_calls(statement.subject))
-    if isinstance(statement, (ast.With, ast.AsyncWith)):
-        calls = sum(expression_finish_calls(item.context_expr) for item in statement.items)
-        return merge_flows([reachable_finish_flow(statement.body)], calls)
-    if isinstance(statement, (ast.For, ast.AsyncFor, ast.While)):
-        control = getattr(statement, "iter", None) or getattr(statement, "test", None)
-        control_calls = expression_finish_calls(control)
-        is_never_entered = isinstance(statement, ast.While) \
-            and isinstance(statement.test, ast.Constant) and statement.test.value is False
-        if is_never_entered:
-            else_flow = reachable_finish_flow(statement.orelse)
-            return merge_flows([else_flow], control_calls)
-        body = reachable_finish_flow(statement.body)
-        is_infinite = isinstance(statement, ast.While) \
-            and isinstance(statement.test, ast.Constant) and statement.test.value is True
-        can_exhaust = not is_infinite
-        else_flow = reachable_finish_flow(statement.orelse) if can_exhaust else Flow(exits=frozenset())
-        exits = set(body.exits - {"normal", "continue", "break"}) | set(else_flow.exits)
-        if "break" in body.exits:
-            exits.add("normal")
-        if can_exhaust and not statement.orelse:
-            exits.add("normal")
-        return Flow(
-            control_calls + body.finish_calls + else_flow.finish_calls,
-            frozenset(exits),
-            body.ambiguous or else_flow.ambiguous,
-        )
-    if isinstance(statement, (ast.Try, ast.TryStar)):
-        body = reachable_finish_flow(statement.body)
-        normal_body = Flow(body.finish_calls, frozenset({"normal"}) if "normal" in body.exits else frozenset(), body.ambiguous)
-        else_flow = reachable_finish_flow(statement.orelse) if "normal" in body.exits else Flow(exits=frozenset())
-        handlers = [reachable_finish_flow(handler.body) for handler in statement.handlers]
-        pre_final = merge_flows([
-            Flow(0, body.exits - {"normal", "raise"}, body.ambiguous),
-            merge_flows([normal_body, else_flow]) if statement.orelse else normal_body,
-            *handlers,
-            Flow(exits=frozenset({"raise"})),
-        ])
-        if not statement.finalbody:
-            return pre_final
-        final = reachable_finish_flow(statement.finalbody)
-        exits = set(final.exits - {"normal"})
-        if "normal" in final.exits:
-            exits.update(pre_final.exits)
-        return Flow(
-            pre_final.finish_calls + final.finish_calls,
-            frozenset(exits),
-            pre_final.ambiguous or final.ambiguous,
-        )
-    simple = (
-        ast.Assign, ast.AnnAssign, ast.AugAssign, ast.Assert, ast.Delete, ast.Expr,
-        ast.Global, ast.Import, ast.ImportFrom, ast.Nonlocal, ast.Pass,
-    )
-    if isinstance(statement, simple):
-        return Flow(expression_finish_calls(statement))
-    return Flow(exits=frozenset(), ambiguous=True)
-
-
-def reachable_finish_flow(statements: list[ast.stmt]) -> Flow:
-    count = 0
-    exits: set[str] = set()
-    normal = True
-    ambiguous = False
-    for statement in statements:
-        if not normal:
-            break
-        flow = statement_flow(statement)
-        count += flow.finish_calls
-        exits.update(flow.exits - {"normal"})
-        normal = "normal" in flow.exits
-        ambiguous = ambiguous or flow.ambiguous
-    if normal:
-        exits.add("normal")
-    return Flow(count, frozenset(exits), ambiguous)
 
 
 def class_fields(
@@ -462,14 +316,17 @@ def check_script(
     if len(mains) != 1:
         errors.append(f"{path}: expected exactly one main(), found {len(mains)}")
     else:
-        flow = reachable_finish_flow(mains[0].body)
-        inventory.finish_calls += flow.finish_calls
-        if flow.ambiguous:
-            errors.append(f"CNO: {path}: unsupported or ambiguous control flow in main()")
-        elif flow.finish_calls != 1:
+        main = mains[0]
+        finish_calls = [node for node in ast.walk(main) if is_run_finish_call(node)]
+        final = main.body[-1] if main.body else None
+        final_call = final.value if isinstance(final, ast.Return) else None
+        if len(finish_calls) != 1 or not is_run_finish_call(final_call):
             errors.append(
-                f"{path}: reachable run.finish() calls: expected 1, found {flow.finish_calls}"
+                f"CNO: {path}: main() must contain exactly one run.finish() call as its "
+                "final top-level return"
             )
+        else:
+            inventory.finish_calls += 1
     for node in ast.walk(tree):
         if (isinstance(node, ast.Attribute) and node.attr == "succeeded"
                 and isinstance(node.value, ast.Name) and node.value.id == "run"):
@@ -651,19 +508,21 @@ def main() -> int:
             print(f"- {error}")
         return 1
 
-    print("HD-02 ADW synchronization: PASS")
+    state = "CHECKED (red fixtures skipped)" if args.skip_red_fixtures else "PASS"
+    print(f"HD-02 ADW synchronization: {state}")
     print("checked inventory:")
     for name, count in sorted(inventory.surfaces.items()):
         print(f"- {name} ADWs: {count}")
     print(f"- AgentCall.output_type declarations: {inventory.agent_calls}")
     print(f"- imported module attributes: {inventory.module_attributes}")
-    print(f"- reachable run.finish() calls: {inventory.finish_calls}")
+    print(f"- top-level final return run.finish() contracts: {inventory.finish_calls}")
     print(f"- dependency/import sets: {inventory.dependency_sets}")
     print(f"- prompt Report contracts: {inventory.prompt_reports}")
     print(f"- generated import-only smokes: {inventory.import_smokes}")
     print(f"- watched-red fixtures: {inventory.red_fixtures}")
     if red_controls_passed:
         print("compound-reachability-red-controls: PASS")
+        print("top-level-final-return-finish-contract: PASS")
     return 0
 
 
