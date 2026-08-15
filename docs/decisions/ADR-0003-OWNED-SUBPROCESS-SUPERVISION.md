@@ -26,6 +26,11 @@ helper becomes a child subreaper, launches the provider process, and repeatedly
 rescans adopted children through cleanup, so coordinator threads and their
 unrelated children remain outside its custody. Missing terminal IPC or an
 unverified empty custody set is could-not-observe.
+The custodian also owns an independent monotonic cleanup watchdog and duplex
+cleanup-request/acknowledgement protocol. Coordinator startup, callback, pipe,
+or deadline failures cannot terminate the subreaper; without an observable
+empty-tree acknowledgement they return cleanup-unverified with custodian
+identity while the helper retains custody and completes bounded cleanup.
 
 `adws/adw_modules/pi_json_adapter.py` is the strict Pi JSON/print projection.
 It requires an exact provider/model, explicit thinking and tool allowlist, and

@@ -104,6 +104,9 @@ no-tools/read-only transport and accounting adapters remain separate.
   so descendants remain discoverable after their original parent exits without
   capturing coordinator-thread children; launch refuses as CNO if custody or
   bounded terminal IPC cannot be verified.
+- Coordinator failure requests cleanup over duplex IPC and waits for an
+  empty-tree acknowledgement; missing acknowledgement is cleanup-unverified
+  with custodian identity, and the coordinator never kills the subreaper.
 - No credential transport is part of this increment, so it does not by itself
   authorize a live provider call.
 - Raw callbacks occur after bounded output is durably retained, not live during

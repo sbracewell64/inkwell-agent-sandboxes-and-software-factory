@@ -312,6 +312,21 @@ def runtime_fixtures(errors: list[str]) -> None:
             unrelated.terminate()
             unrelated.wait(timeout=2)
 
+        startup = run_pi_json(request(temp, "success", phase_id="startup-failure", custodian_fault="startup"))
+        assert_reason(startup, "cleanup-unverified", Observation.COULD_NOT_OBSERVE, errors)
+        check(startup.process is None and startup.cleanup.custodian_pid is None, "startup failure claimed a live custodian", errors)
+
+        broken = run_pi_json(request(temp, "timeout", phase_id="broken-ipc", custodian_fault="broken-ipc", timeout_seconds=0.15))
+        assert_reason(broken, "cleanup-unverified", Observation.COULD_NOT_OBSERVE, errors)
+        check(broken.cleanup.custodian_pid is not None, "broken IPC omitted custodian identity", errors)
+
+        def reject_spawn(_pid: int) -> None:
+            raise RuntimeError("fixture callback rejection")
+
+        callback = run_pi_json(request(temp, "slow-success", phase_id="callback-failure"), on_spawn=reject_spawn)
+        assert_reason(callback, "cleanup-unverified", Observation.COULD_NOT_OBSERVE, errors)
+        check(callback.cleanup.group_absent is True and not callback.cleanup.survivors, "callback failure returned before verified cleanup", errors)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()

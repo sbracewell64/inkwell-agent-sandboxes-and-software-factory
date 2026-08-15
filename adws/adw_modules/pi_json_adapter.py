@@ -85,6 +85,7 @@ class PiAdapterRequest:
     environment: Mapping[str, str] = field(default_factory=dict)
     environment_allowlist: frozenset[str] = SAFE_INHERITED_ENV_NAMES
     platform_name: str | None = None
+    custodian_fault: str | None = None
 
 
 @dataclass(frozen=True)
@@ -539,6 +540,7 @@ def run_pi_json(
                 max_stdout_bytes=request.max_stdout_bytes,
                 max_stderr_bytes=request.max_stderr_bytes,
                 platform_name=request.platform_name,
+                custodian_fault=request.custodian_fault,
             ),
             budget=budget,
             cancel_event=cancel_event,

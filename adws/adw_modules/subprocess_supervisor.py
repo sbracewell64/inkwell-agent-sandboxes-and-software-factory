@@ -18,7 +18,7 @@ import signal
 import subprocess
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
@@ -60,6 +60,7 @@ class CleanupResult:
     descendants_seen: tuple[ProcessIdentity, ...] = ()
     survivors: tuple[ProcessIdentity, ...] = ()
     detail: str = ""
+    custodian_pid: int | None = None
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,7 @@ class SupervisorRequest:
     # Test-only platform injection also makes the refusal contract executable
     # on Linux. Production callers leave this unset.
     platform_name: str | None = None
+    custodian_fault: str | None = None
 
 
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -602,20 +604,69 @@ def _supervise_linux(
 def _custodian_main(connection, request: SupervisorRequest, total: int, attempt_number: int, cancel_event) -> None:
     budget = AttemptBudget(total)
     if not _set_subreaper(True):
-        connection.send(("error", "child subreaper custody could not be established"))
+        try:
+            connection.send(("error", "child subreaper custody could not be established"))
+        except (BrokenPipeError, EOFError, OSError):
+            pass
         connection.close()
         return
+    cleanup_requested = threading.Event()
+
+    def receive_commands() -> None:
+        while True:
+            try:
+                if connection.poll(0.05):
+                    message = connection.recv()
+                    if message == "cleanup":
+                        cleanup_requested.set()
+                        cancel_event.set()
+                if cleanup_requested.is_set():
+                    return
+            except (BrokenPipeError, EOFError, OSError):
+                cleanup_requested.set()
+                cancel_event.set()
+                return
+
+    def watchdog() -> None:
+        deadline = time.monotonic() + request.timeout_seconds + max(0.1, request.poll_interval_seconds * 2)
+        while not cancel_event.is_set() and time.monotonic() < deadline:
+            time.sleep(min(request.poll_interval_seconds, max(0.0, deadline - time.monotonic())))
+        if time.monotonic() >= deadline:
+            cancel_event.set()
+
+    threading.Thread(target=receive_commands, daemon=True).start()
+    threading.Thread(target=watchdog, daemon=True).start()
+
+    def announce(pid: int) -> None:
+        try:
+            connection.send(("spawn", pid))
+            if request.custodian_fault == "broken-ipc":
+                connection.close()
+                cleanup_requested.set()
+                cancel_event.set()
+        except (BrokenPipeError, EOFError, OSError):
+            cleanup_requested.set()
+            cancel_event.set()
+
     try:
         result = _supervise_linux(
             request,
             budget=budget,
             cancel_event=cancel_event,
-            on_spawn=lambda pid: connection.send(("spawn", pid)),
+            on_spawn=announce,
             claimed_attempt=attempt_number,
         )
-        connection.send(("result", result))
+        result = replace(result, cleanup=replace(result.cleanup, custodian_pid=os.getpid()))
+        try:
+            connection.send(("cleanup-ack", result.cleanup, result.process))
+            connection.send(("result", result))
+        except (BrokenPipeError, EOFError, OSError):
+            pass
     except BaseException as error:
-        connection.send(("error", f"{type(error).__name__}: {error}"))
+        try:
+            connection.send(("error", f"{type(error).__name__}: {error}"))
+        except (BrokenPipeError, EOFError, OSError):
+            pass
     finally:
         connection.close()
 
@@ -641,40 +692,123 @@ def supervise(
     if attempt_number is None:
         return _refusal("attempt-budget-exhausted", "total native attempt budget was already spent", started, budget)
     context = multiprocessing.get_context("spawn")
-    parent_connection, child_connection = context.Pipe(duplex=False)
-    helper_cancel = context.Event()
-    helper = context.Process(
-        target=_custodian_main,
-        args=(child_connection, request, budget.total, attempt_number, helper_cancel),
-        daemon=False,
-    )
-    helper.start()
-    child_connection.close()
+    parent_connection = None
+    child_connection = None
+    helper = None
+    helper_cancel = None
     result = None
     error = None
+    cleanup_ack = None
+    provider_identity = None
+    cleanup_requested = False
     helper_deadline = started + request.timeout_seconds + request.term_grace_seconds + request.verification_grace_seconds + 2.0
-    while time.monotonic() < helper_deadline:
-        if cancel_event is not None and cancel_event.is_set():
-            helper_cancel.set()
-        if parent_connection.poll(request.poll_interval_seconds):
-            message = parent_connection.recv()
-            if message[0] == "spawn" and on_spawn:
-                on_spawn(message[1])
-            elif message[0] == "result":
-                result = message[1]
+    try:
+        if request.custodian_fault == "startup":
+            raise OSError("injected custodian startup failure")
+        parent_connection, child_connection = context.Pipe(duplex=True)
+        helper_cancel = context.Event()
+        helper = context.Process(
+            target=_custodian_main,
+            args=(child_connection, request, budget.total, attempt_number, helper_cancel),
+            daemon=False,
+        )
+        helper.start()
+        child_connection.close()
+        child_connection = None
+        while time.monotonic() < helper_deadline:
+            if cancel_event is not None and cancel_event.is_set() and not cleanup_requested:
+                parent_connection.send("cleanup")
+                cleanup_requested = True
+            if parent_connection.poll(request.poll_interval_seconds):
+                message = parent_connection.recv()
+                if message[0] == "spawn":
+                    provider_identity = ProcessIdentity(message[1], message[1], None)
+                    if on_spawn:
+                        on_spawn(message[1])
+                elif message[0] == "cleanup-ack":
+                    cleanup_ack, provider_identity = message[1], message[2]
+                elif message[0] == "result":
+                    result = message[1]
+                    break
+                elif message[0] == "error":
+                    error = message[1]
+                    break
+            if not helper.is_alive() and not parent_connection.poll():
+                error = "custodian exited without a terminal IPC result"
                 break
-            elif message[0] == "error":
-                error = message[1]
-                break
-        if not helper.is_alive() and not parent_connection.poll():
-            error = "custodian exited without a terminal IPC result"
-            break
-    if result is None and helper.is_alive():
-        helper.terminate()
-    helper.join(timeout=max(0.1, request.verification_grace_seconds))
-    parent_connection.close()
+    except (BrokenPipeError, EOFError, OSError, RuntimeError) as failure:
+        error = f"custodian protocol failure: {type(failure).__name__}: {failure}"
+    except BaseException as failure:
+        error = f"custodian callback failure: {type(failure).__name__}: {failure}"
+    finally:
+        if helper is not None and helper.is_alive() and result is None:
+            try:
+                if parent_connection is not None and not cleanup_requested:
+                    parent_connection.send("cleanup")
+                    cleanup_requested = True
+            except (BrokenPipeError, EOFError, OSError):
+                pass
+            ack_deadline = time.monotonic() + request.term_grace_seconds + request.verification_grace_seconds + 1.0
+            while cleanup_ack is None and time.monotonic() < ack_deadline:
+                try:
+                    if parent_connection is not None and parent_connection.poll(request.poll_interval_seconds):
+                        message = parent_connection.recv()
+                        if message[0] == "cleanup-ack":
+                            cleanup_ack, provider_identity = message[1], message[2]
+                        elif message[0] == "result":
+                            result = message[1]
+                except (BrokenPipeError, EOFError, OSError):
+                    break
+            if cleanup_ack is not None:
+                helper.join(timeout=max(0.1, request.verification_grace_seconds))
+        if child_connection is not None:
+            child_connection.close()
+        if parent_connection is not None:
+            parent_connection.close()
+    if error is not None and result is not None:
+        result = replace(
+            result,
+            terminal_state=TerminalState.FAILED,
+            reason=FailureReason("cleanup-unverified", Observation.COULD_NOT_OBSERVE, error),
+        )
     if result is None:
-        return _refusal("linux-custodian-unverified", error or "custodian IPC deadline expired", started, budget)
+        ended = time.monotonic()
+        helper_pid = helper.pid if helper is not None else None
+        cleanup = cleanup_ack or CleanupResult(
+            helper is not None,
+            cleanup_requested,
+            False,
+            False,
+            None,
+            detail=f"custodian {helper_pid} retained custody; cleanup acknowledgement was not observable",
+            custodian_pid=helper_pid,
+        )
+        return SupervisedResult(
+            TerminalState.FAILED,
+            FailureReason("cleanup-unverified", Observation.COULD_NOT_OBSERVE, error or "custodian IPC deadline expired"),
+            None,
+            b"",
+            b"",
+            0,
+            0,
+            started,
+            ended,
+            False,
+            bool(cancel_event is not None and cancel_event.is_set()),
+            False,
+            attempt_number,
+            budget.total,
+            provider_identity,
+            cleanup,
+            EvidenceDigests(_EMPTY_DIGEST, _EMPTY_DIGEST),
+        )
     if result.process is not None and on_exit:
-        on_exit(result.process.pid)
+        try:
+            on_exit(result.process.pid)
+        except BaseException as failure:
+            return replace(
+                result,
+                terminal_state=TerminalState.FAILED,
+                reason=FailureReason("cleanup-unverified", Observation.COULD_NOT_OBSERVE, f"custodian callback failure: {type(failure).__name__}: {failure}"),
+            )
     return result
