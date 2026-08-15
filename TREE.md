@@ -102,6 +102,17 @@ server.test.ts        30 tests. `bun test apps/inkwell/server.test.ts` is what t
 public/               vanilla JS front end: app.js, index.html, style.css.
 ```
 
+## Deterministic CI
+
+```
+.github/workflows/ci.yml  ordinary pull-request and main-push gate; runs the same
+                          offline manifest on Ubuntu and Windows.
+ci/checks.json            authoritative enumeration of checks run by that gate.
+tools/ci_gate.py          non-vacuous runner and three-valued JSON evidence writer.
+docs/validation/check_ci_contract.py
+                          workflow/manifest contract validator and watched-red controls.
+```
+
 ## `.claude/skills/` — the three skills
 
 ```
