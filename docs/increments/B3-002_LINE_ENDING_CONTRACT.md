@@ -100,7 +100,35 @@ The validator checks:
 - the effective repository policy;
 - effective Git attributes on representative files;
 - LF index state;
-- optionally, LF working-tree state for fresh-checkout proof.
+- LF working-tree state for the strict fresh-checkout proof.
+
+## HD-01 authority correction
+
+A later current-state audit found that the original optional mode allowed an
+older supported Windows working tree to retain CRLF while the default validator
+and host doctor reported success. Policy, effective attributes, and index state
+remained correctly LF; the defect was the masked working-tree state.
+
+HD-01 makes the already-proven strict contract authoritative for every
+supported working tree. Both the default validator behavior and the Windows
+host doctor now require watched files to be `i/lf w/lf`. The exact supported
+invocation is:
+
+`python docs/validation/check_line_endings.py --require-worktree-lf`
+
+`--require-worktree-lf` remains in the command to make the operator-facing
+contract explicit, but omitting it no longer weakens validation. A CRLF or
+wrong-attribute observation is `observed-bad`; missing or unreadable evidence
+is `could-not-observe`. Neither can print PASS.
+
+The validator never repairs a checkout as a side effect. After preserving local
+work and confirming `git status --short` is empty, the explicit repair is:
+
+`git checkout-index --force -- .gitattributes justfile just/sandbox/lifecycle/fill.just just/sandbox/lifecycle/setup.just sandbox_mount/guest/provision.sh sandbox_mount/host/run_record.py docs/baseline/PROOF_MATRIX.md`
+
+That command re-materializes the watched files from, without modifying, the
+index. The strict validator must then be rerun. The Windows installation
+runbook owns the complete operator procedure.
 
 ## Renormalization proof
 
@@ -188,7 +216,7 @@ The proof checkout HEAD resolved to:
 
 The strict validator was run:
 
-`python docs\validation\check_line_endings.py --require-worktree-lf`
+`python docs/validation/check_line_endings.py --require-worktree-lf`
 
 Result:
 

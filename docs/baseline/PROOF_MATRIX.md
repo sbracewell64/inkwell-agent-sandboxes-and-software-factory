@@ -38,6 +38,10 @@
 | Line-ending renormalization safety | renormalization produced no unrelated tracked-file changes | PASS |
 | Fresh Windows LF checkout | B3-002 candidate cloned with `core.autocrlf=true`; representative files were `i/lf w/lf` | PASS |
 | B3-002 strict validator | `check_line_endings.py --require-worktree-lf` passed | PASS |
+| HD-01 single strict LF authority | default validator and Windows doctor invoke the same strict owner; exact supported invocation is `python docs/validation/check_line_endings.py --require-worktree-lf` | PASS |
+| HD-01 watched-red controls | CRLF and wrong attributes produce observed-bad; missing files produce could-not-observe; none prints PASS | PASS |
+| HD-01 index-preserving remediation | explicit `checkout-index` fixture retained the same index tree and restored `i/lf w/lf` | PASS |
+| HD-01 hostile-autocrlf fresh clone | disposable clone created with `core.autocrlf=true`; every representative file was `i/lf w/lf attr/text=auto eol=lf` | PASS |
 | B3-002 first candidate hygiene | semantic proof passed but candidate record hygiene failed | CORRECTED BEFORE ACCEPTANCE |
 | B3-002 corrected candidate hygiene | corrected candidate passed staged and commit whitespace gates | PASS |
 | Windows root `just` without zsh | fresh CMD with no zsh successfully listed root namespaces | PASS |

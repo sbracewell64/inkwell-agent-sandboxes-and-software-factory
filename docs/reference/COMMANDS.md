@@ -1,5 +1,17 @@
 # Command Reference
 
+## Host validation
+
+The authoritative strict LF invocation is:
+
+```text
+python docs/validation/check_line_endings.py --require-worktree-lf
+```
+
+The Windows bootstrap and host doctor invoke that same validator. Validation is
+read-only; explicit remediation is documented in
+`docs/operations/INSTALL_WINDOWS.md`.
+
 ## Application
 
 ```text

@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 import subprocess
 
-ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 
 EXPECTED_RULES = (
     "* text=auto eol=lf",
@@ -19,37 +19,68 @@ REPRESENTATIVE_FILES = (
     "docs/baseline/PROOF_MATRIX.md",
 )
 
-
-def git(*args: str) -> str:
-    return subprocess.check_output(
-        ("git", *args),
-        cwd=ROOT,
-        text=True,
-    ).strip()
+STRICT_INVOCATION = (
+    "python docs/validation/check_line_endings.py "
+    "--require-worktree-lf"
+)
 
 
-def attr_value(path: str, attr: str) -> str:
-    output = git("check-attr", attr, "--", path)
+def git(root: Path, *args: str) -> tuple[str, str | None]:
+    try:
+        proc = subprocess.run(
+            ("git", *args),
+            cwd=root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+    except OSError as exc:
+        return "", str(exc)
+
+    output = proc.stdout.strip()
+
+    if proc.returncode != 0:
+        return output, output or f"git exited {proc.returncode} without output"
+
+    return output, None
+
+
+def attr_value(
+    root: Path,
+    path: str,
+    attr: str,
+) -> tuple[str, str | None]:
+    output, error = git(root, "check-attr", attr, "--", path)
+
+    if error:
+        return "", error
+
     prefix = f"{path}: {attr}: "
 
     if not output.startswith(prefix):
-        return ""
+        return "", f"unexpected git check-attr output: {output!r}"
 
-    return output[len(prefix):]
+    return output[len(prefix):], None
 
 
-def eol_state(path: str) -> tuple[str, str, str]:
-    output = git("ls-files", "--eol", "--", path)
+def eol_state(
+    root: Path,
+    path: str,
+) -> tuple[tuple[str, str, str] | None, str | None]:
+    output, error = git(root, "ls-files", "--eol", "--", path)
+
+    if error:
+        return None, error
 
     if not output:
-        return "", "", ""
+        return None, "git ls-files --eol returned no tracked entry"
 
-    parts = output.split()
+    parts = output.split(maxsplit=3)
 
     if len(parts) < 3:
-        return "", "", ""
+        return None, f"unexpected git ls-files --eol output: {output!r}"
 
-    return parts[0], parts[1], parts[2]
+    return (parts[0], parts[1], parts[2]), None
 
 
 def active_attribute_rules(path: Path) -> tuple[str, ...]:
@@ -60,10 +91,7 @@ def active_attribute_rules(path: Path) -> tuple[str, ...]:
     for raw_line in text.splitlines():
         line = raw_line.strip()
 
-        if not line:
-            continue
-
-        if line.startswith("#"):
+        if not line or line.startswith("#"):
             continue
 
         rules.append(line)
@@ -71,94 +99,136 @@ def active_attribute_rules(path: Path) -> tuple[str, ...]:
     return tuple(rules)
 
 
-parser = argparse.ArgumentParser(
-    description="Validate the B3-002 repository line-ending contract."
-)
+def print_remediation() -> None:
+    watched = " ".join((".gitattributes", *REPRESENTATIVE_FILES))
+    print("remediation (explicit; this validator never rewrites the working tree):")
+    print("1. Save or commit local work; require `git status --short` to be empty.")
+    print("2. Re-materialize watched files from the unchanged index:")
+    print(f"   git checkout-index --force -- {watched}")
+    print("3. Re-run the strict owner:")
+    print(f"   {STRICT_INVOCATION}")
 
-parser.add_argument(
-    "--require-worktree-lf",
-    action="store_true",
-    help=(
-        "Also require representative text files to be materialized "
-        "as LF in the current working tree."
-    ),
-)
 
-args = parser.parse_args()
+def validate(root: Path) -> int:
+    observed_bad: list[str] = []
+    could_not_observe: list[str] = []
 
-errors: list[str] = []
+    attributes_path = root / ".gitattributes"
 
-attributes_path = ROOT / ".gitattributes"
+    if not attributes_path.is_file():
+        could_not_observe.append(".gitattributes is missing or unreadable")
+    else:
+        try:
+            rules = active_attribute_rules(attributes_path)
+        except (OSError, UnicodeError) as exc:
+            could_not_observe.append(f"could not read .gitattributes: {exc}")
+        else:
+            if rules != EXPECTED_RULES:
+                observed_bad.append(
+                    "active .gitattributes rules are "
+                    f"{rules!r}, expected {EXPECTED_RULES!r}"
+                )
 
-if not attributes_path.is_file():
-    errors.append(".gitattributes is missing")
-else:
-    rules = active_attribute_rules(attributes_path)
+    for path in REPRESENTATIVE_FILES:
+        full_path = root / path
 
-    if rules != EXPECTED_RULES:
-        errors.append(
-            "active .gitattributes rules are "
-            f"{rules!r}, expected {EXPECTED_RULES!r}"
-        )
+        if not full_path.is_file():
+            could_not_observe.append(
+                f"representative file is missing or unreadable: {path}"
+            )
+            continue
 
-for path in REPRESENTATIVE_FILES:
-    full_path = ROOT / path
+        text_attr, text_error = attr_value(root, path, "text")
+        eol_attr, eol_error = attr_value(root, path, "eol")
 
-    if not full_path.is_file():
-        errors.append(f"representative file is missing: {path}")
-        continue
+        if text_error:
+            could_not_observe.append(
+                f"{path}: could not observe text attribute: {text_error}"
+            )
+        elif text_attr != "auto":
+            observed_bad.append(
+                f"{path}: text attribute is {text_attr!r}, expected 'auto'"
+            )
 
-    text_attr = attr_value(path, "text")
-    eol_attr = attr_value(path, "eol")
+        if eol_error:
+            could_not_observe.append(
+                f"{path}: could not observe eol attribute: {eol_error}"
+            )
+        elif eol_attr != "lf":
+            observed_bad.append(
+                f"{path}: eol attribute is {eol_attr!r}, expected 'lf'"
+            )
 
-    if text_attr != "auto":
-        errors.append(
-            f"{path}: text attribute is {text_attr!r}, expected 'auto'"
-        )
+        state, state_error = eol_state(root, path)
 
-    if eol_attr != "lf":
-        errors.append(
-            f"{path}: eol attribute is {eol_attr!r}, expected 'lf'"
-        )
+        if state_error or state is None:
+            could_not_observe.append(
+                f"{path}: could not observe index/worktree state: "
+                f"{state_error or 'unknown error'}"
+            )
+            continue
 
-    index_eol, worktree_eol, _ = eol_state(path)
+        index_eol, worktree_eol, _ = state
 
-    if index_eol != "i/lf":
-        errors.append(
-            f"{path}: index state is {index_eol!r}, expected 'i/lf'"
-        )
+        if index_eol != "i/lf":
+            observed_bad.append(
+                f"{path}: index state is {index_eol!r}, expected 'i/lf'"
+            )
 
-    if args.require_worktree_lf and worktree_eol != "w/lf":
-        errors.append(
-            f"{path}: working-tree state is {worktree_eol!r}, "
-            "expected 'w/lf'"
-        )
+        if worktree_eol != "w/lf":
+            observed_bad.append(
+                f"{path}: working-tree state is {worktree_eol!r}, "
+                "expected 'w/lf'"
+            )
 
-if errors:
-    print("B3-002 line-ending contract: FAIL")
+    if observed_bad or could_not_observe:
+        outcome = "FAIL" if observed_bad else "CNO"
+        print(f"B3-002 strict line-ending contract: {outcome}")
 
-    for error in errors:
-        print(f"- {error}")
+        for error in observed_bad:
+            print(f"- observed-bad: {error}")
 
-    raise SystemExit(1)
+        for error in could_not_observe:
+            print(f"- could-not-observe: {error}")
 
-print("B3-002 line-ending contract: PASS")
-print("policy: * text=auto eol=lf")
-print("representative tracked text files have LF index state")
+        print_remediation()
+        return 1
 
-if args.require_worktree_lf:
-    print("representative working-tree files are LF")
-else:
-    print(
-        "working-tree LF was not required in this checkout; "
-        "use --require-worktree-lf for fresh-checkout proof"
+    print("B3-002 strict line-ending contract: PASS")
+    print("policy: * text=auto eol=lf")
+    print("representative index/worktree states: i/lf w/lf")
+
+    autocrlf, autocrlf_error = git(root, "config", "--get", "core.autocrlf")
+
+    if autocrlf_error and "exited 1" not in autocrlf_error:
+        print(f"observed core.autocrlf: could-not-observe ({autocrlf_error})")
+    else:
+        print(f"observed core.autocrlf: {autocrlf or '<unset>'}")
+
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Validate the strict B3-002 repository line-ending contract."
     )
+    parser.add_argument(
+        "--require-worktree-lf",
+        action="store_true",
+        help=(
+            "Explicit spelling of the strict contract. Working-tree LF is "
+            "always required, including when this option is omitted."
+        ),
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=DEFAULT_ROOT,
+        help=argparse.SUPPRESS,
+    )
+    args = parser.parse_args()
+    return validate(args.root.resolve())
 
-autocrlf = subprocess.run(
-    ("git", "config", "--get", "core.autocrlf"),
-    cwd=ROOT,
-    text=True,
-    stdout=subprocess.PIPE,
-).stdout.strip()
 
-print(f"observed core.autocrlf: {autocrlf or '<unset>'}")
+if __name__ == "__main__":
+    raise SystemExit(main())

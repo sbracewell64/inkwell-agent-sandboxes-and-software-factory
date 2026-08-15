@@ -179,7 +179,8 @@ requires:
 - Python 3.11 or newer;
 - just 1.56 or newer;
 - canonical `origin`;
-- passing B3-002 line-ending validator;
+- passing the authoritative strict B3-002 invocation,
+  `python docs/validation/check_line_endings.py --require-worktree-lf`;
 - working root `just`;
 - working `just local`;
 - effective `exe.dev` SSH policy;
@@ -396,6 +397,17 @@ B3-003 does not weaken that policy.
 
 The B3-002 line-ending validator passed after the Windows shell and bootstrap changes.
 
+HD-01 later corrected the doctor integration to invoke the already-documented
+strict form exactly:
+
+`python docs/validation/check_line_endings.py --require-worktree-lf`
+
+The default validator is also strict, so no alternate non-worktree mode can
+mask CRLF. Doctor/bootstrap output names the exact command. Failure or
+could-not-observe evidence is terminal, and neither validator nor bootstrap
+rewrites a developer working tree; remediation remains an explicit operator
+action documented in `docs/operations/INSTALL_WINDOWS.md`.
+
 The `.cmd` bootstrap executed successfully under the repository LF policy.
 
 No CRLF exception was required.
@@ -441,7 +453,7 @@ The final fresh-clone/mount/teardown integration proof remains B3-005 scope.
 11. just satisfies the declared compatibility floor.
 12. Bun, uv, just, GitHub CLI, and Git resolve.
 13. Effective SSH policy for `exe.dev` and a synthetic `*.exe.xyz` host passes.
-14. The B3-002 line-ending validator passes.
+14. The strict B3-002 invocation `python docs/validation/check_line_endings.py --require-worktree-lf` passes.
 15. External sqlite3 absence is non-fatal and remains assigned to B3-004.
 16. `--sandbox` composes and passes the existing sandbox doctor.
 17. Persistent user and machine PATH values remain unchanged.

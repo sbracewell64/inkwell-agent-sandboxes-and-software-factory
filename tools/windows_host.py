@@ -23,10 +23,11 @@ def run(
     args: list[str],
     *,
     check: bool = False,
+    cwd: Path = ROOT,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         args,
-        cwd=ROOT,
+        cwd=cwd,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -162,6 +163,54 @@ class Doctor:
     ) -> None:
         suffix = f" — {detail}" if detail else ""
         print(f"  info  {label}{suffix}")
+
+
+STRICT_LINE_ENDING_INVOCATION = (
+    "python docs/validation/check_line_endings.py "
+    "--require-worktree-lf"
+)
+
+
+def check_line_ending_contract(
+    doctor: Doctor,
+    *,
+    root: Path = ROOT,
+) -> None:
+    args = [
+        sys.executable,
+        str(
+            ROOT
+            / "docs"
+            / "validation"
+            / "check_line_endings.py"
+        ),
+        "--require-worktree-lf",
+    ]
+
+    if root != ROOT:
+        args.extend(["--root", str(root)])
+
+    line_endings = run(args, cwd=root)
+    detail = line_endings.stdout.strip()
+    success_marker = "B3-002 strict line-ending contract: PASS"
+
+    if line_endings.returncode != 0:
+        doctor.fail(
+            "line-ending contract",
+            f"{STRICT_LINE_ENDING_INVOCATION}\n{detail}",
+        )
+    elif success_marker not in detail:
+        doctor.fail(
+            "line-ending contract",
+            f"{STRICT_LINE_ENDING_INVOCATION}\n"
+            "could-not-observe: strict validator returned no "
+            "positive success marker",
+        )
+    else:
+        doctor.ok(
+            "line-ending contract",
+            STRICT_LINE_ENDING_INVOCATION,
+        )
 
 
 def executable_version(
@@ -637,24 +686,7 @@ def doctor(
             CANONICAL_ORIGIN,
         )
 
-    line_endings = run(
-        [
-            sys.executable,
-            "docs/validation/"
-            "check_line_endings.py",
-        ]
-    )
-
-    if line_endings.returncode != 0:
-        d.fail(
-            "line-ending contract",
-            line_endings.stdout.strip(),
-        )
-    else:
-        d.ok(
-            "line-ending contract",
-            "B3-002 validator PASS",
-        )
+    check_line_ending_contract(d)
 
     obs_query = run(
         [
