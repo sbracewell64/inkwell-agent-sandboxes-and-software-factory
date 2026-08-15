@@ -28,6 +28,7 @@ Read in this order:
 5. [`development/INCREMENT_PROTOCOL.md`](development/INCREMENT_PROTOCOL.md) — how to change it without losing provenance.
 6. [`reference/COMMANDS.md`](reference/COMMANDS.md) — command surface.
 7. [`reference/GLOSSARY.md`](reference/GLOSSARY.md) — canonical terms.
+8. [`reference/EVIDENCE_MANIFEST.md`](reference/EVIDENCE_MANIFEST.md) — offline run-bound evidence manifest v1 (not runtime acceptance).
 
 ## Documentation authority
 
