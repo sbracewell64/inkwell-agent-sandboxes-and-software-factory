@@ -8,6 +8,17 @@ just inkwell dev
 just inkwell test
 ```
 
+## Deterministic CI
+
+```text
+python tools/ci_gate.py run --evidence ci-evidence.json
+```
+
+This repository-owned gate runs the enumerated offline checks in
+`ci/checks.json`. It succeeds only after at least one check executes and every
+result is `observed-good`; its JSON evidence retains `observed-bad` and
+`could-not-observe` rather than treating either as green.
+
 ## Factory
 
 ```text

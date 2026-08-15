@@ -1,0 +1,200 @@
+"""Run the repository's offline checks with non-vacuous, three-valued evidence."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import time
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_MANIFEST = ROOT / "ci" / "checks.json"
+DEFAULT_EVIDENCE = ROOT / "ci-evidence.json"
+STATUSES = ("observed-good", "observed-bad", "could-not-observe")
+_CANCEL_REQUESTED = False
+
+
+def load_checks(path: Path) -> list[dict[str, Any]]:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"manifest could not be observed: {exc}") from exc
+
+    if document.get("schema_version") != 1:
+        raise ValueError("manifest schema_version must be 1")
+
+    checks = document.get("checks")
+    if not isinstance(checks, list) or not checks:
+        raise ValueError("zero checks discovered")
+
+    seen: set[str] = set()
+    for check in checks:
+        if not isinstance(check, dict):
+            raise ValueError("each check must be an object")
+        check_id = check.get("id")
+        command = check.get("command")
+        timeout = check.get("timeout_seconds")
+        if not isinstance(check_id, str) or not check_id:
+            raise ValueError("each check needs a nonempty id")
+        if check_id in seen:
+            raise ValueError(f"duplicate check id: {check_id}")
+        seen.add(check_id)
+        if (
+            not isinstance(command, list)
+            or not command
+            or not all(isinstance(part, str) and part for part in command)
+        ):
+            raise ValueError(f"{check_id}: command must be a nonempty string list")
+        if not isinstance(timeout, int) or not 1 <= timeout <= 300:
+            raise ValueError(f"{check_id}: timeout_seconds must be 1..300")
+
+    return checks
+
+
+def _expanded_command(command: list[str]) -> list[str]:
+    return [sys.executable if part == "{python}" else part for part in command]
+
+
+def _stop_process(process: subprocess.Popen[str]) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
+def run_check(check: dict[str, Any]) -> dict[str, Any]:
+    command = _expanded_command(check["command"])
+    result: dict[str, Any] = {
+        "id": check["id"],
+        "command": command,
+        "status": "could-not-observe",
+    }
+
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except OSError as exc:
+        result["reason"] = f"tool unavailable: {exc}"
+        return result
+
+    deadline = time.monotonic() + check["timeout_seconds"]
+    output = ""
+
+    while True:
+        if _CANCEL_REQUESTED:
+            _stop_process(process)
+            result["reason"] = "execution cancelled"
+            break
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            _stop_process(process)
+            result["reason"] = "check timed out"
+            break
+
+        try:
+            output, _ = process.communicate(timeout=min(0.2, remaining))
+            result["returncode"] = process.returncode
+            result["status"] = (
+                "observed-good" if process.returncode == 0 else "observed-bad"
+            )
+            break
+        except subprocess.TimeoutExpired:
+            continue
+
+    if output:
+        result["output"] = output.rstrip()
+    return result
+
+
+def conclusion(results: list[dict[str, Any]], discovered: int) -> str:
+    if discovered == 0 or len(results) != discovered:
+        return "could-not-observe"
+    statuses = {result["status"] for result in results}
+    if "could-not-observe" in statuses:
+        return "could-not-observe"
+    if "observed-bad" in statuses:
+        return "observed-bad"
+    return "observed-good"
+
+
+def write_evidence(path: Path, evidence: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rendered = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
+    path.write_text(rendered, encoding="utf-8")
+    print(rendered, end="")
+
+
+def execute(manifest: Path, evidence_path: Path) -> int:
+    results: list[dict[str, Any]] = []
+    manifest_error = ""
+
+    try:
+        checks = load_checks(manifest)
+    except ValueError as exc:
+        checks = []
+        manifest_error = str(exc)
+
+    for check in checks:
+        print(f"::group::{check['id']}", flush=True)
+        result = run_check(check)
+        if result.get("output"):
+            print(result["output"])
+        print(f"status: {result['status']}")
+        print("::endgroup::", flush=True)
+        results.append(result)
+        if _CANCEL_REQUESTED:
+            break
+
+    counts = {status: 0 for status in STATUSES}
+    for result in results:
+        counts[result["status"]] += 1
+
+    overall = conclusion(results, len(checks))
+    evidence: dict[str, Any] = {
+        "schema_version": 1,
+        "conclusion": overall,
+        "discovered_checks": len(checks),
+        "executed_checks": len(results),
+        "status_counts": counts,
+        "results": results,
+    }
+    if manifest_error:
+        evidence["manifest_observation"] = manifest_error
+
+    write_evidence(evidence_path, evidence)
+    return 0 if overall == "observed-good" and len(results) > 0 else 1
+
+
+def _request_cancel(_signum: int, _frame: object) -> None:
+    global _CANCEL_REQUESTED
+    _CANCEL_REQUESTED = True
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=("run",))
+    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--evidence", type=Path, default=DEFAULT_EVIDENCE)
+    args = parser.parse_args()
+
+    signal.signal(signal.SIGINT, _request_cancel)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _request_cancel)
+
+    return execute(args.manifest.resolve(), args.evidence.resolve())
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

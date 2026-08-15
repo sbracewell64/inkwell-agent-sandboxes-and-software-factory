@@ -77,6 +77,10 @@
 | B3-004-H1 correction isolation | only ledger, proof matrix, and B3-004 increment record differ from flawed closure `15bbea9` | PASS |
 | B3-004-H1 clean closure correction | original B3-004 tag preserved; separate correction state establishes the clean base for subsequent B3 work | PASS |
 | B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual intervention | NOT PROVEN |
+| B4-001 offline check discovery | `ci/checks.json` enumerates six provider-free validators/tests | CANDIDATE |
+| B4-001 non-vacuous projection | `tools/ci_gate.py` requires nonempty execution and retains three-valued JSON evidence | CANDIDATE |
+| B4-001 watched-red controls | empty checks/matrix, validator failure, missing tool, cancellation/timeout, and workflow path/trigger drift each observed red locally | PASS |
+| B4-001 Linux/Windows GitHub execution | exact pull-request head must complete both matrix jobs with nonempty execution | CNO UNTIL OBSERVED |
 
 ## Rule
 
