@@ -1,12 +1,13 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-set "PROOF=E:\SSSF-B3-005-PROOF-20260815-154950"
-set "EVIDENCE=E:\SSSF-B3-005-EVIDENCE-20260815-154950\bootstrap"
-set "EXPECTED=5ac8c302a4841a5fd046e99dcab0af0cda172e06"
-set "RUN_ID="
+set "PROOF=E:\SSSF-B3-005-PROOF-20260815-154222"
+set "EVIDENCE=E:\SSSF-B3-005-EVIDENCE-20260815-154222\teardown"
+set "EXPECTED=efd84ab02fee4cb4c8e1e116616e039ba84a0546"
+set "RUN_ID=b3-005-proof-20260815-b30005"
 set "REPO=https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git"
 set "BRANCH=increment/b3-005-fresh-windows-clone-proof"
-echo phase=bootstrap
+set "CONFIG_SOURCE=E:\SSSF\.env"
+echo phase=teardown
 echo started_utc=%DATE% %TIME%
 echo proof_path=%PROOF%
 echo evidence_path=%EVIDENCE%
@@ -36,40 +37,24 @@ echo ;%PATH%; | %SystemRoot%\System32\findstr.exe /i /l /c:";C:\Program Files\Gi
 if not errorlevel 1 exit /b 45
 echo negative_control_git_bin_absent=PASS
 echo negative_control_git_usr_bin_absent=PASS
-echo exact_clone_command=git clone --single-branch --branch %BRANCH% %REPO% %PROOF%
-git clone --single-branch --branch "%BRANCH%" "%REPO%" "%PROOF%"
-if errorlevel 1 exit /b 50
 cd /d "%PROOF%"
-echo --- exact clone identity ---
-git rev-parse HEAD
-git status --porcelain=v2 --branch
-git remote -v
 for /f %%S in ('git rev-parse HEAD') do set "ACTUAL=%%S"
-if /i not "%EXPECTED%"=="%ACTUAL%" exit /b 51
-echo --- root front doors before bootstrap ---
-call just
-if errorlevel 1 exit /b 52
-call just local
-if errorlevel 1 exit /b 53
-echo --- repository bootstrap and composed doctor ---
+if /i not "%EXPECTED%"=="%ACTUAL%" exit /b 81
 call bin\sssf-windows.cmd --sandbox
-if errorlevel 1 exit /b 54
-echo postbootstrap_path=%PATH%
-where sh
-if errorlevel 1 exit /b 55
-where cygpath
-if errorlevel 1 exit /b 56
-where ssh
-if errorlevel 1 exit /b 57
-echo --- B3-004 sqlite-free observability ---
-where sqlite3
-echo where_sqlite3_exit=%ERRORLEVEL%
-if not errorlevel 1 exit /b 58
-python docs\validation\check_obs_query.py --require-no-external-sqlite3
-if errorlevel 1 exit /b 59
-echo --- proof clone tracked state ---
+if errorlevel 1 exit /b 82
+echo --- teardown through project lifecycle ---
+call just sbx lifecycle teardown "%RUN_ID%"
+if errorlevel 1 exit /b 83
+echo --- post-teardown controls ---
+if exist ".sandbox\runs\%RUN_ID%.key" exit /b 84
+call ssh exe.dev ls --json > "%EVIDENCE%\fleet-after.json"
+if errorlevel 1 exit /b 85
+python -c "import json,sys; d=json.load(open(r'%EVIDENCE%\fleet-after.json')); sys.exit(1 if r'%RUN_ID%' in {v.get('vm_name') for v in d.get('vms',[])} else 0)"
+if errorlevel 1 exit /b 86
+sandbox_mount\host\run_record.py get "%RUN_ID%" closed_at
+if errorlevel 1 exit /b 87
 git status --porcelain=v2 --branch
 git diff --exit-code
-if errorlevel 1 exit /b 60
-echo bootstrap_phase=PASS
+if errorlevel 1 exit /b 88
+echo teardown_phase=PASS
 exit /b 0

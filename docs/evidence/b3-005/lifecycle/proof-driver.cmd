@@ -1,13 +1,13 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
 set "PROOF=E:\SSSF-B3-005-PROOF-20260815-154222"
-set "EVIDENCE=E:\SSSF-B3-005-EVIDENCE-20260815-154222\bootstrap"
+set "EVIDENCE=E:\SSSF-B3-005-EVIDENCE-20260815-154222\lifecycle"
 set "EXPECTED=efd84ab02fee4cb4c8e1e116616e039ba84a0546"
-set "RUN_ID="
+set "RUN_ID=b3-005-proof-20260815-b30005"
 set "REPO=https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git"
 set "BRANCH=increment/b3-005-fresh-windows-clone-proof"
 set "CONFIG_SOURCE=E:\SSSF\.env"
-echo phase=bootstrap
+echo phase=lifecycle
 echo started_utc=%DATE% %TIME%
 echo proof_path=%PROOF%
 echo evidence_path=%EVIDENCE%
@@ -37,47 +37,40 @@ echo ;%PATH%; | %SystemRoot%\System32\findstr.exe /i /l /c:";C:\Program Files\Gi
 if not errorlevel 1 exit /b 45
 echo negative_control_git_bin_absent=PASS
 echo negative_control_git_usr_bin_absent=PASS
-echo exact_clone_command=git clone --single-branch --branch %BRANCH% %REPO% %PROOF%
-git clone --single-branch --branch "%BRANCH%" "%REPO%" "%PROOF%"
-if errorlevel 1 exit /b 50
 cd /d "%PROOF%"
-echo --- exact clone identity ---
-git rev-parse HEAD
-git status --porcelain=v2 --branch
-git remote -v
 for /f %%S in ('git rev-parse HEAD') do set "ACTUAL=%%S"
-if /i not "%EXPECTED%"=="%ACTUAL%" exit /b 51
-echo --- root front doors before bootstrap ---
-call just
-if errorlevel 1 exit /b 52
-call just local
-if errorlevel 1 exit /b 53
-echo --- approved ignored host configuration ---
-%SystemRoot%\System32\findstr.exe /b /c:"OPENROUTER_PROVISIONING_KEY=" "%CONFIG_SOURCE%" > "%PROOF%\.env"
-if errorlevel 1 exit /b 531
-git check-ignore -v .env
-if errorlevel 1 exit /b 532
-echo staged_config_name=OPENROUTER_PROVISIONING_KEY
-echo staged_config_value=REDACTED
-echo --- repository bootstrap and composed doctor ---
-call bin\sssf-windows.cmd --sandbox
-if errorlevel 1 exit /b 54
-echo postbootstrap_path=%PATH%
-where sh
-if errorlevel 1 exit /b 55
-where cygpath
-if errorlevel 1 exit /b 56
-where ssh
-if errorlevel 1 exit /b 57
-echo --- B3-004 sqlite-free observability ---
-where sqlite3
-echo where_sqlite3_exit=%ERRORLEVEL%
-if not errorlevel 1 exit /b 58
-python docs\validation\check_obs_query.py --require-no-external-sqlite3
-if errorlevel 1 exit /b 59
-echo --- proof clone tracked state ---
+if /i not "%EXPECTED%"=="%ACTUAL%" exit /b 61
 git status --porcelain=v2 --branch
 git diff --exit-code
-if errorlevel 1 exit /b 60
-echo bootstrap_phase=PASS
+if errorlevel 1 exit /b 62
+git check-ignore -v .env
+if errorlevel 1 exit /b 63
+call bin\sssf-windows.cmd --sandbox
+if errorlevel 1 exit /b 64
+echo --- lifecycle create ---
+call just sbx lifecycle create "%RUN_ID%"
+if errorlevel 1 exit /b 65
+echo --- lifecycle fill ---
+call just sbx lifecycle fill "%RUN_ID%"
+if errorlevel 1 exit /b 66
+echo --- lifecycle setup ---
+call just sbx lifecycle setup "%RUN_ID%"
+if errorlevel 1 exit /b 67
+echo --- lifecycle observe ---
+call just sbx lifecycle observe "%RUN_ID%"
+if errorlevel 1 exit /b 68
+echo --- independent guest source and cleanliness ---
+call just sbx run cmd "%RUN_ID%" "printf 'origin=' && git remote get-url origin && printf 'HEAD=' && git rev-parse HEAD && git status --porcelain=v2 --branch"
+if errorlevel 1 exit /b 69
+echo --- guest sqlite-free observability ---
+call just sbx run cmd "%RUN_ID%" "command -v sqlite3 || true; python docs/validation/check_obs_query.py --require-no-external-sqlite3"
+if errorlevel 1 exit /b 70
+echo --- pre-teardown negative controls ---
+if not exist ".sandbox\runs\%RUN_ID%.key" exit /b 71
+call ssh exe.dev ls "%RUN_ID%" --json
+if errorlevel 1 exit /b 72
+git status --porcelain=v2 --branch
+git diff --exit-code
+if errorlevel 1 exit /b 73
+echo lifecycle_phase=PASS
 exit /b 0

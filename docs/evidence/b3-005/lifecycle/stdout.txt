@@ -1,0 +1,249 @@
+phase=lifecycle
+started_utc=Sat 08/15/2026 11:46:39.56
+proof_path=E:\SSSF-B3-005-PROOF-20260815-154222
+evidence_path=E:\SSSF-B3-005-EVIDENCE-20260815-154222\lifecycle
+expected_sha=efd84ab02fee4cb4c8e1e116616e039ba84a0546
+process_architecture=AMD64
+comspec=C:\WINDOWS\system32\cmd.exe
+prebootstrap_path=C:\Program Files (x86)\Common Files\Oracle\Java\java8path;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\dotnet\;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Google\Cloud SDK\google-cloud-sdk\bin;C:\Program Files\Git\cmd;C:\Program Files\Mullvad VPN\resources;C:\Users\shane\AppData\Local\Programs\Herdr\bin;C:\Users\shane\AppData\Local\codegraph\current\bin;C:\Users\shane\AppData\Local\Programs\Python\Python311\Scripts\;C:\Users\shane\AppData\Local\Programs\Python\Python311\;C:\Users\shane\AppData\Local\Programs\Python\Python313\Scripts\;C:\Users\shane\AppData\Local\Programs\Python\Python313\;C:\Users\shane\AppData\Local\Programs\Python\Launcher\;C:\Users\shane\AppData\Local\Microsoft\WindowsApps;C:\Users\shane\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin;C:\Users\shane\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\shane\AppData\Local\Programs\Ollama;C:\Program Files\nodejs;C:\Users\shane\AppData\Roaming\npm;C:\Users\shane\.local\bin;C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin;C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\Users\shane\.bun\bin
+--- pre-bootstrap executable resolution ---
+C:\Program Files\Git\cmd\git.exe
+where_git_exit=0
+C:\Users\shane\.local\bin\just.exe
+where_just_exit=0
+C:\Windows\System32\OpenSSH\ssh.exe
+where_ssh_exit=0
+where_sh_exit=1
+where_cygpath_exit=1
+where_zsh_exit=1
+negative_control_git_bin_absent=PASS
+negative_control_git_usr_bin_absent=PASS
+# branch.oid efd84ab02fee4cb4c8e1e116616e039ba84a0546
+# branch.head increment/b3-005-fresh-windows-clone-proof
+# branch.upstream origin/increment/b3-005-fresh-windows-clone-proof
+# branch.ab +0 -0
+.gitignore:112:.env	.env
+SSSF Windows host doctor
+  ok    Windows host ù Windows_NT
+  ok    repository checkout ù E:\SSSF-B3-005-PROOF-20260815-154222
+  ok    Git for Windows root ù C:\Program Files\Git
+  ok    PATH uniqueness ù 32 unique entries
+  ok    PATH contains ù C:\Program Files\Git\bin
+  ok    PATH contains ù C:\Program Files\Git\usr\bin
+  ok    git ù C:\Program Files\Git\bin\git.EXE [git version 2.53.0.windows.2]
+  ok    sh ù C:\Program Files\Git\bin\sh.EXE [GNU bash, version 5.2.37(1)-release (x86_64-pc-msys)]
+  ok    cygpath ù C:\Program Files\Git\usr\bin\cygpath.EXE [cygpath (cygwin) 3.6.6]
+  ok    ssh ù C:\Program Files\Git\usr\bin\ssh.EXE [OpenSSH_10.2p1, OpenSSL 3.5.5 27 Jan 2026]
+  ok    python ù C:\Users\shane\AppData\Local\Programs\Python\Python311\python.EXE [Python 3.11.9]
+  ok    python3 ù C:\Users\shane\AppData\Local\Microsoft\WindowsApps\python3.EXE [Python 3.13.5]
+  ok    bun ù C:\Users\shane\.bun\bin\bun.EXE [1.3.14]
+  ok    uv ù C:\Users\shane\.local\bin\uv.EXE [uv 0.12.3 (507230998 2026-08-07 x86_64-pc-windows-msvc)]
+  ok    just ù C:\Users\shane\.local\bin\just.EXE [just 1.58.0]
+  ok    gh ù C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin\gh.EXE [gh version 2.96.0 (2026-07-02)]
+  ok    Git Bash selection ù C:\Program Files\Git\bin\sh.EXE
+  ok    cygpath selection ù C:\Program Files\Git\usr\bin\cygpath.EXE
+  ok    SSH selection ù C:\Program Files\Git\usr\bin\ssh.EXE
+  ok    python compatibility ù 3.11.9
+  ok    python3 compatibility ù 3.13.5
+  ok    just compatibility ù 1.58.0
+  ok    canonical origin ù https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+  ok    line-ending contract ù B3-002 validator PASS
+  ok    observability query contract ù B3-004 validator PASS
+  ok    root `just` front door ù default recipe runs
+  ok    `just local` front door ù default recipe runs
+  ok    ssh config exe.dev ù dedicated identity + accept-new policy resolved
+  ok    ssh config b3-host-probe.exe.xyz ù dedicated identity + accept-new policy resolved
+  info  external sqlite3 ù absent; host observability uses Python stdlib sqlite3
+  info  zsh ù absent; not required on Windows after B3-003
+  info  claude ù C:\Users\shane\.local\bin\claude.EXE
+  info  pi ù C:\Users\shane\AppData\Roaming\npm\pi.CMD
+  info  herdr ù C:\Users\shane\AppData\Local\Programs\Herdr\bin\herdr.EXE
+  ok    sandbox doctor ù sbx doctor: OK
+SSSF Windows host doctor: OK
+
+SSSF Windows session ready.
+repo: E:\SSSF-B3-005-PROOF-20260815-154222
+next: just
+--- lifecycle create ---
+run id:  b3-005-proof-20260815-b30005
+record:  E:\SSSF-B3-005-PROOF-20260815-154222\.sandbox\runs\b3-005-proof-20260815-b30005.json
+vm:      creating b3-005-proof-20260815-b30005 (ssh exe.dev new --tag inkwell) ...
+vm:      b3-005-proof-20260815-b30005  ->  https://b3-005-proof-20260815-b30005.exe.xyz
+key:     sbx-b3-005-proof-20260815-b30005  limit $50.00  hash 8f545509a0688092fffef8a418e6f6a946f92dff0767d2ddf27bbaf1ddfeab41
+key:     secret written to .sandbox/runs/b3-005-proof-20260815-b30005.key (0600) ΓÇö FILL injects it
+ssh:     waiting for b3-005-proof-20260815-b30005.exe.xyz (up to 60s) ...
+ssh:     up after 0s
+session: e902a79e-bdbb-486f-8fe9-583daf4e2f4e
+
+created  b3-005-proof-20260815-b30005  (no code and no secrets on the box yet)
+next     just sbx lifecycle fill b3-005-proof-20260815-b30005
+--- lifecycle fill ---
+==> fill: source repo https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+==> fill: source sha  efd84ab02fee4cb4c8e1e116616e039ba84a0546
+==> fill: b3-005-proof-20260815-b30005 ΓÇö cloning app/ (pin efd84ab02fee4cb4c8e1e116616e039ba84a0546)
+==> fill: gate ok ΓÇö HEAD efd84ab02fee4cb4c8e1e116616e039ba84a0546 matches pin efd84ab02fee4cb4c8e1e116616e039ba84a0546
+==> fill: app/.env written (mode/size: 600 93) ΓÇö provisioning key never left the host
+--- lifecycle setup ---
+[setup] run b3-005-proof-20260815-b30005  vm b3-005-proof-20260815-b30005
+[setup] source repo https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+[setup] source sha  efd84ab02fee4cb4c8e1e116616e039ba84a0546
+[setup] 1/3 provisioning (streaming provision.sh output)
+
+ΓöÇΓöÇ 1/9 repo root ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   /home/exedev/app
+   commit efd84ab
+
+ΓöÇΓöÇ 2/9 bun ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+bun was installed successfully to ~/.bun/bin/bun
+
+Added "~/.bun/bin" to $PATH in "~/.bashrc"
+
+To get started, run:
+
+  source /home/exedev/.bashrc
+  bun --help
+   installed
+   linked into /usr/local/bin for non-interactive ssh
+
+ΓöÇΓöÇ 3/9 just ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   installed
+
+ΓöÇΓöÇ 4/9 pi models.json ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   runtime key baked in from .env
+   wrote /home/exedev/.pi/agent/models.json (10 models)
+
+ΓöÇΓöÇ 5/9 bun install ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+bun install v1.3.14 (0d9b296a)
+
+[1.00ms] done
+   installed apps/inkwell
+bun install v1.3.14 (0d9b296a)
+
++ @types/bun@1.3.14
++ @vitejs/plugin-vue@6.0.8
++ oxlint@1.76.0
++ typescript@5.9.3
++ vite@7.3.6
++ vue-tsc@3.3.8
++ @fontsource/play@5.3.0
++ lucide-vue-next@1.0.0
++ vue@3.5.40
+
+54 packages installed [279.00ms]
+   installed .claude/skills/sssf/apps/visualizer
+
+ΓöÇΓöÇ 6/9 visualizer build ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+vite v7.3.6 building client environment for production...
+transforming...
+Γ£ô 1761 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                            0.48 kB Γöé gzip:  0.31 kB
+dist/assets/play-vietnamese-400-normal-BV5uTUb2.woff       5.88 kB
+dist/assets/play-vietnamese-700-normal-06SubvPC.woff       5.90 kB
+dist/assets/play-greek-400-normal-UtTjCjKX.woff            5.90 kB
+dist/assets/play-greek-700-normal-DPV4uXCx.woff            5.93 kB
+dist/assets/play-cyrillic-400-normal-BVKlG_2G.woff         7.29 kB
+dist/assets/play-cyrillic-700-normal-CYA2uhLo.woff         7.32 kB
+dist/assets/play-vietnamese-400-normal-Dq6vChS4.woff2      7.75 kB
+dist/assets/play-greek-400-normal-DSzcrhge.woff2           7.85 kB
+dist/assets/play-vietnamese-700-normal-DVbIRUI2.woff2      7.88 kB
+dist/assets/play-greek-700-normal-DTsCUUOY.woff2           7.94 kB
+dist/assets/play-cyrillic-ext-400-normal-DZDmihnQ.woff     9.22 kB
+dist/assets/play-cyrillic-ext-700-normal-6wnCTw4e.woff     9.42 kB
+dist/assets/play-cyrillic-700-normal-DKD8ZQvp.woff2        9.48 kB
+dist/assets/play-cyrillic-400-normal-CIlwNE2I.woff2        9.57 kB
+dist/assets/play-latin-ext-400-normal-DWiNbbKY.woff        9.73 kB
+dist/assets/play-latin-ext-700-normal-NH0le58d.woff        9.76 kB
+dist/assets/play-cyrillic-ext-400-normal-CceFcEei.woff2   12.15 kB
+dist/assets/play-cyrillic-ext-700-normal-BXW3iQT7.woff2   12.18 kB
+dist/assets/play-latin-700-normal-BI05-psG.woff           14.07 kB
+dist/assets/play-latin-400-normal-D2Hm0lRT.woff           14.10 kB
+dist/assets/play-latin-ext-400-normal-T8yNC2xf.woff2      14.21 kB
+dist/assets/play-latin-ext-700-normal-_L7IQNKL.woff2      14.52 kB
+dist/assets/play-latin-400-normal-GKW-4YV7.woff2          18.13 kB
+dist/assets/play-latin-700-normal-DyPlLDbb.woff2          18.16 kB
+dist/assets/index-CCKzKemg.css                            26.07 kB Γöé gzip:  5.59 kB
+dist/assets/index-D4npfVU3.js                            112.73 kB Γöé gzip: 42.56 kB
+Γ£ô built in 2.16s
+   dist/ built
+
+ΓöÇΓöÇ 7/9 trace db ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   adws/adw_data/sssf.db ΓÇö 8 tables
+
+ΓöÇΓöÇ 8/9 warm uv ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   uv cache warm
+
+ΓöÇΓöÇ 8b/9 claude onboarding ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   onboarding pre-answered (theme, implicit key approved)
+
+ΓöÇΓöÇ 9/9 summary ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   repo    /home/exedev/app @ efd84ab
+   bun     1.3.14
+   just    just 1.58.0
+   uv      uv 0.12.5 (x86_64-unknown-linux-gnu)
+   pi      0.84.2
+   claude  2.1.232 (Claude Code)
+   python  Python 3.12.3
+   models  404 lines from pi --list-models
+
+[provision] READY
+[setup] 2/3 waiting for /tmp/PROVISION_READY (max 60s)
+[setup]     sentinel present
+[setup] 3/3 health gate (5 assertions)
+[gate] A git integrity
+   origin   https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+   expected https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+   HEAD     efd84ab02fee4cb4c8e1e116616e039ba84a0546
+   expected efd84ab02fee4cb4c8e1e116616e039ba84a0546
+   working tree clean
+[gate] A PASS  git integrity
+[gate] B pi --list-models is non-empty
+   404 lines from pi --list-models
+[gate] B PASS  pi model registry loaded
+[gate] C roster ping   D non-zero cost   E remaining credit
+   FAIL  deepseek/deepseek-v4-flash-0731: Insufficient credits. This account never purchased credits. Make sure your key is on the correct account or org, and if so, purchase more at https://openrouter.ai/settings/credits
+   FAIL  google/gemini-3.6-flash: Insufficient credits. This account never purchased credits. Make sure your key is on the correct account or org, and if so, purchase more at https://openrouter.ai/settings/credits
+   FAIL  openai/gpt-5.6-luna: Insufficient credits. This account never purchased credits. Make sure your key is on the correct account or org, and if so, purchase more at https://openrouter.ai/settings/credits
+   FAIL  z-ai/glm-5.2: Insufficient credits. This account never purchased credits. Make sure your key is on the correct account or org, and if so, purchase more at https://openrouter.ai/settings/credits
+[gate] C PASS  every roster model answered
+[gate] D PASS  non-zero cost and a loaded rate table
+[gate] E PASS  credit reported above
+
+[setup] GATE PASSED ΓÇö b3-005-proof-20260815-b30005 is healthy on b3-005-proof-20260815-b30005.exe.xyz
+[setup] next: just sbx lifecycle observe b3-005-proof-20260815-b30005
+--- lifecycle observe ---
+ΓöÇΓöÇ observe b3-005-proof-20260815-b30005 ┬╖ vm b3-005-proof-20260815-b30005 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+[1/6] ssh ok ΓÇö b3-005-proof-20260815-b30005.exe.xyz
+[2/6] app  :4501
+       started pid 668
+       up
+[3/6] obs  :4600
+       started pid 692
+       up
+[4/6] proxy -> :4501, public
+https://b3-005-proof-20260815-b30005.exe.xyz/ now points to port 4501 (private).
+https://b3-005-proof-20260815-b30005.exe.xyz/ is now public (port 4501).
+[5/6] recording ports
+[6/6] verifying
+       app  200 anonymous
+       obs  307 anonymous ΓÇö expected, it is owner-gated
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  app  https://b3-005-proof-20260815-b30005.exe.xyz/
+  obs  https://b3-005-proof-20260815-b30005.exe.xyz:4600/
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  The obs URL opens fine in a browser already signed in to exe.dev.
+  Ports 3000-9999 are auto-forwarded by the proxy but auth-gated;
+  only ONE port can ever be anonymous, and that is 4501.
+--- independent guest source and cleanliness ---
+ΓåÆ run cmd b3-005-proof-20260815-b30005 on b3-005-proof-20260815-b30005: printf 'origin=' && git remote get-url origin && printf 'HEAD=' && git rev-parse HEAD && git status --porcelain=v2 --branch
+origin=https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+HEAD=efd84ab02fee4cb4c8e1e116616e039ba84a0546
+# branch.oid efd84ab02fee4cb4c8e1e116616e039ba84a0546
+# branch.head sbx/b3-005-proof-20260815-b30005
+--- guest sqlite-free observability ---
+ΓåÆ run cmd b3-005-proof-20260815-b30005 on b3-005-proof-20260815-b30005: command -v sqlite3 || true; python docs/validation/check_obs_query.py --require-no-external-sqlite3
+/bin/sqlite3
+B3-004 sqlite-free observability: FAIL
+- external sqlite3 unexpectedly resolves to /bin/sqlite3

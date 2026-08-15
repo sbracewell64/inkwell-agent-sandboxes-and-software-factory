@@ -23,6 +23,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B3-003 | PASS | Windows bootstrap and host doctor | candidate `d5c53e8`; fresh CMD reconstructed deterministic PATH, Git Bash/SSH, front doors, and sandbox doctor without zsh or persistent PATH mutation |
 | B3-004 | PASS | SQLite-free Windows host observability | implementation candidate `9d160bb` passed runtime/validator proof without external sqlite3; first published closure `15bbea9` later found to contain three trailing-whitespace violations |
 | B3-004-H1 | PASS | Post-freeze B3-004 closure hygiene correction | candidate `1b892ab` passed staged and committed whitespace gates; original B3-004 tag preserved; clean correction state frozen separately |
+| B3-005 | PRE_CERTIFICATION / HOLD | Fresh Windows clone end-to-end portability proof | proof candidate `efd84ab`; fresh native clone, bootstrap, Windows sqlite-free observability, exactly one sandbox, source custody, ordered teardown, key/VM/run-record cleanup proved; Windows-native equivalence remains CNO/HOLD pending Browser Sol and contradictory setup model probe remains failed/unresolved |
 | B4-001 | PASS | Non-vacuous deterministic GitHub CI bootstrap | run `31907345967` on reviewed head `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: Ubuntu and Windows each discovered/executed 6/6 observed-good checks and passed Inkwell 30/30 with 230 assertions; closure successor and later `main` push require fresh checks |
 
 ## Future increments

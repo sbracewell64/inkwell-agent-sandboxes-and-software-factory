@@ -1,0 +1,20 @@
+proof_path=E:\SSSF-B3-005-PROOF-20260815-154222
+captured_utc=2026-08-15T15:49:08Z
+head=efd84ab02fee4cb4c8e1e116616e039ba84a0546
+branch=increment/b3-005-fresh-windows-clone-proof
+origin=https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+status_begin
+# branch.oid efd84ab02fee4cb4c8e1e116616e039ba84a0546
+# branch.head increment/b3-005-fresh-windows-clone-proof
+# branch.upstream origin/increment/b3-005-fresh-windows-clone-proof
+# branch.ab +0 -0
+status_end
+diff_begin
+diff_end
+tracked_diff_names_begin
+tracked_diff_names_end
+runtime_key_file=ABSENT
+run_record=PRESENT
+approved_ignored_config=PRESENT
+.gitignore:112:.env	.env
+.gitignore:161:.sandbox/	.sandbox/runs/b3-005-proof-20260815-b30005.json

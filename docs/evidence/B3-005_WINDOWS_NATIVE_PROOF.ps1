@@ -330,8 +330,11 @@ if errorlevel 1 exit /b 68
 echo --- independent guest source and cleanliness ---
 call just sbx run cmd "%RUN_ID%" "printf 'origin=' && git remote get-url origin && printf 'HEAD=' && git rev-parse HEAD && git status --porcelain=v2 --branch"
 if errorlevel 1 exit /b 69
-echo --- guest sqlite-free observability ---
-call just sbx run cmd "%RUN_ID%" "command -v sqlite3 || true; python docs/validation/check_obs_query.py --require-no-external-sqlite3"
+echo --- guest stdlib observability contract ---
+rem External sqlite3 absence is a Windows-host condition proved before CREATE.
+rem A Linux guest may ship sqlite3; the cross-platform contract is that the
+rem repository helper itself passes without depending on that executable.
+call just sbx run cmd "%RUN_ID%" "python docs/validation/check_obs_query.py"
 if errorlevel 1 exit /b 70
 echo --- pre-teardown negative controls ---
 if not exist ".sandbox\runs\%RUN_ID%.key" exit /b 71
