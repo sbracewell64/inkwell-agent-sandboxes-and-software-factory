@@ -1,0 +1,27 @@
+captured_utc=2026-08-15T15:40:44.3229165Z
+[HKLM]
+ComSpec|ExpandString|%SystemRoot%\system32\cmd.exe
+DriverData|String|C:\Windows\System32\Drivers\DriverData
+NUMBER_OF_PROCESSORS|String|32
+OS|String|Windows_NT
+Path|ExpandString|C:\Program Files (x86)\Common Files\Oracle\Java\java8path;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SYSTEMROOT%\System32\WindowsPowerShell\v1.0\;%SYSTEMROOT%\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\dotnet\;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Google\Cloud SDK\google-cloud-sdk\bin;C:\Program Files\Git\cmd;C:\Program Files\Mullvad VPN\resources
+PATHEXT|String|.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+PROCESSOR_ARCHITECTURE|String|AMD64
+PROCESSOR_IDENTIFIER|String|AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD
+PROCESSOR_LEVEL|String|25
+PROCESSOR_REVISION|String|6102
+PSModulePath|ExpandString|%ProgramFiles%\WindowsPowerShell\Modules;%SystemRoot%\system32\WindowsPowerShell\v1.0\Modules
+TEMP|ExpandString|%SystemRoot%\TEMP
+TMP|ExpandString|%SystemRoot%\TEMP
+USERNAME|String|SYSTEM
+windir|ExpandString|%SystemRoot%
+[HKCU]
+C:\Users\shane\AppData\Local\Programs\Ollama|String|none
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC|String|1
+GEMINI_API_KEY|String|<REDACTED>
+OLLAMA_CONTEXT_LENGTH|String|32768
+OLLAMA_NUM_PARALLEL|String|1
+OneDrive|ExpandString|C:\Users\shane\OneDrive
+Path|ExpandString|C:\Users\shane\AppData\Local\Programs\Herdr\bin;C:\Users\shane\AppData\Local\codegraph\current\bin;C:\Users\shane\AppData\Local\Programs\Python\Python311\Scripts\;C:\Users\shane\AppData\Local\Programs\Python\Python311\;C:\Users\shane\AppData\Local\Programs\Python\Python313\Scripts\;C:\Users\shane\AppData\Local\Programs\Python\Python313\;C:\Users\shane\AppData\Local\Programs\Python\Launcher\;C:\Users\shane\AppData\Local\Microsoft\WindowsApps;C:\Users\shane\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin;C:\Users\shane\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\shane\AppData\Local\Programs\Ollama;C:\Program Files\nodejs;C:\Users\shane\AppData\Roaming\npm;C:\Users\shane\.local\bin;C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin;C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe;;C:\Users\shane\.bun\bin
+TEMP|ExpandString|%USERPROFILE%\AppData\Local\Temp
+TMP|ExpandString|%USERPROFILE%\AppData\Local\Temp

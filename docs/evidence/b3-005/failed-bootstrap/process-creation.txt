@@ -1,0 +1,15 @@
+phase=bootstrap
+launcher=\\wsl.localhost\Ubuntu\home\shane\.treehouse\sssf-4223d9\1\sssf\docs\evidence\B3-005_WINDOWS_NATIVE_PROOF.ps1
+launcher_sha256=0f566533e9033f72497c9376dde4d2f99a9fdad638822567e7eed0dc12666766
+parent_pid=44872
+windows_identity=WIN-SFVUJ0VM92O\shane
+proof_path=E:\SSSF-B3-005-PROOF-20260815-154950
+evidence_path=E:\SSSF-B3-005-EVIDENCE-20260815-154950
+source_repo=https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+branch=increment/b3-005-fresh-windows-clone-proof
+expected_sha=5ac8c302a4841a5fd046e99dcab0af0cda172e06
+run_id=
+config_source=E:\SSSF\.env
+child_environment=CreateEnvironmentBlock(current-user-token, inherit=false)
+child_executable=C:\WINDOWS\System32\cmd.exe
+child_working_directory=E:\
