@@ -11,7 +11,7 @@ Broad artifact directories, empty trace databases, unrelated failed logs, and ne
 
 `tools/evidence_manifest.py` is the sole owner of evidence-manifest v1 schema, canonical serialization, and validation.
 
-V1 binds exact repository/base/candidate/branch/worktree, run and optional ADW identity, purpose, terminal outcome, required phases/dimensions, and a nonempty checked artifact inventory. Qualifying and diagnostic artifacts are distinct. External expected identity is required at validation, artifacts are frozen and hashed before parsing, and results are `observed-good`, `observed-bad`, or CNO.
+V1 binds exact repository/base/candidate/branch/worktree, run and optional ADW identity, purpose, terminal outcome, required phases/dimensions, and a nonempty checked artifact inventory. Qualifying and diagnostic artifacts are distinct. External expected identity is required at validation. Artifact roots/components/files are traversed descriptor-relatively without following links, descriptor identity is reconciled, artifacts are frozen and hashed before parsing, and results are `observed-good`, `observed-bad`, or CNO. Hosts without the required descriptor primitives refuse as CNO rather than falling back to a racy pathname check.
 
 Unknown versions and implicit migrations are refused. SHA-256 is used only for repository-owned content mismatch detection. Signing and key management are out of scope.
 

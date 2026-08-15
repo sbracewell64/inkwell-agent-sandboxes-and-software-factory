@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "tools"
 sys.path.insert(0, str(TOOLS))
 
+import evidence_manifest as manifest_module  # noqa: E402
 from evidence_manifest import (  # noqa: E402
     Observation,
     ValidationContext,
@@ -71,12 +72,187 @@ def set_artifact(item: dict[str, object], path: Path) -> None:
     item["sha256"] = hashlib.sha256(raw).hexdigest()
 
 
+def intermediate_directory_symlink_swap_control(errors: list[str]) -> None:
+    with tempfile.TemporaryDirectory(prefix="sssf-hd08-symlink-swap-") as temp_dir:
+        temp = Path(temp_dir)
+        root = temp / "root"
+        nested = root / "nested"
+        outside = temp / "outside"
+        nested.mkdir(parents=True)
+        outside.mkdir()
+        inside_bytes = b"inside-root-evidence\n"
+        outside_bytes = b"outside-root-substitution\n"
+        (nested / "payload.txt").write_bytes(inside_bytes)
+        (outside / "payload.txt").write_bytes(outside_bytes)
+        context = ValidationContext(
+            canonical_url=CONTEXT.canonical_url,
+            base_sha=CONTEXT.base_sha,
+            candidate_sha=CONTEXT.candidate_sha,
+            branch=CONTEXT.branch,
+            worktree_role=CONTEXT.worktree_role,
+            run_id="symlink-swap-run",
+            adw_id=None,
+            purpose="symlink-swap-control",
+            required_phases=("BUILD",),
+            required_dimensions=("path-confinement",),
+        )
+        document = {
+            "schema_version": "sssf.evidence-manifest.v1",
+            "repository": {
+                "canonical_url": context.canonical_url,
+                "base_sha": context.base_sha,
+                "candidate_sha": context.candidate_sha,
+                "branch": context.branch,
+                "worktree_role": context.worktree_role,
+            },
+            "run": {
+                "run_id": context.run_id,
+                "adw_id": None,
+                "terminal_outcome": "succeeded",
+            },
+            "purpose": context.purpose,
+            "required_phases": ["BUILD"],
+            "required_dimensions": ["path-confinement"],
+            "inventory": [
+                {
+                    "sequence": 0,
+                    "path": "nested/payload.txt",
+                    "artifact_type": "text",
+                    "byte_length": len(outside_bytes),
+                    "sha256": hashlib.sha256(outside_bytes).hexdigest(),
+                    "producer": "race-control",
+                    "run_id": context.run_id,
+                    "adw_id": None,
+                    "phase": "BUILD",
+                    "purpose": context.purpose,
+                    "terminal_outcome": "succeeded",
+                    "evidence_class": "qualifying",
+                    "claimed_dimensions": ["path-confinement"],
+                }
+            ],
+        }
+        write_manifest(root, document)
+        original_open = manifest_module.os.open
+        original_read = manifest_module.os.read
+        original_primitive_check = getattr(
+            manifest_module,
+            "_descriptor_primitives_available",
+            None,
+        )
+        swapped = False
+        captured_reads: list[bytes] = []
+
+        def swap_then_open(path, flags, *args, **kwargs):
+            nonlocal swapped
+            path_text = str(path)
+            if not swapped and path_text.endswith("payload.txt"):
+                swapped = True
+                nested.rename(root / "validated-nested")
+                nested.symlink_to(outside, target_is_directory=True)
+            return original_open(path, flags, *args, **kwargs)
+
+        def record_read(descriptor: int, length: int) -> bytes:
+            chunk = original_read(descriptor, length)
+            captured_reads.append(chunk)
+            return chunk
+
+        manifest_module.os.open = swap_then_open
+        manifest_module.os.read = record_read
+        if original_primitive_check is not None:
+            manifest_module._descriptor_primitives_available = lambda: True
+        try:
+            result = validate_manifest(root / "manifest.json", root, context)
+        finally:
+            manifest_module.os.open = original_open
+            manifest_module.os.read = original_read
+            if original_primitive_check is not None:
+                manifest_module._descriptor_primitives_available = original_primitive_check
+
+        if not swapped:
+            errors.append("intermediate-directory-symlink-swap: boundary was not exercised")
+        if result.observation is Observation.OBSERVED_GOOD:
+            errors.append(
+                "intermediate-directory-symlink-swap: outside-root bytes were accepted"
+            )
+        if "nested/payload.txt" in result.checked_inventory:
+            errors.append(
+                "intermediate-directory-symlink-swap: escaped artifact entered checked inventory"
+            )
+        if outside_bytes in b"".join(captured_reads):
+            errors.append(
+                "intermediate-directory-symlink-swap: outside-root bytes were read"
+            )
+
+
+def descriptor_path_controls(errors: list[str]) -> None:
+    with tempfile.TemporaryDirectory(prefix="sssf-hd08-descriptor-controls-") as temp_dir:
+        temp = Path(temp_dir)
+
+        root_link = temp / "root-link"
+        root_link.symlink_to(FIXTURE, target_is_directory=True)
+        root_result = validate_manifest(root_link / "manifest.json", root_link, CONTEXT)
+        expect(
+            errors,
+            "root symlink",
+            root_result.observation,
+            Observation.OBSERVED_BAD,
+        )
+
+        original_primitive_check = manifest_module._descriptor_primitives_available
+        manifest_module._descriptor_primitives_available = lambda: False
+        try:
+            unsupported = validate_manifest(MANIFEST, FIXTURE, CONTEXT)
+        finally:
+            manifest_module._descriptor_primitives_available = original_primitive_check
+        expect(
+            errors,
+            "unsupported descriptor host",
+            unsupported.observation,
+            Observation.CNO,
+        )
+
+        changing_root = temp / "identity-change"
+        shutil.copytree(FIXTURE, changing_root)
+        changing_path = changing_root / "artifacts/build-result.json"
+        original_read = manifest_module.os.read
+        changed = False
+
+        def read_then_change(descriptor: int, length: int) -> bytes:
+            nonlocal changed
+            chunk = original_read(descriptor, length)
+            if chunk and not changed:
+                changed = True
+                with changing_path.open("ab") as stream:
+                    stream.write(b"changed-during-read\n")
+            return chunk
+
+        manifest_module.os.read = read_then_change
+        try:
+            changed_result = validate_manifest(
+                changing_root / "manifest.json",
+                changing_root,
+                CONTEXT,
+            )
+        finally:
+            manifest_module.os.read = original_read
+        if not changed:
+            errors.append("artifact identity-change control was not exercised")
+        expect(
+            errors,
+            "artifact identity change",
+            changed_result.observation,
+            Observation.CNO,
+        )
+
+
 def run_controls() -> list[str]:
     errors: list[str] = []
     raw = MANIFEST.read_bytes()
     parsed = load_manifest()
     if canonical_manifest_bytes(parsed) != raw:
         errors.append("positive fixture does not round-trip to identical canonical bytes")
+    intermediate_directory_symlink_swap_control(errors)
+    descriptor_path_controls(errors)
     positive = validate_manifest(MANIFEST, FIXTURE, CONTEXT)
     expect(errors, "positive fixture", positive.observation, Observation.OBSERVED_GOOD)
     if positive.checked_inventory != (
@@ -323,6 +499,7 @@ def main() -> int:
     print("HD-08 evidence manifest controls: PASS")
     print("positive fixture round-trips canonical bytes and verifies every hash offline")
     print("watched-red identity, emptiness, diagnostic, tamper, duplicate, and path controls observed")
+    print("intermediate-directory-symlink-swap: PASS")
     return 0
 
 

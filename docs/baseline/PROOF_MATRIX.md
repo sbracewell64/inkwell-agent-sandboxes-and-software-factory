@@ -110,7 +110,7 @@
 | HD-08 canonical manifest bytes | positive fixture round-trips through the sole serializer byte-for-byte | PASS |
 | HD-08 offline checked inventory | positive fixture verifies every artifact hash/type and bound SQLite ADW row from frozen bytes without network/provider access | PASS |
 | HD-08 nonvacuous qualification | empty directory/database/manifest/inventory, diagnostic-only evidence, and absent phase/dimension controls cannot pass | PASS |
-| HD-08 identity and integrity refusal | wrong run/ADW/repository/base/candidate, failed unrelated item, tamper, duplicate/reorder, traversal/symlink, and malformed schema controls observed red/CNO as specified | PASS |
+| HD-08 identity and integrity refusal | wrong identities, failed unrelated item, tamper, duplicate/reorder, descriptor-relative traversal/symlink races, final/root symlinks, identity change, unsupported host, and malformed schema controls observed red/CNO as specified | PASS |
 | HD-08 runtime acceptance integration | intentionally deferred to HD-09 | NOT PROVEN |
 
 ## Rule

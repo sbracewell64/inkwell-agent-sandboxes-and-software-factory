@@ -30,7 +30,7 @@ Provide one provider-independent schema/serializer/validator owner with canonica
 
 The v1 manifest uses exact external validation context rather than trusting self-declared identity. Nonempty, sorted requirements and inventory eliminate vacuous PASS. Each item repeats run, optional ADW, phase, purpose, producer, terminal outcome, class, and claimed dimensions. Diagnostic items are checked but cannot claim a dimension. Qualifying items count only after identity, terminal, path, bytes, hash, and type checks succeed.
 
-Canonical UTF-8 JSON and strict ordering/sequence rules reject duplicate or identity-preserving reorder ambiguity. Artifact reads reject traversal/symlinks and freeze bytes before hashing and parsing. Unknown versions refuse implicit migration as CNO.
+Canonical UTF-8 JSON and strict ordering/sequence rules reject duplicate or identity-preserving reorder ambiguity. Artifact reads open the root, every intermediate directory, and the final regular file through descriptor-relative no-follow operations; they compare descriptor identity and freeze bytes before hashing and parsing. Unsupported descriptor primitives or changed identity are CNO, never a weaker pathname fallback. Unknown versions refuse implicit migration as CNO.
 
 ## Risks / failure modes
 
@@ -61,7 +61,8 @@ Independent review is delegated to the required no-mistakes pipeline before publ
 - sandbox run: not applicable; offline core only
 - ADW: not applicable
 - fixture: `docs/validation/fixtures/evidence_manifest/positive/manifest.json`
-- test result: validator prints `HD-08 evidence manifest controls: PASS`
+- pre-fix watched-red capture: `docs/evidence/hd08/intermediate-directory-symlink-swap-red.txt`, bound to `7148f45b5e906e4fcf220d7c9d32212f6fae985a`
+- test result: validator prints `HD-08 evidence manifest controls: PASS` and `intermediate-directory-symlink-swap: PASS`
 
 ## Documentation changed
 

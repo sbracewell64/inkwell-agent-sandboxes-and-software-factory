@@ -44,11 +44,11 @@ Canonical manifest bytes are UTF-8 JSON with:
 
 Arrays that carry identities are sorted and duplicate-free. Inventory order is canonical path order, with `sequence` equal to the zero-based position. Reorder, duplicate paths, duplicate JSON keys, or noncanonical bytes are observed-bad rather than silently normalized.
 
-Artifact paths are normalized relative POSIX paths. Absolute paths, `..`, backslashes, symlinks in any path component, non-regular files, and escapes from the supplied artifact root are refused.
+Artifact paths are normalized relative POSIX paths. Absolute paths, `..`, backslashes, symlinks in any path component, non-regular files, multiply linked files, and escapes from the supplied artifact root are refused. The root, each intermediate directory, and the final file are opened with descriptor-relative no-follow semantics; after opening the root, the validator never reopens an artifact through a full pathname.
 
 ## Freeze-before-parse rule
 
-For each artifact the validator opens a regular file without following a final symlink, reads it once, and compares file identity/size/timestamps before and after the read. The resulting in-memory bytes are the frozen snapshot. SHA-256 and byte length are checked before any JSON, JSONL, text, or SQLite parsing. Parsing never reopens the source artifact. SQLite is parsed from a temporary immutable snapshot; a qualifying SQLite database must contain at least one user-table row and positively find the manifest ADW ID in an `adw_id` column (or the run ID in a `run_id` column when no ADW applies). A schema-only or unrelated-session database is CNO.
+For each artifact the validator compares descriptor-derived device, inode, exact file type, and link count across every path-component open, then compares the final file identity, size, and timestamps before and after a single read. The resulting in-memory bytes are the frozen snapshot. An identity race or a host without descriptor-relative directory/no-follow primitives is CNO rather than a weaker pathname fallback. SHA-256 and byte length are checked before any JSON, JSONL, text, or SQLite parsing. Parsing never reopens the source artifact. SQLite is parsed from a temporary immutable snapshot; a qualifying SQLite database must contain at least one user-table row and positively find the manifest ADW ID in an `adw_id` column (or the run ID in a `run_id` column when no ADW applies). A schema-only or unrelated-session database is CNO.
 
 SHA-256 here is repository-owned mismatch/tamper detection. It is not a signature, identity proof, credential, or authenticity claim. V1 adds no keys or signing surface.
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import errno
 from enum import Enum
 import hashlib
 import json
@@ -372,76 +373,253 @@ def _validate_shape(manifest: Any) -> list[str]:
     return errors
 
 
+def _descriptor_primitives_available() -> bool:
+    return (
+        hasattr(os, "O_DIRECTORY")
+        and hasattr(os, "O_NOFOLLOW")
+        and os.open in os.supports_dir_fd
+        and os.stat in os.supports_dir_fd
+        and os.stat in os.supports_follow_symlinks
+    )
+
+
+def _opened_identity(metadata: os.stat_result) -> tuple[int, int, int, int]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        stat.S_IFMT(metadata.st_mode),
+        metadata.st_nlink,
+    )
+
+
+def _changed_identity(
+    before: os.stat_result,
+    after: os.stat_result,
+) -> bool:
+    return _opened_identity(before) != _opened_identity(after)
+
+
+def _path_open_error(
+    exc: OSError,
+    *,
+    relative: str,
+    component: str,
+) -> ArtifactRefusal:
+    if exc.errno == errno.ELOOP:
+        return ArtifactRefusal(
+            Observation.OBSERVED_BAD,
+            f"symlink artifact/path component refused: {relative}",
+        )
+    return ArtifactRefusal(
+        Observation.CNO,
+        f"artifact component is unavailable: {relative}: {component}: {exc}",
+    )
+
+
 def _read_frozen_artifact(root: Path, relative: str) -> bytes:
-    if root.is_symlink():
-        raise ArtifactRefusal(Observation.OBSERVED_BAD, "artifact root is a symlink")
+    if not _descriptor_primitives_available():
+        raise ArtifactRefusal(
+            Observation.CNO,
+            "host lacks descriptor-relative no-follow artifact primitives",
+        )
     try:
-        resolved_root = root.resolve(strict=True)
-    except (FileNotFoundError, OSError) as exc:
-        raise ArtifactRefusal(Observation.CNO, f"artifact root is unavailable: {exc}") from exc
-    if not resolved_root.is_dir():
-        raise ArtifactRefusal(Observation.CNO, "artifact root is not a directory")
-
-    current = resolved_root
-    parts = PurePosixPath(relative).parts
-    for part in parts:
-        current = current / part
-        try:
-            metadata = current.lstat()
-        except (FileNotFoundError, PermissionError, OSError) as exc:
-            raise ArtifactRefusal(Observation.CNO, f"artifact is unavailable: {relative}: {exc}") from exc
-        if stat.S_ISLNK(metadata.st_mode):
-            raise ArtifactRefusal(Observation.OBSERVED_BAD, f"symlink artifact/path component refused: {relative}")
-
-    try:
-        if not current.resolve(strict=True).is_relative_to(resolved_root):
-            raise ArtifactRefusal(Observation.OBSERVED_BAD, f"artifact escapes root: {relative}")
-    except OSError as exc:
-        raise ArtifactRefusal(Observation.CNO, f"artifact is unreadable: {relative}: {exc}") from exc
-
-    flags = os.O_RDONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    try:
-        descriptor = os.open(current, flags)
+        root_before = root.lstat()
     except (FileNotFoundError, PermissionError, OSError) as exc:
-        raise ArtifactRefusal(Observation.CNO, f"artifact is unreadable: {relative}: {exc}") from exc
-    try:
-        before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode):
-            raise ArtifactRefusal(Observation.CNO, f"artifact is not a regular file: {relative}")
-        chunks: list[bytes] = []
-        while True:
-            chunk = os.read(descriptor, 1024 * 1024)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        after = os.fstat(descriptor)
-    except OSError as exc:
-        raise ArtifactRefusal(Observation.CNO, f"artifact read failed: {relative}: {exc}") from exc
-    finally:
-        os.close(descriptor)
+        raise ArtifactRefusal(
+            Observation.CNO,
+            f"artifact root is unavailable: {exc}",
+        ) from exc
+    if stat.S_ISLNK(root_before.st_mode):
+        raise ArtifactRefusal(
+            Observation.OBSERVED_BAD,
+            "artifact root is a symlink",
+        )
+    if not stat.S_ISDIR(root_before.st_mode):
+        raise ArtifactRefusal(
+            Observation.CNO,
+            "artifact root is not a directory",
+        )
 
-    identity_before = (
-        before.st_dev,
-        before.st_ino,
-        before.st_size,
-        before.st_mtime_ns,
-        before.st_ctime_ns,
-    )
-    identity_after = (
-        after.st_dev,
-        after.st_ino,
-        after.st_size,
-        after.st_mtime_ns,
-        after.st_ctime_ns,
-    )
-    if identity_before != identity_after:
-        raise ArtifactRefusal(Observation.CNO, f"artifact changed while being frozen: {relative}")
-    raw = b"".join(chunks)
-    if not raw:
-        raise ArtifactRefusal(Observation.CNO, f"artifact is empty: {relative}")
-    return raw
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        directory_flags |= os.O_CLOEXEC
+        file_flags |= os.O_CLOEXEC
+
+    descriptors: list[int] = []
+    try:
+        try:
+            root_descriptor = os.open(root, directory_flags)
+        except OSError as exc:
+            if root.is_symlink():
+                raise ArtifactRefusal(
+                    Observation.OBSERVED_BAD,
+                    "artifact root became a symlink",
+                ) from exc
+            raise ArtifactRefusal(
+                Observation.CNO,
+                f"artifact root could not be opened safely: {exc}",
+            ) from exc
+        descriptors.append(root_descriptor)
+        root_after = os.fstat(root_descriptor)
+        if not stat.S_ISDIR(root_after.st_mode):
+            raise ArtifactRefusal(
+                Observation.CNO,
+                "opened artifact root is not a directory",
+            )
+        if _changed_identity(root_before, root_after):
+            raise ArtifactRefusal(
+                Observation.CNO,
+                "artifact root identity changed while being opened",
+            )
+
+        current_descriptor = root_descriptor
+        parts = PurePosixPath(relative).parts
+        for component in parts[:-1]:
+            try:
+                before = os.stat(
+                    component,
+                    dir_fd=current_descriptor,
+                    follow_symlinks=False,
+                )
+            except OSError as exc:
+                raise _path_open_error(
+                    exc,
+                    relative=relative,
+                    component=component,
+                ) from exc
+            if stat.S_ISLNK(before.st_mode):
+                raise ArtifactRefusal(
+                    Observation.OBSERVED_BAD,
+                    f"symlink artifact/path component refused: {relative}",
+                )
+            if not stat.S_ISDIR(before.st_mode):
+                raise ArtifactRefusal(
+                    Observation.CNO,
+                    f"artifact path component is not a directory: {relative}",
+                )
+            try:
+                next_descriptor = os.open(
+                    component,
+                    directory_flags,
+                    dir_fd=current_descriptor,
+                )
+            except OSError as exc:
+                raise _path_open_error(
+                    exc,
+                    relative=relative,
+                    component=component,
+                ) from exc
+            descriptors.append(next_descriptor)
+            after = os.fstat(next_descriptor)
+            if not stat.S_ISDIR(after.st_mode) or _changed_identity(before, after):
+                raise ArtifactRefusal(
+                    Observation.CNO,
+                    f"artifact directory identity changed while being opened: {relative}",
+                )
+            current_descriptor = next_descriptor
+
+        final_component = parts[-1]
+        try:
+            path_before = os.stat(
+                final_component,
+                dir_fd=current_descriptor,
+                follow_symlinks=False,
+            )
+        except OSError as exc:
+            raise _path_open_error(
+                exc,
+                relative=relative,
+                component=final_component,
+            ) from exc
+        if stat.S_ISLNK(path_before.st_mode):
+            raise ArtifactRefusal(
+                Observation.OBSERVED_BAD,
+                f"symlink artifact refused: {relative}",
+            )
+        if not stat.S_ISREG(path_before.st_mode):
+            raise ArtifactRefusal(
+                Observation.CNO,
+                f"artifact is not a regular file: {relative}",
+            )
+        if path_before.st_nlink != 1:
+            raise ArtifactRefusal(
+                Observation.CNO,
+                f"artifact link count is not exactly one: {relative}",
+            )
+        try:
+            artifact_descriptor = os.open(
+                final_component,
+                file_flags,
+                dir_fd=current_descriptor,
+            )
+        except OSError as exc:
+            raise _path_open_error(
+                exc,
+                relative=relative,
+                component=final_component,
+            ) from exc
+        descriptors.append(artifact_descriptor)
+        opened = os.fstat(artifact_descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or _changed_identity(path_before, opened)
+        ):
+            raise ArtifactRefusal(
+                Observation.CNO,
+                f"artifact identity changed while being opened: {relative}",
+            )
+
+        chunks: list[bytes] = []
+        try:
+            while True:
+                chunk = os.read(artifact_descriptor, 1024 * 1024)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            after_read = os.fstat(artifact_descriptor)
+        except OSError as exc:
+            raise ArtifactRefusal(
+                Observation.CNO,
+                f"artifact read failed: {relative}: {exc}",
+            ) from exc
+        complete_before = (
+            opened.st_dev,
+            opened.st_ino,
+            stat.S_IFMT(opened.st_mode),
+            opened.st_nlink,
+            opened.st_size,
+            opened.st_mtime_ns,
+            opened.st_ctime_ns,
+        )
+        complete_after = (
+            after_read.st_dev,
+            after_read.st_ino,
+            stat.S_IFMT(after_read.st_mode),
+            after_read.st_nlink,
+            after_read.st_size,
+            after_read.st_mtime_ns,
+            after_read.st_ctime_ns,
+        )
+        if complete_before != complete_after:
+            raise ArtifactRefusal(
+                Observation.CNO,
+                f"artifact changed while being frozen: {relative}",
+            )
+        raw = b"".join(chunks)
+        if not raw:
+            raise ArtifactRefusal(
+                Observation.CNO,
+                f"artifact is empty: {relative}",
+            )
+        return raw
+    finally:
+        for descriptor in reversed(descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
 
 
 def _quote_sqlite_identifier(identifier: str) -> str:
