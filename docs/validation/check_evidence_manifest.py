@@ -300,6 +300,44 @@ def run_controls() -> list[str]:
             write_manifest(target, document)
             expect(errors, label, validate(target).observation, Observation.OBSERVED_BAD)
 
+        declared_phase, declared_phase_doc = fresh("declared-phase")
+        write_manifest(declared_phase, declared_phase_doc)
+        declared_phase_result = validate(declared_phase)
+        expect(
+            errors,
+            "declared phase positive control",
+            declared_phase_result.observation,
+            Observation.OBSERVED_GOOD,
+        )
+
+        wrong_phase, wrong_phase_doc = fresh("wrong-phase")
+        inventory = wrong_phase_doc["inventory"]
+        assert isinstance(inventory, list)
+        qualifying_item = inventory[0]
+        assert isinstance(qualifying_item, dict)
+        original_item = deepcopy(qualifying_item)
+        qualifying_item["phase"] = "UNDECLARED"
+        unchanged_item = deepcopy(qualifying_item)
+        unchanged_item["phase"] = original_item["phase"]
+        if unchanged_item != original_item:
+            errors.append("wrong phase control changed fields other than phase")
+        write_manifest(wrong_phase, wrong_phase_doc)
+        wrong_phase_result = validate(wrong_phase)
+        expect(
+            errors,
+            "wrong phase",
+            wrong_phase_result.observation,
+            Observation.OBSERVED_BAD,
+        )
+        phase_reason = (
+            "artifacts/build-result.json: phase is not declared in required_phases"
+        )
+        if wrong_phase_result.issues.count(phase_reason) != 1:
+            errors.append(
+                "wrong phase: expected exact undeclared-phase reason once, got "
+                f"{wrong_phase_result.issues!r}"
+            )
+
         wrong_run, wrong_run_doc = fresh("wrong-run")
         run = wrong_run_doc["run"]
         assert isinstance(run, dict)
@@ -499,6 +537,7 @@ def main() -> int:
     print("HD-08 evidence manifest controls: PASS")
     print("positive fixture round-trips canonical bytes and verifies every hash offline")
     print("watched-red identity, emptiness, diagnostic, tamper, duplicate, and path controls observed")
+    print("wrong-phase-control: PASS")
     print("intermediate-directory-symlink-swap: PASS")
     return 0
 
