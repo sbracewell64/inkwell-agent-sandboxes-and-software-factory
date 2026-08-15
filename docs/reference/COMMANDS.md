@@ -39,6 +39,12 @@ just adw ...
 
 ADW recipes execute workflows inside the appropriate working directory/config.
 
+Validate installed, template, and disposable generated ADW contracts without a provider call:
+
+```text
+uv run docs/validation/check_adw_synchronization.py
+```
+
 ## Sandbox
 
 ```text

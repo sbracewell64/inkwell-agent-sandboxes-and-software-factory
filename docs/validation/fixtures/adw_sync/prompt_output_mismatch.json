@@ -1,0 +1,6 @@
+{
+  "path": "adws/adw_data/prompt_engineering/scout/user.md",
+  "old": "  \"notes_for_next_agent\": \"<where the next agent should start>\"",
+  "new": "  \"stale_field\": \"<removed output field>\"",
+  "expected": "prompt/output fields mismatch for ScoutOutput"
+}

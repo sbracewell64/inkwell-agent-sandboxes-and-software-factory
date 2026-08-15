@@ -29,6 +29,7 @@ Respond with ONLY valid JSON matching `ScoutOutput` — no prose before or after
   "findings": [
     { "file": "src/server.ts", "note": "<why this file matters>" }
   ],
-  "artifacts": ["<context_handoff_dir>/scout_findings.md"]
+  "artifacts": ["<context_handoff_dir>/scout_findings.md"],
+  "notes_for_next_agent": "<where the next agent should start>"
 }
 ```

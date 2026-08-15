@@ -1,0 +1,6 @@
+{
+  "path": ".claude/skills/sssf/scripts/make_adw.py",
+  "old": "    return run.finish()",
+  "new": "    return 0 if run.succeeded else 1",
+  "expected": "stale run.succeeded is not a finish path"
+}
