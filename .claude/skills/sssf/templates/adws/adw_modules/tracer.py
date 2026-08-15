@@ -11,7 +11,15 @@ import json
 import sqlite3
 from pathlib import Path
 
-from .data_types import AgentConfig, EventRecord, GateReport, Phase
+from .data_types import (
+    AgentConfig,
+    EventRecord,
+    GateCNOReason,
+    GateCNOSource,
+    GateReport,
+    GateStatus,
+    Phase,
+)
 from .utils import ensure_dir, new_id, now_iso
 
 SCHEMA = """
@@ -63,10 +71,20 @@ CREATE TABLE IF NOT EXISTS gate_results (
   phase_id      TEXT REFERENCES phases,
   attempt       INTEGER,
   gate          TEXT,
-  passed        INTEGER,
+  passed        INTEGER,            -- compatibility projection: 1 PASS, 0 FAIL, NULL CNO
+  outcome       TEXT NOT NULL CHECK(outcome IN ('PASS','FAIL','COULD_NOT_OBSERVE')),
+  cno_reason    TEXT,
+  cno_source    TEXT,
+  nonempty_required INTEGER NOT NULL CHECK(nonempty_required IN (0,1)),
   violations_json TEXT,
   checks_json   TEXT,               -- [{item, ok, note}] — WHAT the gate verified
-  created_at    TEXT
+  created_at    TEXT,
+  CHECK((outcome='COULD_NOT_OBSERVE' AND cno_reason IN (
+          'NO_REQUIRED_OBSERVATIONS','NO_GATES_DISCOVERED','GATE_RAISED',
+          'INVALID_GATE_RETURN','LEGACY_BOOLEAN_ONLY','MALFORMED_TYPED_OUTCOME')
+        AND cno_source IN ('GATE_REPORT','AGENT_CALL','GATE_EXECUTION',
+          'GATE_ADAPTER','SCHEMA_MIGRATION','TRACE_READER'))
+     OR (outcome IN ('PASS','FAIL') AND cno_reason IS NULL AND cno_source IS NULL))
 );
 CREATE TABLE IF NOT EXISTS processes (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,7 +114,11 @@ MIGRATIONS = [("agent_sessions", "color", "TEXT"),
               ("sessions", "adw_name", "TEXT"),
               ("agent_sessions", "context_tokens", "INTEGER"),
               ("agent_sessions", "context_window", "INTEGER"),
-              ("sessions", "archived", "INTEGER DEFAULT 0")]
+              ("sessions", "archived", "INTEGER DEFAULT 0"),
+              ("gate_results", "outcome", "TEXT"),
+              ("gate_results", "cno_reason", "TEXT"),
+              ("gate_results", "cno_source", "TEXT"),
+              ("gate_results", "nonempty_required", "INTEGER")]
 
 
 class Tracer:
@@ -118,6 +140,55 @@ class Tracer:
             columns = {row[1] for row in self.conn.execute(f"PRAGMA table_info({table})")}
             if column not in columns:
                 self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+        # Legacy PASS cannot be reconstructed from a Boolean alone: it may have
+        # been the vacuous `not violations` result. Preserve explicit old
+        # negatives as FAIL and downgrade every old/unknown positive to CNO.
+        self.conn.execute(
+            "UPDATE gate_results SET outcome = CASE WHEN passed=0 THEN ? ELSE ? END "
+            "WHERE outcome IS NULL OR outcome NOT IN (?,?,?)",
+            (GateStatus.FAIL.value, GateStatus.COULD_NOT_OBSERVE.value,
+             GateStatus.PASS.value, GateStatus.FAIL.value,
+             GateStatus.COULD_NOT_OBSERVE.value),
+        )
+        self.conn.execute(
+            "UPDATE gate_results SET cno_reason=?, cno_source=? "
+            "WHERE outcome=? AND (cno_reason IS NULL OR cno_source IS NULL)",
+            (GateCNOReason.LEGACY_BOOLEAN_ONLY.value,
+             GateCNOSource.SCHEMA_MIGRATION.value,
+             GateStatus.COULD_NOT_OBSERVE.value),
+        )
+        self.conn.execute(
+            "UPDATE gate_results SET cno_reason=?, cno_source=? WHERE outcome=? "
+            "AND (cno_reason NOT IN (?,?,?,?,?,?) OR cno_source NOT IN (?,?,?,?,?,?))",
+            (GateCNOReason.MALFORMED_TYPED_OUTCOME.value,
+             GateCNOSource.SCHEMA_MIGRATION.value,
+             GateStatus.COULD_NOT_OBSERVE.value,
+             *(reason.value for reason in GateCNOReason),
+             *(source.value for source in GateCNOSource)),
+        )
+        self.conn.execute(
+            "UPDATE gate_results SET cno_reason=NULL, cno_source=NULL "
+            "WHERE outcome<>?",
+            (GateStatus.COULD_NOT_OBSERVE.value,),
+        )
+        self.conn.execute(
+            "UPDATE gate_results SET nonempty_required=1 "
+            "WHERE nonempty_required IS NULL OR nonempty_required NOT IN (0,1)"
+        )
+        self.conn.execute(
+            "UPDATE gate_results SET outcome=?, cno_reason=?, cno_source=? "
+            "WHERE outcome=? AND nonempty_required=1 "
+            "AND (checks_json IS NULL OR TRIM(checks_json) IN ('','[]'))",
+            (GateStatus.COULD_NOT_OBSERVE.value,
+             GateCNOReason.MALFORMED_TYPED_OUTCOME.value,
+             GateCNOSource.SCHEMA_MIGRATION.value,
+             GateStatus.PASS.value),
+        )
+        self.conn.execute(
+            "UPDATE gate_results SET passed = CASE outcome WHEN ? THEN 1 WHEN ? THEN 0 ELSE NULL END",
+            (GateStatus.PASS.value, GateStatus.FAIL.value),
+        )
 
     # ── events ──────────────────────────────────────────────────────────────
     def event(self, record: EventRecord) -> str:
@@ -239,12 +310,18 @@ class Tracer:
         )
 
     def gate_row(self, phase: Phase, gate: str, report: GateReport, attempt: int) -> None:
-        """The report carries both the verdict and the evidence behind it."""
+        """Persist the typed verdict and evidence; Boolean is projection only."""
+        outcome = report.outcome
+        passed = (1 if outcome.status == GateStatus.PASS else
+                  0 if outcome.status == GateStatus.FAIL else None)
         self.conn.execute(
-            "INSERT INTO gate_results (adw_id, phase_id, attempt, gate, passed,"
-            " violations_json, checks_json, created_at) VALUES (?,?,?,?,?,?,?,?)",
-            (phase.adw_id, phase.phase_id, attempt, gate, int(report.passed),
-             json.dumps(report.violations),
+            "INSERT INTO gate_results (adw_id, phase_id, attempt, gate, passed, outcome,"
+            " cno_reason, cno_source, nonempty_required, violations_json, checks_json,"
+            " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (phase.adw_id, phase.phase_id, attempt, gate, passed, outcome.status.value,
+             outcome.reason.value if outcome.reason else None,
+             outcome.source.value if outcome.source else None,
+             int(report.nonempty_required), json.dumps(report.violations),
              json.dumps([c.model_dump() for c in report.checks]), now_iso()),
         )
 

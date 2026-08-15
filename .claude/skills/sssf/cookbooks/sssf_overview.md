@@ -20,11 +20,11 @@ adws/
 ├── adw_document.py              write up the work just done, from git diff vs main
 ├── adw_simple_sdlc.py           plan → build → test → review → document; commits each product
 ├── adw_modules/                 ALL low-level logic — ADW scripts stay thin
-│   ├── data_types.py            AgentCall, PhaseParams, Phase, Envelope + one output type per agent call
+│   ├── data_types.py            AgentCall, PhaseParams, Envelope types + canonical PASS/FAIL/CNO gate outcome
 │   ├── agents.py                load_config, validate, resolve entry → interface + model + thinking
 │   ├── runner.py                the Run object: run.phase(PhaseParams) → ph.call(AgentCall)
 │   ├── agent_pi.py              Pi interface (v1)   ·   agent_cc.py  Claude Code (v2, stubbed)
-│   ├── gates.py                 gate(envelope, run) -> GateReport — one check per item verified
+│   ├── gates.py                 gate(envelope, run) -> GateReport — explicit nonempty evidence requirement
 │   ├── changes.py               git diff vs a resolved base → ChangeSet → envelope for the documenter
 │   ├── prompts.py, session.py, tracer.py, console.py, git_helper.py, utils.py
 └── adw_data/

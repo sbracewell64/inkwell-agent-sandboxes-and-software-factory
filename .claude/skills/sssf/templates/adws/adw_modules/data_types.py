@@ -9,9 +9,19 @@ that its final JSON response is parsed against. No untyped handoffs.
 
 from __future__ import annotations
 
+import json
+from enum import Enum
 from typing import Any, Callable, Literal, Optional, Type
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 PhaseKind = Literal["engineer", "agent", "code"]
 PhaseStatus = Literal["queued", "running", "success", "fail"]
@@ -249,6 +259,72 @@ class VerifyOutput(EnvelopeBase):
 
 # ── Agent calls ──────────────────────────────────────────────────────────────
 
+class GateStatus(str, Enum):
+    """The only outcomes a gate can produce. Never use this as a Boolean."""
+
+    PASS = "PASS"
+    FAIL = "FAIL"
+    COULD_NOT_OBSERVE = "COULD_NOT_OBSERVE"
+
+
+class GateCNOReason(str, Enum):
+    """Closed reasons for an observation that could not be made."""
+
+    NO_REQUIRED_OBSERVATIONS = "NO_REQUIRED_OBSERVATIONS"
+    NO_GATES_DISCOVERED = "NO_GATES_DISCOVERED"
+    GATE_RAISED = "GATE_RAISED"
+    INVALID_GATE_RETURN = "INVALID_GATE_RETURN"
+    LEGACY_BOOLEAN_ONLY = "LEGACY_BOOLEAN_ONLY"
+    MALFORMED_TYPED_OUTCOME = "MALFORMED_TYPED_OUTCOME"
+
+
+class GateCNOSource(str, Enum):
+    """Closed locations at which gate evidence became unavailable."""
+
+    GATE_REPORT = "GATE_REPORT"
+    AGENT_CALL = "AGENT_CALL"
+    GATE_EXECUTION = "GATE_EXECUTION"
+    GATE_ADAPTER = "GATE_ADAPTER"
+    SCHEMA_MIGRATION = "SCHEMA_MIGRATION"
+    TRACE_READER = "TRACE_READER"
+
+
+class GateOutcome(BaseModel):
+    """Canonical typed gate outcome, including mandatory CNO provenance."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: GateStatus
+    reason: Optional[GateCNOReason] = None
+    source: Optional[GateCNOSource] = None
+    detail: str = ""
+
+    @model_validator(mode="after")
+    def _closed_cno_data(self) -> "GateOutcome":
+        is_cno = self.status == GateStatus.COULD_NOT_OBSERVE
+        if is_cno and (self.reason is None or self.source is None):
+            raise ValueError("COULD_NOT_OBSERVE requires a closed reason and source")
+        if not is_cno and (self.reason is not None or self.source is not None or self.detail):
+            raise ValueError("PASS and FAIL cannot carry could-not-observe data")
+        return self
+
+    def __bool__(self) -> bool:
+        raise TypeError("GateOutcome has three values; compare .status explicitly")
+
+    @classmethod
+    def from_json(cls, raw: str) -> "GateOutcome":
+        """Strict parser: duplicate fields are refused instead of overwritten."""
+        def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            value: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in value:
+                    raise ValueError(f"duplicate outcome field: {key}")
+                value[key] = item
+            return value
+
+        return cls.model_validate(json.loads(raw, object_pairs_hook=unique_object))
+
+
 class GateCheck(BaseModel):
     """One thing a gate looked at, and what it found.
 
@@ -257,18 +333,37 @@ class GateCheck(BaseModel):
     """
 
     item: str                       # what was checked: a path, a command, a test
-    ok: bool
+    ok: StrictBool
     note: str = ""
 
 
 class GateReport(BaseModel):
-    """What every gate returns: the checks it ran. Violations are derived.
+    """Checks plus an explicit evidence requirement; outcome is derived once.
 
-    Authoring stays a one-liner per item — `report.check(...)` appends and
-    returns self, so a gate is a loop and a return.
+    Every gate must declare `nonempty_required`. A required gate with no checks
+    is COULD_NOT_OBSERVE, not a vacuous pass. Explicit failed checks remain FAIL.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
+    nonempty_required: StrictBool
     checks: list[GateCheck] = Field(default_factory=list)
+    cno_reason: Optional[GateCNOReason] = None
+    cno_source: Optional[GateCNOSource] = None
+    cno_detail: str = ""
+
+    @model_validator(mode="after")
+    def _complete_explicit_cno(self) -> "GateReport":
+        fields = (self.cno_reason, self.cno_source)
+        if any(value is not None for value in fields) and not all(value is not None for value in fields):
+            raise ValueError("an explicit CNO report requires both reason and source")
+        return self
+
+    @classmethod
+    def could_not_observe(cls, reason: GateCNOReason, source: GateCNOSource,
+                          detail: str) -> "GateReport":
+        return cls(nonempty_required=True, cno_reason=reason,
+                   cno_source=source, cno_detail=detail)
 
     def check(self, item: str, ok: bool, note: str = "") -> "GateReport":
         self.checks.append(GateCheck(item=item, ok=ok, note=note))
@@ -279,8 +374,34 @@ class GateReport(BaseModel):
         return [f"{c.item}: {c.note or 'failed'}" for c in self.checks if not c.ok]
 
     @property
-    def passed(self) -> bool:
-        return not self.violations
+    def outcome(self) -> GateOutcome:
+        # A positively observed defect remains FAIL even if other evidence was
+        # unavailable; CNO must never mask a judgement the gate did make.
+        if self.violations:
+            return GateOutcome(status=GateStatus.FAIL)
+        if self.cno_reason is not None and self.cno_source is not None:
+            return GateOutcome(status=GateStatus.COULD_NOT_OBSERVE,
+                               reason=self.cno_reason, source=self.cno_source,
+                               detail=self.cno_detail)
+        if self.nonempty_required and not self.checks:
+            return GateOutcome(
+                status=GateStatus.COULD_NOT_OBSERVE,
+                reason=GateCNOReason.NO_REQUIRED_OBSERVATIONS,
+                source=GateCNOSource.GATE_REPORT,
+                detail="the gate required evidence but recorded zero checks",
+            )
+        return GateOutcome(status=GateStatus.PASS)
+
+    @property
+    def problems(self) -> list[str]:
+        """Correction/refusal reasons. PASS alone has an empty list."""
+        if self.outcome.status == GateStatus.FAIL:
+            return self.violations
+        if self.outcome.status == GateStatus.COULD_NOT_OBSERVE:
+            outcome = self.outcome
+            detail = f": {outcome.detail}" if outcome.detail else ""
+            return [f"could not observe ({outcome.reason.value}/{outcome.source.value}){detail}"]
+        return []
 
 
 class AgentCall(BaseModel):
@@ -291,7 +412,7 @@ class AgentCall(BaseModel):
     output_type: Type[EnvelopeBase]
     prompt: str
     previous: Optional[EnvelopeBase] = None
-    gates: list[Callable] = Field(default_factory=list)   # gate(envelope, run) -> list[str]
+    gates: list[Callable] = Field(default_factory=list)   # gate(envelope, run) -> GateReport
 
 
 # ── Config ───────────────────────────────────────────────────────────────────
@@ -356,7 +477,7 @@ class EventRecord(BaseModel):
 
     adw_id: str
     phase_id: str = ""
-    type: str                       # phase_start | agent_start | tool_call | handoff | gate_pass | gate_fail | log | agent_end | phase_end | error
+    type: str                       # phase_start | agent_start | tool_call | handoff | gate_pass | gate_fail | gate_could_not_observe | log | agent_end | phase_end | error
     name: str = ""
     payload: dict[str, Any] = Field(default_factory=dict)
     parent_id: str = ""

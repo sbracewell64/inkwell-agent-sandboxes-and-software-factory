@@ -38,7 +38,15 @@ let cursor = 0
 let inflight = false
 let timer: ReturnType<typeof setInterval> | undefined
 
-const SIDE_TABLE_TYPES = new Set(['gate_pass', 'gate_fail', 'handoff', 'agent_end', 'phase_end', 'error'])
+const SIDE_TABLE_TYPES = new Set([
+  'gate_pass',
+  'gate_fail',
+  'gate_could_not_observe',
+  'handoff',
+  'agent_end',
+  'phase_end',
+  'error',
+])
 
 async function tick() {
   if (inflight) return
