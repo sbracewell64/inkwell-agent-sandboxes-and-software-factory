@@ -60,6 +60,7 @@ def contract_errors(root: Path) -> list[str]:
         "timeout-minutes: 10",
         "fail-fast: false",
         "os: [ubuntu-24.04, windows-2022]",
+        "ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}",
         "persist-credentials: false",
         "python-version: '3.12.8'",
         "check-latest: false",
@@ -198,6 +199,30 @@ def watched_red_errors() -> list[str]:
         )
         if not contract_errors(contract_root):
             errors.append("empty OS matrix did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}\n",
+                "",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("missing exact-head checkout did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "github.event.pull_request.head.sha || github.sha",
+                "github.sha || github.sha",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("substituted exact-head checkout did not go red")
 
         (contract_root / WORKFLOW).unlink()
         shutil.copy2(ROOT / WORKFLOW, contract_root / ".github" / "workflows" / "drift.yml")
