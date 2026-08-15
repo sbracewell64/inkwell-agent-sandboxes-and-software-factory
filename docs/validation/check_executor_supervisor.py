@@ -327,6 +327,32 @@ def runtime_fixtures(errors: list[str]) -> None:
         assert_reason(callback, "cleanup-unverified", Observation.COULD_NOT_OBSERVE, errors)
         check(callback.cleanup.group_absent is True and not callback.cleanup.survivors, "callback failure returned before verified cleanup", errors)
 
+        delivered = []
+
+        def reject_first_event(event: dict) -> None:
+            delivered.append(event["type"])
+            raise RuntimeError("fixture event delivery rejection")
+
+        before_terminal_request = request(temp, "success", phase_id="event-callback-before-terminal")
+        before_terminal = run_pi_json(before_terminal_request, on_event=reject_first_event)
+        assert_reason(before_terminal, "observation-delivery-failed", Observation.COULD_NOT_OBSERVE, errors)
+        check(delivered == ["session"], "failed event callback was invoked again", errors)
+        check(before_terminal.primary_terminal_state == TerminalState.SUCCEEDED and before_terminal.primary_reason is None, "callback CNO erased structured success", errors)
+        check(before_terminal.returncode == 0 and before_terminal.cleanup.group_absent is True, "callback CNO lost exit or cleanup evidence", errors)
+        check(before_terminal.evidence.raw_events_sha256 == before_terminal.evidence.stdout_sha256 and evidence_path(before_terminal_request).is_file(), "callback CNO lost durable raw evidence", errors)
+
+        delivered.clear()
+
+        def reject_terminal_event(event: dict) -> None:
+            delivered.append(event["type"])
+            if event["type"] == "agent_end":
+                raise RuntimeError("fixture terminal delivery rejection")
+
+        after_terminal = run_pi_json(request(temp, "terminal-first-success", phase_id="event-callback-after-terminal"), on_event=reject_terminal_event)
+        assert_reason(after_terminal, "observation-delivery-failed", Observation.COULD_NOT_OBSERVE, errors)
+        check(delivered == ["message_end", "agent_end"], "post-terminal events were delivered after callback failure", errors)
+        check(after_terminal.primary_terminal_state == TerminalState.SUCCEEDED and after_terminal.terminal_stop == "stop", "terminal callback CNO erased provider outcome", errors)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()

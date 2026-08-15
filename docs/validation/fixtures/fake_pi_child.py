@@ -36,6 +36,21 @@ def success():
     emit({"type": "agent_end", "messages": [message]})
 
 
+def terminal_first_success():
+    message = {
+        "role": "assistant",
+        "provider": "fixture",
+        "model": "deterministic",
+        "thinkingLevel": "high",
+        "content": [{"type": "text", "text": "typed-success-marker"}],
+        "stopReason": "stop",
+        "usage": {"input": 1, "output": 1, "totalTokens": 2, "cost": {"total": 0.0}},
+    }
+    emit({"type": "message_end", "message": message})
+    emit({"type": "agent_end", "messages": [message]})
+    emit({"type": "status", "status": "post-terminal"})
+
+
 def main():
     mode = sys.argv[-1]
     if mode in {"success", "stdin-consumption"}:
@@ -55,6 +70,8 @@ def main():
         }
         emit({"type": "message_end", "message": message})
         emit({"type": "agent_end", "messages": [message]})
+    elif mode == "terminal-first-success":
+        terminal_first_success()
     elif mode == "malformed":
         print("{not-json", flush=True)
         emit({"type": "agent_end", "messages": []})

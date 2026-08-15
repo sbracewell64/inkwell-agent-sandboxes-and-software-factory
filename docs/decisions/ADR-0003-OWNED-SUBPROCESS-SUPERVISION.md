@@ -39,6 +39,9 @@ context files, and project approval. It creates an isolated, credential-free
 Pi settings directory with agent/provider retries and compaction disabled.
 Raw bounded stdout is fsynced before JSON parsing or event callbacks. A
 structured provider error remains failure regardless of process exit status.
+Event callback exceptions disable further delivery and return typed
+observation-delivery CNO while retaining the separately classified provider
+outcome, raw digest, process result, and cleanup evidence.
 Observable native retry events are counted and charged to the same budget; a
 retry despite the disabled policy fails.
 

@@ -42,6 +42,8 @@ bounded and deterministic without calling a provider.
 - isolated credential-free settings disabling native retries, provider retries,
   compaction, project trust, packages, and telemetry/update startup work;
 - durable bounded raw events before parsing;
+- typed observation-delivery CNO that preserves the primary provider outcome
+  and cleanup evidence when a post-capture callback fails;
 - strict malformed/missing/duplicate terminal-event handling;
 - shell-zero structured-error precedence;
 - observable native-retry accounting against the common budget;

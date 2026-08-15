@@ -142,6 +142,9 @@ class PiTerminalResult:
     stderr_bytes_seen: int
     event_bytes_preserved: int
     events: tuple[dict, ...] = ()
+    primary_terminal_state: TerminalState | None = None
+    primary_reason: FailureReason | None = None
+    observation_delivery_error: str | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -555,9 +558,13 @@ def run_pi_json(
         os.fsync(raw_file.fileno())
     raw_digest = hashlib.sha256(process_result.stdout).hexdigest()
     parsed = _parse_events(process_result.stdout)
+    callback_error = None
     for event in parsed.events:
-        if on_event:
-            on_event(event)
+        if on_event and callback_error is None:
+            try:
+                on_event(event)
+            except BaseException as error:
+                callback_error = f"{type(error).__name__}: {error}"
 
     extra_native_attempts = parsed.native_retry_starts
     within_budget = budget.charge_observed_native_attempts(extra_native_attempts)
@@ -609,6 +616,16 @@ def run_pi_json(
             state = TerminalState.FAILED
             reason = FailureReason("resolved-target-mismatch", Observation.OBSERVED_BAD, "Pi resolved a provider, model, or effort different from the exact request")
 
+    primary_state = state
+    primary_reason = reason
+    if callback_error is not None:
+        state = TerminalState.FAILED
+        reason = FailureReason(
+            "observation-delivery-failed",
+            Observation.COULD_NOT_OBSERVE,
+            f"durable event callback failed: {callback_error}",
+        )
+
     return PiTerminalResult(
         state,
         reason,
@@ -633,4 +650,7 @@ def run_pi_json(
         process_result.stderr_bytes_seen,
         len(process_result.stdout),
         parsed.events,
+        primary_state,
+        primary_reason,
+        callback_error,
     )
