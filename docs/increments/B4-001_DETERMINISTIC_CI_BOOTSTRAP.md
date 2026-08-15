@@ -1,7 +1,9 @@
 # B4-001 — Non-Vacuous Deterministic CI Bootstrap
 
-**Status:** CANDIDATE — EXACT PULL-REQUEST-HEAD PROOF REQUIRED
+**Status:** PROVEN AT REVIEWED IMPLEMENTATION HEAD
 **Starts from:** `04e5484a6190f033d25e1626b96a4cca93b7f755`
+**Reviewed implementation:** `29819d98ea2b046bc432bde2a3e9cd42be7640a4`
+**Proof workflow run:** `31907345967`
 
 ## Problem
 
@@ -106,16 +108,33 @@ Discovery, dependency, cancellation, and timeout failures remain
 could-not-observe. Expected red controls are watched by the validator; they do
 not weaken the real gate or create permanently failing GitHub jobs.
 
-## Bootstrap proof rule
+## Exact reviewed pull-request proof
 
-Local controls cannot prove that GitHub recognized or ran a newly introduced
-workflow. B4-001 remains a candidate until the real workflow completes on its
-own exact pull-request head and both jobs report nonempty execution.
+Local controls could not prove that GitHub recognized or ran the newly
+introduced workflow, so that evidence remained CNO until PR 6 existed.
+Workflow run `31907345967` then executed against exact reviewed pull-request
+head:
 
-If GitHub requires workflow presence on the default branch before it can run,
-the exact-head result remains CNO. That bootstrap constraint requires a
-bounded Browser Sol/authority decision through canonical landing; it must not
-be relabeled green or bypassed with a lower-level merge.
+`29819d98ea2b046bc432bde2a3e9cd42be7640a4`
+
+Both matrix jobs completed successfully with nonempty evidence:
+
+| Runner | Discovered | Executed | observed-good | observed-bad | could-not-observe | Inkwell |
+|---|---:|---:|---:|---:|---:|---|
+| `ubuntu-24.04` | 6 | 6 | 6 | 0 | 0 | 30 pass, 0 fail, 230 assertions |
+| `windows-2022` | 6 | 6 | 6 | 0 | 0 | 30 pass, 0 fail, 230 assertions |
+
+The workflow's exact-head checkout contract and the watched-red ref-drift
+control were present in that reviewed head. Browser Sol ruling `5304171586`
+independently rechecked canonical main at the stated base, PR 6 open and
+unmerged, the reviewed head, and both completed successful checks before
+authorizing this provenance-only closure successor.
+
+The successor changes only this increment record, the increment ledger, and
+the proof matrix. It does not change executable semantics. Its own exact head
+still requires the same nonempty Linux and Windows checks before landing, and
+the later `main` push remains CNO until its separate trigger runs. Neither
+future check is inferred from run `31907345967`.
 
 ## Non-goals
 
@@ -139,3 +158,7 @@ be relabeled green or bypassed with a lower-level merge.
 7. Every watched-red control is observed red with the calibrated status.
 8. The exact pull-request head completes the real workflow before B4-001 is
    called PASS.
+
+Workflow run `31907345967` proves these criteria for reviewed implementation
+head `29819d98ea2b046bc432bde2a3e9cd42be7640a4`. The closure successor and
+post-merge `main` push retain their independent exact-head check requirements.
