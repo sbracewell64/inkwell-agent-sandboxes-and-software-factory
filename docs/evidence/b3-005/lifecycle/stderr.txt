@@ -1,0 +1,22 @@
+INFO: Could not find files for the given pattern(s).
+INFO: Could not find files for the given pattern(s).
+INFO: Could not find files for the given pattern(s).
+run branch sbx/b3-005-proof-20260815-b30005 created
+#=#=#
+##O#-#
+
+#########################################                                 58.3%
+######################################################################## 100.0%
+install: Repository:  https://github.com/casey/just
+install: Crate:       just
+install: Tag:         1.58.0
+install: Target:      x86_64-unknown-linux-musl
+install: Destination: /usr/local/bin
+install: Archive:     https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz
+No packages! Deleted empty lockfile
+Downloading pygments (1.2MiB)
+Downloading pydantic-core (2.0MiB)
+ Downloaded pydantic-core
+ Downloaded pygments
+Installed 11 packages in 8ms
+error: recipe `cmd` failed with exit code 1

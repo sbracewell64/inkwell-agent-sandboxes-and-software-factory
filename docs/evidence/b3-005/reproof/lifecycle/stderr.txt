@@ -1,0 +1,26 @@
+INFO: Could not find files for the given pattern(s).
+INFO: Could not find files for the given pattern(s).
+INFO: Could not find files for the given pattern(s).
+run branch sbx/b3-005-reproof-20260815-b30006 created
+
+                                                                           1.2%
+######################################################################## 100.0%
+install: Repository:  https://github.com/casey/just
+install: Crate:       just
+install: Tag:         1.58.0
+install: Target:      x86_64-unknown-linux-musl
+install: Destination: /usr/local/bin
+install: Archive:     https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz
+No packages! Deleted empty lockfile
+Downloading pydantic-core (2.0MiB)
+Downloading pygments (1.2MiB)
+ Downloaded pydantic-core
+ Downloaded pygments
+Installed 11 packages in 7ms
+[setup] FAILED: assertions C/D/E ΓÇö CNO/HOLD; required remote evidence unavailable
+[setup] the VM is still running on purpose ΓÇö the evidence is on the box:
+[setup]   ssh b3-005-reproof-20260815-b30006.exe.xyz
+[setup]   ssh b3-005-reproof-20260815-b30006.exe.xyz 'cd app && git status --porcelain'
+[setup]   ssh b3-005-reproof-20260815-b30006.exe.xyz 'pi --list-models'
+[setup] tear it down only when you are done: just sbx lifecycle teardown b3-005-reproof-20260815-b30006
+error: recipe `setup` failed with exit code 1

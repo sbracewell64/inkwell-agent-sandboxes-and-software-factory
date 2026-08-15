@@ -1,0 +1,65 @@
+candidate=f1e955051b7a0971d808bd0588fbe4551d7e5d62
+tree=50d5cc083e56f4b12df24786ff1c85d6cc893bb6
+branch=increment/b3-005-fresh-windows-clone-proof
+validated_utc=2026-08-15T15:56:00Z
+# branch.oid f1e955051b7a0971d808bd0588fbe4551d7e5d62
+# branch.head increment/b3-005-fresh-windows-clone-proof
+# branch.upstream origin/increment/b3-005-fresh-windows-clone-proof
+# branch.ab +1 -0
+f1e9550 docs: close reversible B3-005 pre-certification proof
+B3-002 line-ending contract: PASS
+policy: * text=auto eol=lf
+representative tracked text files have LF index state
+representative working-tree files are LF
+observed core.autocrlf: <unset>
+B2-002 sandbox source contract: PASS
+canonical origin: https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+current committed HEAD: f1e955051b7a0971d808bd0588fbe4551d7e5d62
+run record + FILL + SETUP provenance contract is present
+B1 agent bootstrap: PASS
+validated 7 durable entrypoints/references
+evidence manifests + closed JSON: PASS (40 manifest entries)
+bun test v1.3.14 (0d9b296a)
+
+apps\inkwell\server.test.ts:
+(pass) starts with an empty list [13.16ms]
+(pass) creates a post with defaults [5.24ms]
+(pass) full lifecycle: create → list → update → publish toggle → delete [42.09ms]
+(pass) list is ordered by updated_at DESC [32.47ms]
+(pass) unknown id returns 404 {error: 'not found'} on every route [1.71ms]
+(pass) malformed JSON body returns 400 with an error [0.30ms]
+(pass) word_count counts whitespace-split words [4.49ms]
+(pass) app.js cycles view mode on Cmd+Enter [21.54ms]
+(pass) index.html exposes the panes and the three mode buttons [26.85ms]
+(pass) style.css defines all three layouts [11.65ms]
+(pass) app.js wires mode state, buttons, and live preview [20.65ms]
+(pass) view-mode cycling: edit → split → preview → edit (behavioral, pure section) [21.85ms]
+(pass) preview rendering: markdown section renders headings, inline marks, lists, code (behavioral) [21.09ms]
+(pass) index.html contains shortcuts modal elements and visual key hints [23.96ms]
+(pass) app.js contains keydown handlers for Cmd+N, ?, and Escape [21.89ms]
+(pass) index.html contains focus mode and font size control elements [28.12ms]
+(pass) style.css contains focus-mode styles [12.07ms]
+(pass) app.js contains focus mode and font size handlers and shortcut listeners [20.58ms]
+(pass) creates post with target_word_count and updates it via PUT [10.27ms]
+(pass) index.html contains target word count, reading time, and goal elements [26.84ms]
+(pass) app.js contains reading time calculation and writing goal logic [20.78ms]
+(pass) GET /api/posts?q= filters posts by title or content (case-insensitive) [17.09ms]
+(pass) GET /api/posts/:id/stats returns post stats and 404 for unknown id [21.13ms]
+(pass) GET /api/stats returns counts of total, published, and draft posts, and total_words [16.13ms]
+(pass) index.html, app.js, and style.css contain search filter UI elements and logic [57.07ms]
+(pass) GET /api/tags returns distinct tag counts sorted by count DESC, tag ASC [45.39ms]
+(pass) style.css color variables meet WCAG AA contrast standards [10.31ms]
+(pass) index.html contains brand vector icon and relocated new-post button in list-head [25.41ms]
+(pass) style.css contains styles for brand icon, brand alignment, and list-head controls [11.75ms]
+(pass) theme tokens, light mode, and theme toggle controls are present [55.73ms]
+
+ 30 pass
+ 0 fail
+ 230 expect() calls
+Ran 30 tests across 1 file. [795.00ms]
+B3-004 sqlite-free observability: PASS
+stdlib sqlite3 serves sessions/phases/tail/procs
+ADW_ID queries are parameterized
+missing databases fail read-only without creation
+external sqlite3 CLI is absent
+post-commit exact-candidate validation: PASS

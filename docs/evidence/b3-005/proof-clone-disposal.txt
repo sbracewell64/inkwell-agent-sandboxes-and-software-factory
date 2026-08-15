@@ -1,0 +1,4 @@
+disposed_utc=2026-08-15T15:49:31Z
+proof_path=E:\SSSF-B3-005-PROOF-20260815-154222
+proof_path_absent=PASS
+approved_ignored_config_residue=ABSENT_WITH_DISPOSED_CLONE

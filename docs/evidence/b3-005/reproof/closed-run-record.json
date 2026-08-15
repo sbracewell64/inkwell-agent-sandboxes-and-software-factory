@@ -1,0 +1,16 @@
+{
+  "run_id": "b3-005-reproof-20260815-b30006",
+  "vm_name": "b3-005-reproof-20260815-b30006",
+  "https_url": "https://b3-005-reproof-20260815-b30006.exe.xyz",
+  "key_hash": "f974db06bc15e3a9e7528a0ecb8c82355ceb5ca31a34433691e9b56bb16f6ae1",
+  "limit": 50.0,
+  "spend": 0.0,
+  "session_id": "f1b41928-4517-453f-b00c-5bc83d7795ab",
+  "source_repo": "https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git",
+  "source_sha": "7aedae1c3e8e7d3683ffea11f60d54458efb3cc6",
+  "commit_sha": "7aedae1c3e8e7d3683ffea11f60d54458efb3cc6",
+  "ports": null,
+  "pid": null,
+  "created_at": "2026-08-15T16:09:17Z",
+  "closed_at": "2026-08-15T16:10:30Z"
+}

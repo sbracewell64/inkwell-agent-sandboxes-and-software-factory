@@ -1,0 +1,92 @@
+B3-005 ACCEPTANCE CORRECTION / REPROOF VALIDATION
+validated_utc=2026-08-15T16:14:42Z
+repair_candidate=7aedae1c3e8e7d3683ffea11f60d54458efb3cc6
+
+== calibrated contradictory all-PASS marker control ==
+setup C/D/E acceptance: FAIL
+reason: all-PASS marker contradicted failure diagnostics
+states: roster=PASS cost=PASS credit=PASS
+contradiction_exit=1
+contradiction rejected: RED as expected
+
+== first-proof legacy evidence control ==
+setup C/D/E acceptance: CNO/HOLD
+reason: expected exactly one result marker, observed 0
+first_proof_exit=3
+first proof classified CNO/HOLD as expected
+
+== repaired fresh live evidence control ==
+setup C/D/E acceptance: CNO/HOLD
+reason: expected exactly one result marker, observed 0
+reproof_exit=3
+reproof classified CNO/HOLD as expected
+downstream C/D/E/setup/observe PASS suppression: PASS
+
+== deterministic setup acceptance validator ==
+B3-005 setup C/D/E acceptance: PASS
+contradictory failure diagnostics cannot produce PASS
+missing, malformed, and unavailable evidence classify CNO/HOLD
+
+== project validators ==
+B3-002 line-ending contract: PASS
+policy: * text=auto eol=lf
+representative tracked text files have LF index state
+representative working-tree files are LF
+observed core.autocrlf: <unset>
+B2-002 sandbox source contract: PASS
+canonical origin: https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+current committed HEAD: 7aedae1c3e8e7d3683ffea11f60d54458efb3cc6
+run record + FILL + SETUP provenance contract is present
+B1 agent bootstrap: PASS
+validated 7 durable entrypoints/references
+
+== reproof manifests and closed record ==
+reproof manifests and closed run record: PASS (31 entries)
+
+== Python compile and Just parse ==
+Python compile and Just parse: PASS
+
+== Inkwell suite ==
+bun test v1.3.14 (0d9b296a)
+
+apps\inkwell\server.test.ts:
+(pass) starts with an empty list [11.33ms]
+(pass) creates a post with defaults [4.60ms]
+(pass) full lifecycle: create → list → update → publish toggle → delete [45.05ms]
+(pass) list is ordered by updated_at DESC [51.89ms]
+(pass) unknown id returns 404 {error: 'not found'} on every route [1.53ms]
+(pass) malformed JSON body returns 400 with an error [0.26ms]
+(pass) word_count counts whitespace-split words [7.60ms]
+(pass) app.js cycles view mode on Cmd+Enter [19.12ms]
+(pass) index.html exposes the panes and the three mode buttons [24.17ms]
+(pass) style.css defines all three layouts [9.43ms]
+(pass) app.js wires mode state, buttons, and live preview [18.01ms]
+(pass) view-mode cycling: edit → split → preview → edit (behavioral, pure section) [19.46ms]
+(pass) preview rendering: markdown section renders headings, inline marks, lists, code (behavioral) [19.15ms]
+(pass) index.html contains shortcuts modal elements and visual key hints [20.43ms]
+(pass) app.js contains keydown handlers for Cmd+N, ?, and Escape [19.50ms]
+(pass) index.html contains focus mode and font size control elements [21.25ms]
+(pass) style.css contains focus-mode styles [9.02ms]
+(pass) app.js contains focus mode and font size handlers and shortcut listeners [18.38ms]
+(pass) creates post with target_word_count and updates it via PUT [9.17ms]
+(pass) index.html contains target word count, reading time, and goal elements [20.53ms]
+(pass) app.js contains reading time calculation and writing goal logic [19.63ms]
+(pass) GET /api/posts?q= filters posts by title or content (case-insensitive) [14.98ms]
+(pass) GET /api/posts/:id/stats returns post stats and 404 for unknown id [18.47ms]
+(pass) GET /api/stats returns counts of total, published, and draft posts, and total_words [24.28ms]
+(pass) index.html, app.js, and style.css contain search filter UI elements and logic [48.86ms]
+(pass) GET /api/tags returns distinct tag counts sorted by count DESC, tag ASC [47.53ms]
+(pass) style.css color variables meet WCAG AA contrast standards [9.82ms]
+(pass) index.html contains brand vector icon and relocated new-post button in list-head [23.23ms]
+(pass) style.css contains styles for brand icon, brand alignment, and list-head controls [9.50ms]
+(pass) theme tokens, light mode, and theme toggle controls are present [52.05ms]
+
+ 30 pass
+ 0 fail
+ 230 expect() calls
+Ran 30 tests across 1 file. [756.00ms]
+
+== hygiene/security ==
+whitespace and reproof credential-value scan: PASS
+
+acceptance correction/reproof validation: PASS; end-to-end remains CNO/HOLD

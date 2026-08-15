@@ -1,0 +1,127 @@
+B3-005 FINAL VALIDATION PRE-COMMIT
+2026-08-15T15:54:37Z
+
+== calibrated red: line-ending validator ==
+B3-002 line-ending contract: FAIL
+- justfile: working-tree state is 'w/crlf', expected 'w/lf'
+negative_control_exit=1
+negative control RED as expected
+
+== real line-ending validator ==
+B3-002 line-ending contract: PASS
+policy: * text=auto eol=lf
+representative tracked text files have LF index state
+representative working-tree files are LF
+observed core.autocrlf: <unset>
+
+== calibrated red: sandbox source-contract validator ==
+B2-002 sandbox source contract: FAIL
+- fill.just missing contract element: git remote get-url origin
+- origin is '/home/shane/.treehouse/sssf-4223d9/1/sssf/.', expected canonical repository
+negative_control_exit=1
+negative control RED as expected
+
+== real sandbox source-contract validator ==
+B2-002 sandbox source contract: PASS
+canonical origin: https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+current committed HEAD: 5246d36c0f12c678668f3bf42a47713a5a4ec2a6
+run record + FILL + SETUP provenance contract is present
+
+== agent bootstrap validator ==
+B1 agent bootstrap: PASS
+validated 7 durable entrypoints/references
+
+== repository ownership validator in isolated complete-ref clone ==
+B2-001 repository ownership: PASS
+origin is canonical
+upstream is reference-only
+local main tracks canonical origin/main
+canonical main descends from proven B2-001
+all immutable proven refs resolve exactly
+
+== evidence manifest calibrated red and real checks ==
+negative control RED as expected: deliberately wrong digest mismatched
+evidence manifests: PASS (40 files)
+
+== retained JSON and three-valued closure controls ==
+closed run record and explicit CNO/HOLD/FAIL rows: PASS
+
+== Python compile ==
+Python compile: PASS
+
+== hygiene ==
+git diff --check: PASS
+
+== sensitive-value scan ==
+sensitive-value scan: PASS
+
+== Inkwell calibrated red ==
+bun test v1.3.14 (0d9b296a)
+The following filters did not match any test files:
+ apps/inkwell/definitely-missing-b3-005.test.ts
+328 files were searched [67.00ms]
+
+note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
+note: To treat the "apps/inkwell/definitely-missing-b3-005.test.ts" filter as a path, run "bun test ./apps/inkwell/definitely-missing-b3-005.test.ts"
+
+Learn more about bun test: https://bun.com/docs/cli/test
+negative_control_exit=1
+negative control RED as expected
+
+== Inkwell real suite ==
+bun test v1.3.14 (0d9b296a)
+
+apps\inkwell\server.test.ts:
+(pass) starts with an empty list [14.29ms]
+(pass) creates a post with defaults [5.01ms]
+(pass) full lifecycle: create → list → update → publish toggle → delete [41.02ms]
+(pass) list is ordered by updated_at DESC [44.71ms]
+(pass) unknown id returns 404 {error: 'not found'} on every route [1.90ms]
+(pass) malformed JSON body returns 400 with an error [0.39ms]
+(pass) word_count counts whitespace-split words [5.26ms]
+(pass) app.js cycles view mode on Cmd+Enter [22.80ms]
+(pass) index.html exposes the panes and the three mode buttons [27.38ms]
+(pass) style.css defines all three layouts [12.09ms]
+(pass) app.js wires mode state, buttons, and live preview [20.74ms]
+(pass) view-mode cycling: edit → split → preview → edit (behavioral, pure section) [21.23ms]
+(pass) preview rendering: markdown section renders headings, inline marks, lists, code (behavioral) [22.55ms]
+(pass) index.html contains shortcuts modal elements and visual key hints [26.28ms]
+(pass) app.js contains keydown handlers for Cmd+N, ?, and Escape [22.22ms]
+(pass) index.html contains focus mode and font size control elements [25.70ms]
+(pass) style.css contains focus-mode styles [11.62ms]
+(pass) app.js contains focus mode and font size handlers and shortcut listeners [20.56ms]
+(pass) creates post with target_word_count and updates it via PUT [12.19ms]
+(pass) index.html contains target word count, reading time, and goal elements [25.77ms]
+(pass) app.js contains reading time calculation and writing goal logic [22.01ms]
+(pass) GET /api/posts?q= filters posts by title or content (case-insensitive) [16.64ms]
+(pass) GET /api/posts/:id/stats returns post stats and 404 for unknown id [21.22ms]
+(pass) GET /api/stats returns counts of total, published, and draft posts, and total_words [17.99ms]
+(pass) index.html, app.js, and style.css contain search filter UI elements and logic [61.05ms]
+(pass) GET /api/tags returns distinct tag counts sorted by count DESC, tag ASC [45.82ms]
+(pass) style.css color variables meet WCAG AA contrast standards [10.84ms]
+(pass) index.html contains brand vector icon and relocated new-post button in list-head [25.42ms]
+(pass) style.css contains styles for brand icon, brand alignment, and list-head controls [11.85ms]
+(pass) theme tokens, light mode, and theme toggle controls are present [58.08ms]
+
+ 30 pass
+ 0 fail
+ 230 expect() calls
+Ran 30 tests across 1 file. [831.00ms]
+
+== Windows B3-004 validator ==
+B3-004 sqlite-free observability: PASS
+stdlib sqlite3 serves sessions/phases/tail/procs
+ADW_ID queries are parameterized
+missing databases fail read-only without creation
+external sqlite3 CLI is absent
+
+== PowerShell proof harness parser calibrated red ==
+\\wsl.localhost\Ubuntu\home\shane\.treehouse\sssf-4223d9\1\sssf\docs\evidence\B3-005_WINDOWS_NATIVE_PROOF.ps1 : Cannot
+validate argument on parameter 'Phase'. The argument "invalid" does not belong to the set
+"bootstrap,lifecycle,teardown" specified by the ValidateSet attribute. Supply an argument that is in the set and then
+try the command again.
+    + CategoryInfo          : InvalidData: (:) [B3-005_WINDOWS_NATIVE_PROOF.ps1], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : ParameterArgumentValidationError,B3-005_WINDOWS_NATIVE_PROOF.ps1
+
+negative_parameter_control_exit=1
+PowerShell parser reached parameter validation: PASS

@@ -1,0 +1,8 @@
+FAILED_PROOF_HEAD=5ac8c302a4841a5fd046e99dcab0af0cda172e06
+FAILED_PROOF_STATUS_BEGIN
+# branch.oid 5ac8c302a4841a5fd046e99dcab0af0cda172e06
+# branch.head increment/b3-005-fresh-windows-clone-proof
+# branch.upstream origin/increment/b3-005-fresh-windows-clone-proof
+# branch.ab +0 -0
+FAILED_PROOF_DIFF_BEGIN
+FAILED_PROOF_DIFF_END

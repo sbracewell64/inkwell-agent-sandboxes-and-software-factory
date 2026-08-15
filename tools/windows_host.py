@@ -675,6 +675,25 @@ def doctor(
             "B3-004 validator PASS",
         )
 
+    setup_acceptance = run(
+        [
+            sys.executable,
+            "docs/validation/"
+            "check_setup_cde_acceptance.py",
+        ]
+    )
+
+    if setup_acceptance.returncode != 0:
+        d.fail(
+            "setup C/D/E acceptance",
+            setup_acceptance.stdout.strip(),
+        )
+    else:
+        d.ok(
+            "setup C/D/E acceptance",
+            "B3-005 validator PASS",
+        )
+
     root_front = run(
         ["just"]
     )

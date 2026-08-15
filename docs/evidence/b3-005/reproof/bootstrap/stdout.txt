@@ -1,0 +1,107 @@
+phase=bootstrap
+started_utc=Sat 08/15/2026 12:08:36.30
+proof_path=E:\SSSF-B3-005-REPROOF-20260815-160826
+evidence_path=E:\SSSF-B3-005-REPROOF-EVIDENCE-20260815-160826\bootstrap
+expected_sha=7aedae1c3e8e7d3683ffea11f60d54458efb3cc6
+process_architecture=AMD64
+comspec=C:\WINDOWS\system32\cmd.exe
+prebootstrap_path=C:\Program Files (x86)\Common Files\Oracle\Java\java8path;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\dotnet\;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Google\Cloud SDK\google-cloud-sdk\bin;C:\Program Files\Git\cmd;C:\Program Files\Mullvad VPN\resources;C:\Users\shane\AppData\Local\Programs\Herdr\bin;C:\Users\shane\AppData\Local\codegraph\current\bin;C:\Users\shane\AppData\Local\Programs\Python\Python311\Scripts\;C:\Users\shane\AppData\Local\Programs\Python\Python311\;C:\Users\shane\AppData\Local\Programs\Python\Python313\Scripts\;C:\Users\shane\AppData\Local\Programs\Python\Python313\;C:\Users\shane\AppData\Local\Programs\Python\Launcher\;C:\Users\shane\AppData\Local\Microsoft\WindowsApps;C:\Users\shane\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin;C:\Users\shane\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\shane\AppData\Local\Programs\Ollama;C:\Program Files\nodejs;C:\Users\shane\AppData\Roaming\npm;C:\Users\shane\.local\bin;C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin;C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\Users\shane\.bun\bin
+--- pre-bootstrap executable resolution ---
+C:\Program Files\Git\cmd\git.exe
+where_git_exit=0
+C:\Users\shane\.local\bin\just.exe
+where_just_exit=0
+C:\Windows\System32\OpenSSH\ssh.exe
+where_ssh_exit=0
+where_sh_exit=1
+where_cygpath_exit=1
+where_zsh_exit=1
+negative_control_git_bin_absent=PASS
+negative_control_git_usr_bin_absent=PASS
+exact_clone_command=git clone --single-branch --branch increment/b3-005-fresh-windows-clone-proof https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git E:\SSSF-B3-005-REPROOF-20260815-160826
+--- exact clone identity ---
+7aedae1c3e8e7d3683ffea11f60d54458efb3cc6
+# branch.oid 7aedae1c3e8e7d3683ffea11f60d54458efb3cc6
+# branch.head increment/b3-005-fresh-windows-clone-proof
+# branch.upstream origin/increment/b3-005-fresh-windows-clone-proof
+# branch.ab +0 -0
+origin	https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git (fetch)
+origin	https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git (push)
+--- root front doors before bootstrap ---
+Available recipes:
+    default     # list commands
+    adw ...     # the ADWs themselves: just adw sdlc "..."
+    inkwell ... # boot and test the Inkwell app itself
+    local ...   # boot an orchestrator agent that works on THIS machine
+    obs ...     # read the trace db: sessions, phases, tail, procs
+    sbx ...     # sandbox orchestration: mount, execute, observe, tear down VMs
+Available recipes:
+    cc      # Claude Code orchestrator ΓÇö reads the sssf overview, then handles your ask
+    default # list the local commands
+    pi      # Pi orchestrator ΓÇö same posture, pi harness
+--- approved ignored host configuration ---
+.gitignore:112:.env	.env
+staged_config_name=OPENROUTER_PROVISIONING_KEY
+staged_config_value=REDACTED
+--- repository bootstrap and composed doctor ---
+SSSF Windows host doctor
+  ok    Windows host ù Windows_NT
+  ok    repository checkout ù E:\SSSF-B3-005-REPROOF-20260815-160826
+  ok    Git for Windows root ù C:\Program Files\Git
+  ok    PATH uniqueness ù 32 unique entries
+  ok    PATH contains ù C:\Program Files\Git\bin
+  ok    PATH contains ù C:\Program Files\Git\usr\bin
+  ok    git ù C:\Program Files\Git\bin\git.EXE [git version 2.53.0.windows.2]
+  ok    sh ù C:\Program Files\Git\bin\sh.EXE [GNU bash, version 5.2.37(1)-release (x86_64-pc-msys)]
+  ok    cygpath ù C:\Program Files\Git\usr\bin\cygpath.EXE [cygpath (cygwin) 3.6.6]
+  ok    ssh ù C:\Program Files\Git\usr\bin\ssh.EXE [OpenSSH_10.2p1, OpenSSL 3.5.5 27 Jan 2026]
+  ok    python ù C:\Users\shane\AppData\Local\Programs\Python\Python311\python.EXE [Python 3.11.9]
+  ok    python3 ù C:\Users\shane\AppData\Local\Microsoft\WindowsApps\python3.EXE [Python 3.13.5]
+  ok    bun ù C:\Users\shane\.bun\bin\bun.EXE [1.3.14]
+  ok    uv ù C:\Users\shane\.local\bin\uv.EXE [uv 0.12.3 (507230998 2026-08-07 x86_64-pc-windows-msvc)]
+  ok    just ù C:\Users\shane\.local\bin\just.EXE [just 1.58.0]
+  ok    gh ù C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin\gh.EXE [gh version 2.96.0 (2026-07-02)]
+  ok    Git Bash selection ù C:\Program Files\Git\bin\sh.EXE
+  ok    cygpath selection ù C:\Program Files\Git\usr\bin\cygpath.EXE
+  ok    SSH selection ù C:\Program Files\Git\usr\bin\ssh.EXE
+  ok    python compatibility ù 3.11.9
+  ok    python3 compatibility ù 3.13.5
+  ok    just compatibility ù 1.58.0
+  ok    canonical origin ù https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git
+  ok    line-ending contract ù B3-002 validator PASS
+  ok    observability query contract ù B3-004 validator PASS
+  ok    setup C/D/E acceptance ù B3-005 validator PASS
+  ok    root `just` front door ù default recipe runs
+  ok    `just local` front door ù default recipe runs
+  ok    ssh config exe.dev ù dedicated identity + accept-new policy resolved
+  ok    ssh config b3-host-probe.exe.xyz ù dedicated identity + accept-new policy resolved
+  info  external sqlite3 ù absent; host observability uses Python stdlib sqlite3
+  info  zsh ù absent; not required on Windows after B3-003
+  info  claude ù C:\Users\shane\.local\bin\claude.EXE
+  info  pi ù C:\Users\shane\AppData\Roaming\npm\pi.CMD
+  info  herdr ù C:\Users\shane\AppData\Local\Programs\Herdr\bin\herdr.EXE
+  ok    sandbox doctor ù sbx doctor: OK
+SSSF Windows host doctor: OK
+
+SSSF Windows session ready.
+repo: E:\SSSF-B3-005-REPROOF-20260815-160826
+next: just
+postbootstrap_path=C:\Program Files\Git\bin;C:\Program Files\Git\usr\bin;C:\Users\shane\.local\bin;C:\Users\shane\.bun\bin;C:\Program Files (x86)\Common Files\Oracle\Java\java8path;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\dotnet\;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Google\Cloud SDK\google-cloud-sdk\bin;C:\Program Files\Git\cmd;C:\Program Files\Mullvad VPN\resources;C:\Users\shane\AppData\Local\Programs\Herdr\bin;C:\Users\shane\AppData\Local\codegraph\current\bin;C:\Users\shane\AppData\Local\Programs\Python\Python311\Scripts\;C:\Users\shane\AppData\Local\Programs\Python\Python311\;C:\Users\shane\AppData\Local\Programs\Python\Python313\Scripts\;C:\Users\shane\AppData\Local\Programs\Python\Python313\;C:\Users\shane\AppData\Local\Programs\Python\Launcher\;C:\Users\shane\AppData\Local\Microsoft\WindowsApps;C:\Users\shane\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin;C:\Users\shane\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\shane\AppData\Local\Programs\Ollama;C:\Program Files\nodejs;C:\Users\shane\AppData\Roaming\npm;C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin;C:\Users\shane\AppData\Local\Microsoft\WinGet\Packages\jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe
+C:\Program Files\Git\bin\sh.exe
+C:\Program Files\Git\usr\bin\sh.exe
+C:\Program Files\Git\usr\bin\cygpath.exe
+C:\Program Files\Git\usr\bin\ssh.exe
+C:\Windows\System32\OpenSSH\ssh.exe
+--- B3-004 sqlite-free observability ---
+where_sqlite3_exit=1
+B3-004 sqlite-free observability: PASS
+stdlib sqlite3 serves sessions/phases/tail/procs
+ADW_ID queries are parameterized
+missing databases fail read-only without creation
+external sqlite3 CLI is absent
+--- proof clone tracked state ---
+# branch.oid 7aedae1c3e8e7d3683ffea11f60d54458efb3cc6
+# branch.head increment/b3-005-fresh-windows-clone-proof
+# branch.upstream origin/increment/b3-005-fresh-windows-clone-proof
+# branch.ab +0 -0
+bootstrap_phase=PASS
