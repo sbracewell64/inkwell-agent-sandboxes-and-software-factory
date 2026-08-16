@@ -26,12 +26,30 @@ from adws.adw_modules.pi_json_adapter import (  # noqa: E402
 from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
     AttemptBudget,
     Observation,
+    SupervisorRequest,
     TerminalState,
     correction_attempt_budget,
+    supervise,
 )
 
 FIXTURE = ROOT / "docs" / "validation" / "fixtures" / "fake_pi_child.py"
 TYPED_TAIL = "typed-parent-tail-marker"
+
+
+class DeferredCancellation:
+    """Cancellation that becomes set after its first observation.
+
+    This drives the pre-launch setup window deterministically: the first
+    observation, before the attempt is claimed, sees no cancellation, and every
+    later observation sees one. It is a race driver, not an expected answer.
+    """
+
+    def __init__(self) -> None:
+        self.observations = 0
+
+    def is_set(self) -> bool:
+        self.observations += 1
+        return self.observations > 1
 
 
 def check(condition: bool, message: str, errors: list[str]) -> None:
@@ -345,6 +363,102 @@ def runtime_fixtures(errors: list[str]) -> None:
         assert_reason(cancelled, "cancelled", Observation.COULD_NOT_OBSERVE, errors)
         check(cancelled.cancelled and cancelled.cleanup.reaped, "live cancellation cleanup incomplete", errors)
 
+        # Cancellation after a claim keeps its spent attempt: the claim is real
+        # work and is never refunded to make accounting look cheaper.
+        after_claim_budget = AttemptBudget(1)
+        after_claim_cancel = threading.Event()
+        timer = threading.Timer(0.08, after_claim_cancel.set)
+        timer.start()
+        after_claim = run_pi_json(
+            request(temp, "slow-success", phase_id="cancel-after-claim"),
+            budget=after_claim_budget,
+            cancel_event=after_claim_cancel,
+        )
+        timer.join()
+        assert_reason(after_claim, "cancelled", Observation.COULD_NOT_OBSERVE, errors)
+        check(after_claim.cancelled and after_claim.process is not None, "cancellation after a claim lost its process identity", errors)
+        check(
+            after_claim_budget.used == 1 and after_claim.attempts.native_attempts == 1 and after_claim.attempts.supervisor_attempt == 1,
+            f"cancellation after a claim refunded its attempt: used={after_claim_budget.used} attempts={after_claim.attempts.native_attempts}",
+            errors,
+        )
+
+        # Negative control: a cancellation already set before invocation must be
+        # observed before the attempt budget is touched, so nothing is claimed,
+        # nothing is spawned, and no callback is invoked.
+        preset_budget = AttemptBudget(1)
+        preset_cancel = threading.Event()
+        preset_cancel.set()
+        preset_spawned: list[int] = []
+        preset_exited: list[int] = []
+        preset_events: list[str] = []
+        preset = run_pi_json(
+            request(temp, "success", phase_id="cancel-preset"),
+            budget=preset_budget,
+            cancel_event=preset_cancel,
+            on_event=lambda event: preset_events.append(event["type"]),
+            on_spawn=preset_spawned.append,
+            on_exit=preset_exited.append,
+        )
+        assert_reason(preset, "cancelled-before-launch", Observation.COULD_NOT_OBSERVE, errors)
+        check(preset.cancelled, "pre-set cancellation was not typed as cancelled", errors)
+        check(preset_budget.used == 0, f"pre-set cancellation consumed attempt budget: used={preset_budget.used}", errors)
+        check(
+            preset.attempts.native_attempts == 0 and preset.attempts.supervisor_attempt is None,
+            f"pre-set cancellation claimed a native attempt: {preset.attempts}",
+            errors,
+        )
+        check(preset.process is None and not preset.provider_launched, "pre-set cancellation produced a provider process", errors)
+        check(
+            preset.cleanup.custodian_pid is None and not preset.cleanup.attempted,
+            f"pre-set cancellation produced a custodian: {preset.cleanup.detail}",
+            errors,
+        )
+        check(
+            not preset_spawned and not preset_exited and not preset_events,
+            f"pre-set cancellation invoked callbacks: spawn={preset_spawned} exit={preset_exited} event={preset_events}",
+            errors,
+        )
+
+        # Negative control: a cancellation arriving inside the pre-launch setup
+        # window must fail closed before the custodian starts, while still
+        # keeping the attempt it already claimed.
+        setup_budget = AttemptBudget(1)
+        setup_cancel = DeferredCancellation()
+        setup_spawned: list[int] = []
+        setup_exited: list[int] = []
+        environment = safe_environment()
+        setup_result = supervise(
+            SupervisorRequest(
+                argv=[str(FIXTURE), "--print", "--mode", "json", "success"],
+                cwd=str(ROOT),
+                environment=environment,
+                environment_allowlist=frozenset(environment),
+                timeout_seconds=2.0,
+                term_grace_seconds=0.15,
+                verification_grace_seconds=0.6,
+            ),
+            budget=setup_budget,
+            cancel_event=setup_cancel,
+            on_spawn=setup_spawned.append,
+            on_exit=setup_exited.append,
+        )
+        assert_reason(setup_result, "cancelled-before-launch", Observation.COULD_NOT_OBSERVE, errors)
+        check(setup_cancel.observations >= 2, "pre-launch setup never rechecked cancellation before the custodian", errors)
+        check(setup_result.cancelled, "pre-launch setup cancellation was not typed as cancelled", errors)
+        check(
+            setup_budget.used == 1 and setup_result.attempt_number == 1,
+            f"pre-launch setup cancellation refunded its claimed attempt: used={setup_budget.used}",
+            errors,
+        )
+        check(setup_result.process is None, "pre-launch setup cancellation launched a provider process", errors)
+        check(
+            setup_result.cleanup.custodian_pid is None and not setup_result.cleanup.attempted,
+            f"pre-launch setup cancellation started a custodian: {setup_result.cleanup.detail}",
+            errors,
+        )
+        check(not setup_spawned and not setup_exited, "pre-launch setup cancellation invoked spawn/exit callbacks", errors)
+
         late_cancel = threading.Event()
         timer = threading.Timer(0.25, late_cancel.set)
         timer.start()
@@ -446,7 +560,7 @@ def main() -> int:
             print(f"FAIL: {error}")
         return 1
     print("executor-supervisor: PASS")
-    print("watched-red: inherited stdin, malformed/missing/duplicate terminal, structured shell-zero error, hidden retry, timeout, overflow, cancellation")
+    print("watched-red: inherited stdin, malformed/missing/duplicate terminal, structured shell-zero error, hidden retry, timeout, overflow, cancellation (live, late, pre-set, pre-launch-setup)")
     print("provider-calls: 0")
     return 0
 

@@ -188,6 +188,20 @@ def _refusal(code: str, detail: str, started: float, budget: AttemptBudget) -> S
     )
 
 
+def _cancelled_before_launch(detail: str, started: float, budget: AttemptBudget, attempt_number: int | None) -> SupervisedResult:
+    """Refuse a launch that cancellation preempted, with explicit accounting.
+
+    A cancellation observed before any claim leaves the budget untouched and
+    reports no attempt.  A claim already taken stays taken: spent budget is
+    never refunded to make accounting look cheaper.
+    """
+    return replace(
+        _refusal("cancelled-before-launch", detail, started, budget),
+        cancelled=True,
+        attempt_number=attempt_number,
+    )
+
+
 def _validate(request: SupervisorRequest) -> str | None:
     if not request.argv or any(not isinstance(arg, str) or not arg or "\0" in arg for arg in request.argv):
         return "argv must be a nonempty array of nonempty NUL-free strings"
@@ -688,6 +702,16 @@ def supervise(
     invalid = _validate(request)
     if invalid:
         return _refusal("invalid-launch-contract", invalid, started, budget)
+    # Cancellation is observed before the budget is touched.  Platform and
+    # contract refusals keep precedence because they are pure and name a more
+    # specific defect, but neither claims an attempt, so no spend precedes this.
+    if cancel_event is not None and cancel_event.is_set():
+        return _cancelled_before_launch(
+            "cancellation was already observed before any native attempt was claimed",
+            started,
+            budget,
+            None,
+        )
     attempt_number = budget.claim()
     if attempt_number is None:
         return _refusal("attempt-budget-exhausted", "total native attempt budget was already spent", started, budget)
@@ -712,6 +736,18 @@ def supervise(
             args=(child_connection, request, budget.total, attempt_number, helper_cancel),
             daemon=False,
         )
+        # Recheck immediately before the custodian exists: a cancellation that
+        # arrived during pre-launch setup fails closed here rather than
+        # proceeding into an avoidable helper and provider launch.  The claim
+        # taken above is still spent and is reported as such.
+        if cancel_event is not None and cancel_event.is_set():
+            helper = None
+            return _cancelled_before_launch(
+                "cancellation was observed during pre-launch setup, before the custodian was started",
+                started,
+                budget,
+                attempt_number,
+            )
         helper.start()
         child_connection.close()
         child_connection = None

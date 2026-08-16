@@ -29,7 +29,8 @@ bounded and deterministic without calling a provider.
 - closed stdin;
 - monotonic wall timeout and cancellation;
 - bounded stdout/stderr bytes;
-- a shared native-attempt budget;
+- a shared native-attempt budget claimed only after cancellation is observed,
+  plus a recheck immediately before the custodian starts;
 - a new Unix process group, TERM grace, KILL escalation, child reap, Linux
   descendant identity tracking, escaped-descendant cleanup, and bounded
   group/descendant absence verification;
@@ -80,7 +81,8 @@ cover:
 8. escaped, immediate-parent-exit, and TERM-handler late-fork descendants that
    must be killed and verified absent;
 9. stdout and event overflow;
-10. live and late cancellation races;
+10. live and late cancellation races, a cancellation already set before
+    invocation, and a cancellation arriving during pre-launch setup;
 11. custodian startup/IPC, spawn callback, event callback, and evidence-storage
     failures with typed CNO and retained primary evidence where observable;
 12. explicit unsupported-Windows Job Object refusal;
@@ -111,6 +113,31 @@ Subsequent executable corrections make this ruling provenance only. The current
 candidate requires fresh exact-candidate review and fresh nonempty Linux and
 Windows checks before landing; neither acceptance nor checks may be inferred
 from ruling `5304605032` or run `31911734134`.
+
+## Pre-launch cancellation correction
+
+Review of head `64fbd0e3be7383e7cd5294eba6923d686d012c51` found that
+`supervise()` claimed the attempt budget and started the custodian before it
+observed cancellation at all, so a cancellation already set at entry still
+spent budget and still launched a provider. The correction observes
+cancellation before `budget.claim()` and rechecks it immediately before the
+custodian starts, returning typed `cancelled-before-launch` /
+`could-not-observe` with `cancelled` set.
+
+Accounting stays explicit rather than convenient:
+
+- observed before any claim: no attempt number, no budget use, no custodian or
+  provider identity, and no spawn, exit, or event callback;
+- observed after a claim: the claim is already spent and stays spent, and the
+  result reports that attempt number. Spent work is never refunded to make
+  accounting look cheaper.
+
+Both branches are proven by fixtures that were first watched red against the
+unfixed head. The pre-set control failed there for the intended reason: it
+consumed one attempt, produced a provider process, produced a custodian, and
+invoked both spawn and exit callbacks. Platform and contract refusals keep
+precedence over the cancellation check because they are pure and name a more
+specific defect, and neither claims an attempt.
 
 ## Refusal conditions
 
@@ -143,6 +170,11 @@ no-tools/read-only transport and accounting adapters remain separate.
 - Coordinator failure requests cleanup over duplex IPC and waits for an
   empty-tree acknowledgement; missing acknowledgement is cleanup-unverified
   with custodian identity, and the coordinator never kills the subreaper.
+- Cancellation observed after the custodian starts remains governed by the
+  existing duplex cleanup protocol: the provider may already be live, so that
+  case still spends its attempt and is typed `cancelled` with verified cleanup
+  rather than refused. This correction narrows the pre-launch window only; it
+  does not claim the post-launch window never launches a provider.
 - No credential transport is part of this increment, so it does not by itself
   authorize a live provider call.
 - Raw callbacks occur after bounded output is durably retained, not live during
