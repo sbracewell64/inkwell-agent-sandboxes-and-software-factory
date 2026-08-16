@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "_doc": [
+    "Which paths MUST stay in step between the live ADW surface and the SSSF skill",
+    "template surface, and which MAY diverge.",
+    "",
+    "Pair roots come from .claude/skills/sssf/cookbooks/install.md's stamp table.",
+    "The two surfaces are NOT a subtree mirror: install.py maps",
+    "templates/prompt_engineering -> adws/adw_data/prompt_engineering, and",
+    "templates/sssf.config.yaml -> adws/adw_sssf_config/sssf.config.yaml.",
+    "",
+    "policy=mirrored      every file under the pair must be byte-identical, and the",
+    "                     file sets must match, unless a divergence entry says why.",
+    "divergences          per-path escapes from a mirrored pair. Each MUST carry a",
+    "                     reason and evidence, so an escape is a reviewed decision",
+    "                     rather than an accident that stopped failing."
+  ],
+  "pairs": [
+    {
+      "id": "adw-scripts",
+      "live": "adws",
+      "template": ".claude/skills/sssf/templates/adws",
+      "glob": "adw_*.py",
+      "recursive": false,
+      "policy": "mirrored"
+    },
+    {
+      "id": "adw-modules",
+      "live": "adws/adw_modules",
+      "template": ".claude/skills/sssf/templates/adws/adw_modules",
+      "glob": "*.py",
+      "recursive": false,
+      "policy": "mirrored"
+    },
+    {
+      "id": "prompt-engineering",
+      "live": "adws/adw_data/prompt_engineering",
+      "template": ".claude/skills/sssf/templates/prompt_engineering",
+      "glob": "*.md",
+      "recursive": true,
+      "policy": "mirrored"
+    },
+    {
+      "id": "harness-engineering",
+      "live": "adws/adw_data/harness_engineering",
+      "template": ".claude/skills/sssf/templates/harness_engineering",
+      "glob": "*.ts",
+      "recursive": true,
+      "policy": "mirrored"
+    }
+  ],
+  "divergences": [
+    {
+      "pair": "adw-modules",
+      "path": "quality.py",
+      "kind": "content",
+      "reason": "The template ships deliberately genericized placeholder blocks; the live copy is wired to Inkwell's real commands. A stamped repo cannot guess its own test runner, so the template must NOT carry Inkwell's argv.",
+      "evidence": ".claude/skills/sssf/templates/adws/adw_modules/quality.py banner 'REPLACE THE PLACEHOLDER COMMANDS BELOW'; docs/increments/HD-02_ADW_SYNCHRONIZATION.md pins the shared API names run_inkwell_tests/run_inkwell_quality as the contract instead of the bodies."
+    },
+    {
+      "pair": "adw-modules",
+      "path": "pi_json_adapter.py",
+      "kind": "live_only",
+      "reason": "UNRESOLVED INTENT — landed live-only by B4-002 (PR 7, 923c0e4) and currently dormant: no module under adws/ imports it. Held out of the template pending a decision, NOT because divergence was shown to be intended. Do not copy to clear this entry; decide it.",
+      "evidence": "docs/baseline/PROOF_MATRIX.md:100 asserts the shipped ADW path is unchanged by B4-002; docs/increments/B4-002_EXECUTOR_SUPERVISOR.md 'Boundaries and non-goals' is silent on the skill template surface."
+    },
+    {
+      "pair": "adw-modules",
+      "path": "subprocess_supervisor.py",
+      "kind": "live_only",
+      "reason": "UNRESOLVED INTENT — same landing and same dormancy as pi_json_adapter.py. Held out of the template pending a decision, NOT because divergence was shown to be intended. Do not copy to clear this entry; decide it.",
+      "evidence": "docs/baseline/PROOF_MATRIX.md:100; docs/increments/B4-002_EXECUTOR_SUPERVISOR.md 'Boundaries and non-goals' is silent on the skill template surface."
+    }
+  ],
+  "unpaired": [
+    {
+      "live": "adws/adw_sssf_config/sssf.config.yaml",
+      "template": ".claude/skills/sssf/templates/sssf.config.yaml",
+      "reason": "User-owned agent roster. install.md marks it user-owned and warns that --force overwrites operator edits, so the stamped starter roster and a repo's live roster are meant to diverge the moment they are stamped.",
+      "evidence": ".claude/skills/sssf/cookbooks/install.md:19,34"
+    },
+    {
+      "live": "adws/adw_sssf_config/sssf.deepestseek.config.yaml",
+      "template": null,
+      "reason": "Live-only alternate roster; install.py stamps exactly one config. Alternate rosters are a live-surface concept.",
+      "evidence": ".claude/skills/sssf/cookbooks/install.md:19; .claude/skills/sssf/references/config.md:5 (--config/SSSF_CONFIG selects another roster)"
+    },
+    {
+      "live": "adws/adw_sssf_config/sssf.frontier.config.yaml",
+      "template": null,
+      "reason": "Live-only alternate roster; see sssf.deepestseek.config.yaml.",
+      "evidence": "docs/baseline/PROOF_MATRIX.md:99 counts 'five rosters' as a live-surface property."
+    },
+    {
+      "live": "adws/adw_sssf_config/sssf.open-weights.config.yaml",
+      "template": null,
+      "reason": "Live-only alternate roster; see sssf.deepestseek.config.yaml.",
+      "evidence": "docs/baseline/PROOF_MATRIX.md:99"
+    },
+    {
+      "live": "adws/adw_sssf_config/sssf.top-speed.config.yaml",
+      "template": null,
+      "reason": "Live-only alternate roster; see sssf.deepestseek.config.yaml.",
+      "evidence": "docs/baseline/PROOF_MATRIX.md:99"
+    }
+  ]
+}
