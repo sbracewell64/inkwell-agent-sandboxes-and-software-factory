@@ -35,4 +35,5 @@ if errorlevel 1 exit /b %errorlevel%
 echo.
 echo SSSF Windows session ready.
 echo repo: %SSSF_ROOT%
+echo line endings: python docs/validation/check_line_endings.py --require-worktree-lf
 echo next: just

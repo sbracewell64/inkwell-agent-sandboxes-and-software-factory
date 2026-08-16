@@ -2,8 +2,26 @@
 
 ## Preflight
 
+On Windows, the bootstrap/host doctor owns the composed host preflight:
+
 ```bat
-just sbx manage doctor
+bin\sssf-windows.cmd --sandbox
+```
+
+Its line-ending check is exactly:
+
+```bat
+python docs/validation/check_line_endings.py --require-worktree-lf
+```
+
+On every host, the same strict validator is authoritative; a `FAIL` or `CNO`
+outcome is terminal and never rewrites the working tree. See
+[`INSTALL_WINDOWS.md`](INSTALL_WINDOWS.md) for explicit, index-preserving
+remediation.
+
+Then run the payload test:
+
+```bat
 just inkwell test
 ```
 
