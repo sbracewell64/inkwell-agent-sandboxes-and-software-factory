@@ -114,10 +114,21 @@ def require_divergence_metadata(entry: dict, label: str, relation: object,
             isinstance(value, str) and value.strip() for value in required):
         findings.cno.append(
             f"{label} contract required_exports must be a non-empty list of strings")
+    verifier = contract.get("verifier")
+    if isinstance(verifier, str) and verifier.strip():
+        declared_verifier = (ROOT / verifier).resolve()
+        actual_verifier = Path(__file__).resolve()
+        if not declared_verifier.is_file() or declared_verifier != actual_verifier:
+            findings.cno.append(
+                f"{label} contract verifier does not resolve to this validator: "
+                f"{verifier!r}")
     symbol = contract.get("verifier_symbol")
-    if isinstance(symbol, str) and symbol.strip() and globals().get(symbol) is None:
-        findings.cno.append(
-            f"{label} contract verifier_symbol does not exist: {symbol!r}")
+    if isinstance(symbol, str) and symbol.strip():
+        resolved = globals().get(symbol)
+        if not callable(resolved) or getattr(resolved, "__module__", None) != __name__:
+            findings.cno.append(
+                f"{label} contract verifier_symbol is not a callable defined in this "
+                f"module: {symbol!r} resolved to {resolved!r}")
 
 
 def load_contract(path: Path, findings: Findings) -> dict | None:
@@ -512,6 +523,12 @@ CONTROLS = (
      None, "malformed_contract", "cno", "overrides[1]"),
     ("missing-divergence-metadata",
      None, "missing_metadata", "cno", "overrides[0] intentional divergence has invalid evidence"),
+    ("fictitious-declared-verifier",
+     None, "bad_verifier_path", "cno", "verifier does not resolve to this validator"),
+    ("noncallable-declared-verifier-symbol",
+     None, "noncallable_verifier_symbol", "cno", "'json' resolved to"),
+    ("imported-declared-verifier-symbol",
+     None, "imported_verifier_symbol", "cno", "'Path' resolved to"),
     ("coupled-adapter-without-supervisor",
      ".claude/skills/sssf/templates/adws/adw_modules/subprocess_supervisor.py",
      "remove", "red", "coupled group split"),
@@ -690,6 +707,36 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
                 if not introduced:
                     control.problems.append(
                         f"{name}: stripped field did not yield CNO naming {names}")
+                else:
+                    control.log.append(f"watched-red {name}: CNO naming {names}")
+                continue
+            if kind in {"bad_verifier_path", "noncallable_verifier_symbol",
+                        "imported_verifier_symbol"}:
+                contract = document["overrides"][0].get("contract")
+                if not isinstance(contract, dict):
+                    control.problems.append(
+                        f"{name}: precondition absent — overrides[0] contract missing")
+                    continue
+                mutated = json.loads(json.dumps(document))
+                probe_value = {
+                    "bad_verifier_path": ("verifier", "docs/validation/not-a-verifier.py"),
+                    "noncallable_verifier_symbol": ("verifier_symbol", "json"),
+                    "imported_verifier_symbol": ("verifier_symbol", "Path"),
+                }[kind]
+                field_name, value = probe_value
+                if contract.get(field_name) == value:
+                    control.problems.append(
+                        f"{name}: precondition absent — {field_name} already equals {value!r}")
+                    continue
+                mutated["overrides"][0]["contract"][field_name] = value
+                probe_contract = temp / f"{kind}-contract.json"
+                probe_contract.write_text(json.dumps(mutated), encoding="utf-8")
+                result = validate(root, probe_contract)
+                introduced = [line for line in result.cno
+                              if line not in baseline_cno and names in line]
+                if not introduced:
+                    control.problems.append(
+                        f"{name}: invalid declaration did not yield CNO naming {names}")
                 else:
                     control.log.append(f"watched-red {name}: CNO naming {names}")
                 continue
