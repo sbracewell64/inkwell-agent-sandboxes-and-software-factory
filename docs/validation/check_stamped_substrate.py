@@ -26,6 +26,7 @@ declared expectation is violated, PASS only over a nonempty assertion set.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import subprocess
 import sys
@@ -35,6 +36,93 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 INSTALLER = Path(".claude/skills/sssf/scripts/install.py")
 CONTRACT = Path(__file__).resolve().parent / "mapped_surface_contract.json"
+
+
+def joined_path(node: ast.expr, base: str) -> str | None:
+    parts: list[str] = []
+    while isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+        if not isinstance(node.right, ast.Constant) or not isinstance(node.right.value, str):
+            return None
+        parts.append(node.right.value)
+        node = node.left
+    if not isinstance(node, ast.Name) or node.id != base:
+        return None
+    return "/".join(reversed(parts))
+
+
+def installer_mappings(installer: Path) -> tuple[set[tuple[str, str]] | None, str | None]:
+    try:
+        tree = ast.parse(installer.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError) as exc:
+        return None, f"installer mapping could not be parsed: {exc}"
+    main = next((node for node in tree.body
+                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                 and node.name == "main"), None)
+    if main is None:
+        return None, "installer mapping source has no main()"
+    mappings: set[tuple[str, str]] = set()
+    calls = [node for node in ast.walk(main)
+             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+             and node.func.id == "stamp"]
+    for call in calls:
+        if len(call.args) < 2:
+            return None, "stamp() call in main() has fewer than two arguments"
+        template = joined_path(call.args[0], "TEMPLATES")
+        live = joined_path(call.args[1], "root")
+        if template is None or live is None:
+            return None, f"stamp() pair at line {call.lineno} is not statically observable"
+        pair = (f".claude/skills/sssf/templates/{template}", live)
+        if pair in mappings:
+            return None, f"duplicate stamp() pair: {pair[0]} -> {pair[1]}"
+        mappings.add(pair)
+    if not mappings:
+        return None, "main() contains no observable stamp() calls"
+    return mappings, None
+
+
+def contract_mappings(contract: Path) -> tuple[set[tuple[str, str]] | None, str | None]:
+    try:
+        document = json.loads(contract.read_text(encoding="utf-8"))
+        surfaces = document["surfaces"]
+        pairs = {(surface["template"], surface["live"]) for surface in surfaces}
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        return None, f"mapped-surface contract could not be observed: {exc}"
+    if len(pairs) != len(surfaces):
+        return None, "mapped-surface contract contains a duplicate template/live pair"
+    return pairs, None
+
+
+def reconcile_mapping(installer: Path, contract: Path) -> tuple[list[str], list[str]]:
+    actual, actual_error = installer_mappings(installer)
+    declared, declared_error = contract_mappings(contract)
+    if actual_error or declared_error:
+        return [], [error for error in (actual_error, declared_error) if error]
+    failures = [f"installer stamp pair has no declared surface: {template} -> {live}"
+                for template, live in sorted(actual - declared)]
+    failures.extend(
+        f"declared surface has no installer stamp pair: {template} -> {live}"
+        for template, live in sorted(declared - actual))
+    return failures, []
+
+
+def mapping_red_control(installer: Path, contract: Path,
+                        baseline: list[str]) -> tuple[bool, str]:
+    source = installer.read_text(encoding="utf-8")
+    target = 'root / "adws" / "adw_data" / "harness_engineering"'
+    replacement = 'root / "adws" / "adw_data" / "harness_engineering_probe"'
+    if source.count(target) != 1:
+        return False, "precondition absent: unique harness_engineering stamp destination"
+    with tempfile.TemporaryDirectory(prefix="sssf-stamp-map-red-") as directory:
+        mutated = Path(directory) / "install.py"
+        mutated.write_text(source.replace(target, replacement), encoding="utf-8")
+        failures, cno = reconcile_mapping(mutated, contract)
+    introduced = [line for line in failures
+                  if line not in baseline and "harness_engineering_probe" in line]
+    if cno:
+        return False, f"mutation became unobservable: {cno[0]}"
+    if not introduced:
+        return False, "mutation did not turn reconciliation red naming its target pair"
+    return True, "watched-red installer-mapping-drift: FAIL naming harness_engineering_probe"
 
 
 def stamp(root: Path, target: Path) -> tuple[bool, str]:
@@ -61,6 +149,18 @@ def main() -> int:
     failures: list[str] = []
     cno: list[str] = []
     checked = 0
+
+    mapping_failures, mapping_cno = reconcile_mapping(root / INSTALLER, CONTRACT)
+    failures.extend(mapping_failures)
+    cno.extend(mapping_cno)
+    checked += 1
+    if not mapping_cno:
+        control_ok, control_detail = mapping_red_control(
+            root / INSTALLER, CONTRACT, mapping_failures)
+        if not control_ok:
+            cno.append(control_detail)
+        else:
+            checked += 1
 
     with tempfile.TemporaryDirectory(prefix="sssf-stamp-fixture-") as directory:
         target = Path(directory)
@@ -155,6 +255,7 @@ def main() -> int:
     print(f"- {checked} expectation(s) checked against a fresh disposable stamp")
     print("- present: supervisor+adapter pair, permissions.preserve, mapped scout notice")
     print("- preserved: quality.py placeholder scaffold, user-owned roster divergence")
+    print(f"- {control_detail}")
     return 0
 
 

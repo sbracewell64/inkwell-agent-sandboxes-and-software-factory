@@ -153,20 +153,6 @@
       "owner": "this repository",
       "rationale": "Alternate roster; see sssf.deepestseek.config.yaml.",
       "evidence": "docs/baseline/PROOF_MATRIX.md:99"
-    },
-    {
-      "path": "adws/adw_data/sessions",
-      "relation": "LIVE_ONLY",
-      "owner": "runtime",
-      "rationale": "Created at runtime and gitignored by install.py's ensure_gitignore; never stamped.",
-      "evidence": ".claude/skills/sssf/cookbooks/install.md:26"
-    },
-    {
-      "path": "adws/adw_data/sssf.db",
-      "relation": "LIVE_ONLY",
-      "owner": "runtime",
-      "rationale": "Created at runtime and gitignored; never stamped.",
-      "evidence": ".claude/skills/sssf/cookbooks/install.md:26"
     }
   ]
 }

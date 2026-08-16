@@ -105,6 +105,28 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
     if not isinstance(document.get("surfaces"), list) or not document["surfaces"]:
         findings.cno.append("contract declares no mapped surfaces")
         return None
+    surface_ids: set[str] = set()
+    for surface in document["surfaces"]:
+        sid = surface.get("id") if isinstance(surface, dict) else None
+        if sid in surface_ids:
+            findings.cno.append(f"duplicate surface id: {sid!r}")
+        if sid is not None:
+            surface_ids.add(sid)
+    override_keys: set[tuple[object, object]] = set()
+    for override in document.get("overrides", []) or []:
+        key = (override.get("surface"), override.get("path"))
+        if key in override_keys:
+            findings.cno.append(
+                f"duplicate override key: {key[0]}:{key[1]}")
+        override_keys.add(key)
+    live_only_paths: set[object] = set()
+    for entry in document.get("live_only", []) or []:
+        entry_path = entry.get("path")
+        if entry_path in live_only_paths:
+            findings.cno.append(f"duplicate live_only path: {entry_path!r}")
+        live_only_paths.add(entry_path)
+    if findings.cno:
+        return None
     return document
 
 
@@ -309,6 +331,10 @@ def validate(root: Path, contract_path: Path) -> Findings:
         if target.exists():
             findings.record(INTENTIONAL, entry["path"], relation="LIVE_ONLY",
                             owner=entry.get("owner", "unspecified"))
+        else:
+            findings.fail.append(
+                f"{entry['path']}: declared LIVE_ONLY path ABSENT from live surface")
+            findings.record(UNRESOLVED, entry["path"], reason="declared_present_but_absent")
 
     check_exclusions(document, findings)
     check_coupled(document, root, findings)
@@ -523,7 +549,8 @@ def structured_state(findings: Findings, verdict: str, contract_path: Path,
     }
 
 
-def report(findings: Findings, control: RedControls | None, state_path: Path | None) -> int:
+def report(findings: Findings, contract_path: Path, control: RedControls | None,
+           state_path: Path | None) -> int:
     if control is not None and not control.passed:
         verdict = "CNO"
     elif findings.cno:
@@ -555,7 +582,7 @@ def report(findings: Findings, control: RedControls | None, state_path: Path | N
         for line in control.log:
             print(f"- {line}")
 
-    state = structured_state(findings, verdict, DEFAULT_CONTRACT, control)
+    state = structured_state(findings, verdict, contract_path, control)
     if state_path is not None:
         state_path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n",
                               encoding="utf-8")
@@ -576,7 +603,7 @@ def main() -> int:
     # Calibration runs on every invocation, so this verifier cannot report PASS
     # without having just demonstrated it still fails where it must.
     control = None if args.skip_red_controls else red_controls(root, contract_path)
-    return report(validate(root, contract_path), control, args.state)
+    return report(validate(root, contract_path), contract_path, control, args.state)
 
 
 if __name__ == "__main__":
