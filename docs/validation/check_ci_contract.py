@@ -38,6 +38,12 @@ EXPECTED_CHECKS = {
     "sandbox-source-contract-validator": (
         "{python}", "docs/validation/check_sandbox_source_contract.py"
     ),
+    "executor-supervisor-and-pi-adapter-validator": (
+        "{python}", "docs/validation/check_executor_supervisor.py"
+    ),
+    "production-extension-path-validator": (
+        "{python}", "docs/validation/check_production_extension_path.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
 
@@ -244,7 +250,7 @@ def main() -> int:
         return 1
 
     print("B4-001 deterministic CI contract: PASS")
-    print("6 offline checks enumerated; Linux and Windows matrix is nonempty")
+    print(f"{len(EXPECTED_CHECKS)} offline checks enumerated; Linux and Windows matrix is nonempty")
     print("watched-red: empty discovery/matrix, validator failure, missing tool")
     print("watched-red: cancellation/timeout and workflow path/trigger drift")
     return 0

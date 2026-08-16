@@ -24,6 +24,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B3-004 | PASS | SQLite-free Windows host observability | implementation candidate `9d160bb` passed runtime/validator proof without external sqlite3; first published closure `15bbea9` later found to contain three trailing-whitespace violations |
 | B3-004-H1 | PASS | Post-freeze B3-004 closure hygiene correction | candidate `1b892ab` passed staged and committed whitespace gates; original B3-004 tag preserved; clean correction state frozen separately |
 | B4-001 | PASS | Non-vacuous deterministic GitHub CI bootstrap | run `31907345967` on reviewed head `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: Ubuntu and Windows each discovered/executed 6/6 observed-good checks and passed Inkwell 30/30 with 230 assertions; closure successor and later `main` push require fresh checks |
+| B4-002 | CORRECTED CANDIDATE — CNO | Provider-neutral subprocess supervisor + strict Pi JSON/print adapter | Run `31917258787` on corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7` had `total_count: 2`: `deterministic (ubuntu-24.04)` and `deterministic (windows-2022)` both completed with conclusion `success`; this closing documentation change advances the head again, so landing requires a fresh independent review and its own nonempty Linux/Windows checks bound to the final exact head; a check observed on one head is never evidence for another; Windows provider execution remains CNO/refused |
 
 ## Future increments
 

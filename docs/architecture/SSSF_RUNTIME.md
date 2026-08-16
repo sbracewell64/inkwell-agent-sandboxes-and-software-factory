@@ -9,7 +9,12 @@ Low-level behavior belongs in `adws/adw_modules/`.
 ## Core modules
 
 - `agents.py` — roster loading, required-agent validation, agent execution
-- `agent_pi.py` / harness adapters — model/harness invocation
+- `agent_pi.py` / harness adapters — model/harness invocation; this is the path
+  ADW phases actually run, and it forwards configured `harness_engineering`
+  extensions to Pi
+- `pi_json_adapter.py` — strict no-session Pi JSON/print contract; substrate for
+  a later integration, not yet on the ADW execution path
+- `subprocess_supervisor.py` — bounded provider-neutral native process ownership
 - `data_types.py` — typed envelopes
 - `gates.py` — claim verification
 - `quality.py` — deterministic quality commands
@@ -43,6 +48,10 @@ The baseline builder proof demonstrated:
 - second response parsed and passed.
 
 This is preferred to restarting because the correction keeps accumulated task context.
+
+B4-002 lands the strict no-session execution substrate but does not wire it into
+this path, so these semantics are unchanged. Adopting bounded no-session
+correction attempts is a later, separately reviewed integration step.
 
 ## Acceptance
 

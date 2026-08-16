@@ -84,6 +84,21 @@
 | B4-001 Windows GitHub execution | run `31907345967`, `windows-2022`, exact reviewed head: 6/6 observed-good; Inkwell 30 pass, 0 fail, 230 assertions | PASS |
 | B4-001 closure successor execution | provenance-only successor must complete the same nonempty Linux/Windows checks on its own exact head | CNO UNTIL OBSERVED |
 | B4-001 default-branch push execution | accepted successor must trigger the same nonempty Linux/Windows checks after merge | CNO UNTIL OBSERVED |
+| B4-002 strict launch surface | exact provider/model, effort, tools, JSON print, no session/resources/approval/fallback, closed stdin, allowlisted env | PASS — LOCAL FIXTURE |
+| B4-002 credential environment refusal | sensitive names and credential-style names outside the fragment vocabulary are refused before launch; the fixed process-mechanics allowlist is the complete boundary | PASS — WATCHED RED + LOCAL FIXTURE |
+| B4-002 shell-zero structured error precedence | deterministic children exit zero with provider error; missing, incomplete, and drifting target metadata remains secondary typed evidence while provider error remains primary | LOCAL FIXTURE REQUIRED; EXACT-CANDIDATE REVIEW CNO |
+| B4-002 process bounds and cleanup | timeout, cancellation, ignored TERM, output overflow, reap, Unix group and escaped-descendant absence verification | PASS — LOCAL LINUX FIXTURE |
+| B4-002 shipped extension-bearing production path | all ten shipped planner/scout agents across five rosters declare nonempty `harness_engineering`; each drives the real `agent_pi` launch path and its extensions are forwarded as `-e`, not rejected | PASS — WATCHED RED + LOCAL FIXTURE |
+| B4-002 production integration boundary | `agent_pi.py`, `agents.py`, `data_types.py`, `console.py`, `gates.py`, `permissions.py` are byte-identical to canonical `main` `a984f6cf`, so the shipped ADW path is unchanged by this increment | PASS |
+| B4-002 pre-launch cancellation | cancellation already set at `supervise()` entry is observed before the attempt claim: zero budget use, no custodian or provider identity, no spawn/exit/event callback; cancellation during pre-launch setup fails closed before the custodian while keeping its already-claimed attempt | PASS — WATCHED RED + LOCAL LINUX FIXTURE |
+| B4-002 stdin parent-tail regression | inherited-stdin control suppresses marker; owned supervisor preserves required typed parent-tail marker | PASS — WATCHED RED + LOCAL FIXTURE |
+| B4-002 protocol and attempt accounting | malformed/missing/duplicate terminal events and hidden retry are typed and charged against common budget | PASS — LOCAL FIXTURE |
+| B4-002 immutable resolved-target enforcement | every assistant `message_end` retains event/message identity; incomplete or drifting tuples remain terminal despite later matching output | LOCAL FIXTURE REQUIRED; EXACT-CANDIDATE REVIEW CNO |
+| B4-002 Windows descendant containment | Job Object path is not implemented; launch returns typed CNO before spawn | CNO — HONEST REFUSAL |
+| B4-002 reviewed Linux PR-head projection | run `31911734134` completed the nonempty Linux checks on exact reviewed head `2291725cf0782b40ce01a17d29b6415a51b130de` | PASS — RULING `5304605032` |
+| B4-002 reviewed Windows PR-head projection | run `31911734134` completed the nonempty Windows static/parser/refusal checks on the same exact reviewed head | PASS — FAIL-CLOSED REFUSAL PROJECTION |
+| WINDOWS_PROVIDER_EXECUTION | green Windows CI proves refusal, not provider launch, Job Object custody, or descendant cleanup | CNO/REFUSED |
+| B4-002 corrected candidate execution | run `31917258787` on corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7` returned `total_count: 2`; `deterministic (ubuntu-24.04)` and `deterministic (windows-2022)` both completed with conclusion `success`; this closing documentation change advances the head again, so fresh independent review and its own nonempty Linux/Windows checks must bind to the final exact head; a check observed on one head is never evidence for another; ruling `5304605032` is provenance only | CHECKS PASS AT `5447b56e`; FINAL-HEAD REVIEW AND CHECKS CNO |
 
 ## Rule
 

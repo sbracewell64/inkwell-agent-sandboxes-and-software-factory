@@ -26,6 +26,22 @@ The full repository may exist in the VM, but the VM lacks the host control-plane
 
 The boundary is credential-based rather than relying on deleting orchestration files.
 
+## Provider subprocess boundary
+
+The B4-002 execution substrate does not inherit the operator environment. Its
+caller supplies an exact environment mapping and allowlist; the strict Pi
+adapter pins that allowlist to its fixed PATH/locale/temp process-mechanics set
+and creates an isolated credential-free Pi settings directory. Sensitive-name
+fragments provide an additional typed refusal, but safety does not depend on
+enumerating every credential word. Credentials, auth homes, cookies, and tokens
+are not argv, evidence, or adapter configuration. Live authentication transport
+is a separate increment.
+
+Pi stdin is closed. Ambient sessions, extensions, skills, prompt templates,
+context files, project approval, model fallback, and native retries are
+disabled. On Windows, execution refuses as could-not-observe until a proven Job
+Object cleanup path exists.
+
 ## Agent write security
 
 `tools:` is capability, not path security.
