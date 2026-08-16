@@ -102,27 +102,88 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
     if document.get("schema_version") != 1:
         findings.cno.append("contract schema_version must be 1")
         return None
-    if not isinstance(document.get("surfaces"), list) or not document["surfaces"]:
+    for name in ("surfaces", "overrides", "live_only", "coupled"):
+        value = document.get(name, [])
+        if not isinstance(value, list):
+            findings.cno.append(f"contract collection {name!r} must be a list")
+        else:
+            document[name] = value
+    ignore = document.get("ignore", [])
+    if not isinstance(ignore, list) or not all(isinstance(v, str) and v for v in ignore):
+        findings.cno.append("contract collection 'ignore' must be a list of strings")
+    if findings.cno:
+        return None
+    if not document["surfaces"]:
         findings.cno.append("contract declares no mapped surfaces")
         return None
+    allowed_relations = {
+        "EXACT_MIRROR", "CONTRACT_ONLY", "TEMPLATE_SCAFFOLD", "USER_OWNED", "LIVE_ONLY"}
     surface_ids: set[str] = set()
-    for surface in document["surfaces"]:
-        sid = surface.get("id") if isinstance(surface, dict) else None
+    for index, surface in enumerate(document["surfaces"]):
+        if not isinstance(surface, dict):
+            findings.cno.append(
+                f"surfaces[{index}] must be an object: {surface!r}")
+            continue
+        for field_name in ("id", "live", "template"):
+            value = surface.get(field_name)
+            if not isinstance(value, str) or not value:
+                findings.cno.append(
+                    f"surfaces[{index}] has invalid {field_name}: {value!r}")
+        sid = surface.get("id")
         if sid in surface_ids:
             findings.cno.append(f"duplicate surface id: {sid!r}")
-        if sid is not None:
+        if isinstance(sid, str) and sid:
             surface_ids.add(sid)
+        relation = surface.get("default_relation")
+        if relation not in allowed_relations:
+            findings.cno.append(
+                f"surfaces[{index}] has unknown default_relation: {relation!r}")
+        if not isinstance(surface.get("recursive"), bool):
+            findings.cno.append(
+                f"surfaces[{index}] has invalid recursive: {surface.get('recursive')!r}")
+        excluded = surface.get("exclude_live", [])
+        if not isinstance(excluded, list) or not all(
+                isinstance(value, str) and value for value in excluded):
+            findings.cno.append(
+                f"surfaces[{index}] exclude_live must be a list of strings")
     override_keys: set[tuple[object, object]] = set()
-    for override in document.get("overrides", []) or []:
+    for index, override in enumerate(document["overrides"]):
+        if not isinstance(override, dict):
+            findings.cno.append(
+                f"overrides[{index}] must be an object: {override!r}")
+            continue
+        for field_name in ("surface", "path", "relation"):
+            value = override.get(field_name)
+            if not isinstance(value, str) or not value:
+                findings.cno.append(
+                    f"overrides[{index}] has invalid {field_name}: {value!r}")
         key = (override.get("surface"), override.get("path"))
         if key in override_keys:
             findings.cno.append(
                 f"duplicate override key: {key[0]}:{key[1]}")
         override_keys.add(key)
+        if override.get("surface") not in surface_ids:
+            findings.cno.append(
+                f"overrides[{index}] names unknown surface: {override.get('surface')!r}")
+        relation = override.get("relation")
+        if relation not in allowed_relations:
+            findings.cno.append(
+                f"overrides[{index}] has unknown relation: {relation!r}")
+        if relation in {"CONTRACT_ONLY", "TEMPLATE_SCAFFOLD"}:
+            contract = override.get("contract")
+            if not isinstance(contract, dict):
+                findings.cno.append(
+                    f"overrides[{index}] contract must be an object")
+            elif not isinstance(contract.get("required_exports"), list) or not all(
+                    isinstance(value, str) and value
+                    for value in contract.get("required_exports", [])):
+                findings.cno.append(
+                    f"overrides[{index}] required_exports must be a list of strings")
     live_only_paths: set[object] = set()
-    for entry in document.get("live_only", []) or []:
+    for index, entry in enumerate(document["live_only"]):
         if not isinstance(entry, dict):
-            findings.cno.append(f"live_only entry must be an object: {entry!r}")
+            findings.cno.append(
+                f"live_only[{index}] must be an object: {entry!r}")
             continue
         entry_path = entry.get("path")
         if entry_path in live_only_paths:
@@ -145,6 +206,23 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
         if match == "FILE_PREFIX" and presence != "RUNTIME_OPTIONAL":
             findings.cno.append(
                 f"live_only {entry_path!r} FILE_PREFIX requires RUNTIME_OPTIONAL")
+    for index, group in enumerate(document["coupled"]):
+        if not isinstance(group, dict):
+            findings.cno.append(
+                f"coupled[{index}] must be an object: {group!r}")
+            continue
+        surface = group.get("surface")
+        if not isinstance(surface, str) or not surface:
+            findings.cno.append(
+                f"coupled[{index}] has invalid surface: {surface!r}")
+        elif surface not in surface_ids:
+            findings.cno.append(
+                f"coupled[{index}] names unknown surface: {surface!r}")
+        members = group.get("members")
+        if not isinstance(members, list) or not members or not all(
+                isinstance(member, str) and member for member in members):
+            findings.cno.append(
+                f"coupled[{index}] members must be a non-empty list of strings")
     if findings.cno:
         return None
     return document
@@ -403,6 +481,8 @@ CONTROLS = (
      "adws/adw_modules/zz_undeclared.py", "add", "red", "zz_undeclared.py"),
     ("undeclared-excluded-prefix-addition",
      "adws/adw_data/zz_undeclared.json", "add", "red", "zz_undeclared.json"),
+    ("malformed-contract-entry",
+     None, "malformed_contract", "cno", "overrides[1]"),
     ("coupled-adapter-without-supervisor",
      ".claude/skills/sssf/templates/adws/adw_modules/subprocess_supervisor.py",
      "remove", "red", "coupled group split"),
@@ -518,6 +598,7 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
 
     base = validate(root, contract_path)
     baseline = {line.split("\n", 1)[0] for line in base.fail}
+    baseline_cno = set(base.cno)
 
     for name, target, kind, expect, names in CONTROLS:
         if expect == "clean":
@@ -545,6 +626,25 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
 
         with tempfile.TemporaryDirectory(prefix="sssf-parity-red-") as directory:
             temp = Path(directory)
+            if kind == "malformed_contract":
+                if not all(isinstance(entry, dict)
+                           for entry in document["overrides"]):
+                    control.problems.append(
+                        f"{name}: precondition absent — overrides already malformed")
+                    continue
+                mutated = json.loads(json.dumps(document))
+                mutated["overrides"].append("not-an-object")
+                probe_contract = temp / "malformed-contract.json"
+                probe_contract.write_text(json.dumps(mutated), encoding="utf-8")
+                result = validate(root, probe_contract)
+                introduced = [line for line in result.cno
+                              if line not in baseline_cno and names in line]
+                if not introduced:
+                    control.problems.append(
+                        f"{name}: malformed entry did not yield CNO naming {names}")
+                else:
+                    control.log.append(f"watched-red {name}: CNO naming {names}")
+                continue
             materialize(document, root, temp)
             path = temp / target
             if kind == "add" and path.exists():
