@@ -1,0 +1,10 @@
+HD-08 intermediate-directory symlink-swap negative control
+source_head: 7148f45b5e906e4fcf220d7c9d32212f6fae985a
+command: python3 docs/validation/check_evidence_manifest.py
+expected: nonzero because the pre-fix implementation accepts outside-root bytes at the validation/open boundary
+observed_exit: 1
+observed_output:
+HD-08 evidence manifest controls: FAIL
+- intermediate-directory-symlink-swap: outside-root bytes were accepted
+- intermediate-directory-symlink-swap: escaped artifact entered checked inventory
+classification: observed-bad (negative control watched red)

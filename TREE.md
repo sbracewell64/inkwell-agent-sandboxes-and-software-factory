@@ -121,6 +121,13 @@ docs/validation/check_production_extension_path.py
                           path; extensions must be forwarded as -e, never rejected.
 ```
 
+## `tools/` — repository-owned utilities
+
+```
+evidence_manifest.py  sole offline evidence-manifest v1 schema, canonical serializer, and
+                      validator. It does not authorize runtime acceptance.
+```
+
 ## `.claude/skills/` — the three skills
 
 ```
@@ -137,6 +144,9 @@ commands/prime.md     `/prime` — boots a net-new agent on this whole system.
 ## Docs and inputs
 
 ```
+docs/reference/EVIDENCE_MANIFEST.md  authoritative manifest v1 contract and HD-09 boundary.
+docs/validation/check_evidence_manifest.py  deterministic positive and watched-red controls.
+docs/validation/fixtures/evidence_manifest/ canonical offline manifest fixtures.
 specs/sandbox-mount-system.html   THE PLAN, and the working checklist. Live checkboxes record
                       what was verified ON HARDWARE. An unchecked box means "not proven",
                       not "not written". Opens in a browser. Read the "Where this stands"

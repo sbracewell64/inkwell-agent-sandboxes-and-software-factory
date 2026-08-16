@@ -27,6 +27,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B4-002 | CORRECTED CANDIDATE — CNO | Provider-neutral subprocess supervisor + strict Pi JSON/print adapter | Run `31917258787` on corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7` had `total_count: 2`: `deterministic (ubuntu-24.04)` and `deterministic (windows-2022)` both completed with conclusion `success`; this closing documentation change advances the head again, so landing requires a fresh independent review and its own nonempty Linux/Windows checks bound to the final exact head; a check observed on one head is never evidence for another; Windows provider execution remains CNO/refused |
 | HD-01 | PASS | One authoritative strict LF working-tree contract | default + doctor strict owner; CRLF/missing/wrong-attribute watched-red controls; hostile-`core.autocrlf=true` fresh clone remained `i/lf w/lf` |
 | HD-03 | PASS | Nonvacuous three-valued gate outcomes | 15 focused controls prove PASS/FAIL/CNO, fail-closed migration, trace provenance, and non-green CNO rendering |
+| HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
 
 ## Future increments
 

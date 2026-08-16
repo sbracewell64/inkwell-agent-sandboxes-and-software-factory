@@ -1,0 +1,13 @@
+HD-08 wrong-phase coverage negative meta-control
+source_commit: 73d8a8313f3a9b70edbba42a9e8862d0e7feb164
+source_tree: 0ce23ea9996525550fb8b39f5d18e3a4265e7635
+acquisition: clean file bytes from git show 73d8a8313f3a9b70edbba42a9e8862d0e7feb164:docs/validation/check_evidence_manifest.py
+probe_sha256: edfafd6ce9c8e1ea4aa5be3abf9ae93e7e27d48e3544ac55a106a40825221732
+command: git show 73d8a8313f3a9b70edbba42a9e8862d0e7feb164:docs/validation/check_evidence_manifest.py | python3 -c 'import sys; source=sys.stdin.read(); required=("fresh(\"wrong-phase\")", "phase is not declared in required_phases", "wrong-phase-control: PASS"); missing=[marker for marker in required if marker not in source]; print("wrong-phase fixture/inventory assertion: " + ("PRESENT" if not missing else "MISSING")); print("missing markers: " + ", ".join(missing)); raise SystemExit(1 if missing else 0)'
+expected_exit: nonzero (1) because the pre-fix harness lacks the required wrong-phase fixture/inventory assertion
+observed_exit: 1
+observed_output:
+wrong-phase fixture/inventory assertion: MISSING
+missing markers: fresh("wrong-phase"), phase is not declared in required_phases, wrong-phase-control: PASS
+classification: watched-red missing control coverage
+scope: This does not claim that the v1 validator accepted undeclared phases; it proves that commit 73d8a831 lacked the required deterministic control.

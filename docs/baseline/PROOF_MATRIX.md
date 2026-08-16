@@ -107,6 +107,12 @@
 | B4-002 reviewed Windows PR-head projection | run `31911734134` completed the nonempty Windows static/parser/refusal checks on the same exact reviewed head | PASS — FAIL-CLOSED REFUSAL PROJECTION |
 | WINDOWS_PROVIDER_EXECUTION | green Windows CI proves refusal, not provider launch, Job Object custody, or descendant cleanup | CNO/REFUSED |
 | B4-002 corrected candidate execution | run `31917258787` on corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7` returned `total_count: 2`; `deterministic (ubuntu-24.04)` and `deterministic (windows-2022)` both completed with conclusion `success`; this closing documentation change advances the head again, so fresh independent review and its own nonempty Linux/Windows checks must bind to the final exact head; a check observed on one head is never evidence for another; ruling `5304605032` is provenance only | CHECKS PASS AT `5447b56e`; FINAL-HEAD REVIEW AND CHECKS CNO |
+| HD-08 canonical manifest bytes | positive fixture round-trips through the sole serializer byte-for-byte | PASS |
+| HD-08 offline checked inventory | positive fixture verifies every artifact hash/type and bound SQLite ADW row from frozen bytes without network/provider access | PASS |
+| HD-08 nonvacuous qualification | empty directory/database/manifest/inventory, diagnostic-only evidence, and absent phase/dimension controls cannot pass | PASS |
+| HD-08 identity and integrity refusal | wrong identities, failed unrelated item, tamper, duplicate/reorder, descriptor-relative traversal/symlink races, final/root symlinks, identity change, unsupported host, and malformed schema controls observed red/CNO as specified | PASS |
+| HD-08 intermediate-component stat-to-open race | component swapped for an outside-root symlink between its no-follow stat and its descriptor-relative open; shipped implementation refused non-PASS with empty checked inventory and no outside-root bytes read, calibrated watched-red against a content-addressed defective variant with both intermediate protections removed | PASS |
+| HD-08 runtime acceptance integration | intentionally deferred to HD-09 | NOT PROVEN |
 
 ## Rule
 

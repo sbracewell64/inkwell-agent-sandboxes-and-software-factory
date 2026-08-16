@@ -75,6 +75,16 @@ just obs tail <adw-id>
 just obs ui
 ```
 
+## Offline evidence manifest core
+
+```text
+python3 tools/evidence_manifest.py schema
+python3 tools/evidence_manifest.py validate --help
+python3 docs/validation/check_evidence_manifest.py
+```
+
+Manifest v1 validation is offline evidence checking only. It does not authorize runtime acceptance; HD-09 owns that integration.
+
 ## Identity warning
 
 `run-id` and `adw-id` are different.
