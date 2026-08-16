@@ -68,6 +68,13 @@ setup), and unsupported Windows cleanup. Linux executes process behavior; Window
 static/parser controls and proves typed refusal before launch rather than
 turning missing Job Object containment into a pass.
 
+`docs/validation/check_production_extension_path.py` guards the shipped
+extension-bearing ADW path. It refuses to pass unless a shipped roster declares
+a nonempty `harness_engineering` agent, then drives each one through the real
+`agent_pi` launch path against a local recording stub and asserts every
+configured extension is forwarded as `-e`. It exists because a strict-adapter
+rewrite once rejected those extensions and the rest of the gate did not notice.
+
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and
 sandbox source invariants that do not need the network remain enumerated.

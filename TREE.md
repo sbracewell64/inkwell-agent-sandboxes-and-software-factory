@@ -116,6 +116,9 @@ docs/validation/check_ci_contract.py
 docs/validation/check_executor_supervisor.py
                           provider-free process/Pi adapter fixtures, including watched-red
                           stdin inheritance and explicit Windows cleanup refusal.
+docs/validation/check_production_extension_path.py
+                          shipped harness_engineering rosters drive the real agent_pi launch
+                          path; extensions must be forwarded as -e, never rejected.
 ```
 
 ## `.claude/skills/` — the three skills

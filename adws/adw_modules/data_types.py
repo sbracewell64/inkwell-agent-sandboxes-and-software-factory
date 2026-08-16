@@ -375,23 +375,14 @@ class PiRequest(BaseModel):
 
     prompt: str
     system_prompt: str
-    model: str                      # exact provider/model target; no catalog lookup
+    model: str                      # registry pattern, resolved to provider + id
     thinking: str = "medium"
-    session_id: str                 # SSSF correlation only; strict Pi gets --no-session
-    session_dir: str                # legacy artifact location; not passed to strict Pi
-    raw_output_path: str            # root for collision-free per-attempt JSONL evidence
-    execution_id: str
-    phase_id: str
-    attempt_number: int
+    session_id: str                 # pi --session-id: creates or continues
+    session_dir: str
+    raw_output_path: str            # JSONL stream lands here
     tools: Optional[list[str]] = None
     extensions: list[str] = Field(default_factory=list)
     cwd: str = "."                  # set from run.repo_root — the codebase root agents work in
-    timeout_seconds: float = 120.0
-    term_grace_seconds: float = 1.0
-    max_stdout_bytes: int = 4 * 1024 * 1024
-    max_stderr_bytes: int = 1024 * 1024
-    max_event_bytes: int = 4 * 1024 * 1024
-    total_attempt_budget: int = 1
 
 
 class UsageBreakdown(BaseModel):
@@ -453,8 +444,4 @@ class PiResult(BaseModel):
     # turn; this is how full the window is right now, which is what the
     # visualizer's context bar measures against `context_window`.
     context_tokens: int = 0
-    context_window: int = 0         # unavailable under strict no-catalog execution
-    # Full strict-adapter terminal envelope: target/effort resolution, stop or
-    # error, source-classed usage/cost, native attempts, process identity,
-    # cleanup verification, timeout/cancel, and evidence digests.
-    terminal: dict[str, Any] = Field(default_factory=dict)
+    context_window: int = 0         # 0 when the registry declares no ceiling

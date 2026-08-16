@@ -139,7 +139,7 @@ just inkwell test     # the suite the factory runs
   <img src="images/01_factory_spine.svg" alt="The factory spine: a deterministic ADW script sequencing plan, build, and test phases with agents as bounded nodes" width="750">
 </p>
 
-Twelve ADWs (AI Developer Workflows) under `adws/`, each a thin `uv run` script whose docstring is its chain: `adw_simple_sdlc` runs plan, build, test, review, document with three separate commits. Typed envelopes carry context between phases; gates validate every claim, and a failure launches a bounded no-session correction attempt charged to the same total budget. **Agent proposes, code disposes.**
+Twelve ADWs (AI Developer Workflows) under `adws/`, each a thin `uv run` script whose docstring is its chain: `adw_simple_sdlc` runs plan, build, test, review, document with three separate commits. Typed envelopes carry context between phases; gates validate every claim, and a failure re-enters the same session as a correction, never a restart. **Agent proposes, code disposes.**
 
 <p align="center">
   <img src="images/value/03_core_four.png" alt="An agent is four things: a model, a harness, tools, and a prompt, wired around a central agent node" width="750">
@@ -217,10 +217,7 @@ Two handles, do not confuse them: **`<run-id>`** names the sandbox (it is also t
   <img src="images/14_observe_from_outside.png" alt="Observe from outside only: the out-sandbox orchestrator reads the app and agent view but never reaches in; traces flow up from the agents" width="780">
 </p>
 
-You watch from outside; you never reach in. Phase progress is recorded in
-`sssf.db` as it happens. For strict Pi attempts, bounded raw output is retained
-durably before complete thoughts, responses, and tool calls are parsed and
-recorded; the visualizer polls the WAL-backed database without blocking writers.
+You watch from outside; you never reach in. Every phase, tool call, complete thought, and complete response streams into `sssf.db` as it happens (agents to sqlite to you, WAL so reads never block writers), and the visualizer polls it.
 
 <p align="center">
   <img src="images/value/06_observability.png" alt="A swimlane of engineer, planner, and builder phases over time, every run recorded down into a sqlite store" width="750">

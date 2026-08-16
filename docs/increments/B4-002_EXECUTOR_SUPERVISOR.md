@@ -61,8 +61,32 @@ bounded and deterministic without calling a provider.
 - structured provider errors remain the primary verdict while any incomplete
   or drifting target tuples remain attached as secondary typed observations.
 
-The legacy `agent_pi.run` now delegates native execution to this adapter. It no
-longer reads Pi's user model catalog or launches a separate list-models process.
+## Production integration is deliberately out of this increment
+
+An earlier revision of this increment rewired `agent_pi.run` to delegate to the
+strict adapter. That was a production compatibility **regression** against
+canonical `main`, found by Browser Sol ruling `5305160143`:
+
+- canonical `main` forwards every configured extension as `-e <path>`;
+- the rewired path raised `ValueError` for any nonempty `request.extensions`.
+
+Shipped rosters populate `harness_engineering` nonempty for the planner and
+scout in all five configurations, and `agents.py` passes it straight through, so
+those phases would have failed before supervision or provider launch. "Already
+present earlier in this pull request" is not "already present in the product":
+generation 1 is part of the change under review.
+
+The correction separates substrate from integration. `agent_pi.py`, `agents.py`,
+`data_types.py`, and the affected comment-only modules are byte-identical to
+`a984f6cf`, so the shipped ADW path keeps its canonical contract exactly,
+including catalog-based model resolution and same-session corrections. The
+strict adapter and supervisor land as a proven, self-contained substrate that
+nothing in production calls yet.
+
+Wiring it in requires an extension-transport decision — the strict contract
+passes `--no-extensions`, which shipped rosters contradict — and that is a
+separate, separately reviewed increment, tracked as
+`sssf-pi-adapter-extension-transport`.
 
 ## Deterministic proof
 
@@ -89,9 +113,22 @@ cover:
 13. fully qualified target, explicit effort, exact tool policy, strict Pi argv
     controls, and immutable requested-versus-resolved target enforcement.
 
-The check is the seventh repository-owned offline CI manifest entry. Linux runs
+The check is the sixth repository-owned offline CI manifest entry. Linux runs
 all process fixtures. Windows runs the nonempty static/parser/refusal proof and
 reports runtime execution as CNO; it does not skip into a false pass.
+
+`docs/validation/check_production_extension_path.py` is the seventh entry and
+guards the seam this increment got wrong. It reads every shipped roster, refuses
+to pass unless it finds a nonempty `harness_engineering` agent, and drives each
+one through the real `agent_pi` launch path against a local recording stub,
+asserting that configured extensions are forwarded as `-e` and are not rejected.
+It makes no provider call. Because the offline gate ships no pydantic, pyyaml, or
+dotenv, the control reads rosters with a small indentation-aware scan and serves
+`agent_pi`'s two dependency-bearing imports from stdlib stand-ins; request
+construction, argv assembly, and the rejection boundary under test are the real
+module source. Watched red against the rewired head: all ten shipped
+planner/scout agents were rejected with `Pi extensions are disabled by the
+strict adapter contract`.
 
 ## Exact reviewed pull-request proof
 

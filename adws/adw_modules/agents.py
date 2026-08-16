@@ -2,8 +2,9 @@
 
 Every ADW validates its agents before running (fail fast, nothing spawns
 against a half-valid config). Every agent call parses against a concrete
-output type; parse failures and gate violations launch bounded no-session
-correction attempts under one total budget. Agent proposes, code disposes.
+output type; parse failures and gate violations re-prompt the SAME session
+with a correction — context intact, bounded retries. Agent proposes, code
+disposes.
 """
 
 from __future__ import annotations
@@ -18,7 +19,6 @@ from . import agent_pi, permissions, prompts
 from .data_types import (AgentCall, AgentConfig, EnvelopeBase, EventRecord,
                          GateCheck, GateReport, Phase, PiRequest, SSSFConfig,
                          UsageBreakdown)
-from .subprocess_supervisor import correction_attempt_budget
 from .utils import new_id
 
 JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSON
@@ -103,19 +103,14 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                           "harness_engineering": agent.harness_engineering}))
     run.console.agent_started(agent.name, agent.model, session_id)
 
-    # Parse retries and gate corrections are distinct no-session Pi attempts.
-    # Spend accumulates across all of them under one native-attempt budget;
-    # there is deliberately no inherited context occupancy to report.
+    # Parse retries and gate corrections re-enter the SAME pi session, so the
+    # last send is the one whose context occupancy is current — while spend is
+    # the opposite: every send costs, so usage accumulates across all of them.
     latest: agent_pi.PiResult | None = None
     spent = UsageBreakdown()
-    # Every gate round can launch one initial send and two JSON corrections.
-    # Native retries inside Pi are charged here too by the strict adapter.
-    attempt_budget = agent_pi.AttemptBudget(total=correction_attempt_budget(phase.params.retries))
-    send_number = 0
 
     def send(prompt_text: str) -> agent_pi.PiResult:
-        nonlocal latest, send_number
-        send_number += 1
+        nonlocal latest
         request = PiRequest(
             prompt=prompt_text,
             system_prompt=system_text,
@@ -124,14 +119,10 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             session_id=session_id,
             # absolute: these are read by the pi subprocess, which runs in repo_root
             session_dir=str((agent_dir / "pi_sessions").resolve()),
-            raw_output_path=str((agent_dir / "raw_events").resolve()),
-            execution_id=run.adw_id,
-            phase_id=phase.phase_id,
-            attempt_number=send_number,
+            raw_output_path=str((agent_dir / "raw_output.jsonl").resolve()),
             tools=agent.tools,
             extensions=agent.harness_engineering,
             cwd=str(run.repo_root),
-            total_attempt_budget=attempt_budget.total,
         )
         result = agent_pi.run(
             request,
@@ -139,8 +130,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             on_spawn=lambda pid: run.tracer.process_start(
                 run.adw_id, "agent", agent.name, pid,
                 f"{agent.coding_agent} {agent.name} {agent.model}"),
-            on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid),
-            budget=attempt_budget)
+            on_exit=lambda pid: run.tracer.process_end(run.adw_id, pid))
         run.add_usage(result.tokens, result.cost)
         spent.merge(result.usage)
         latest = result
@@ -158,7 +148,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     result = send(user_text)
     envelope, attempt = _parse_with_retries(run, phase, call, result, send)
 
-    # Claim-gate violations become separately budgeted correction attempts.
+    # claim gates — violations flow back into the SAME session as corrections
     for gate_attempt in range(1, max(1, phase.params.retries + 1) + 1):
         violations = []
         for gate in call.gates:
@@ -243,7 +233,7 @@ def _as_report(result) -> GateReport:
 def _agent_session_id(run, agent: AgentConfig) -> str:
     entry = run.agent_map.get(agent.name)
     if entry and entry.get("model") == agent.model:
-        return entry["session_id"]           # stable SSSF correlation; Pi does not resume it
+        return entry["session_id"]           # rejoin the existing context window
     return f"sssf-{run.adw_id}-{agent.name}-{new_id(4)}"
 
 
@@ -288,7 +278,8 @@ def _extract_json(text: str) -> dict:
 
 
 def _parse_with_retries(run, phase: Phase, call: AgentCall, result, send):
-    """Parse the declared output; failures launch bounded correction attempts."""
+    """Parse the final response against the declared output type; on failure,
+    continue the SAME session with a correction (bounded)."""
     for attempt in range(1, JSON_FIX_ATTEMPTS + 2):
         try:
             payload = _extract_json(result.text)
