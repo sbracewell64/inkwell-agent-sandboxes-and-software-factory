@@ -15,8 +15,8 @@ Low-level behavior belongs in `adws/adw_modules/`.
 - `pi_json_adapter.py` — strict no-session Pi JSON/print contract; substrate for
   a later integration, not yet on the ADW execution path
 - `subprocess_supervisor.py` — bounded provider-neutral native process ownership
-- `data_types.py` — typed envelopes
-- `gates.py` — claim verification
+- `data_types.py` — typed envelopes and the canonical gate outcome contract
+- `gates.py` — claim verification with explicit evidence requirements
 - `quality.py` — deterministic quality commands
 - `permissions.py` — post-agent write-boundary enforcement
 - `tracer.py` — SQLite trace
@@ -36,6 +36,31 @@ A phase has:
 - inputs/previous envelope,
 - output contract,
 - gates.
+
+## Gate outcome semantics
+
+`data_types.py` owns the one gate outcome model: `PASS`, `FAIL`, or
+`COULD_NOT_OBSERVE` (CNO). It cannot be used as a Boolean. CNO always carries a
+closed reason and source.
+
+Every `GateReport` declares `nonempty_required`. A failed observed check is
+`FAIL`; qualifying positive checks are `PASS`; zero required checks, zero
+discovered gates, an exception while collecting evidence, or a legacy/untyped
+return is CNO. Only explicit `PASS` advances an agent phase. The console and UI
+render CNO amber, never green, and the trace stores outcome, reason, source,
+checks, and the nonempty requirement.
+
+Existing genuine controls keep their bounded meaning: nonempty artifact gates
+prove the declared artifact observations they actually recorded, and permission
+enforcement remains a separate post-agent boundary. Neither is presented as
+proof that an envelope listed every real repository mutation; Git/content claim
+reconciliation belongs to a later increment.
+
+Legacy `gate_results.passed` is retained only as a compatibility projection
+(`1` PASS, `0` FAIL, `NULL` CNO). Schema migration preserves an old explicit
+negative as FAIL but downgrades old Boolean green to CNO because vacuous and
+nonvacuous historical positives cannot be distinguished. Readers missing the
+typed columns also project CNO rather than consulting the legacy Boolean.
 
 ## Correction semantics
 

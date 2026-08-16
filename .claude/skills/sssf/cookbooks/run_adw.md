@@ -81,7 +81,7 @@ sqlite3 adws/adw_data/sssf.db \
 
 # why a phase failed
 sqlite3 adws/adw_data/sssf.db \
-  "select attempt, gate, passed, checks_json from gate_results where adw_id='a1b2c3d4';"
+  "select attempt, gate, outcome, cno_reason, cno_source, checks_json from gate_results where adw_id='a1b2c3d4';"
 
 # session-level status
 sqlite3 adws/adw_data/sssf.db \

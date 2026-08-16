@@ -98,7 +98,7 @@ just sbx run cmd <run-id> 'sqlite3 adws/adw_data/sssf.db "select seq,name,kind,o
 just sbx run cmd <run-id> 'sqlite3 adws/adw_data/sssf.db "select rowid,type,name,started_at from events where adw_id='"'"'84b6551f'"'"' order by rowid desc limit 25;"'
 
 # why a phase failed
-just sbx run cmd <run-id> 'sqlite3 adws/adw_data/sssf.db "select gate,passed,violations_json from gate_results where adw_id='"'"'84b6551f'"'"' order by id;"'
+just sbx run cmd <run-id> 'sqlite3 adws/adw_data/sssf.db "select gate,outcome,cno_reason,cno_source,violations_json from gate_results where adw_id='"'"'84b6551f'"'"' order by id;"'
 
 # what is running right now (ended_at NULL = believed alive)
 just sbx run cmd <run-id> 'sqlite3 adws/adw_data/sssf.db "select kind,name,pid,started_at from processes where adw_id='"'"'84b6551f'"'"' and ended_at is null;"'

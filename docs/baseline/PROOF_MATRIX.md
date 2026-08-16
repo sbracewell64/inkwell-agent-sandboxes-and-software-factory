@@ -80,6 +80,10 @@
 | B3-004-H1 correction candidate hygiene | candidate `1b892ab084bc4785c6f31f8999b586534d9e477b` passed both staged `git diff --cached --check` and committed `git show --check` | PASS |
 | B3-004-H1 correction isolation | only ledger, proof matrix, and B3-004 increment record differ from flawed closure `15bbea9` | PASS |
 | B3-004-H1 clean closure correction | original B3-004 tag preserved; separate correction state establishes the clean base for subsequent B3 work | PASS |
+| HD-03 zero required gate observations | focused `GateReport` and zero-discovery controls | COULD_NOT_OBSERVE; CANNOT ADVANCE |
+| HD-03 explicit failed gate check | focused negative fixture | FAIL |
+| HD-03 qualifying nonempty gate evidence | exact nonempty artifact fixture across existence/content/claim gates | PASS |
+| HD-03 malformed/legacy gate outcome | parser, adapter, migration, console, and trace controls | CNO/REFUSED; NEVER BOOLEAN PASS |
 | B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual intervention | NOT PROVEN |
 | B4-001 offline check discovery | run `31907345967` at `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: each OS discovered and executed 6/6 checks | PASS |
 | B4-001 non-vacuous projection | each job retained 6 observed-good, 0 observed-bad, and 0 could-not-observe results | PASS |

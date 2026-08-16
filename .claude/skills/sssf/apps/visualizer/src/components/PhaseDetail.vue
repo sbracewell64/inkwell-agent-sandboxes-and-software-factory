@@ -176,16 +176,67 @@ function gateChecks(g: GateResult): GateCheck[] | null {
   try {
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return null
-    return parsed
-      .filter((c): c is Record<string, unknown> => c !== null && typeof c === 'object')
-      .map((c) => ({
-        item: typeof c.item === 'string' ? c.item : '',
-        ok: c.ok === true,
-        note: typeof c.note === 'string' ? c.note : '',
-      }))
+    if (
+      !parsed.every(
+        (c) =>
+          c !== null &&
+          typeof c === 'object' &&
+          typeof (c as Record<string, unknown>).item === 'string' &&
+          typeof (c as Record<string, unknown>).ok === 'boolean' &&
+          typeof (c as Record<string, unknown>).note === 'string',
+      )
+    ) {
+      return null
+    }
+    return parsed as GateCheck[]
   } catch {
     return null
   }
+}
+
+const cnoReasons = new Set([
+  'NO_REQUIRED_OBSERVATIONS',
+  'NO_GATES_DISCOVERED',
+  'GATE_RAISED',
+  'INVALID_GATE_RETURN',
+  'LEGACY_BOOLEAN_ONLY',
+  'MALFORMED_TYPED_OUTCOME',
+])
+const cnoSources = new Set([
+  'GATE_REPORT',
+  'AGENT_CALL',
+  'GATE_EXECUTION',
+  'GATE_ADAPTER',
+  'SCHEMA_MIGRATION',
+  'TRACE_READER',
+])
+
+type DisplayGateStatus = 'PASS' | 'FAIL' | 'COULD_NOT_OBSERVE'
+
+/** Fail closed on missing, unknown, or internally inconsistent typed results. */
+function gateStatus(g: GateResult): DisplayGateStatus {
+  if (g.outcome === 'COULD_NOT_OBSERVE') return 'COULD_NOT_OBSERVE'
+  if (g.cno_reason != null || g.cno_source != null) return 'COULD_NOT_OBSERVE'
+  if (g.outcome === 'FAIL') return 'FAIL'
+  if (g.outcome !== 'PASS') return 'COULD_NOT_OBSERVE'
+  const checks = gateChecks(g)
+  if (g.nonempty_required !== 0 && (!checks || checks.length === 0)) {
+    return 'COULD_NOT_OBSERVE'
+  }
+  if (checks?.some((check) => !check.ok)) return 'COULD_NOT_OBSERVE'
+  return 'PASS'
+}
+
+function gateMark(g: GateResult): string {
+  return gateStatus(g) === 'PASS' ? '✓ PASS' : gateStatus(g) === 'FAIL' ? '✗ FAIL' : '? CNO'
+}
+
+function gateExplanation(g: GateResult): string {
+  if (gateStatus(g) !== 'COULD_NOT_OBSERVE') return ''
+  if (cnoReasons.has(g.cno_reason ?? '') && cnoSources.has(g.cno_source ?? '')) {
+    return `${g.cno_reason} · ${g.cno_source}`
+  }
+  return 'MALFORMED_TYPED_OUTCOME · TRACE_READER'
 }
 
 /** Collapsed-row count label: mixed gates surface how many items failed. */
@@ -256,6 +307,7 @@ function toggleSection(id: string) {
 
 const typeClass: Record<string, string> = {
   gate_fail: 't-red',
+  gate_could_not_observe: 't-yellow',
   error: 't-red',
   gate_pass: 't-green',
   tool_call: 't-cyan',
@@ -503,13 +555,13 @@ function togglePanel(id: string) {
           @toggle="toggleSection('gates')"
         >
           <div v-if="!phaseGates.length" class="faint">no gate results</div>
-          <div v-for="g in phaseGates" :key="g.id" class="gate" :class="g.passed ? 'pass' : 'fail'">
+          <div v-for="g in phaseGates" :key="g.id" class="gate" :class="gateStatus(g).toLowerCase()">
             <template v-if="gateChecks(g)">
               <button class="gate-line gate-toggle" @click="toggleGate(g.id)">
                 <span class="chev">{{ openGates.has(g.id) ? '▾' : '▸' }}</span>
-                <span class="gate-mark">{{ g.passed ? '✓' : '✗' }}</span>
+                <span class="gate-mark">{{ gateMark(g) }}</span>
                 <span class="gate-name">{{ g.gate }}</span>
-                <span class="tag" :class="{ 'tag-fail': !g.passed }">
+                <span class="tag" :class="{ 'tag-fail': gateStatus(g) === 'FAIL' }">
                   <span class="tag-k">checks</span>
                   <span class="tag-v">{{ checksLabel(gateChecks(g) ?? []) }}</span>
                 </span>
@@ -538,14 +590,17 @@ function togglePanel(id: string) {
                   }}</span>
                   <pre v-else-if="c.note" class="check-note-block">{{ c.note }}</pre>
                 </div>
-                <ul v-if="!g.passed && violations(g).length" class="violations">
+                <ul v-if="gateStatus(g) === 'FAIL' && violations(g).length" class="violations">
                   <li v-for="(v, i) in violations(g)" :key="i">{{ v }}</li>
                 </ul>
+                <div v-if="gateStatus(g) === 'COULD_NOT_OBSERVE'" class="cno-reason">
+                  {{ gateExplanation(g) }}
+                </div>
               </div>
             </template>
             <template v-else>
               <div class="gate-line">
-                <span class="gate-mark">{{ g.passed ? '✓' : '✗' }}</span>
+                <span class="gate-mark">{{ gateMark(g) }}</span>
                 <span class="gate-name">{{ g.gate }}</span>
                 <span class="tag">
                   <span class="tag-k">attempt</span>
@@ -553,9 +608,12 @@ function togglePanel(id: string) {
                 </span>
                 <span class="dim gate-time">{{ fmtClock(g.created_at) }}</span>
               </div>
-              <ul v-if="violations(g).length" class="violations">
+              <ul v-if="gateStatus(g) === 'FAIL' && violations(g).length" class="violations">
                 <li v-for="(v, i) in violations(g)" :key="i">{{ v }}</li>
               </ul>
+              <div v-if="gateStatus(g) === 'COULD_NOT_OBSERVE'" class="cno-reason">
+                {{ gateExplanation(g) }}
+              </div>
             </template>
           </div>
         </DetailSection>
@@ -965,6 +1023,10 @@ h3:first-child {
   border-left-color: var(--red);
 }
 
+.gate.could_not_observe {
+  border-left-color: var(--amber);
+}
+
 .gate-line {
   display: flex;
   gap: 12px;
@@ -1045,6 +1107,11 @@ h3:first-child {
 
 .gate.fail .gate-mark {
   color: var(--red);
+}
+
+.gate.could_not_observe .gate-mark,
+.cno-reason {
+  color: var(--amber);
 }
 
 .gate-name {

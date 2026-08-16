@@ -63,14 +63,14 @@ If the type and the Report example drift, the agent produces what the prompt ask
 
 ## Adding a gate
 
-A gate is a callable — `gate(envelope, run) -> GateReport`. You record **one check per item you look at**, and the harness derives the verdict: any failed check is a violation, and no failed checks means pass.
+A gate is a callable — `gate(envelope, run) -> GateReport`. You record **one check per item you look at** and explicitly declare `nonempty_required`. The harness derives one typed outcome: a failed check is `FAIL`; all positive checks are `PASS`; zero required checks or unavailable evidence is `COULD_NOT_OBSERVE` (CNO), never a vacuous pass.
 
 ```python
 from adw_modules.data_types import GateReport
 
 def tests_declared_passed(envelope, run) -> GateReport:
     """Verify the envelope's own test claims, after the fact."""
-    report = GateReport()
+    report = GateReport(nonempty_required=True)
     for f in envelope.failures:
         report.check(f.test, False, f.error)
     report.check("suite", envelope.passed,
@@ -79,7 +79,7 @@ def tests_declared_passed(envelope, run) -> GateReport:
     return report
 ```
 
-`report.check(item, ok, note)` appends and returns the report, so a single-item gate is one line: `return GateReport().check(command, ok, f"exit {code}")`.
+`report.check(item, ok, note)` appends and returns the report, so a single-item gate is one line: `return GateReport(nonempty_required=True).check(command, ok, f"exit {code}")`.
 
 **Write a note on passing checks too, not just failures.** The note is the evidence, and it is what makes a green gate worth reading — `artifacts_exist ✓ 1 checked · plan.md — exists, 454B` tells you what was verified, where a bare ✓ tells you nothing. Notes on failed checks double as the reason and are what the agent is told, so phrase them as the problem: `"claimed changed file does not exist"`.
 
@@ -87,14 +87,14 @@ Rules that keep gates honest:
 
 - **Verify claims, never predict.** File names and counts are unknowable before the agent finishes; gates check what the envelope declared.
 - **Quantity as properties, not counts.** "at least one artifact", "ALL declared paths exist" — never `len(artifacts) == 3`.
-- **Record checks, don't raise.** The harness feeds the derived violations back into the same session as a correction — context intact, bounded by the phase's `retries` — and traces every check, passed or failed, to `gate_results.checks_json` and the `gate_pass`/`gate_fail` event payload.
+- **Record checks, don't raise.** The harness feeds FAIL/CNO problems back into the same session — context intact, bounded by the phase's `retries` — and traces checks plus typed outcome to `gate_results` and `gate_pass`/`gate_fail`/`gate_could_not_observe` events.
 - **Check every item, even after one fails.** Don't early-return on the first problem; the agent fixes more per correction round when it sees every failure at once, and the trace shows the full picture.
 - **Don't gate the ungateable.** Plan quality and code taste are a reviewer agent's job or a human's.
 
-A gate that returns a plain `list[str]` of violations still works — the harness adapts it — but it records no evidence for the items that passed, so prefer a `GateReport`.
+A gate that returns a plain `list[str]`, Boolean, `None`, or any other legacy value is refused as CNO (`INVALID_GATE_RETURN`). There is deliberately no truthiness fallback.
 
 Reusable gates live in `gates.py`; genuine one-offs can be defined inline at the ADW call site and passed in `gates=[...]`.
 
 ## Before you finish
 
-Run the smoke ADW — `uv run adws/adw_prompt.py "ping"` — since every module change rides the same path a real run does.
+Run the focused module tests and a gated ADW appropriate to the changed path. `adw_prompt.py` deliberately declares no evidence gate, so under the nonvacuous contract it records CNO; do not use it as a green gate smoke test.

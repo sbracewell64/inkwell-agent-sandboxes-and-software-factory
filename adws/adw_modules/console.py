@@ -13,7 +13,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.text import Text
 
-from .data_types import EnvelopeBase, EventRecord, Phase
+from .data_types import EnvelopeBase, EventRecord, GateStatus, Phase
 
 KIND_COLOR = {"engineer": "cyan", "agent": "magenta", "code": "yellow"}
 MAX_LINE = 160          # dynamic text (summaries, violations, errors) is clipped
@@ -109,13 +109,23 @@ class Console:
 
     # ── verification ────────────────────────────────────────────────────────
     def gate_result(self, name: str, report) -> None:
-        """A gate reports WHAT it checked, not just whether it passed."""
-        ok = report.passed
-        mark = "[green]✓[/green]" if ok else "[red]✗[/red]"
-        summary = (f"{len(report.checks)} checked" if ok
-                   else f"[red]{len(report.violations)} of {len(report.checks)} failed[/red]")
+        """Render PASS, FAIL, and CNO distinctly; only PASS is green."""
+        outcome = report.outcome
+        if outcome.status == GateStatus.PASS:
+            mark, level = "[green]✓ PASS[/green]", "info"
+            summary = f"{len(report.checks)} checked"
+        elif outcome.status == GateStatus.FAIL:
+            mark, level = "[red]✗ FAIL[/red]", "error"
+            summary = f"[red]{len(report.violations)} of {len(report.checks)} failed[/red]"
+        else:
+            mark, level = "[yellow]? COULD_NOT_OBSERVE[/yellow]", "warn"
+            summary = (f"[yellow]{escape(outcome.reason.value)} · "
+                       f"{escape(outcome.source.value)}[/yellow]")
         self._emit(f"  {mark} gate [dim]{escape(name)}[/dim] [dim]{summary}[/dim]",
-                   level="info" if ok else "error")
+                   level=level)
+        if outcome.status == GateStatus.COULD_NOT_OBSERVE and outcome.detail:
+            self._emit(f"    [dim yellow]{escape(_clip(outcome.detail))}[/dim yellow]",
+                       level="warn")
         for check in report.checks:
             style = "dim" if check.ok else "dim red"
             detail = f" — {_clip(check.note)}" if check.note else ""

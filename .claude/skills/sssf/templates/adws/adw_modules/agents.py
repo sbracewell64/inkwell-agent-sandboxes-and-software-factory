@@ -16,9 +16,20 @@ from typing import Optional
 import yaml
 
 from . import agent_pi, permissions, prompts
-from .data_types import (AgentCall, AgentConfig, EnvelopeBase, EventRecord,
-                         GateCheck, GateReport, Phase, PiRequest, SSSFConfig,
-                         UsageBreakdown)
+from .data_types import (
+    AgentCall,
+    AgentConfig,
+    EnvelopeBase,
+    EventRecord,
+    GateCNOReason,
+    GateCNOSource,
+    GateReport,
+    GateStatus,
+    Phase,
+    PiRequest,
+    SSSFConfig,
+    UsageBreakdown,
+)
 from .utils import new_id
 
 JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSON
@@ -144,30 +155,39 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     result = send(user_text)
     envelope, attempt = _parse_with_retries(run, phase, call, result, send)
 
-    # claim gates — violations flow back into the SAME session as corrections
+    # Claim gates use a three-valued outcome. Only explicit PASS advances; both
+    # judged defects and unavailable evidence return to the SAME session while
+    # retaining FAIL versus COULD_NOT_OBSERVE in the trace.
     for gate_attempt in range(1, max(1, phase.params.retries + 1) + 1):
-        violations = []
-        for gate in call.gates:
-            report = _as_report(gate(envelope, run))
-            found = report.violations
-            run.tracer.gate_row(phase, gate.__name__, report, gate_attempt)
+        problems = []
+        for gate_name, report in _evaluate_gates(call, envelope, run):
+            outcome = report.outcome
+            run.tracer.gate_row(phase, gate_name, report, gate_attempt)
+            event_type = {
+                GateStatus.PASS: "gate_pass",
+                GateStatus.FAIL: "gate_fail",
+                GateStatus.COULD_NOT_OBSERVE: "gate_could_not_observe",
+            }[outcome.status]
             run.tracer.event(EventRecord(
                 adw_id=run.adw_id, phase_id=phase.phase_id,
-                type="gate_fail" if found else "gate_pass", name=gate.__name__,
-                payload={"attempt": gate_attempt, "violations": found,
-                         "checks": [c.model_dump() for c in report.checks]}))
-            run.console.gate_result(gate.__name__, report)
-            violations.extend(found)
-        if not violations:
+                type=event_type, name=gate_name,
+                payload={"attempt": gate_attempt,
+                         "outcome": outcome.model_dump(mode="json"),
+                         "violations": report.violations,
+                         "checks": [c.model_dump() for c in report.checks],
+                         "nonempty_required": report.nonempty_required}))
+            run.console.gate_result(gate_name, report)
+            problems.extend(report.problems)
+        if not problems:
             break
         if gate_attempt > phase.params.retries:
-            raise GateFailure(f"{agent.name} failed gates after {gate_attempt} attempt(s):\n- "
-                              + "\n- ".join(violations))
+            raise GateFailure(f"{agent.name} did not pass gates after {gate_attempt} attempt(s):\n- "
+                              + "\n- ".join(problems))
         phase.attempt = gate_attempt
         run.console.retry(agent.name, gate_attempt, phase.params.retries,
-                          f"{len(violations)} gate violation(s)")
-        correction = ("Your previous response failed validation:\n- "
-                      + "\n- ".join(violations)
+                          f"{len(problems)} gate problem(s)")
+        correction = ("Your previous response did not pass validation:\n- "
+                      + "\n- ".join(problems)
                       + "\n\nFix these problems, then re-emit ONLY your Report JSON.")
         result = send(correction)
         envelope, attempt = _parse_with_retries(run, phase, call, result, send)
@@ -218,11 +238,39 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
 
 # ── internals ────────────────────────────────────────────────────────────────
 
-def _as_report(result) -> GateReport:
-    """Accept a GateReport, or a legacy gate that returned a violations list."""
+def _as_report(result, gate_name: str = "unknown") -> GateReport:
+    """Refuse legacy/untyped returns as CNO; never infer from their truthiness."""
     if isinstance(result, GateReport):
         return result
-    return GateReport(checks=[GateCheck(item=str(v), ok=False) for v in (result or [])])
+    return GateReport.could_not_observe(
+        GateCNOReason.INVALID_GATE_RETURN,
+        GateCNOSource.GATE_ADAPTER,
+        f"gate {gate_name!r} returned {type(result).__name__}, not GateReport",
+    )
+
+
+def _evaluate_gates(call: AgentCall, envelope: EnvelopeBase, run) -> list[tuple[str, GateReport]]:
+    """Run declared gates and make absent/raised/untyped observations explicit."""
+    if not call.gates:
+        return [("gate_discovery", GateReport.could_not_observe(
+            GateCNOReason.NO_GATES_DISCOVERED,
+            GateCNOSource.AGENT_CALL,
+            "the agent call declared zero gates",
+        ))]
+
+    reports = []
+    for gate in call.gates:
+        gate_name = getattr(gate, "__name__", type(gate).__name__)
+        try:
+            report = _as_report(gate(envelope, run), gate_name)
+        except Exception as error:
+            report = GateReport.could_not_observe(
+                GateCNOReason.GATE_RAISED,
+                GateCNOSource.GATE_EXECUTION,
+                f"gate {gate_name!r} raised {type(error).__name__}: {error}",
+            )
+        reports.append((gate_name, report))
+    return reports
 
 
 def _agent_session_id(run, agent: AgentConfig) -> str:

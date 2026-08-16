@@ -15,7 +15,7 @@ export type PhaseStatus = "queued" | "running" | "success" | "fail";
 /** phases.kind — decides which lane a block renders in. */
 export type PhaseKind = "engineer" | "code" | "agent";
 
-/** events.type — the twelve types tracer.py emits. */
+/** events.type — the closed set tracer.py emits. */
 export type EventType =
   | "phase_start"
   | "phase_end"
@@ -27,6 +27,7 @@ export type EventType =
   | "handoff"
   | "gate_pass"
   | "gate_fail"
+  | "gate_could_not_observe"
   | "log"
   | "error";
 
@@ -107,21 +108,38 @@ export interface Envelope {
   created_at: string | null;
 }
 
+export type GateStatus = "PASS" | "FAIL" | "COULD_NOT_OBSERVE";
+export type GateCNOReason =
+  | "NO_REQUIRED_OBSERVATIONS"
+  | "NO_GATES_DISCOVERED"
+  | "GATE_RAISED"
+  | "INVALID_GATE_RETURN"
+  | "LEGACY_BOOLEAN_ONLY"
+  | "MALFORMED_TYPED_OUTCOME";
+export type GateCNOSource =
+  | "GATE_REPORT"
+  | "AGENT_CALL"
+  | "GATE_EXECUTION"
+  | "GATE_ADAPTER"
+  | "SCHEMA_MIGRATION"
+  | "TRACE_READER";
+
 export interface GateResult {
   id: number;
   adw_id: string;
   phase_id: string | null;
   attempt: number | null;
   gate: string | null;
-  /** SQLite integer boolean. */
-  passed: number | null;
+  outcome: GateStatus | string | null;
+  cno_reason: GateCNOReason | string | null;
+  cno_source: GateCNOSource | string | null;
+  nonempty_required: number | null;
   /** JSON array of violation strings; "[]" on a pass. */
   violations_json: string | null;
   /**
-   * JSON array of GateCheck — the per-item evidence behind the verdict, so a
-   * green gate can say WHAT it verified rather than only that it passed.
-   * Null on rows written before the tracer recorded checks; those are not
-   * backfilled, so fall back to the verdict alone.
+   * JSON array of GateCheck — the per-item evidence behind the verdict. Null
+   * means unavailable evidence and is rendered CNO, never inferred from the
+   * legacy Boolean projection.
    */
   checks_json: string | null;
   created_at: string | null;

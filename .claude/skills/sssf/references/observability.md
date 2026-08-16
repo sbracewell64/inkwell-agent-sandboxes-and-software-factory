@@ -18,8 +18,9 @@ Location comes from `observability.db` in `sssf.config.yaml`, default `adws/adw_
 | `agent_start` | a coding agent is spawned or resumed for `ph.call(...)` |
 | `tool_call` | a tool (`read`, `bash`, `edit`, `write`) returns — **one event per real call**, named `bash: ls -la src`, payload `{tool, tool_call_id, args, result_snippet, ok, duration_ms, agent}` |
 | `handoff` | an envelope crosses from one agent to the next |
-| `gate_pass` | a gate found no failed checks — payload carries `attempt`, `checks` (the evidence), and an empty `violations` |
-| `gate_fail` | a gate found at least one failed check — payload carries `attempt`, `checks`, and `violations` |
+| `gate_pass` | a gate recorded qualifying nonempty positive evidence — payload carries typed `outcome`, `attempt`, `checks`, and `nonempty_required` |
+| `gate_fail` | a gate observed at least one failed check — payload retains typed FAIL separately from unavailable evidence |
+| `gate_could_not_observe` | required evidence was empty/unavailable, no gates were discovered, or a gate result was untyped; payload preserves closed CNO reason/source |
 | `log` | an explicit `ph.log(...)` from the ADW script |
 | `agent_end` | the agent's run completes; envelope parsed or not — payload carries `cost`, `usage` (the per-component breakdown), `context_tokens`, `context_window` |
 | `phase_end` | the block exits; carries the resolved status |
@@ -37,9 +38,13 @@ It is computed the way pi computes it for its own footer and its auto-compaction
 
 Two caveats worth knowing. Pi adds an *estimate* for any messages trailing the last assistant usage; in a batch (`-p`) run the session ends on that message, so the two agree. And if auto-compaction fires as the very last act of a run, the recorded number is the pre-compaction size — pi itself reports `null` in that window rather than guessing.
 
-**Gates record evidence, not just a verdict.** A gate returns one `{item, ok, note}` check per thing it looked at, and `violations` are derived from the failed ones. Both land in `gate_results` (`checks_json` + `violations_json`) and in the `gate_pass`/`gate_fail` payload, so a green gate can answer *what did you verify* — `{"item": "…/plan.md", "ok": true, "note": "exists, 454B"}` — rather than only *did it pass*. Rows written before this existed have `checks_json` NULL; treat that as "no evidence recorded", not "nothing checked".
+**Gates record evidence and a three-valued outcome.** `GateOutcome` in `data_types.py` is the owner of `PASS | FAIL | COULD_NOT_OBSERVE`; it cannot coerce to Boolean. A gate declares `nonempty_required` and returns one `{item, ok, note}` check per observation. A failed check is FAIL. All required observations must be present and positive to PASS. Zero required checks or unavailable evidence is CNO with a closed `cno_reason` and `cno_source`.
 
-The gate event payload carries `attempt` too, so the `gate_results` table and the event stream are equivalent sources — a live consumer can group gate results per correction round from events alone, without a second query.
+Outcome, CNO provenance, requirement, checks, and violations land in `gate_results` and the matching `gate_pass`/`gate_fail`/`gate_could_not_observe` event. Thus PASS can answer *what did you verify* — `{"item": "…/plan.md", "ok": true, "note": "exists, 454B"}` — while CNO remains distinct from a judged defect.
+
+`passed` is compatibility projection only: `1` for PASS, `0` for FAIL, and SQL NULL for CNO. Migration preserves legacy negatives as FAIL and downgrades legacy Boolean green to CNO (`LEGACY_BOOLEAN_ONLY` / `SCHEMA_MIGRATION`); old positives may have been vacuous. A reader opening a schema without typed outcome columns projects CNO (`TRACE_READER`) and never falls back to `passed`. Missing/malformed/unknown typed data and missing checks for a required PASS render CNO.
+
+The gate event payload carries `attempt` too, so the table and event stream retain the same typed result per correction round.
 
 **A `tool_call` is the one event that spans time**, so it fills both `started_at` and `ended_at` on the row — the tool's real start and return. Every other type is a point in time: `started_at` is when it was recorded and `ended_at` stays NULL. Lay tool calls out on a time axis from those columns, never by parsing `payload_json` (`duration_ms` is in the payload too, as pi's own number, but it is a convenience, not the source for layout).
 
@@ -74,7 +79,8 @@ events (
   phase_id      TEXT REFERENCES phases,   -- every event logs against adw + phase
   parent_id     TEXT,                     -- span nesting
   type          TEXT,   -- phase_start | phase_end | agent_start | agent_end | tool_call
-                        -- | handoff | gate_pass | gate_fail | log | error
+                        -- | handoff | gate_pass | gate_fail | gate_could_not_observe
+                        -- | log | error
   name          TEXT,
   payload_json  TEXT,
   tokens        INTEGER,
@@ -99,7 +105,11 @@ gate_results (
   phase_id      TEXT REFERENCES phases,
   attempt       INTEGER,
   gate          TEXT,
-  passed        INTEGER,
+  passed        INTEGER,            -- compatibility only: 1 PASS, 0 FAIL, NULL CNO
+  outcome       TEXT,               -- PASS | FAIL | COULD_NOT_OBSERVE
+  cno_reason    TEXT,               -- closed enum; required only for CNO
+  cno_source    TEXT,               -- closed enum; required only for CNO
+  nonempty_required INTEGER,        -- whether zero checks is CNO
   violations_json TEXT,             -- derived: the failed checks, as "item: note"
   checks_json   TEXT,               -- [{item, ok, note}] — everything the gate looked at
   created_at    TEXT

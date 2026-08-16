@@ -395,10 +395,22 @@ export class SssfDb {
 
   gates(adwId: string): GateResult[] {
     const checks = this.optionalColumn("gate_results", "checks_json");
+    const outcome = this.hasColumn("gate_results", "outcome")
+      ? "outcome"
+      : "'COULD_NOT_OBSERVE' AS outcome";
+    const reason = this.hasColumn("gate_results", "cno_reason")
+      ? "cno_reason"
+      : "'LEGACY_BOOLEAN_ONLY' AS cno_reason";
+    const source = this.hasColumn("gate_results", "cno_source")
+      ? "cno_source"
+      : "'TRACE_READER' AS cno_source";
+    const nonempty = this.hasColumn("gate_results", "nonempty_required")
+      ? "nonempty_required"
+      : "1 AS nonempty_required";
     return this.db
       .query<GateResult, [string]>(
-        `SELECT id, adw_id, phase_id, attempt, gate, passed, violations_json,
-                ${checks}, created_at
+        `SELECT id, adw_id, phase_id, attempt, gate, ${outcome}, ${reason},
+                ${source}, ${nonempty}, violations_json, ${checks}, created_at
            FROM gate_results WHERE adw_id = ? ORDER BY id`,
       )
       .all(adwId);

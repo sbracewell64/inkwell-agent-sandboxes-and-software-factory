@@ -1,9 +1,10 @@
 """Validation gates: verify the envelope's CLAIMS, never guesses.
 
 A gate is `gate(envelope, run) -> GateReport` — one check per item it looked at.
-Violations are derived from the failed checks and sent back to the SAME agent
-session as a correction. Every check is recorded either way, so a green gate
-says WHAT it verified instead of only that it passed.
+The typed outcome is derived from failed checks and each gate's explicit
+nonempty requirement. Failures and unavailable evidence are sent back to the
+SAME agent session as corrections. Every check is recorded either way, so PASS
+says WHAT it verified instead of only presenting an empty violations list.
 
 Gates check what is mechanically checkable; plan quality is a reviewer's job.
 """
@@ -25,7 +26,7 @@ def _size(path: Path) -> str:
 
 
 def artifacts_exist(envelope: EnvelopeBase, run) -> GateReport:
-    report = GateReport()
+    report = GateReport(nonempty_required=True)
     for a in envelope.artifacts:
         p = Path(a)
         report.check(a, p.exists(),
@@ -34,7 +35,7 @@ def artifacts_exist(envelope: EnvelopeBase, run) -> GateReport:
 
 
 def files_non_empty(envelope: EnvelopeBase, run) -> GateReport:
-    report = GateReport()
+    report = GateReport(nonempty_required=True)
     for a in envelope.artifacts:
         p = Path(a)
         if not (p.exists() and p.is_file()):
@@ -45,7 +46,7 @@ def files_non_empty(envelope: EnvelopeBase, run) -> GateReport:
 
 
 def json_parses(envelope: EnvelopeBase, run) -> GateReport:
-    report = GateReport()
+    report = GateReport(nonempty_required=True)
     for a in envelope.artifacts:
         p = Path(a)
         if p.suffix != ".json" or not p.exists():
@@ -60,7 +61,7 @@ def json_parses(envelope: EnvelopeBase, run) -> GateReport:
 
 def diff_matches_claims(envelope: EnvelopeBase, run) -> GateReport:
     """Every file claimed changed must exist on disk."""
-    report = GateReport()
+    report = GateReport(nonempty_required=True)
     for f in getattr(envelope, "changed_files", []):
         p = Path(f)
         report.check(f, p.exists(),
@@ -76,7 +77,7 @@ def verdict_consistent(envelope: EnvelopeBase, run) -> GateReport:
     rejection that names no problem, is a claim the harness can refute without
     reading a line of the diff.
     """
-    report = GateReport()
+    report = GateReport(nonempty_required=True)
     approved = bool(getattr(envelope, "approved", False))
     blocking = list(getattr(envelope, "blocking", []))
     unmet = [f.requirement for f in getattr(envelope, "findings", []) if not f.met]
@@ -103,6 +104,6 @@ def tests_pass(command: str):
         note = f"exit {result.returncode}"
         if not ok:
             note += "\n" + (result.stdout + result.stderr)[-TAIL_CHARS:]
-        return GateReport().check(command, ok, note)
+        return GateReport(nonempty_required=True).check(command, ok, note)
     gate.__name__ = f"tests_pass({command})"
     return gate

@@ -33,16 +33,16 @@ Delete the block, drop any now-unused agent from `REQUIRED_AGENTS`, and re-threa
 
 ## Add gates
 
-Gates are callables over the finished envelope — `gate(envelope, run) -> GateReport`, recording one `check(item, ok, note)` per thing they looked at, with violations derived from the failed ones. Compose them per call:
+Gates are callables over the finished envelope — `gate(envelope, run) -> GateReport`, recording one `check(item, ok, note)` per thing they looked at and declaring whether nonempty evidence is required. Compose them per call:
 
 ```python
         build = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt, previous=plan,
                                   gates=[gates.artifacts_exist, gates.diff_matches_claims]))
 ```
 
-On violations the harness does **not** restart the agent — it sends the violation list back into the **same session** as a correction (pi's `--session-id` creates-or-continues, so the context window is intact), bounded by that phase's `retries`. Every gate result is traced to the `gate_results` table. Exhausting the retries raises `GateFailure` and fails the phase.
+Only typed `PASS` advances. On `FAIL` or `COULD_NOT_OBSERVE` the harness does **not** restart the agent — it sends the distinct problem back into the **same session** as a correction (pi's `--session-id` creates-or-continues, so the context window is intact), bounded by that phase's `retries`. Every result, check, and CNO reason/source is traced to `gate_results`. Exhausting retries raises `GateFailure` and fails the phase; declaring zero gates produces CNO rather than advancement.
 
-Gate claims, not guesses: declared artifacts exist and are non-empty, declared JSON parses, declared changes appear in the diff, declared test commands pass. Never hardcode counts — express quantity as a property of the declared list ("at least one artifact", "ALL declared paths valid"). Plan quality and code taste are not gateable; that is a reviewer agent or a human. New reusable gates go in `adw_modules/gates.py` (`update_modules.md`).
+Gate claims, not guesses: declared artifacts exist and are non-empty, declared JSON parses, declared changes appear in the diff, declared test commands pass. Never hardcode counts — express quantity as a property of the declared list ("at least one artifact", "ALL declared paths valid"). This does not prove claim completeness or reconcile actual Git mutations; those are separate controls. Plan quality and code taste are not gateable; that is a reviewer agent or a human. New reusable gates go in `adw_modules/gates.py` (`update_modules.md`).
 
 ## Add a bounded fix loop
 

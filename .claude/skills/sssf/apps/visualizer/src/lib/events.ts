@@ -2,7 +2,7 @@ import type { AgentStartPayload, EventRow, ToolCallPayload } from './types'
 
 // ── Event dot colors ─────────────────────────────────────────────────────────
 // One color per event type, shared by the session-card timelines and the phase
-// detail list. gate_fail reads as an error signal on purpose.
+// detail list. FAIL is red; unavailable gate evidence is amber, never green.
 
 export const EVENT_DOT_COLORS: Record<string, string> = {
   agent_start: '#c89bff',
@@ -13,6 +13,7 @@ export const EVENT_DOT_COLORS: Record<string, string> = {
   agent_end: '#4ade80',
   error: '#ff6f67',
   gate_fail: '#ff6f67',
+  gate_could_not_observe: '#e8b64a',
 }
 
 export function dotColor(type: string | null): string | null {
