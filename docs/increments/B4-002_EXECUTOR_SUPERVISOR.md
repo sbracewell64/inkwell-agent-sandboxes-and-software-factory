@@ -77,11 +77,11 @@ present earlier in this pull request" is not "already present in the product":
 generation 1 is part of the change under review.
 
 The correction separates substrate from integration. `agent_pi.py`, `agents.py`,
-`data_types.py`, and the affected comment-only modules are byte-identical to
-`a984f6cf`, so the shipped ADW path keeps its canonical contract exactly,
-including catalog-based model resolution and same-session corrections. The
-strict adapter and supervisor land as a proven, self-contained substrate that
-nothing in production calls yet.
+`data_types.py`, `console.py`, `gates.py`, and `permissions.py` are
+byte-identical to `a984f6cf`, so the shipped ADW path keeps its canonical
+contract exactly, including catalog-based model resolution and same-session
+corrections. The strict adapter and supervisor land as a proven,
+self-contained substrate that nothing in production calls yet.
 
 Wiring it in requires an extension-transport decision — the strict contract
 passes `--no-extensions`, which shipped rosters contradict — and that is a

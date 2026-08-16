@@ -52,6 +52,13 @@ retry despite the disabled policy fails.
 No model catalog or credential store is consulted. Provider authentication or
 subscription transport is not established by this increment.
 
+This supervisor and adapter are self-contained substrate and are not wired into
+the shipped ADW execution path. `agent_pi.py` retains the canonical production
+contract, including extension forwarding, catalog-based model resolution, and
+same-session correction. Production integration requires a separate
+extension-transport decision because the strict adapter disables extensions
+that shipped rosters require.
+
 ## Windows decision
 
 The candidate does not claim that `CREATE_NEW_PROCESS_GROUP` is equivalent to
@@ -62,12 +69,14 @@ CI still executes the strict static/parser controls and the refusal fixture.
 
 ## Consequences
 
-- Existing Pi configurations that request extensions now refuse rather than
-  silently weakening the strict adapter.
-- Existing same-session continuation is not available through this adapter;
-  each invocation is one bounded, no-session attempt.
-- Context-window catalog lookup is unavailable and reports zero through the
-  legacy `PiResult` compatibility object.
+- Requests made directly to the strict adapter refuse extensions rather than
+  silently weakening its contract; existing ADW configurations continue to
+  forward their extensions through `agent_pi.py`.
+- Same-session continuation is unavailable through the strict adapter; each
+  invocation is one bounded, no-session attempt. Existing ADW continuation is
+  unchanged.
+- The strict adapter does not perform context-window catalog lookup. The
+  production adapter's catalog-based resolution is unchanged.
 - Linux can execute the full deterministic process fixtures. Windows remains
   an honest execution CNO, not a portability pass.
 - Host no-tools/read-only transport and accounting adapters remain separate
