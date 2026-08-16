@@ -1,6 +1,6 @@
 # B4-002 — Owned Executor Supervisor and Strict Pi Adapter
 
-**Status:** CORRECTED CANDIDATE; FRESH EXACT-HEAD REVIEW AND CI REQUIRED
+**Status:** CORRECTED CANDIDATE; FRESH EXACT-HEAD REVIEW REQUIRED
 **Starts from:** `a984f6cf0a89503d3db8855ccd820b83e9ee60a1`
 **Reviewed implementation:** `2291725cf0782b40ce01a17d29b6415a51b130de`
 **Proof workflow run:** `31911734134`
@@ -109,10 +109,11 @@ provider execution fails closed with the required typed refusal. It does
 `WINDOWS_PROVIDER_EXECUTION` remains `CNO/REFUSED` until a proven Job Object
 path lands.
 
-Subsequent executable corrections make this ruling provenance only. The current
-candidate requires fresh exact-candidate review and fresh nonempty Linux and
-Windows checks before landing; neither acceptance nor checks may be inferred
-from ruling `5304605032` or run `31911734134`.
+Subsequent executable corrections make this ruling provenance only. Fresh
+nonempty Linux and Windows checks completed successfully on corrected exact PR
+head `3ee9edcb8e8ba799eff647318ad6fd7983f0ffc6`. Landing remains held pending a
+fresh independent review bound to that exact head; neither acceptance nor the
+corrected checks may be inferred from ruling `5304605032` or run `31911734134`.
 
 ## Pre-launch cancellation correction
 
@@ -188,8 +189,10 @@ reviewed implementation. Browser Sol ruling `5304605032` accepted workflow run
 `2291725cf0782b40ce01a17d29b6415a51b130de`, while preserving Windows provider
 execution as `CNO/REFUSED`.
 
-That ruling is stale for landing after executable corrections. The corrected
-candidate remains CNO until fresh exact-candidate review and fresh nonempty
-Linux and Windows checks complete successfully on its own exact head. An
-absent, pending, mismatched, skipped, cancelled, neutral, timed-out, or failing
-review or check is not PASS and does not authorize landing.
+That ruling is stale for landing after executable corrections. Fresh nonempty
+Linux and Windows checks completed successfully on corrected exact PR head
+`3ee9edcb8e8ba799eff647318ad6fd7983f0ffc6`, while preserving Windows provider
+execution as `CNO/REFUSED`. The candidate remains CNO and landing remains held
+until a fresh independent review is bound to that exact head. An absent,
+pending, mismatched, skipped, cancelled, neutral, timed-out, or failing review
+is not PASS and does not authorize landing.

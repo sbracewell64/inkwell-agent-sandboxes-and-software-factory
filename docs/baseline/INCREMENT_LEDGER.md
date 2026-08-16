@@ -24,7 +24,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | B3-004 | PASS | SQLite-free Windows host observability | implementation candidate `9d160bb` passed runtime/validator proof without external sqlite3; first published closure `15bbea9` later found to contain three trailing-whitespace violations |
 | B3-004-H1 | PASS | Post-freeze B3-004 closure hygiene correction | candidate `1b892ab` passed staged and committed whitespace gates; original B3-004 tag preserved; clean correction state frozen separately |
 | B4-001 | PASS | Non-vacuous deterministic GitHub CI bootstrap | run `31907345967` on reviewed head `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: Ubuntu and Windows each discovered/executed 6/6 observed-good checks and passed Inkwell 30/30 with 230 assertions; closure successor and later `main` push require fresh checks |
-| B4-002 | CORRECTED CANDIDATE — CNO | Provider-neutral subprocess supervisor + strict Pi JSON/print adapter | Browser Sol ruling `5304605032` and run `31911734134` remain provenance for reviewed head `2291725cf0782b40ce01a17d29b6415a51b130de` but are stale for landing after executable corrections; fresh exact-candidate review and nonempty Linux/Windows checks required; Windows provider execution remains CNO/refused |
+| B4-002 | CORRECTED CANDIDATE — CNO | Provider-neutral subprocess supervisor + strict Pi JSON/print adapter | Fresh nonempty Linux/Windows checks completed successfully on corrected exact PR head `3ee9edcb8e8ba799eff647318ad6fd7983f0ffc6`; landing remains held for fresh independent exact-head review; Windows provider execution remains CNO/refused |
 
 ## Future increments
 
