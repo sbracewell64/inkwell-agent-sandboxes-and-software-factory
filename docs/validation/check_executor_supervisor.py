@@ -217,6 +217,29 @@ def static_contract(errors: list[str]) -> None:
                 ),
                 "pi-environment-not-allowlisted",
             ),
+            (
+                request(
+                    temp,
+                    "success",
+                    phase_id="sensitive-app-secret",
+                    environment={"APP_SECRET": "fixture-not-a-secret"},
+                    environment_allowlist=frozenset({"APP_SECRET"}),
+                ),
+                "pi-sensitive-environment-refused",
+            ),
+            # A credential-style name the fragment list still does not spell
+            # out. The fixed process-mechanics allowlist is what refuses it, so
+            # closing this gap never depended on enumerating every secret word.
+            (
+                request(
+                    temp,
+                    "success",
+                    phase_id="sensitive-signing-passphrase",
+                    environment={"SIGNING_PASSPHRASE": "fixture-not-a-secret"},
+                    environment_allowlist=frozenset({"SIGNING_PASSPHRASE"}),
+                ),
+                "pi-environment-not-allowlisted",
+            ),
         ):
             result = run_pi_json(bad)
             assert_reason(result, code, Observation.COULD_NOT_OBSERVE, errors)
@@ -578,7 +601,7 @@ def main() -> int:
             print(f"FAIL: {error}")
         return 1
     print("executor-supervisor: PASS")
-    print("watched-red: inherited stdin, malformed/missing/duplicate terminal, structured shell-zero error, hidden retry, timeout, overflow, cancellation (live, late, pre-set, pre-launch-setup)")
+    print("watched-red: inherited stdin, malformed/missing/duplicate terminal, structured shell-zero error, hidden retry, timeout, overflow, cancellation (live, late, pre-set, pre-launch-setup), fragment-free credential environment names")
     print("provider-calls: 0")
     return 0
 
