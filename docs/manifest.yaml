@@ -27,3 +27,33 @@ repository:
   upstream: https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git
   accepted_branch: main
   development_branch_pattern: increment/*
+foundational_sources:
+  super_simple_software_factory:
+    repository: https://github.com/disler/super-simple-software-factory.git
+    role: foundational_inner_factory_reference
+    relationship: standalone SSSF skill and factory source from which the embedded factory layer derives
+    observed_refs:
+      main: de31374882e7a4e3e5b7bb9bd09e69dc2f779356
+      example: b2dcb8e436db9b10f7580d7568b3e251609eb36b
+    reference_scope: full_git_repository_including_code_docs_skills_templates_examples_and_history
+    preservation_status: external_repository_pinned_by_exact_git_identity
+  factory_in_a_box:
+    repository: https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git
+    role: foundational_integrated_three_tier_reference
+    relationship: integrates Inkwell, embedded SSSF, and the host/sandbox orchestration layers
+    observed_refs:
+      main: 92f1701810993b8303562265ba04c727468fe070
+    reference_scope: full_git_repository_including_code_docs_skills_recipes_examples_and_history
+    preservation_status: preserved_in_canonical_fork_lineage_and_pinned_by_exact_git_identity
+foundational_source_policy:
+  instruction: >-
+    For inherited SSSF or Factory-In-A-Box architecture, behavior, or design questions,
+    inspect the relevant foundational repository at an exact Git revision and consult the
+    full source tree as needed; do not rely on README summaries alone.
+  current_authority: >-
+    Foundational repositories explain lineage and reusable design. Current canonical SSSF
+    code, configuration, immutable evidence, and accepted Git objects remain authoritative
+    for present behavior.
+  freshness: >-
+    Pinned refs preserve the historical foundation. When researching later upstream ideas,
+    inspect the then-current upstream separately and record its exact identity before use.
