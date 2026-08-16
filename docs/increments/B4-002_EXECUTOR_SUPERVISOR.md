@@ -110,13 +110,15 @@ provider execution fails closed with the required typed refusal. It does
 path lands.
 
 Subsequent executable corrections make this ruling provenance only. Workflow
-run `31917258787` completed nonempty Linux and Windows checks successfully on
-corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7`. The closing
-documentation commit advances the head past that observation, so landing
-requires a fresh independent review, and its own nonempty Linux and Windows
-checks, bound to the final exact head. A check result observed on one head is
-never evidence for another, and neither acceptance nor the corrected checks may
-be inferred from ruling `5304605032` or run `31911734134`.
+run `31917258787` on corrected head
+`5447b56eac128c4dad80d751fbfa3c0144ee7cf7` returned `total_count: 2`.
+`deterministic (ubuntu-24.04)` and `deterministic (windows-2022)` both completed
+with conclusion `success`. This closing documentation change advances the head
+again, past that observation, so landing requires a fresh independent review
+and its own nonempty Linux and Windows checks bound to the final exact head. A
+check result observed on one head is never evidence for another, and neither
+acceptance nor the corrected checks may be inferred from ruling `5304605032` or
+run `31911734134`.
 
 ## Pre-launch cancellation correction
 
@@ -193,11 +195,14 @@ reviewed implementation. Browser Sol ruling `5304605032` accepted workflow run
 execution as `CNO/REFUSED`.
 
 That ruling is stale for landing after executable corrections. Run
-`31917258787` completed nonempty Linux and Windows checks successfully on
-corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7`, while preserving
-Windows provider execution as `CNO/REFUSED`. The candidate remains CNO and
-landing remains held until a fresh independent review, and the nonempty Linux
-and Windows checks observed on that same final head, are bound to the exact
-bytes being landed. An absent, empty, mismatched, skipped, cancelled, neutral,
-timed-out, or failing review or check is not PASS and does not authorize
-landing, and a check observed on an earlier head never qualifies a later one.
+`31917258787` on corrected head
+`5447b56eac128c4dad80d751fbfa3c0144ee7cf7` returned `total_count: 2`;
+`deterministic (ubuntu-24.04)` and `deterministic (windows-2022)` both completed
+with conclusion `success`, while Windows provider execution remained
+`CNO/REFUSED`. This closing documentation change advances the head again. The
+candidate remains CNO and landing remains held until a fresh independent review
+and nonempty Linux and Windows checks observed on that same final exact head are
+bound to the bytes being landed. An absent, empty, mismatched, skipped,
+cancelled, neutral, timed-out, or failing review or check is not PASS and does
+not authorize landing, and a check observed on an earlier head never qualifies
+a later one.
