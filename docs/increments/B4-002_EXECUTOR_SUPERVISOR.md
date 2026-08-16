@@ -109,11 +109,14 @@ provider execution fails closed with the required typed refusal. It does
 `WINDOWS_PROVIDER_EXECUTION` remains `CNO/REFUSED` until a proven Job Object
 path lands.
 
-Subsequent executable corrections make this ruling provenance only. Fresh
-nonempty Linux and Windows checks completed successfully on corrected exact PR
-head `3ee9edcb8e8ba799eff647318ad6fd7983f0ffc6`. Landing remains held pending a
-fresh independent review bound to that exact head; neither acceptance nor the
-corrected checks may be inferred from ruling `5304605032` or run `31911734134`.
+Subsequent executable corrections make this ruling provenance only. Workflow
+run `31917258787` completed nonempty Linux and Windows checks successfully on
+corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7`. The closing
+documentation commit advances the head past that observation, so landing
+requires a fresh independent review, and its own nonempty Linux and Windows
+checks, bound to the final exact head. A check result observed on one head is
+never evidence for another, and neither acceptance nor the corrected checks may
+be inferred from ruling `5304605032` or run `31911734134`.
 
 ## Pre-launch cancellation correction
 
@@ -189,10 +192,12 @@ reviewed implementation. Browser Sol ruling `5304605032` accepted workflow run
 `2291725cf0782b40ce01a17d29b6415a51b130de`, while preserving Windows provider
 execution as `CNO/REFUSED`.
 
-That ruling is stale for landing after executable corrections. Fresh nonempty
-Linux and Windows checks completed successfully on corrected exact PR head
-`3ee9edcb8e8ba799eff647318ad6fd7983f0ffc6`, while preserving Windows provider
-execution as `CNO/REFUSED`. The candidate remains CNO and landing remains held
-until a fresh independent review is bound to that exact head. An absent,
-pending, mismatched, skipped, cancelled, neutral, timed-out, or failing review
-is not PASS and does not authorize landing.
+That ruling is stale for landing after executable corrections. Run
+`31917258787` completed nonempty Linux and Windows checks successfully on
+corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7`, while preserving
+Windows provider execution as `CNO/REFUSED`. The candidate remains CNO and
+landing remains held until a fresh independent review, and the nonempty Linux
+and Windows checks observed on that same final head, are bound to the exact
+bytes being landed. An absent, empty, mismatched, skipped, cancelled, neutral,
+timed-out, or failing review or check is not PASS and does not authorize
+landing, and a check observed on an earlier head never qualifies a later one.

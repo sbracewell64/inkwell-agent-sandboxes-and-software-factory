@@ -95,7 +95,7 @@
 | B4-002 reviewed Linux PR-head projection | run `31911734134` completed the nonempty Linux checks on exact reviewed head `2291725cf0782b40ce01a17d29b6415a51b130de` | PASS — RULING `5304605032` |
 | B4-002 reviewed Windows PR-head projection | run `31911734134` completed the nonempty Windows static/parser/refusal checks on the same exact reviewed head | PASS — FAIL-CLOSED REFUSAL PROJECTION |
 | WINDOWS_PROVIDER_EXECUTION | green Windows CI proves refusal, not provider launch, Job Object custody, or descendant cleanup | CNO/REFUSED |
-| B4-002 corrected candidate execution | fresh nonempty Linux and Windows checks completed successfully on corrected exact PR head `3ee9edcb8e8ba799eff647318ad6fd7983f0ffc6`; fresh independent exact-head review remains required for landing; ruling `5304605032` is provenance only | CHECKS PASS; REVIEW CNO |
+| B4-002 corrected candidate execution | run `31917258787` completed nonempty Linux and Windows checks successfully on corrected head `5447b56eac128c4dad80d751fbfa3c0144ee7cf7`; the closing documentation commit advances the head, so the fresh independent review and its own nonempty checks must bind to the final exact head; ruling `5304605032` is provenance only | CHECKS PASS AT `5447b56e`; FINAL-HEAD REVIEW CNO |
 
 ## Rule
 
