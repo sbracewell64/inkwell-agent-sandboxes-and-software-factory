@@ -146,10 +146,17 @@ redo; a write has already happened, so re-prompting fixes nothing. Instead:
 
 1. every unauthorized change the agent **introduced** is rolled back — tracked
    files with `git checkout --`, untracked files by deletion;
-2. a path that was **already dirty** before the agent ran is left untouched. The
-   operator had uncommitted work there, and discarding it to tidy up would be
-   the same harm this module exists to prevent;
-3. the phase fails and names every path with what happened to it.
+2. before the agent runs, the current bytes of already-dirty regular files up
+   to 1 MiB are preserved in memory; if the agent overwrites, deletes, or reverts
+   one, those exact bytes are restored;
+3. when at most three unauthorized paths were all deleted, rolled back, or
+   restored, the console names the recovered slip and the phase continues;
+4. an unrecoverable path or more than three unauthorized paths fails the phase
+   and names every path with what happened to it.
+
+Preservation is best-effort. A file that cannot be read, vanishes during the
+snapshot, or exceeds 1 MiB retains the fail-closed behavior if the agent changes
+it; the cleanup never guesses what the operator's bytes were.
 
 ```yaml
 defaults:

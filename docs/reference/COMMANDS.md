@@ -45,6 +45,13 @@ Validate installed, template, and disposable generated ADW contracts without a p
 uv run docs/validation/check_adw_synchronization.py
 ```
 
+Validate byte parity for the mapped live/template surface, including its
+watched-red controls, with the standard library only:
+
+```text
+python docs/validation/check_surface_mirror.py
+```
+
 ## Sandbox
 
 ```text

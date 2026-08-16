@@ -52,9 +52,12 @@ checks, and the nonempty requirement.
 
 Existing genuine controls keep their bounded meaning: nonempty artifact gates
 prove the declared artifact observations they actually recorded, and permission
-enforcement remains a separate post-agent boundary. Neither is presented as
-proof that an envelope listed every real repository mutation; Git/content claim
-reconciliation belongs to a later increment.
+enforcement remains a separate post-agent boundary. Before an agent runs, that
+boundary preserves up to 1 MiB of each already-dirty file. It restores those
+bytes when necessary and permits at most three fully recovered out-of-scope
+writes to continue; an unrecovered or larger breach fails the phase. Neither
+control is presented as proof that an envelope listed every real repository
+mutation; Git/content claim reconciliation belongs to a later increment.
 
 Legacy `gate_results.passed` is retained only as a compatibility projection
 (`1` PASS, `0` FAIL, `NULL` CNO). Schema migration preserves an old explicit
@@ -89,3 +92,9 @@ Every ADW must end through the run finish path with an explicit accepted conditi
 ## Static synchronization
 
 `docs/validation/check_adw_synchronization.py` is the authority for the installed, skill-template, and disposable generated ADW contract. It checks a nonempty surface inventory, statically resolves imported module attributes, requires concrete typed agent calls and exactly one `run.finish()` as the final top-level return from `main()` after a bounded fallthrough prefix, reconciles PEP 723 dependencies with imports, and matches prompt Report fields to output models. Its generated import smoke does not execute `main()` or call a provider.
+
+That internal-contract validator does not compare the installed and template
+surfaces. `docs/validation/surface_mirror_manifest.json` owns the mapped path
+pairs and reviewed divergences; `check_surface_mirror.py` requires byte parity
+for every other path. It reports CNO for a vacuous or unreviewable comparison
+and runs watched-red content mutations on every invocation.

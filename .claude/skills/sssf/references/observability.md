@@ -16,6 +16,8 @@ Location comes from `observability.db` in `sssf.config.yaml`, default `adws/adw_
 |---|---|
 | `phase_start` | a `run.phase(...)` block is entered |
 | `agent_start` | a coding agent is spawned or resumed for `ph.call(...)` |
+| `thinking` | a complete assistant `message_end` carries one or more thinking blocks; payload includes clipped text, `stop_reason`, and agent |
+| `agent_message` | a complete assistant `message_end` carries one or more text blocks; payload includes clipped text, `stop_reason`, and agent |
 | `tool_call` | a tool (`read`, `bash`, `edit`, `write`) returns — **one event per real call**, named `bash: ls -la src`, payload `{tool, tool_call_id, args, result_snippet, ok, duration_ms, agent}` |
 | `handoff` | an envelope crosses from one agent to the next |
 | `gate_pass` | a gate recorded qualifying nonempty positive evidence — payload carries typed `outcome`, `attempt`, `checks`, and `nonempty_required` |
@@ -26,7 +28,10 @@ Location comes from `observability.db` in `sssf.config.yaml`, default `adws/adw_
 | `phase_end` | the block exits; carries the resolved status |
 | `error` | a raise inside a phase block |
 
-`parent_id` nests spans, so an agent phase expands into its tool-call spans in the UI.
+`message_update` deltas are deliberately not traced: only complete assistant
+messages become `thinking` or `agent_message` events, before the tool call they
+narrate. `parent_id` nests spans, so an agent phase expands into its tool-call
+spans in the UI.
 
 **Spend is itemised per phase.** `agent_end.usage` carries tokens *and* dollars for each component pi reports — `input`, `output`, `cache_read`, `cache_write` — summed across every send the phase made, so a phase that retried on a bad envelope or a failed gate shows what all its attempts cost, not just the last one. The four components sum to `total_tokens`, and their costs sum to `total_cost`; the visualizer's Cost panel renders them as a table you can add up by eye.
 
@@ -78,7 +83,8 @@ events (
   adw_id        TEXT REFERENCES sessions,
   phase_id      TEXT REFERENCES phases,   -- every event logs against adw + phase
   parent_id     TEXT,                     -- span nesting
-  type          TEXT,   -- phase_start | phase_end | agent_start | agent_end | tool_call
+  type          TEXT,   -- phase_start | phase_end | agent_start | agent_end
+                        -- | thinking | agent_message | tool_call
                         -- | handoff | gate_pass | gate_fail | gate_could_not_observe
                         -- | log | error
   name          TEXT,
