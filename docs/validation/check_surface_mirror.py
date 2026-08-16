@@ -82,6 +82,9 @@ def load_manifest(path: Path, findings: Findings) -> dict | None:
     except (OSError, json.JSONDecodeError) as exc:
         findings.cno.append(f"manifest could not be observed: {exc}")
         return None
+    if not isinstance(document, dict):
+        findings.cno.append("manifest must be a JSON object")
+        return None
     if document.get("schema_version") != 1:
         findings.cno.append("manifest schema_version must be 1")
         return None
@@ -254,8 +257,12 @@ def red_controls(root: Path, manifest_path: Path) -> RedControls:
     do that means the instrument is not measuring content parity, which is CNO
     rather than something to pass over.
     """
-    document = json.loads(manifest_path.read_text(encoding="utf-8"))
     control = RedControls()
+    manifest_findings = Findings()
+    document = load_manifest(manifest_path, manifest_findings)
+    if document is None:
+        control.problems.extend(manifest_findings.cno)
+        return control
     baseline = {line.split("\n", 1)[0] for line in validate(root, manifest_path).fail}
     for name, target, kind, expected in MUTATIONS:
         with tempfile.TemporaryDirectory(prefix="sssf-mirror-red-") as directory:
