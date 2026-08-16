@@ -119,6 +119,15 @@ docs/validation/check_executor_supervisor.py
 docs/validation/check_production_extension_path.py
                           shipped harness_engineering rosters drive the real agent_pi launch
                           path; extensions must be forwarded as -e, never rejected.
+docs/validation/mapped_surface_contract.json
+                          authoritative template<->live relations and the non-isomorphic
+                          stamp mapping transcribed from install.py.
+docs/validation/check_mapped_surface_parity.py
+                          mapped content parity, structured matched/intentional/drift state,
+                          watched-red calibration re-run on every invocation.
+docs/validation/check_stamped_substrate.py
+                          fresh disposable stamp: reconciled substrate arrives, intentional
+                          scaffold and user-owned divergence survives.
 ```
 
 ## `tools/` — repository-owned utilities

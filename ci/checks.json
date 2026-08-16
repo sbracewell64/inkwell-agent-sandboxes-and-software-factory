@@ -37,8 +37,13 @@
       "timeout_seconds": 60
     },
     {
-      "id": "live-template-surface-mirror-validator",
-      "command": ["{python}", "docs/validation/check_surface_mirror.py"],
+      "id": "mapped-surface-parity-validator",
+      "command": ["{python}", "docs/validation/check_mapped_surface_parity.py"],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "stamped-substrate-validator",
+      "command": ["{python}", "docs/validation/check_stamped_substrate.py"],
       "timeout_seconds": 60
     },
     {

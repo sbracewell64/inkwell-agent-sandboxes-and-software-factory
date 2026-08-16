@@ -27,6 +27,24 @@ Run from the **target repo root** — the cwd is where everything lands. If the 
 
 The two `*_engineering` dirs mirror the two config keys of the same name: `prompt_engineering` is what an agent is told, `harness_engineering` is what its harness can do. Both are yours the moment they are stamped. Edit them in `adws/adw_data/`, never back inside the skill.
 
+## The mapping is not a mirror
+
+Read the "From" column again: **template paths stamp to different live paths.** `templates/prompt_engineering/` becomes `adws/adw_data/prompt_engineering/`, `templates/sssf.config.yaml` becomes `adws/adw_sssf_config/sssf.config.yaml`, `templates/env.sample` becomes `.env.sample`. The two surfaces are a *mapping*, not a mirror, so comparing them by relative path — `diff -rq adws .claude/skills/sssf/templates/adws` — is not a parity check. It reports correctly-mapped trees as missing and tells you nothing about the paths it does line up.
+
+The authority for that mapping is the `stamp()` calls in `install.py`'s `main()`. **`docs/validation/mapped_surface_contract.json`** transcribes them and assigns every governed path exactly one relation:
+
+| Relation | Meaning |
+|---|---|
+| `EXACT_MIRROR` | Mapped content identity is required. Fails closed on divergent bytes or a missing counterpart. The module tree and both `*_engineering` trees are this. |
+| `CONTRACT_ONLY` | Bodies may diverge, but a **named** verifier proves a **named** property. The property is the obligation — a filename is not proof. |
+| `TEMPLATE_SCAFFOLD` | The template copy is a deliberate placeholder a stamped repo is expected to replace. `adw_modules/quality.py` is this: its blocks ship as `echo`s that announce they are fake, because a stamped repo cannot guess your test runner. Its shared API (`run_inkwell_tests`, `run_inkwell_quality`) is still enforced by name. |
+| `USER_OWNED` | Stamped once as a starter, then yours. `sssf.config.yaml`, `.env.sample` and the `justfile` are this — `install.py` skips them when they already exist, so divergence is the designed steady state, not drift. |
+| `LIVE_ONLY` | Present in this repository by design and never stamped, such as the alternate rosters selected with `--config`. |
+
+An added, removed, or divergent governed path with **no declared relation** is a non-pass, never a silent accept. `docs/validation/check_mapped_surface_parity.py` enforces this and emits the status as structured state; `docs/validation/check_stamped_substrate.py` stamps into a disposable directory and checks what a fresh install really receives. Both run in CI.
+
+If you change a `stamp()` call, update the contract in the same commit — the contract is a transcription, and a stale transcription is worse than none.
+
 `harness_engineering/` ships with `subagents.ts` — the pi extension backing `subagent_create` / `_continue` / `_list` / `_remove`, wired to the planner and scout in the starter roster.
 
 ## Idempotency

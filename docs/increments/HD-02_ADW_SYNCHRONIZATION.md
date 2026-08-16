@@ -58,3 +58,36 @@ Accepted inventory at implementation time:
 - 16 watched-red fixtures.
 
 The validator printed `HD-02 ADW synchronization: PASS`, `compound-reachability-red-controls: PASS`, `top-level-final-return-finish-contract: PASS`, and `prefix-fallthrough-contract: PASS`. No provider/model or sandbox was invoked.
+
+## Claim boundary — added 2026-08-16, normative clarification
+
+Everything above stands as recorded. This section adds no claim and withdraws
+none; it names the boundary of the claim that was always being made, because the
+word "synchronization" in this increment's title reads wider than what its
+validator checks.
+
+**What `check_adw_synchronization.py` verifies:** the internal CONTRACT SHAPE of
+each surface, independently — imports and imported module attributes resolve
+against that surface's own `adw_modules` tree, every `AgentCall` names a concrete
+`EnvelopeBase` subclass, exactly one top-level final-return `run.finish()`, PEP
+723 dependencies reconcile with imports, and prompt `Report` fields match their
+output model. It constructs installed, template and generated surfaces and loops
+over them one at a time.
+
+**What it does not verify, and never claimed to:** that the installed and
+template surfaces hold the SAME CONTENT. It performs no cross-surface digest or
+byte comparison. Both surfaces can satisfy every contract above while a module
+differs between them, and this validator will correctly print `PASS`.
+
+That is not a defect in this increment — it is outside its boundary. But the
+gap was real and unowned, and it is how the live/template drift repaired in the
+mapped-surface increment went undetected: a validator named "ADW synchronization"
+was green while four modules and five prompts differed across the surfaces it
+names.
+
+**Content parity now has its own owner:** `docs/validation/check_mapped_surface_parity.py`,
+governed by `docs/validation/mapped_surface_contract.json`. The two validators are
+deliberately separate rather than merged — one owns contract shape, the other owns
+the mapped content relationship, and mixing those semantics for naming convenience
+would make both harder to reason about. This validator is preserved unchanged; its
+verdict is not broadened retroactively by the existence of the newer one.

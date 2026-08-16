@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "_doc": [
+    "AUTHORITATIVE contract for the relationship between installable skill-template",
+    "bytes and live repository bytes.",
+    "",
+    "The two surfaces are NOT a subtree mirror. install.py stamps template paths to",
+    "DIFFERENT live paths, so a raw relative-path or `diff -rq` comparison is not an",
+    "authoritative parity model — it reports correctly-mapped trees as absent. Every",
+    "mapping below is transcribed from the stamp() calls in install.py's main(),",
+    "which are the source of truth; docs describe that mapping but do not define it.",
+    "",
+    "Every governed path resolves to exactly one typed relation. An added, removed,",
+    "or divergent governed path with no declared relation is NON-PASS or CNO — never",
+    "silently accepted."
+  ],
+
+  "authority": {
+    "mapping_source": ".claude/skills/sssf/scripts/install.py",
+    "mapping_symbol": "main() stamp() calls",
+    "note": "If install.py's stamp calls change, this contract is stale and the verifier must be updated with it."
+  },
+
+  "relations": {
+    "EXACT_MIRROR": "Mapped content identity is required. Fails closed on divergent bytes and on a counterpart missing from either surface.",
+    "CONTRACT_ONLY": "Bodies may diverge, but a NAMED verifier proves a NAMED property. The property, not the filename, is the obligation.",
+    "TEMPLATE_SCAFFOLD": "The template copy is a deliberate generic placeholder that a stamped repo is expected to replace. Body divergence is correct; any shared API contract is declared separately and still enforced.",
+    "USER_OWNED": "Stamped once as a starter, then owned by the target repo. install.py skips it when it already exists, so divergence is the designed steady state.",
+    "LIVE_ONLY": "Present on the live surface by design and never stamped. Must be declared to stay distinguishable from an omitted stamping substrate."
+  },
+
+  "ignore": ["__pycache__", ".pyc"],
+
+  "surfaces": [
+    {
+      "id": "adw-tree",
+      "template": ".claude/skills/sssf/templates/adws",
+      "live": "adws",
+      "install_py": "stamp(TEMPLATES / \"adws\", root / \"adws\")",
+      "recursive": true,
+      "default_relation": "EXACT_MIRROR",
+      "rationale": "install.md:22 — the template module tree carries 'all low-level logic', and the twelve starter ADWs are stamped verbatim. This is the substrate a stamped repo runs on, so one-sided edits are drift by default.",
+      "exclude_live": ["adw_data", "adw_sssf_config"],
+      "exclude_reason": "These live subtrees are stamped from DIFFERENT template roots, or are live-only. Each excluded prefix must be claimed by another surface or by live_only below; an unclaimed exclusion is a silent escape and is refused."
+    },
+    {
+      "id": "prompt-engineering",
+      "template": ".claude/skills/sssf/templates/prompt_engineering",
+      "live": "adws/adw_data/prompt_engineering",
+      "install_py": "stamp(TEMPLATES / \"prompt_engineering\", root / \"adws\" / \"adw_data\" / \"prompt_engineering\")",
+      "recursive": true,
+      "default_relation": "EXACT_MIRROR",
+      "rationale": "Non-isomorphic mapping: template root and live root differ. A stamped repo must receive the same agent instructions the live surface runs, including any mechanism notice that describes runtime behaviour such as out-of-scope write rollback."
+    },
+    {
+      "id": "harness-engineering",
+      "template": ".claude/skills/sssf/templates/harness_engineering",
+      "live": "adws/adw_data/harness_engineering",
+      "install_py": "stamp(TEMPLATES / \"harness_engineering\", root / \"adws\" / \"adw_data\" / \"harness_engineering\")",
+      "recursive": true,
+      "default_relation": "EXACT_MIRROR",
+      "rationale": "Non-isomorphic mapping. Pi extensions backing declared tools must be identical, or a stamped roster declares a tool its extension cannot serve."
+    },
+    {
+      "id": "roster-config",
+      "template": ".claude/skills/sssf/templates/sssf.config.yaml",
+      "live": "adws/adw_sssf_config/sssf.config.yaml",
+      "install_py": "stamp(TEMPLATES / \"sssf.config.yaml\", root / \"adws\" / \"adw_sssf_config\" / \"sssf.config.yaml\")",
+      "recursive": false,
+      "default_relation": "USER_OWNED",
+      "owner": "target repository operator",
+      "rationale": "The agent roster. install.md:19 marks it user-owned and install.md:34 warns that --force overwrites operator edits, so template and live are meant to diverge the moment it is stamped.",
+      "evidence": ".claude/skills/sssf/cookbooks/install.md:19,34"
+    },
+    {
+      "id": "env-sample",
+      "template": ".claude/skills/sssf/templates/env.sample",
+      "live": ".env.sample",
+      "install_py": "stamp(TEMPLATES / \"env.sample\", root / \".env.sample\")",
+      "recursive": false,
+      "default_relation": "USER_OWNED",
+      "owner": "target repository operator",
+      "rationale": "Non-isomorphic mapping: templates/env.sample stamps to a DOTFILE at the repo root. The template documents provider keys generically ('WHICH KEYS YOU NEED DEPENDS ON YOUR ROSTER'); the live copy is specific to this repo's single-provider OpenRouter setup. install.py skips it when present.",
+      "evidence": ".claude/skills/sssf/scripts/install.py stamp() skip-if-exists; template env.sample header vs live .env.sample header"
+    },
+    {
+      "id": "justfile",
+      "template": ".claude/skills/sssf/templates/justfile",
+      "live": "justfile",
+      "install_py": "stamp(TEMPLATES / \"justfile\", root / \"justfile\")",
+      "recursive": false,
+      "default_relation": "USER_OWNED",
+      "owner": "target repository operator",
+      "rationale": "Starter recipes only. install.py's own comment says it is 'Skipped like any other file if the repo already has a justfile', and the live copy carries repo-specific shell settings and application recipes.",
+      "evidence": ".claude/skills/sssf/scripts/install.py:77-80; .claude/skills/sssf/cookbooks/install.md:25"
+    }
+  ],
+
+  "overrides": [
+    {
+      "surface": "adw-tree",
+      "path": "adw_modules/quality.py",
+      "relation": "TEMPLATE_SCAFFOLD",
+      "owner": "target repository operator",
+      "rationale": "The template copy ships placeholder blocks that exit 0 and announce they are fake, because a stamped repo cannot guess its own test runner and a wrong-but-plausible command that silently passes is worse than one that says so. The live copy is wired to this repo's real commands. Copying either body over the other is a defect, not a repair.",
+      "evidence": ".claude/skills/sssf/templates/adws/adw_modules/quality.py banner 'REPLACE THE PLACEHOLDER COMMANDS BELOW'",
+      "contract": {
+        "property": "Both surfaces must define the shared quality API as module-level callables, so every stamped ADW call site resolves on both surfaces even though the bodies differ.",
+        "required_exports": ["run_inkwell_tests", "run_inkwell_quality", "as_envelope"],
+        "verifier": "docs/validation/check_mapped_surface_parity.py",
+        "verifier_symbol": "check_contract_exports",
+        "corroborating_verifier": "docs/validation/check_adw_synchronization.py",
+        "corroborating_property": "resolves imported adw_modules attributes per surface, so a call site naming a removed export fails there too",
+        "note": "The named property is the obligation. A filename or a validator's name is not proof, which is why the exact exports and the exact verifier symbol are written down here."
+      }
+    }
+  ],
+
+  "coupled": [
+    {
+      "surface": "adw-tree",
+      "members": ["adw_modules/pi_json_adapter.py", "adw_modules/subprocess_supervisor.py"],
+      "rationale": "pi_json_adapter imports subprocess_supervisor directly, so a stamped state carrying the adapter without its supervisor is broken on import. They stamp together or not at all.",
+      "evidence": "adws/adw_modules/pi_json_adapter.py 'from .subprocess_supervisor import ...'; ruling 5308853615 lines 26,35"
+    }
+  ],
+
+  "live_only": [
+    {
+      "path": "adws/adw_sssf_config/sssf.deepestseek.config.yaml",
+      "relation": "LIVE_ONLY",
+      "owner": "this repository",
+      "rationale": "Alternate roster. install.py stamps exactly one config; additional rosters are selected with --config or SSSF_CONFIG and are a live-surface concept.",
+      "evidence": ".claude/skills/sssf/references/config.md:5; docs/baseline/PROOF_MATRIX.md:99 counts five rosters as a live-surface property"
+    },
+    {
+      "path": "adws/adw_sssf_config/sssf.frontier.config.yaml",
+      "relation": "LIVE_ONLY",
+      "owner": "this repository",
+      "rationale": "Alternate roster; see sssf.deepestseek.config.yaml.",
+      "evidence": "docs/baseline/PROOF_MATRIX.md:99"
+    },
+    {
+      "path": "adws/adw_sssf_config/sssf.open-weights.config.yaml",
+      "relation": "LIVE_ONLY",
+      "owner": "this repository",
+      "rationale": "Alternate roster; see sssf.deepestseek.config.yaml.",
+      "evidence": "docs/baseline/PROOF_MATRIX.md:99"
+    },
+    {
+      "path": "adws/adw_sssf_config/sssf.top-speed.config.yaml",
+      "relation": "LIVE_ONLY",
+      "owner": "this repository",
+      "rationale": "Alternate roster; see sssf.deepestseek.config.yaml.",
+      "evidence": "docs/baseline/PROOF_MATRIX.md:99"
+    },
+    {
+      "path": "adws/adw_data/sessions",
+      "relation": "LIVE_ONLY",
+      "owner": "runtime",
+      "rationale": "Created at runtime and gitignored by install.py's ensure_gitignore; never stamped.",
+      "evidence": ".claude/skills/sssf/cookbooks/install.md:26"
+    },
+    {
+      "path": "adws/adw_data/sssf.db",
+      "relation": "LIVE_ONLY",
+      "owner": "runtime",
+      "rationale": "Created at runtime and gitignored; never stamped.",
+      "evidence": ".claude/skills/sssf/cookbooks/install.md:26"
+    }
+  ]
+}

@@ -44,8 +44,11 @@ EXPECTED_CHECKS = {
     "production-extension-path-validator": (
         "{python}", "docs/validation/check_production_extension_path.py"
     ),
-    "live-template-surface-mirror-validator": (
-        "{python}", "docs/validation/check_surface_mirror.py"
+    "mapped-surface-parity-validator": (
+        "{python}", "docs/validation/check_mapped_surface_parity.py"
+    ),
+    "stamped-substrate-validator": (
+        "{python}", "docs/validation/check_stamped_substrate.py"
     ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
