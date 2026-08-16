@@ -88,9 +88,9 @@ adws/adw_modules/     agents.py (roster + validation), agent_pi.py / agent_cc.py
                       (typed envelopes), gates.py, quality.py (deterministic checks incl. the
                       test suite), tracer.py (the trace db), session.py, runner.py,
                       permissions.py, git_helper.py.
-adws/adw_sssf_config/ sssf.config.yaml (cheap roster) and sssf.frontier.config.yaml.
-                      Every model is `openrouter/<id>`; the first slash splits provider
-                      from model id.
+adws/adw_sssf_config/ five rosters: cheap default, frontier, DeepSeek, open-weights, and
+                      top-speed. Every model is `openrouter/<id>`; the first slash splits
+                      provider from model id.
 adws/adw_data/        runtime: sessions/, prompt_engineering/, harness_engineering/, and
                       sssf.db. NEVER edit sessions/ — it is the run record.
 ```

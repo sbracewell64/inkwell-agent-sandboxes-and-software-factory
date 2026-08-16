@@ -69,8 +69,8 @@
       "recursive": false,
       "default_relation": "USER_OWNED",
       "owner": "target repository operator",
-      "rationale": "The agent roster. install.md:19 marks it user-owned and install.md:34 warns that --force overwrites operator edits, so template and live are meant to diverge the moment it is stamped.",
-      "evidence": ".claude/skills/sssf/cookbooks/install.md:19,34"
+      "rationale": "The agent roster. The install guide's mapping table classifies it as USER_OWNED, and its Idempotency section warns that --force overwrites operator edits, so template and live are meant to diverge after it is stamped.",
+      "evidence": ".claude/skills/sssf/cookbooks/install.md sections 'The mapping is not a mirror' and 'Idempotency'"
     },
     {
       "id": "env-sample",
@@ -92,7 +92,7 @@
       "default_relation": "USER_OWNED",
       "owner": "target repository operator",
       "rationale": "Starter recipes only. install.py's own comment says it is 'Skipped like any other file if the repo already has a justfile', and the live copy carries repo-specific shell settings and application recipes.",
-      "evidence": ".claude/skills/sssf/scripts/install.py:77-80; .claude/skills/sssf/cookbooks/install.md:25"
+      "evidence": ".claude/skills/sssf/scripts/install.py main() justfile stamp and skip-if-exists behavior; .claude/skills/sssf/cookbooks/install.md section 'What gets stamped'"
     }
   ],
 
@@ -169,7 +169,7 @@
       "match": "EXACT",
       "owner": "runtime",
       "rationale": "Created at runtime and gitignored by install.py's ensure_gitignore; never stamped.",
-      "evidence": ".claude/skills/sssf/cookbooks/install.md:26"
+      "evidence": ".claude/skills/sssf/cookbooks/install.md section 'What gets stamped'"
     },
     {
       "path": "adws/adw_data/sssf.db",
@@ -178,7 +178,7 @@
       "match": "FILE_PREFIX",
       "owner": "runtime",
       "rationale": "Created at runtime and gitignored; never stamped.",
-      "evidence": ".claude/skills/sssf/cookbooks/install.md:26"
+      "evidence": ".claude/skills/sssf/cookbooks/install.md section 'What gets stamped'"
     }
   ]
 }

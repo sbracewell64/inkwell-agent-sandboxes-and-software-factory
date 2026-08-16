@@ -37,7 +37,7 @@ The authority for that mapping is the `stamp()` calls in `install.py`'s `main()`
 |---|---|
 | `EXACT_MIRROR` | Mapped content identity is required. Fails closed on divergent bytes or a missing counterpart. The module tree and both `*_engineering` trees are this. |
 | `CONTRACT_ONLY` | Bodies may diverge, but a **named** verifier proves a **named** property. The property is the obligation — a filename is not proof. |
-| `TEMPLATE_SCAFFOLD` | The template copy is a deliberate placeholder a stamped repo is expected to replace. `adw_modules/quality.py` is this: its blocks ship as `echo`s that announce they are fake, because a stamped repo cannot guess your test runner. Its shared API (`run_inkwell_tests`, `run_inkwell_quality`) is still enforced by name. |
+| `TEMPLATE_SCAFFOLD` | The template copy is a deliberate placeholder a stamped repo is expected to replace. `adw_modules/quality.py` is this: its blocks ship as `echo`s that announce they are fake, because a stamped repo cannot guess your test runner. Its shared API (`run_inkwell_tests`, `run_inkwell_quality`, `as_envelope`) is still enforced by name. |
 | `USER_OWNED` | Stamped once as a starter, then yours. `sssf.config.yaml`, `.env.sample` and the `justfile` are this — `install.py` skips them when they already exist, so divergence is the designed steady state, not drift. |
 | `LIVE_ONLY` | Present in this repository by design and never stamped, such as the alternate rosters selected with `--config`. |
 
@@ -49,7 +49,7 @@ If you change a `stamp()` call, update the contract in the same commit — the c
 
 ## Idempotency
 
-Re-running is safe. `install.py` skips **every** file that already exists — your config, your prompts, and previously stamped code alike — and reports what it skipped, so a second run doubles as a drift check. To refresh stamped code (`adw_modules/`, the starter `adw_*.py`) to the skill's current version, run with `--force` — but know that `--force` overwrites ALL existing stamped files, including `sssf.config.yaml` and `prompt_engineering/`, so commit or back up user-owned edits first.
+Re-running is safe. `install.py` skips **every** file that already exists — your config, your prompts, and previously stamped code alike — and reports what it skipped. Skipping does not compare bytes; use `check_mapped_surface_parity.py` to detect drift in this repository. To refresh stamped code (`adw_modules/`, the starter `adw_*.py`) to the skill's current version, run with `--force` — but know that `--force` overwrites ALL existing stamped files, including `sssf.config.yaml` and `prompt_engineering/`, so commit or back up user-owned edits first.
 
 ## Post-install checklist
 
