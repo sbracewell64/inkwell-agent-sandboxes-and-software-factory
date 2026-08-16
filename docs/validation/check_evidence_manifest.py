@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import types
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "tools"
@@ -23,6 +24,8 @@ from evidence_manifest import (  # noqa: E402
 
 FIXTURE = ROOT / "docs/validation/fixtures/evidence_manifest/positive"
 MANIFEST = FIXTURE / "manifest.json"
+TOOL_SOURCE = TOOLS / "evidence_manifest.py"
+EVIDENCE_DIR = ROOT / "docs/evidence/hd08"
 CONTEXT = ValidationContext(
     canonical_url=(
         "https://github.com/sbracewell64/"
@@ -245,6 +248,230 @@ def descriptor_path_controls(errors: list[str]) -> None:
         )
 
 
+INTERMEDIATE_TOCTTOU_MUTATIONS = (
+    (
+        """                next_descriptor = os.open(
+                    component,
+                    directory_flags,
+                    dir_fd=current_descriptor,
+                )""",
+        """                next_descriptor = os.open(
+                    component,
+                    directory_flags & ~os.O_NOFOLLOW,
+                    dir_fd=current_descriptor,
+                )""",
+    ),
+    (
+        "            if not stat.S_ISDIR(after.st_mode) or _changed_identity(before, after):",
+        "            if not stat.S_ISDIR(after.st_mode):",
+    ),
+)
+
+
+def defective_intermediate_variant() -> tuple[types.ModuleType, str]:
+    """Build the bounded defective variant used to calibrate the intermediate
+    time-of-check-to-time-of-use control.
+
+    It removes exactly two intermediate-component protections and nothing else:
+    the no-follow flag on the descriptor-relative open, and the identity
+    reconciliation of the descriptor that open returned. The mutated program is
+    content-addressed so the calibration binds to exact bytes rather than to a
+    Git object that may stop being fetchable.
+    """
+    source = TOOL_SOURCE.read_bytes().decode("utf-8")
+    for original, replacement in INTERMEDIATE_TOCTTOU_MUTATIONS:
+        if source.count(original) != 1:
+            raise RuntimeError(
+                "intermediate-component-tocttou: defective variant could not be "
+                "built; expected exactly one occurrence of a mutation site"
+            )
+        source = source.replace(original, replacement)
+    mutated = source.encode("utf-8")
+    digest = hashlib.sha256(mutated).hexdigest()
+    module = types.ModuleType("evidence_manifest_intermediate_defect")
+    module.__file__ = str(TOOL_SOURCE)
+    # dataclasses resolves a class's defining module through sys.modules, so the
+    # variant has to be registered before its body executes.
+    sys.modules[module.__name__] = module
+    exec(compile(mutated, "<hd08-intermediate-defect>", "exec"), module.__dict__)
+    return module, digest
+
+
+def intermediate_component_tocttou_control(module: types.ModuleType) -> list[str]:
+    """Swap an intermediate path component for an outside-root symlink inside the
+    window between its no-follow stat and its descriptor-relative open.
+
+    Returns the findings observed against `module`. An empty list means the
+    implementation refused the swap without reading or admitting outside bytes.
+    """
+    findings: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="sssf-hd08-intermediate-tocttou-") as temp_dir:
+        temp = Path(temp_dir)
+        root = temp / "root"
+        nested = root / "nested"
+        outside = temp / "outside"
+        nested.mkdir(parents=True)
+        outside.mkdir()
+        inside_bytes = b"inside-root-intermediate-evidence\n"
+        outside_bytes = b"outside-root-intermediate-substitution\n"
+        (nested / "payload.txt").write_bytes(inside_bytes)
+        (outside / "payload.txt").write_bytes(outside_bytes)
+        context = ValidationContext(
+            canonical_url=CONTEXT.canonical_url,
+            base_sha=CONTEXT.base_sha,
+            candidate_sha=CONTEXT.candidate_sha,
+            branch=CONTEXT.branch,
+            worktree_role=CONTEXT.worktree_role,
+            run_id="intermediate-tocttou-run",
+            adw_id=None,
+            purpose="intermediate-component-tocttou-control",
+            required_phases=("BUILD",),
+            required_dimensions=("path-confinement",),
+        )
+        document = {
+            "schema_version": "sssf.evidence-manifest.v1",
+            "repository": {
+                "canonical_url": context.canonical_url,
+                "base_sha": context.base_sha,
+                "candidate_sha": context.candidate_sha,
+                "branch": context.branch,
+                "worktree_role": context.worktree_role,
+            },
+            "run": {
+                "run_id": context.run_id,
+                "adw_id": None,
+                "terminal_outcome": "succeeded",
+            },
+            "purpose": context.purpose,
+            "required_phases": ["BUILD"],
+            "required_dimensions": ["path-confinement"],
+            "inventory": [
+                {
+                    "sequence": 0,
+                    "path": "nested/payload.txt",
+                    "artifact_type": "text",
+                    "byte_length": len(outside_bytes),
+                    "sha256": hashlib.sha256(outside_bytes).hexdigest(),
+                    "producer": "intermediate-race-control",
+                    "run_id": context.run_id,
+                    "adw_id": None,
+                    "phase": "BUILD",
+                    "purpose": context.purpose,
+                    "terminal_outcome": "succeeded",
+                    "evidence_class": "qualifying",
+                    "claimed_dimensions": ["path-confinement"],
+                }
+            ],
+        }
+        (root / "manifest.json").write_bytes(module.canonical_manifest_bytes(document))
+
+        original_stat = module.os.stat
+        original_read = module.os.read
+        original_primitive_check = getattr(
+            module,
+            "_descriptor_primitives_available",
+            None,
+        )
+        swapped = False
+        captured_reads: list[bytes] = []
+
+        def stat_then_swap(path, *args, dir_fd=None, follow_symlinks=True, **kwargs):
+            observed = original_stat(
+                path,
+                *args,
+                dir_fd=dir_fd,
+                follow_symlinks=follow_symlinks,
+                **kwargs,
+            )
+            nonlocal swapped
+            if (
+                not swapped
+                and dir_fd is not None
+                and not follow_symlinks
+                and str(path) == "nested"
+            ):
+                # The no-follow check has just observed the genuine directory.
+                # Replace the component before the descriptor-relative open.
+                swapped = True
+                nested.rename(root / "checked-nested")
+                nested.symlink_to(outside, target_is_directory=True)
+            return observed
+
+        def record_read(descriptor: int, length: int) -> bytes:
+            chunk = original_read(descriptor, length)
+            captured_reads.append(chunk)
+            return chunk
+
+        module.os.stat = stat_then_swap
+        module.os.read = record_read
+        if original_primitive_check is not None:
+            module._descriptor_primitives_available = lambda: True
+        try:
+            result = module.validate_manifest(root / "manifest.json", root, context)
+        finally:
+            module.os.stat = original_stat
+            module.os.read = original_read
+            if original_primitive_check is not None:
+                module._descriptor_primitives_available = original_primitive_check
+
+        if not swapped:
+            findings.append(
+                "intermediate-component-tocttou: boundary was not exercised"
+            )
+        # The defective variant carries its own Observation enum, so identity
+        # comparison across modules would silently never match. Compare values.
+        if result.observation.value == Observation.OBSERVED_GOOD.value:
+            findings.append(
+                "intermediate-component-tocttou: outside-root bytes were accepted"
+            )
+        if "nested/payload.txt" in result.checked_inventory:
+            findings.append(
+                "intermediate-component-tocttou: escaped artifact entered checked inventory"
+            )
+        if outside_bytes in b"".join(captured_reads):
+            findings.append(
+                "intermediate-component-tocttou: outside-root bytes were read"
+            )
+    return findings
+
+
+def intermediate_component_tocttou_controls(errors: list[str]) -> None:
+    """Run the intermediate-component control against the production
+    implementation, then calibrate it watched-red against the bounded defective
+    variant, then bind the calibration to its supplemental evidence file."""
+    for finding in intermediate_component_tocttou_control(manifest_module):
+        errors.append(finding)
+
+    defective_module, digest = defective_intermediate_variant()
+    defective_findings = intermediate_component_tocttou_control(defective_module)
+    if not defective_findings:
+        errors.append(
+            "intermediate-component-tocttou: control stayed green against the "
+            "defective variant, so it proves nothing"
+        )
+        return
+
+    evidence = EVIDENCE_DIR / f"intermediate-component-tocttou-red-{digest[:12]}.txt"
+    if not evidence.is_file():
+        errors.append(
+            "intermediate-component-tocttou: supplemental content-addressed "
+            f"evidence is missing: {evidence.name}"
+        )
+        return
+    recorded = evidence.read_text(encoding="utf-8")
+    if f"defective_program_sha256: {digest}" not in recorded:
+        errors.append(
+            "intermediate-component-tocttou: supplemental evidence does not bind "
+            f"the exact defective program digest {digest}"
+        )
+    for finding in defective_findings:
+        if finding not in recorded:
+            errors.append(
+                "intermediate-component-tocttou: supplemental evidence does not "
+                f"record observed finding: {finding}"
+            )
+
+
 def run_controls() -> list[str]:
     errors: list[str] = []
     raw = MANIFEST.read_bytes()
@@ -252,6 +479,7 @@ def run_controls() -> list[str]:
     if canonical_manifest_bytes(parsed) != raw:
         errors.append("positive fixture does not round-trip to identical canonical bytes")
     intermediate_directory_symlink_swap_control(errors)
+    intermediate_component_tocttou_controls(errors)
     descriptor_path_controls(errors)
     positive = validate_manifest(MANIFEST, FIXTURE, CONTEXT)
     expect(errors, "positive fixture", positive.observation, Observation.OBSERVED_GOOD)
@@ -539,6 +767,7 @@ def main() -> int:
     print("watched-red identity, emptiness, diagnostic, tamper, duplicate, and path controls observed")
     print("wrong-phase-control: PASS")
     print("intermediate-directory-symlink-swap: PASS")
+    print("intermediate-component-tocttou-control: PASS")
     return 0
 
 

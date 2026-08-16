@@ -1,0 +1,107 @@
+HD-08 intermediate-component time-of-check-to-time-of-use negative control
+
+This is SUPPLEMENTAL evidence added alongside, and not in place of, the earlier
+watched-red captures in this directory. Those files are retained unchanged.
+
+boundary
+  Between the no-follow `os.stat(component, dir_fd=..., follow_symlinks=False)`
+  of an INTERMEDIATE path component and the descriptor-relative
+  `os.open(component, directory_flags, dir_fd=...)` of that same component, the
+  component is replaced with a symlink pointing outside the artifact root.
+  This is the intermediate component, not the leaf and not the root.
+
+control
+  docs/validation/check_evidence_manifest.py
+    intermediate_component_tocttou_control  - exercises the window
+    defective_intermediate_variant          - builds the calibration variant
+    intermediate_component_tocttou_controls - runs both arms and binds this file
+
+program identity
+  The calibration variant is derived deterministically from the production tool
+  bytes and content-addressed, so this proof does not depend on any unadvertised
+  Git object remaining fetchable.
+
+  base_tool_path: tools/evidence_manifest.py
+  base_tool_sha256: 445acc4f2d0a8a59fd3543d5591ca810d72c8864cb88005aa85951e5f89b6687
+  defective_program_sha256: e10712b9ed01f400731798338ed99ad87cf76bf0069963c2e11280dc0b4cf53e
+
+  derivation: exactly two textual mutations, each required to occur exactly once,
+  applied to the base tool bytes. Both are scoped to the intermediate-component
+  traversal loop; nothing else is altered.
+
+  mutation 1 - remove the intermediate no-follow protection
+    -                    directory_flags,
+    +                    directory_flags & ~os.O_NOFOLLOW,
+    within:
+                     next_descriptor = os.open(
+                         component,
+                         ...,
+                         dir_fd=current_descriptor,
+                     )
+
+  mutation 2 - remove the intermediate identity reconciliation
+    -            if not stat.S_ISDIR(after.st_mode) or _changed_identity(before, after):
+    +            if not stat.S_ISDIR(after.st_mode):
+
+defective arm
+  expected_exit: nonzero (1), because the variant lacking both intermediate
+    protections follows the swapped component outside the artifact root
+  observed_exit: 1
+  observed_output:
+defective_program_sha256: e10712b9ed01f400731798338ed99ad87cf76bf0069963c2e11280dc0b4cf53e
+intermediate-component-tocttou: outside-root bytes were accepted
+intermediate-component-tocttou: escaped artifact entered checked inventory
+intermediate-component-tocttou: outside-root bytes were read
+findings: 3
+
+production arm
+  expected_exit: 0, because the shipped implementation must refuse the swap
+    without reading or admitting outside-root bytes
+  observed_exit: 0
+  observed_output:
+production: tools/evidence_manifest.py
+findings: 0
+
+  shipped implementation detail at this boundary:
+    observation: could-not-observe
+    checked_inventory: ()
+    issue: "artifact component is unavailable: nested/payload.txt: nested:
+            [Errno 20] Not a directory: 'nested'"
+  The refusal arrives as ENOTDIR rather than ELOOP because the open carries
+  O_DIRECTORY as well as O_NOFOLLOW, so it is classified could-not-observe
+  rather than observed-bad. It is fail-closed either way: non-PASS, empty
+  checked inventory, and no outside-root bytes read.
+
+reproduction (from the repository root; ARM is "production" or "defective")
+  python3 - ARM <<'EOF'
+  import importlib.util, sys
+  spec = importlib.util.spec_from_file_location("chk", "docs/validation/check_evidence_manifest.py")
+  chk = importlib.util.module_from_spec(spec)
+  try:
+      spec.loader.exec_module(chk)
+  except SystemExit:
+      pass
+  arm = sys.argv[1]
+  if arm == "defective":
+      module, digest = chk.defective_intermediate_variant()
+      print("defective_program_sha256: " + digest)
+  else:
+      module = chk.manifest_module
+      print("production: tools/evidence_manifest.py")
+  findings = chk.intermediate_component_tocttou_control(module)
+  for finding in findings:
+      print(finding)
+  print("findings: " + str(len(findings)))
+  raise SystemExit(1 if findings else 0)
+  EOF
+
+classification
+  defective variant: observed-bad, watched red for the intended reason
+  shipped implementation: refusal held; outside-root bytes were neither read
+    nor admitted to checked inventory
+
+scope
+  This proves the shipped implementation survives a swap of the intermediate
+  component inside the stat-to-open window, and that the control detects the
+  escape when both intermediate protections are removed. It does not claim any
+  runtime acceptance integration, which remains deferred to HD-09.

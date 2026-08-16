@@ -63,7 +63,8 @@ Independent review is delegated to the required no-mistakes pipeline before publ
 - fixture: `docs/validation/fixtures/evidence_manifest/positive/manifest.json`
 - pre-fix watched-red capture: `docs/evidence/hd08/intermediate-directory-symlink-swap-red.txt`, bound to `7148f45b5e906e4fcf220d7c9d32212f6fae985a`
 - pre-fix wrong-phase coverage capture: `docs/evidence/hd08/wrong-phase-control-red-73d8a831.txt`, bound to `73d8a8313f3a9b70edbba42a9e8862d0e7feb164`
-- test result: validator prints `HD-08 evidence manifest controls: PASS`, `wrong-phase-control: PASS`, and `intermediate-directory-symlink-swap: PASS`
+- supplemental content-addressed capture: `docs/evidence/hd08/intermediate-component-tocttou-red-e10712b9ed01.txt`, bound to defective program digest `e10712b9ed01f400731798338ed99ad87cf76bf0069963c2e11280dc0b4cf53e` derived from `tools/evidence_manifest.py` digest `445acc4f2d0a8a59fd3543d5591ca810d72c8864cb88005aa85951e5f89b6687`
+- test result: validator prints `HD-08 evidence manifest controls: PASS`, `wrong-phase-control: PASS`, `intermediate-directory-symlink-swap: PASS`, and `intermediate-component-tocttou-control: PASS`
 
 ## Documentation changed
 

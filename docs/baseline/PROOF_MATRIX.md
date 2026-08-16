@@ -111,6 +111,7 @@
 | HD-08 offline checked inventory | positive fixture verifies every artifact hash/type and bound SQLite ADW row from frozen bytes without network/provider access | PASS |
 | HD-08 nonvacuous qualification | empty directory/database/manifest/inventory, diagnostic-only evidence, and absent phase/dimension controls cannot pass | PASS |
 | HD-08 identity and integrity refusal | wrong identities, failed unrelated item, tamper, duplicate/reorder, descriptor-relative traversal/symlink races, final/root symlinks, identity change, unsupported host, and malformed schema controls observed red/CNO as specified | PASS |
+| HD-08 intermediate-component stat-to-open race | component swapped for an outside-root symlink between its no-follow stat and its descriptor-relative open; shipped implementation refused non-PASS with empty checked inventory and no outside-root bytes read, calibrated watched-red against a content-addressed defective variant with both intermediate protections removed | PASS |
 | HD-08 runtime acceptance integration | intentionally deferred to HD-09 | NOT PROVEN |
 
 ## Rule
