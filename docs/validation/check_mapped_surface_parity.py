@@ -131,7 +131,11 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
 
 
 def ignored(rel: str, patterns: list[str]) -> bool:
-    return any(token in rel for token in patterns)
+    parts = Path(rel).parts
+    return any(
+        parts[-1].endswith(token) if token.startswith(".") else token in parts
+        for token in patterns
+    )
 
 
 def enumerate_side(base: Path, recursive: bool, ignore: list[str]) -> dict[str, Path] | None:
@@ -198,19 +202,36 @@ def check_contract_exports(override: dict, live: Path | None, template: Path | N
                 f"{contract.get('verifier', '?')}")
 
 
-def check_exclusions(document: dict, findings: Findings) -> None:
+def check_exclusions(document: dict, root: Path, findings: Findings) -> None:
     """Every excluded live prefix must be claimed elsewhere, or it is an escape."""
-    claimed = {s["live"] for s in document["surfaces"]}
-    claimed |= {entry["path"] for entry in document.get("live_only", [])}
+    ignore = document.get("ignore", [])
+    surface_claims = {s["live"] for s in document["surfaces"]}
+    live_only_claims = {entry["path"] for entry in document.get("live_only", [])}
     for surface in document["surfaces"]:
         live_root = surface["live"]
         for prefix in surface.get("exclude_live", []) or []:
             full = f"{live_root}/{prefix}"
-            if not any(c == full or c.startswith(full + "/") for c in claimed):
+            excluded_root = root / full
+            if not excluded_root.exists():
                 findings.cno.append(
-                    f"{surface['id']}: excludes '{prefix}' but nothing else in the "
-                    "contract claims it; an unclaimed exclusion silently removes a "
-                    "path from governance")
+                    f"{surface['id']}: excluded prefix not observed: {full}")
+                continue
+            descendants = [path for path in excluded_root.rglob("*")
+                           if path.is_file()
+                           and not ignored(str(path.relative_to(root)), ignore)]
+            for path in descendants:
+                rel = str(path.relative_to(root)).replace("\\", "/")
+                claimed_by_surface = any(
+                    claim != live_root
+                    and (rel == claim or rel.startswith(claim + "/"))
+                    for claim in surface_claims)
+                claimed_live_only = any(
+                    rel == claim or rel.startswith(claim + "/")
+                    for claim in live_only_claims)
+                if not claimed_by_surface and not claimed_live_only:
+                    findings.fail.append(
+                        f"{rel}: UNDECLARED GOVERNED PATH under excluded prefix {full}")
+                    findings.record(DRIFT, rel, kind="undeclared_excluded_descendant")
 
 
 def check_coupled(document: dict, root: Path, findings: Findings) -> None:
@@ -331,12 +352,12 @@ def validate(root: Path, contract_path: Path) -> Findings:
         if target.exists():
             findings.record(INTENTIONAL, entry["path"], relation="LIVE_ONLY",
                             owner=entry.get("owner", "unspecified"))
-        else:
+        elif entry.get("presence", "REQUIRED") == "REQUIRED":
             findings.fail.append(
                 f"{entry['path']}: declared LIVE_ONLY path ABSENT from live surface")
             findings.record(UNRESOLVED, entry["path"], reason="declared_present_but_absent")
 
-    check_exclusions(document, findings)
+    check_exclusions(document, root, findings)
     check_coupled(document, root, findings)
 
     if not findings.compared and not findings.cno:
@@ -357,6 +378,8 @@ CONTROLS = (
      ".claude/skills/sssf/templates/adws/adw_modules/tracer.py", "remove", "red", "tracer.py"),
     ("undeclared-live-only-addition",
      "adws/adw_modules/zz_undeclared.py", "add", "red", "zz_undeclared.py"),
+    ("undeclared-excluded-prefix-addition",
+     "adws/adw_data/zz_undeclared.json", "add", "red", "zz_undeclared.json"),
     ("coupled-adapter-without-supervisor",
      ".claude/skills/sssf/templates/adws/adw_modules/subprocess_supervisor.py",
      "remove", "red", "coupled group split"),
@@ -501,6 +524,10 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
             temp = Path(directory)
             materialize(document, root, temp)
             path = temp / target
+            if kind == "add" and path.exists():
+                control.problems.append(
+                    f"{name}: precondition absent — target already exists: {target}")
+                continue
             try:
                 apply_mutation(path, kind)
             except OSError as exc:
