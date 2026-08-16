@@ -192,6 +192,16 @@ def install_stub(directory: Path, models: list[str]) -> Path:
         if provider and model_id:
             catalog.append([provider, model_id])
     stub.with_suffix(".catalog.json").write_text(json.dumps(catalog))
+    if sys.platform == "win32":
+        # CreateProcess cannot launch a Python script through its shebang. A
+        # batch shim keeps PI_PATH directly executable on Windows while the
+        # same local Python stub remains the argv recorder on every platform.
+        launcher = directory / "pi_stub.cmd"
+        launcher.write_text(
+            f'@"{sys.executable}" "{stub}" %*\n',
+            encoding="utf-8",
+        )
+        return launcher
     return stub
 
 
