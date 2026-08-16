@@ -121,10 +121,30 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
         override_keys.add(key)
     live_only_paths: set[object] = set()
     for entry in document.get("live_only", []) or []:
+        if not isinstance(entry, dict):
+            findings.cno.append(f"live_only entry must be an object: {entry!r}")
+            continue
         entry_path = entry.get("path")
         if entry_path in live_only_paths:
             findings.cno.append(f"duplicate live_only path: {entry_path!r}")
         live_only_paths.add(entry_path)
+        if not isinstance(entry_path, str) or not entry_path:
+            findings.cno.append(f"live_only entry has invalid path: {entry_path!r}")
+        if entry.get("relation") != "LIVE_ONLY":
+            findings.cno.append(
+                f"live_only {entry_path!r} has invalid relation: "
+                f"{entry.get('relation')!r}")
+        presence = entry.get("presence")
+        if presence not in {"REQUIRED", "RUNTIME_OPTIONAL"}:
+            findings.cno.append(
+                f"live_only {entry_path!r} has unknown presence: {presence!r}")
+        match = entry.get("match")
+        if match not in {"EXACT", "FILE_PREFIX"}:
+            findings.cno.append(
+                f"live_only {entry_path!r} has unknown match: {match!r}")
+        if match == "FILE_PREFIX" and presence != "RUNTIME_OPTIONAL":
+            findings.cno.append(
+                f"live_only {entry_path!r} FILE_PREFIX requires RUNTIME_OPTIONAL")
     if findings.cno:
         return None
     return document
@@ -206,7 +226,7 @@ def check_exclusions(document: dict, root: Path, findings: Findings) -> None:
     """Every excluded live prefix must be claimed elsewhere, or it is an escape."""
     ignore = document.get("ignore", [])
     surface_claims = {s["live"] for s in document["surfaces"]}
-    live_only_claims = {entry["path"] for entry in document.get("live_only", [])}
+    live_only_claims = document.get("live_only", [])
     for surface in document["surfaces"]:
         live_root = surface["live"]
         for prefix in surface.get("exclude_live", []) or []:
@@ -226,8 +246,11 @@ def check_exclusions(document: dict, root: Path, findings: Findings) -> None:
                     and (rel == claim or rel.startswith(claim + "/"))
                     for claim in surface_claims)
                 claimed_live_only = any(
-                    rel == claim or rel.startswith(claim + "/")
-                    for claim in live_only_claims)
+                    rel == entry["path"]
+                    or rel.startswith(entry["path"] + "/")
+                    or (entry["match"] == "FILE_PREFIX"
+                        and rel.startswith(entry["path"]))
+                    for entry in live_only_claims)
                 if not claimed_by_surface and not claimed_live_only:
                     findings.fail.append(
                         f"{rel}: UNDECLARED GOVERNED PATH under excluded prefix {full}")
@@ -352,7 +375,7 @@ def validate(root: Path, contract_path: Path) -> Findings:
         if target.exists():
             findings.record(INTENTIONAL, entry["path"], relation="LIVE_ONLY",
                             owner=entry.get("owner", "unspecified"))
-        elif entry.get("presence", "REQUIRED") == "REQUIRED":
+        elif entry["presence"] == "REQUIRED":
             findings.fail.append(
                 f"{entry['path']}: declared LIVE_ONLY path ABSENT from live surface")
             findings.record(UNRESOLVED, entry["path"], reason="declared_present_but_absent")

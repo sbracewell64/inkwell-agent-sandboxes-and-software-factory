@@ -129,6 +129,8 @@
     {
       "path": "adws/adw_sssf_config/sssf.deepestseek.config.yaml",
       "relation": "LIVE_ONLY",
+      "presence": "REQUIRED",
+      "match": "EXACT",
       "owner": "this repository",
       "rationale": "Alternate roster. install.py stamps exactly one config; additional rosters are selected with --config or SSSF_CONFIG and are a live-surface concept.",
       "evidence": ".claude/skills/sssf/references/config.md:5; docs/baseline/PROOF_MATRIX.md:99 counts five rosters as a live-surface property"
@@ -136,6 +138,8 @@
     {
       "path": "adws/adw_sssf_config/sssf.frontier.config.yaml",
       "relation": "LIVE_ONLY",
+      "presence": "REQUIRED",
+      "match": "EXACT",
       "owner": "this repository",
       "rationale": "Alternate roster; see sssf.deepestseek.config.yaml.",
       "evidence": "docs/baseline/PROOF_MATRIX.md:99"
@@ -143,6 +147,8 @@
     {
       "path": "adws/adw_sssf_config/sssf.open-weights.config.yaml",
       "relation": "LIVE_ONLY",
+      "presence": "REQUIRED",
+      "match": "EXACT",
       "owner": "this repository",
       "rationale": "Alternate roster; see sssf.deepestseek.config.yaml.",
       "evidence": "docs/baseline/PROOF_MATRIX.md:99"
@@ -150,6 +156,8 @@
     {
       "path": "adws/adw_sssf_config/sssf.top-speed.config.yaml",
       "relation": "LIVE_ONLY",
+      "presence": "REQUIRED",
+      "match": "EXACT",
       "owner": "this repository",
       "rationale": "Alternate roster; see sssf.deepestseek.config.yaml.",
       "evidence": "docs/baseline/PROOF_MATRIX.md:99"
@@ -158,6 +166,7 @@
       "path": "adws/adw_data/sessions",
       "relation": "LIVE_ONLY",
       "presence": "RUNTIME_OPTIONAL",
+      "match": "EXACT",
       "owner": "runtime",
       "rationale": "Created at runtime and gitignored by install.py's ensure_gitignore; never stamped.",
       "evidence": ".claude/skills/sssf/cookbooks/install.md:26"
@@ -166,6 +175,7 @@
       "path": "adws/adw_data/sssf.db",
       "relation": "LIVE_ONLY",
       "presence": "RUNTIME_OPTIONAL",
+      "match": "FILE_PREFIX",
       "owner": "runtime",
       "rationale": "Created at runtime and gitignored; never stamped.",
       "evidence": ".claude/skills/sssf/cookbooks/install.md:26"
