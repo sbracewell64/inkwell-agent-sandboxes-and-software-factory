@@ -842,12 +842,11 @@ def main() -> int:
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     parser.add_argument("--state", type=Path, default=None,
                         help="also write the structured state to this path")
-    parser.add_argument("--skip-red-controls", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     root, contract_path = args.root.resolve(), args.contract.resolve()
     # Calibration runs on every invocation, so this verifier cannot report PASS
     # without having just demonstrated it still fails where it must.
-    control = None if args.skip_red_controls else red_controls(root, contract_path)
+    control = red_controls(root, contract_path)
     return report(validate(root, contract_path), contract_path, control, args.state)
 
 
