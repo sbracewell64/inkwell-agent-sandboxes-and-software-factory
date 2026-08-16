@@ -1,0 +1,6 @@
+{
+  "path": "adws/adw_quality.py",
+  "old": "    return run.finish()",
+  "new": "    if prompt:\n        match prompt:\n            case _:\n                return run.finish()\n    else:\n        while True:\n            return 0\n    return 0",
+  "expected": "main() must contain exactly one run.finish() call as its final top-level return"
+}

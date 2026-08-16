@@ -17,7 +17,7 @@ deciding.
 ║      argv=["bun", "test", "apps/web/server.test.ts"]                         ║
 ║      argv=["uv", "run", "pytest", "-q"]                                      ║
 ║      argv=["npm", "run", "lint"]                                             ║
-║  Delete the blocks you don't need, and drop them from run_quality()'s list.   ║
+║  Delete unused blocks and remove them from run_inkwell_quality().             ║
 ║                                                                              ║
 ║  Two rules when you write the real command:                                  ║
 ║    1. argv LIST, never a shell string — no quoting bugs, no shell injection.  ║
@@ -174,7 +174,7 @@ def build(run) -> QualityCheckResult:
     ), run)
 
 
-def run_tests(run) -> QualityResult:
+def run_inkwell_tests(run) -> QualityResult:
     """The test suite alone, as a QualityResult — the deterministic test phase.
 
     This is what replaces a `tester` agent once the command is written down. An
@@ -211,7 +211,7 @@ def as_envelope(result: QualityResult, what: str) -> VerifyOutput:
     )
 
 
-def run_quality(run) -> QualityResult:
+def run_inkwell_quality(run) -> QualityResult:
     """Run every block and collect ALL failures — one pass tells you everything.
 
     Ordering contract for the caller: a failing block does NOT fail the phase.

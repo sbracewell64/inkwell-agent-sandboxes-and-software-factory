@@ -1,0 +1,6 @@
+{
+  "path": "adws/adw_quality.py",
+  "old": "    return run.finish()",
+  "new": "    return 0\n    return run.finish()",
+  "expected": "main() prefix does not provably fall through to final run.finish()"
+}

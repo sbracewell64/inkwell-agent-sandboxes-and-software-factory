@@ -1,0 +1,6 @@
+{
+  "path": "adws/adw_quality.py",
+  "old": "    return run.finish()",
+  "new": "    while False:\n        return run.finish()\n    return 0",
+  "expected": "main() must contain exactly one run.finish() call as its final top-level return"
+}

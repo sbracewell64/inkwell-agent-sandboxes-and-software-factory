@@ -55,10 +55,10 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
     for i in range(1, MAX_FIX_LOOPS + 1):
         with run.phase(PhaseParams(name=f"verify_{i}", kind="code", owner="quality",
                                    description="Lint, typecheck, and build before testing")) as ph:
-            quality_result = quality.run_quality(run)
+            quality_result = quality.run_inkwell_quality(run)
             record(ph, quality_result)
 
-        # run_quality() already includes the test block; a repo that wants tests
+        # run_inkwell_quality() already includes the test block; a repo that wants tests
         # in their own phase can split them out the way this comment does.
         test_result = quality_result
 

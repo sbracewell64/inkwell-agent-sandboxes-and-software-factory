@@ -1,0 +1,6 @@
+{
+  "path": ".claude/skills/sssf/scripts/make_adw.py",
+  "old": "# dependencies = [\"pydantic\", \"python-dotenv\", \"pyyaml\", \"rich\"]",
+  "new": "# dependencies = [\"pydantic\", \"python-dotenv\", \"pyyaml\"]",
+  "expected": "dependency/import mismatch: missing=['rich']"
+}
