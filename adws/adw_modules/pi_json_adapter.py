@@ -59,7 +59,7 @@ PI_OWNED_ENV_NAMES = frozenset(
 )
 _PROVIDER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _EVIDENCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-_SENSITIVE_ENV_FRAGMENTS = ("KEY", "TOKEN", "CREDENTIAL", "AUTH", "COOKIE", "HOME")
+_SENSITIVE_ENV_FRAGMENTS = ("KEY", "TOKEN", "CREDENTIAL", "AUTH", "COOKIE", "HOME", "PASSWORD", "SECRET")
 _EMPTY_DIGEST = hashlib.sha256(b"").hexdigest()
 
 
@@ -595,6 +595,15 @@ def run_pi_json(
                 "pi-sensitive-environment-refused",
                 Observation.COULD_NOT_OBSERVE,
                 "credential, auth-home, cookie, and token environment names require a separate transport increment",
+            ),
+        )
+    if set(request.environment_allowlist) - set(SAFE_INHERITED_ENV_NAMES):
+        return _refused_result(
+            request,
+            FailureReason(
+                "pi-environment-not-allowlisted",
+                Observation.COULD_NOT_OBSERVE,
+                "environment allowlist contains a name outside the fixed process-mechanics contract",
             ),
         )
 

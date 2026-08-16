@@ -179,7 +179,7 @@ def static_contract(errors: list[str]) -> None:
             check(argv[argv.index("--model") + 1] == "deterministic", "Pi model drifted", errors)
             check(argv[argv.index("--thinking") + 1] == "high", "Pi effort drifted", errors)
             check("--models" not in argv and "--continue" not in argv and "--resume" not in argv, "Pi fallback/session flag present", errors)
-        forbidden = ("KEY", "TOKEN", "CREDENTIAL", "AUTH", "COOKIE", "HOME")
+        forbidden = ("KEY", "TOKEN", "CREDENTIAL", "AUTH", "COOKIE", "HOME", "PASSWORD", "SECRET")
         exposed_names = set(candidate.environment) | set(candidate.environment_allowlist) | set(PI_OWNED_ENV_NAMES)
         check(not [name for name in exposed_names if any(word in name.upper() for word in forbidden)], "credential/auth-home environment name entered adapter contract", errors)
         check(all("secret" not in arg.lower() for arg in (argv or [])), "credential-like value entered argv", errors)
@@ -198,6 +198,24 @@ def static_contract(errors: list[str]) -> None:
                     environment_allowlist=frozenset({"PROVIDER_TOKEN"}),
                 ),
                 "pi-sensitive-environment-refused",
+            ),
+            (
+                request(
+                    temp,
+                    "success",
+                    environment={"DATABASE_PASSWORD": "fixture-not-a-secret"},
+                    environment_allowlist=frozenset({"DATABASE_PASSWORD"}),
+                ),
+                "pi-sensitive-environment-refused",
+            ),
+            (
+                request(
+                    temp,
+                    "success",
+                    environment={"CUSTOM_MODE": "fixture"},
+                    environment_allowlist=frozenset({"CUSTOM_MODE"}),
+                ),
+                "pi-environment-not-allowlisted",
             ),
         ):
             result = run_pi_json(bad)
