@@ -85,6 +85,7 @@
 | B4-001 closure successor execution | provenance-only successor must complete the same nonempty Linux/Windows checks on its own exact head | CNO UNTIL OBSERVED |
 | B4-001 default-branch push execution | accepted successor must trigger the same nonempty Linux/Windows checks after merge | CNO UNTIL OBSERVED |
 | B4-002 strict launch surface | exact provider/model, effort, tools, JSON print, no session/resources/approval/fallback, closed stdin, allowlisted env | PASS — LOCAL FIXTURE |
+| B4-002 credential environment refusal | sensitive names and credential-style names outside the fragment vocabulary are refused before launch; the fixed process-mechanics allowlist is the complete boundary | PASS — WATCHED RED + LOCAL FIXTURE |
 | B4-002 shell-zero structured error precedence | deterministic children exit zero with provider error; missing, incomplete, and drifting target metadata remains secondary typed evidence while provider error remains primary | LOCAL FIXTURE REQUIRED; EXACT-CANDIDATE REVIEW CNO |
 | B4-002 process bounds and cleanup | timeout, cancellation, ignored TERM, output overflow, reap, Unix group and escaped-descendant absence verification | PASS — LOCAL LINUX FIXTURE |
 | B4-002 shipped extension-bearing production path | all ten shipped planner/scout agents across five rosters declare nonempty `harness_engineering`; each drives the real `agent_pi` launch path and its extensions are forwarded as `-e`, not rejected | PASS — WATCHED RED + LOCAL FIXTURE |

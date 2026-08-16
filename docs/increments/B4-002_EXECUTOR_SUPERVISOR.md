@@ -43,6 +43,8 @@ bounded and deterministic without calling a provider.
 - JSON print mode, exact built-in tool allowlist, and no fallback;
 - explicit no-session, no-extension, no-skill, no-prompt-template,
   no-context-file and no-approval flags;
+- a fixed process-mechanics environment allowlist, with sensitive-name
+  detection as defense in depth rather than the credential boundary;
 - isolated credential-free settings disabling native retries, provider retries,
   compaction, project trust, packages, and telemetry/update startup work;
 - durable bounded raw events before parsing;
@@ -111,7 +113,9 @@ cover:
     failures with typed CNO and retained primary evidence where observable;
 12. explicit unsupported-Windows Job Object refusal;
 13. fully qualified target, explicit effort, exact tool policy, strict Pi argv
-    controls, and immutable requested-versus-resolved target enforcement.
+    controls, and immutable requested-versus-resolved target enforcement;
+14. sensitive and fragment-free credential-style environment names refused
+    before child launch by the sensitive-name and fixed-allowlist controls.
 
 The check is the sixth repository-owned offline CI manifest entry. Linux runs
 all process fixtures. Windows runs the nonempty static/parser/refusal proof and
