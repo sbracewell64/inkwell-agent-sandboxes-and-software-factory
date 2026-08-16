@@ -30,13 +30,17 @@ repository:
 foundational_sources:
   super_simple_software_factory:
     repository: https://github.com/disler/super-simple-software-factory.git
+    preservation_mirror: https://github.com/sbracewell64/super-simple-software-factory.git
     role: foundational_inner_factory_reference
     relationship: standalone SSSF skill and factory source from which the embedded factory layer derives
     observed_refs:
       main: de31374882e7a4e3e5b7bb9bd09e69dc2f779356
       example: b2dcb8e436db9b10f7580d7568b3e251609eb36b
+    mirror_refs:
+      main: de31374882e7a4e3e5b7bb9bd09e69dc2f779356
+      example: b2dcb8e436db9b10f7580d7568b3e251609eb36b
     reference_scope: full_git_repository_including_code_docs_skills_templates_examples_and_history
-    preservation_status: external_repository_pinned_by_exact_git_identity
+    preservation_status: operator_owned_github_fork_preserves_main_and_example_at_pinned_git_identities
   factory_in_a_box:
     repository: https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git
     role: foundational_integrated_three_tier_reference
