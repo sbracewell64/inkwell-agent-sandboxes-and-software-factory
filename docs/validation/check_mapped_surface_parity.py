@@ -89,6 +89,37 @@ def sha256(path: Path) -> str | None:
         return None
 
 
+def require_divergence_metadata(entry: dict, label: str, relation: object,
+                                findings: Findings) -> None:
+    if relation not in {"CONTRACT_ONLY", "TEMPLATE_SCAFFOLD", "USER_OWNED", "LIVE_ONLY"}:
+        return
+    for field_name in ("owner", "rationale", "evidence"):
+        value = entry.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            findings.cno.append(
+                f"{label} intentional divergence has invalid {field_name}: {value!r}")
+    if relation not in {"CONTRACT_ONLY", "TEMPLATE_SCAFFOLD"}:
+        return
+    contract = entry.get("contract")
+    if not isinstance(contract, dict) or not contract:
+        findings.cno.append(f"{label} contract must be a non-empty object")
+        return
+    for field_name in ("property", "verifier", "verifier_symbol"):
+        value = contract.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            findings.cno.append(
+                f"{label} contract has invalid {field_name}: {value!r}")
+    required = contract.get("required_exports")
+    if not isinstance(required, list) or not required or not all(
+            isinstance(value, str) and value.strip() for value in required):
+        findings.cno.append(
+            f"{label} contract required_exports must be a non-empty list of strings")
+    symbol = contract.get("verifier_symbol")
+    if isinstance(symbol, str) and symbol.strip() and globals().get(symbol) is None:
+        findings.cno.append(
+            f"{label} contract verifier_symbol does not exist: {symbol!r}")
+
+
 def load_contract(path: Path, findings: Findings) -> dict | None:
     """Read the contract, or record precisely why it could not be observed."""
     try:
@@ -138,6 +169,8 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
         if relation not in allowed_relations:
             findings.cno.append(
                 f"surfaces[{index}] has unknown default_relation: {relation!r}")
+        require_divergence_metadata(
+            surface, f"surfaces[{index}]", relation, findings)
         if not isinstance(surface.get("recursive"), bool):
             findings.cno.append(
                 f"surfaces[{index}] has invalid recursive: {surface.get('recursive')!r}")
@@ -169,16 +202,8 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
         if relation not in allowed_relations:
             findings.cno.append(
                 f"overrides[{index}] has unknown relation: {relation!r}")
-        if relation in {"CONTRACT_ONLY", "TEMPLATE_SCAFFOLD"}:
-            contract = override.get("contract")
-            if not isinstance(contract, dict):
-                findings.cno.append(
-                    f"overrides[{index}] contract must be an object")
-            elif not isinstance(contract.get("required_exports"), list) or not all(
-                    isinstance(value, str) and value
-                    for value in contract.get("required_exports", [])):
-                findings.cno.append(
-                    f"overrides[{index}] required_exports must be a list of strings")
+        require_divergence_metadata(
+            override, f"overrides[{index}]", relation, findings)
     live_only_paths: set[object] = set()
     for index, entry in enumerate(document["live_only"]):
         if not isinstance(entry, dict):
@@ -195,6 +220,8 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
             findings.cno.append(
                 f"live_only {entry_path!r} has invalid relation: "
                 f"{entry.get('relation')!r}")
+        require_divergence_metadata(
+            entry, f"live_only[{index}]", entry.get("relation"), findings)
         presence = entry.get("presence")
         if presence not in {"REQUIRED", "RUNTIME_OPTIONAL"}:
             findings.cno.append(
@@ -483,6 +510,8 @@ CONTROLS = (
      "adws/adw_data/zz_undeclared.json", "add", "red", "zz_undeclared.json"),
     ("malformed-contract-entry",
      None, "malformed_contract", "cno", "overrides[1]"),
+    ("missing-divergence-metadata",
+     None, "missing_metadata", "cno", "overrides[0] intentional divergence has invalid evidence"),
     ("coupled-adapter-without-supervisor",
      ".claude/skills/sssf/templates/adws/adw_modules/subprocess_supervisor.py",
      "remove", "red", "coupled group split"),
@@ -642,6 +671,25 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
                 if not introduced:
                     control.problems.append(
                         f"{name}: malformed entry did not yield CNO naming {names}")
+                else:
+                    control.log.append(f"watched-red {name}: CNO naming {names}")
+                continue
+            if kind == "missing_metadata":
+                evidence = document["overrides"][0].get("evidence")
+                if not isinstance(evidence, str) or not evidence.strip():
+                    control.problems.append(
+                        f"{name}: precondition absent — overrides[0] evidence missing")
+                    continue
+                mutated = json.loads(json.dumps(document))
+                del mutated["overrides"][0]["evidence"]
+                probe_contract = temp / "missing-metadata-contract.json"
+                probe_contract.write_text(json.dumps(mutated), encoding="utf-8")
+                result = validate(root, probe_contract)
+                introduced = [line for line in result.cno
+                              if line not in baseline_cno and names in line]
+                if not introduced:
+                    control.problems.append(
+                        f"{name}: stripped field did not yield CNO naming {names}")
                 else:
                     control.log.append(f"watched-red {name}: CNO naming {names}")
                 continue
