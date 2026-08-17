@@ -1,7 +1,7 @@
 HD-15 derived-source provenance: negative controls watched red before any green
 source_head: bee9296a4c94b1dc3da6991acd1755a91fa681eb
 shipped_program: docs/validation/check_derived_source_provenance.py
-shipped_program_sha256: 1b85e144ab6d6bb9e769588b6f186287310addc3b814b052b22220a4f2d6f66f
+shipped_program_sha256: cd8be2729094dda0182658b68d7a3a7d9e471937fe3dfde50082716aaccc2802
 
 control_taxonomy_after_pipeline_custody_fixes: 31 controls; 24 refusals and
 7 green-side controls. Review added external-bundle, filename-identity, and
@@ -9,6 +9,14 @@ symlink-bundle refusals plus the worktree-isolation green control. These are
 PIPELINE CUSTODY FIXES, not part of the original design. The count describes
 the executable suite, and the additions are named because a changed count with
 no account of what changed is not independently checkable.
+
+regeneration: this matrix was regenerated against the FINAL shipped bytes.
+An earlier revision named program digest `1b85e144...`, which was correct when
+written but went stale when commit `a357834` corrected a one-line docstring in
+the validator. The digest was NOT patched in place: every defect variant was
+rebuilt from the final source, re-hashed, and re-run, and the observations below
+are the output those exact bytes produced. Swapping a digest would make this
+file assert that observations came from bytes that never produced them.
 
 Each control below runs the SHIPPED calibration harness against a deliberately
 defective copy of the validator. A control that cannot be watched failing is
@@ -20,7 +28,7 @@ path and `calibration_errors()` was called; the findings below are its returned
 strings in order.
 
 --- DEFECT-1: exact-identity matching weakened to "any non-empty string" ---
-defect_sha256: 0d82361ddf91c5a9e0f1fff9c4902f13112513b9040d2dba2b632ad03591129c
+defect_sha256: b56bb391057f47fafde2a4991e66fdd463ebf85312625576bcd41897c6e10c6d
 mutation: `_require_hex` accepts any non-empty string instead of matching the
           40/64 lowercase-hex pattern.
 expected: the branch and tag controls stop being red, because a name would then
@@ -36,21 +44,27 @@ note: the calibration input repository carries branch
       not about a failed lookup. Discovery is not identity.
 
 --- DEFECT-2: recorded hashes substituted for recomputed ones ---
-defect_sha256: a412d6097ccbbdad6fb9592ba1614b2cd50c1affbb29dded61e40a8fd152b076
+defect_sha256: 5e8a5ae7f9a91139180217f42a1d47aff1cf0a16fd888c1f2a010270fae6976f
 mutation: `verify_input` compares the claim to itself instead of hashing the
           input bytes; the destination hash comparison is disabled.
 expected: tamper controls stop being red, and the precedence control degrades.
 observed_output:
 input content hash not verified against bytes: expected FAIL, observed PASS (())
-destination hash not verified against bytes: expected FAIL, observed PASS (())
+destination hash not verified against bytes: went FAIL for the wrong reason (("docs/provenance/derived_source/calibration-derived-gate.json.transformed_files[0]: the working-tree copy of 'apps/example/derived_gate.py' differs from the recorded destination head, so the record no longer describes the shipped bytes",))
 precedence control: a violation alongside an incomplete universe reported CANNOT_OBSERVE instead of FAIL
 classification: observed-bad (control watched red)
 note: this is the "a field nothing verifies is prose with punctuation" control.
       It also demonstrates the precedence law: with the real violation no longer
       detected, an incomplete universe masked it as CANNOT_OBSERVE.
+      Recorded exactly as observed: the destination control still goes red, but
+      for a DIFFERENT reason than the one it calibrates. With the destination
+      hash comparison disabled, the independent working-tree comparison catches
+      the tamper instead. That is defence in depth, and it is retained here as
+      observed rather than restated as the cleaner "observed PASS" line, because
+      an evidence file that improves on what actually happened is fabrication.
 
 --- DEFECT-3: extent arithmetic removed ---
-defect_sha256: 8d9bbbe07280f539143ebe657f90ba1169ee8996728cb3c9491481529e30b314
+defect_sha256: b8e1e5623f2a643e981b82f493260b3aa48ae4298a5a1b70e2732df5b572dba0
 mutation: the derived-versus-input extent comparison and the input-range bound
           against the proven input are both disabled.
 expected: a claim wider than its proof becomes acceptable.
@@ -60,7 +74,7 @@ input range beyond the proven input: expected FAIL, observed PASS (())
 classification: observed-bad (control watched red)
 
 --- DEFECT-4: absence rounded into a pass ---
-defect_sha256: c4ceca74ac212b1ae5357289ddabd91db77ab71cafda945273a5f381d1f4d8b1
+defect_sha256: b6d67178d2f75c3c9e03c059312d632766141cb21e1bfc8f626dedffe49651cb
 mutation: an empty record set yields Verdict.PASS instead of NOT_APPLICABLE.
 expected: the absence control goes red.
 observed_output:

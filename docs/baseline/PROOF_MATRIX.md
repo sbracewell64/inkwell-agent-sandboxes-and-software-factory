@@ -117,7 +117,7 @@
 | HD-08 identity and integrity refusal | wrong identities, failed unrelated item, tamper, duplicate/reorder, descriptor-relative traversal/symlink races, final/root symlinks, identity change, unsupported host, and malformed schema controls observed red/CNO as specified | PASS |
 | HD-08 intermediate-component stat-to-open race | component swapped for an outside-root symlink between its no-follow stat and its descriptor-relative open; shipped implementation refused non-PASS with empty checked inventory and no outside-root bytes read, calibrated watched-red against a content-addressed defective variant with both intermediate protections removed | PASS |
 | HD-08 runtime acceptance integration | intentionally deferred to HD-09 | NOT PROVEN |
-| HD-15 derived-source population | 398 tracked files enumerated at `bee9296a`; zero provenance records and zero marker-bearing files; nothing exists to certify | NOT APPLICABLE — CNO |
+| HD-15 derived-source population | 400 tracked files enumerated on this branch; zero provenance records and zero marker-bearing files; nothing exists to certify | NOT APPLICABLE — CNO |
 | HD-15 exact-identity binding | every recorded commit, tree, blob, and content hash is resolved through a retained immutable input and recomputed from bytes; a branch or tag name that resolves to the correct commit is still refused | PASS — WATCHED RED |
 | HD-15 no claim exceeds its input proof | a derived range wider than the input range it cites, and an input range citing lines beyond the proven input, are both refused | PASS — WATCHED RED |
 | HD-15 B3 caveat visibility | a record without `OVERALL_B3_NOT_COMPLETE` is refused | PASS — WATCHED RED |

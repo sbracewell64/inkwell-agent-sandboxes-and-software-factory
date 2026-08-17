@@ -3,7 +3,7 @@ source_head: bee9296a4c94b1dc3da6991acd1755a91fa681eb
 command: python3 docs/validation/check_derived_source_provenance.py
 observed_output:
 HD-15 derived-source provenance contract: PASS
-HD-15 derived-source population: NOT_APPLICABLE (records=0, marked-files=0, tracked-universe=398, verified-bindings=0)
+HD-15 derived-source population: NOT_APPLICABLE (records=0, marked-files=0, tracked-universe=400, verified-bindings=0)
 HD-15 population note: the universe was enumerated and holds no derived source, so there is nothing to certify. NOT_APPLICABLE is a could-not-observe result and is not a pass; it does not state that any derived source complies.
 contract: template is schema-shaped and is refused as a real record
 watched-red: missing commit/tree, branch-name and tag-name identity, missing OVERALL_B3_NOT_COMPLETE, over-reaching derived and input ranges
@@ -11,6 +11,7 @@ watched-red: tampered input content/tree/commit/path/slice, tampered destination
 watched-red: untracked/external/symlink immutable input fails; committed bytes remain authoritative; unusable retained input is CNO; absence is NOT_APPLICABLE, not a pass
 watched-red: a violation alongside an incomplete universe still reports FAIL
 migration: none authorised, none performed; this validator creates no import path
+
 observed_exit: 0
 
 classification, stated precisely so a later reader cannot widen it:
@@ -19,7 +20,7 @@ classification, stated precisely so a later reader cannot widen it:
   demonstrably red-capable; see watched-red-control-matrix.txt in this
   directory.
 
-  The POPULATION is NOT_APPLICABLE, a form of could-not-observe. 398 tracked
+  The POPULATION is NOT_APPLICABLE, a form of could-not-observe. 400 tracked
   files were enumerated and none is identified as derived source, so there is
   nothing to certify. This is "we checked and there is none". It is NOT "there
   is none and we proved it complies", and it is NOT "we did not look".
