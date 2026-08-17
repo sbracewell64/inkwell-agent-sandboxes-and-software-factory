@@ -166,7 +166,7 @@ def is_placeholder(value: object) -> bool:
 
 @dataclass(frozen=True)
 class PopulationResult:
-    """A three-valued population assessment; ``verdict`` is derived once."""
+    """A four-valued population assessment; ``verdict`` is derived once."""
 
     verdict: Verdict
     observed_bad: tuple[str, ...] = ()

@@ -125,9 +125,11 @@ verifies, against bytes:
    lines than the input range it cites, and an input range may not cite lines
    beyond the proven input.
 
-A field that nothing verifies is prose with punctuation. Every field above is
-checked against bytes, and each check is calibrated by a control that is
-watched failing first.
+A recorded hash or immutable identity that is not verified is prose with
+punctuation. The input and destination identities, hashes, byte length, paths,
+and range extents above are checked against retained Git objects and bytes; the
+remaining custody and classification fields are structurally validated. The
+byte-level bindings are calibrated by controls watched failing first.
 
 ## Refusals
 
