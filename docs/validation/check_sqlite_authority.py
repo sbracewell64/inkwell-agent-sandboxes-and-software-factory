@@ -842,7 +842,9 @@ def public_read_methods(text: str) -> set[str]:
     return declared - {"setArchived", "close"}
 
 
-def exercise_binding_errors() -> tuple[list[str], list[str], list[str]]:
+def exercise_binding_errors(
+    evidence_path: Path = EXERCISE_EVIDENCE,
+) -> tuple[list[str], list[str], list[str]]:
     """Bind the recorded Bun exercise to the TypeScript bytes present right now.
 
     Returns (contradictions, absences, notes). An absent or unparsable record is
@@ -857,7 +859,7 @@ def exercise_binding_errors() -> tuple[list[str], list[str], list[str]]:
 
     if not EXERCISE_SCRIPT.is_file():
         absences.append(f"the visualizer read-surface exercise is missing: {EXERCISE_SCRIPT.name}")
-    if not EXERCISE_EVIDENCE.is_file():
+    if not evidence_path.is_file():
         absences.append(
             "no recorded visualizer read-surface exercise; the read surface has not been "
             "executed against any known bytes"
@@ -865,10 +867,17 @@ def exercise_binding_errors() -> tuple[list[str], list[str], list[str]]:
         return contradictions, absences, notes
 
     try:
-        record = json.loads(EXERCISE_EVIDENCE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        evidence_bytes = evidence_path.read_bytes()
+        record = json.loads(evidence_bytes)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         absences.append(f"the recorded exercise could not be read: {exc}")
         return contradictions, absences, notes
+
+    if evidence_bytes != sqlite_authority.canonical_json(record).encode("utf-8"):
+        contradictions.append(
+            "the recorded exercise is not canonical JSON: sorted keys, no insignificant "
+            "whitespace, and one final LF are required"
+        )
 
     if record.get("schema_version") != 1 or record.get("exercise") != EXERCISE_ID:
         absences.append(
@@ -944,64 +953,64 @@ def exercise_binding_errors() -> tuple[list[str], list[str], list[str]]:
     return contradictions, absences, notes
 
 
-def exercise_control_errors() -> list[str]:
+def exercise_control_errors(temp: Path) -> list[str]:
     """Watched red: a moved byte must break the binding, and a bad record must be rejected."""
     errors: list[str] = []
     if not EXERCISE_EVIDENCE.is_file():
         return errors
 
-    record = json.loads(EXERCISE_EVIDENCE.read_text(encoding="utf-8"))
-    original = EXERCISE_EVIDENCE.read_bytes()
+    record = json.loads(EXERCISE_EVIDENCE.read_bytes())
+    control_evidence = temp / "visualizer-read-surface-exercise.json"
     reader_path = ROOT / sqlite_authority.VISUALIZER_DB
 
     def rewrite(mutate) -> tuple[list[str], list[str]]:
-        altered = json.loads(json.dumps(record))
+        altered = json.loads(sqlite_authority.canonical_json(record))
         mutate(altered)
-        EXERCISE_EVIDENCE.write_text(
-            json.dumps(altered, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        contradictions, absences, _ = exercise_binding_errors()
+        control_evidence.write_text(sqlite_authority.canonical_json(altered), encoding="utf-8")
+        contradictions, absences, _ = exercise_binding_errors(control_evidence)
         return contradictions, absences
 
-    try:
-        # One byte of the visualizer source moves, with no re-run of the exercise.
-        drifted, _ = rewrite(
-            lambda r: r["sources"].__setitem__(
-                sqlite_authority.VISUALIZER_DB,
-                hashlib.sha256(reader_path.read_bytes() + b" ").hexdigest(),
-            )
+    drifted, _ = rewrite(
+        lambda r: r["sources"].__setitem__(
+            sqlite_authority.VISUALIZER_DB,
+            hashlib.sha256(reader_path.read_bytes() + b" ").hexdigest(),
         )
-        if not any("has changed since it was last executed" in item for item in drifted):
-            errors.append("negative control: a changed visualizer source did not break the binding")
+    )
+    if not any("has changed since it was last executed" in item for item in drifted):
+        errors.append("negative control: a changed visualizer source did not break the binding")
 
-        refused, _ = rewrite(lambda r: r["mutation"].__setitem__("refused", False))
-        if not any("SUCCEEDING" in item for item in refused):
-            errors.append(
-                "negative control: a record showing the read surface mutating was accepted"
-            )
-
-        changed, _ = rewrite(
-            lambda r: r["fixture"].__setitem__("digest_after_reads", "0" * 64)
+    refused, _ = rewrite(lambda r: r["mutation"].__setitem__("refused", False))
+    if not any("SUCCEEDING" in item for item in refused):
+        errors.append(
+            "negative control: a record showing the read surface mutating was accepted"
         )
-        if not any("fixture database changing" in item for item in changed):
-            errors.append("negative control: a record showing the fixture changing was accepted")
 
-        no_attempt, _ = rewrite(lambda r: r["mutation"].__setitem__("attempted", False))
-        if not any("proves the surface runs" in item for item in no_attempt):
-            errors.append("negative control: a record with no mutation attempt was accepted")
+    changed, _ = rewrite(
+        lambda r: r["fixture"].__setitem__("digest_after_reads", "0" * 64)
+    )
+    if not any("fixture database changing" in item for item in changed):
+        errors.append("negative control: a record showing the fixture changing was accepted")
 
-        dropped, _ = rewrite(lambda r: r["reads"].__setitem__("methods", ["sessions"]))
-        if not any("never exercised against a fixture" in item for item in dropped):
-            errors.append("negative control: an incomplete read-method list was accepted")
+    no_attempt, _ = rewrite(lambda r: r["mutation"].__setitem__("attempted", False))
+    if not any("proves the surface runs" in item for item in no_attempt):
+        errors.append("negative control: a record with no mutation attempt was accepted")
 
-        EXERCISE_EVIDENCE.unlink()
-        _, missing, _ = exercise_binding_errors()
-        if not any("has not been executed" in item for item in missing):
-            errors.append(
-                "negative control: an absent exercise record was not could-not-observe"
-            )
-    finally:
-        EXERCISE_EVIDENCE.write_bytes(original)
+    dropped, _ = rewrite(lambda r: r["reads"].__setitem__("methods", ["sessions"]))
+    if not any("never exercised against a fixture" in item for item in dropped):
+        errors.append("negative control: an incomplete read-method list was accepted")
+
+    canonical = sqlite_authority.canonical_json(record).encode("utf-8")
+    control_evidence.write_bytes(canonical.replace(b'{"', b'{\n  "', 1))
+    noncanonical, _, _ = exercise_binding_errors(control_evidence)
+    if not any("not canonical JSON" in item for item in noncanonical):
+        errors.append("negative control: a noncanonical exercise record was accepted")
+
+    control_evidence.unlink()
+    _, missing, _ = exercise_binding_errors(control_evidence)
+    if not any("has not been executed" in item for item in missing):
+        errors.append(
+            "negative control: an absent exercise record was not could-not-observe"
+        )
     return errors
 
 
@@ -1233,6 +1242,7 @@ def main() -> int:
     if args.exercise_visualizer:
         return run_visualizer_exercise(args.bun)
 
+    evidence_digest_before = file_digest(EXERCISE_EVIDENCE) if EXERCISE_EVIDENCE.is_file() else None
     errors: list[str] = []
     binding_notes: list[str] = []
     with tempfile.TemporaryDirectory(prefix="sssf-hd13-") as raw_temp:
@@ -1256,11 +1266,14 @@ def main() -> int:
         binding_notes.extend(notes)
         errors.extend(binding_bad)
         errors.extend(f"could-not-observe: {item}" for item in binding_absent)
-        errors.extend(exercise_control_errors())
+        errors.extend(exercise_control_errors(temp))
 
         if args.controls:
             report_controls(temp, fixture)
             print()
+
+    if evidence_digest_before is not None and file_digest(EXERCISE_EVIDENCE) != evidence_digest_before:
+        errors.append("the validation run changed the tracked visualizer exercise evidence")
 
     if errors:
         print("HD-13 SQLite field authority: FAIL")

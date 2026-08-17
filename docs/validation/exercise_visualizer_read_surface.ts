@@ -63,7 +63,7 @@ function canonicalJson(value: unknown): string {
     }
     return input;
   };
-  return `${JSON.stringify(sort(value), null, 2)}\n`;
+  return `${JSON.stringify(sort(value))}\n`;
 }
 
 const dbPath = resolve(arg("db"));
