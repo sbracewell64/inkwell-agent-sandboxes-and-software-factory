@@ -29,6 +29,7 @@ Read in this order:
 6. [`reference/COMMANDS.md`](reference/COMMANDS.md) — command surface.
 7. [`reference/GLOSSARY.md`](reference/GLOSSARY.md) — canonical terms.
 8. [`reference/EVIDENCE_MANIFEST.md`](reference/EVIDENCE_MANIFEST.md) — offline run-bound evidence manifest v1 (not runtime acceptance).
+9. [`reference/SQLITE_AUTHORITY.md`](reference/SQLITE_AUTHORITY.md) — field-level authority and mutation ownership for every record surface. Read this before deleting, rebuilding, relocating or archiving a trace database.
 
 ## Documentation authority
 

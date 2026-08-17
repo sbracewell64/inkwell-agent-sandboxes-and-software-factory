@@ -41,6 +41,9 @@ EXPECTED_CHECKS = {
     "executor-supervisor-and-pi-adapter-validator": (
         "{python}", "docs/validation/check_executor_supervisor.py"
     ),
+    "sqlite-field-authority-validator": (
+        "{python}", "docs/validation/check_sqlite_authority.py"
+    ),
     "production-extension-path-validator": (
         "{python}", "docs/validation/check_production_extension_path.py"
     ),

@@ -91,6 +91,20 @@ python3 docs/validation/check_evidence_manifest.py
 
 Manifest v1 validation is offline evidence checking only. It does not authorize runtime acceptance; HD-09 owns that integration.
 
+## Record authority
+
+```text
+python3 tools/sqlite_authority.py matrix
+python3 tools/sqlite_authority.py render
+python3 tools/sqlite_authority.py observe --db adws/adw_data/sssf.db
+python3 docs/validation/check_sqlite_authority.py
+python3 docs/validation/check_sqlite_authority.py --controls
+```
+
+`observe` is three-valued: exit `0` observed-good, `1` observed-bad, `2` could-not-observe. A
+missing or empty database is could-not-observe, never an empty pass. `--controls` prints what each
+negative control observed, so a green result can be audited rather than trusted.
+
 ## Identity warning
 
 `run-id` and `adw-id` are different.
