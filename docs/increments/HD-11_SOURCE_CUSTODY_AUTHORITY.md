@@ -32,7 +32,7 @@ Historical increment records were not edited. B2-002 describes what was true at 
 
 It reads the document and the code together, offline — file bytes only, no network, no git, no subprocess.
 
-- Every contract row must cite a file that exists. Recipe rows are verified by bounded recognizers for the operative assignment or conditional and its refusing exit path after comments and literal-false blocks are removed; duplicate rows are malformed.
+- Every contract row must cite a file that exists. Recipe rows are verified by bounded recognizers for the operative assignment or conditional and its refusing exit path after conservative exclusion removes full-line and inline comments and truncates at an always-false condition; duplicate rows are malformed. The exclusion is intentionally over-broad and does not parse shell.
 - The required row set is derived from the code: the persisted provenance names come out of the `"$RR" set` write in `just/sandbox/lifecycle/fill.just` and are cross-checked against `FIELDS` in `sandbox_mount/host/run_record.py`. Renaming a field in the code turns the document red; naming a field the code does not persist turns it red the other way.
 - Canonical and upstream URLs in the document must equal the values `docs/validation/check_repository_ownership.py` declares. Any third repository is refused.
 - No claim about what the sandbox clones may name a repository, by URL literal or by the upstream owner's name, because the recipe names none. Claim extraction binds a colon lead-in to the block it introduces, which is exactly how the pre-HD-11 document attributed a hard-coded upstream URL to FILL across a blank line.
@@ -41,7 +41,7 @@ It reads the document and the code together, offline — file bytes only, no net
 - The remote roles are cited as enforcement, not vocabulary: the table binds them to the `origin != CANONICAL` and push-`DISABLED` assertions in the ownership validator, so a role claim cannot survive the code dropping the check that backs it.
 - A missing or unparsable input, or a recipe row outside the accepted bounded syntax, is reported as could-not-observe by row name and is never narrowed into a pass. Structurally verified and unchecked rows are printed on green and red paths.
 
-This implements the standing “discovery is not identity” and property-scoped completeness ruling from Browser Sol, captain-delegated authority, control issue 4 comment 5310771128, recorded at `data/captain-rulings-2026-08-17-discovery-is-not-identity.md`. Substring occurrence is used for exclusion, never as confirmation of a recipe acceptance predicate.
+This implements the standing “discovery is not identity” and property-scoped completeness ruling from Browser Sol, captain-delegated authority, control issue 4 comment 5310771128, recorded at `data/captain-rulings-2026-08-17-discovery-is-not-identity.md`. Loose matching is used only for conservative exclusion, never confirmation. Persisted provenance is derived from the sanitized operative write region, and each persisted row has its own bounded recognizer.
 
 Acceptance covers canonical and upstream roles, the public clone restriction, the exact pin, the dirty-host rule, the guest branch and gate, the persisted fields, the SETUP recheck, and the harvest namespace — 22 reconciled elements.
 
@@ -66,7 +66,8 @@ The remaining controls copy the cited files into a throwaway root, mutate exactl
 | unfollowable-citation | a cited path cannot be opened |
 | code-token-drift | a cited token no longer occurs in the cited file |
 | comment-only-token | a token surviving only in a comment cannot confirm structure |
-| dead-branch-token | a token surviving only in a literal-false block cannot confirm structure |
+| inline-comment-only-token | a token surviving only in an inline comment cannot confirm structure |
+| dead-branch-token | a token after a nested block inside a literal-false region cannot confirm structure |
 | duplicate-row | duplicated identity is rejected rather than resolved by position |
 | unchecked-row | unrecognized bounded syntax is named and prevents satisfaction |
 

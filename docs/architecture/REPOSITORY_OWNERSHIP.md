@@ -33,7 +33,7 @@ HARVEST reads the same run branch and writes it home under `refs/sandbox/<run-id
 
 ## Contract table
 
-Every row below is a claim this document makes about the code, the file that owns it, and the operative token a reader will find by opening that file. `docs/validation/check_source_custody_authority.py` rejects duplicate rows and verifies recipe rows with bounded structural recognizers after removing comments and unreachable literal-false blocks. A row outside that accepted syntax is reported unchecked by name and prevents a satisfied verdict.
+Every row below is a claim this document makes about the code, the file that owns it, and the operative token a reader will find by opening that file. `docs/validation/check_source_custody_authority.py` rejects duplicate rows and verifies recipe rows with bounded structural recognizers after conservatively removing comments and everything following an always-false condition. This exclusion is deliberately over-broad and does not parse shell: uncertain structure becomes unchecked by name and prevents a satisfied verdict.
 
 | Contract element | Code authority | Exact token |
 | --- | --- | --- |

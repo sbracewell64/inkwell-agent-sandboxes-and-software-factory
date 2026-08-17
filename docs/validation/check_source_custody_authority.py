@@ -145,7 +145,7 @@ def code_facts(root: Path) -> Facts:
         raise Unobservable(f"{RECORD}: FIELDS is not a tuple of names")
 
     # The provenance the recipe actually persists, in the order it persists it.
-    fill = read(root, FILL)
+    fill = operative_recipe_text(read(root, FILL))
     marker = '"$RR" set {{RUN_ID}}'
     start = fill.find(marker)
     if start < 0:
@@ -204,6 +204,8 @@ def token_present(root: Path, rel: str, token: str) -> bool:
         text = read(root, rel)
     except Unobservable:
         return False
+    if rel.endswith(".just"):
+        return token in operative_recipe_text(text)
     if token in text:
         return True
     if rel.endswith(".py"):
@@ -217,18 +219,11 @@ def token_present(root: Path, rel: str, token: str) -> bool:
 
 def operative_recipe_text(source: str) -> str:
     lines = []
-    dead_depth = 0
     for line in source.splitlines():
+        line = re.sub(r"(^|\s)#.*$", r"\1", line)
         stripped = line.lstrip()
-        if stripped.startswith("#"):
-            continue
         if re.match(r"if\s+(?:false|\[\s+(?:1\s+=\s+0|0\s+=\s+1)\s+\])\s*;\s*then\s*$", stripped):
-            dead_depth += 1
-            continue
-        if dead_depth:
-            if re.match(r"fi(?:\s*(?:#.*)?)?$", stripped):
-                dead_depth -= 1
-            continue
+            break
         lines.append(line)
     return "\n".join(lines)
 
@@ -256,9 +251,13 @@ def structural_coverage(root: Path, expected: dict[str, tuple[str, str]]) -> Cov
     for element, (rel, _) in expected.items():
         if rel.endswith(".just"):
             pattern = STRUCTURAL_PATTERNS.get(element)
-            if pattern is None and element.startswith("persisted-"):
-                verified.append(element)
-                continue
+            if element.startswith("persisted-"):
+                _, token = expected[element]
+                pattern = (
+                    r'"\$RR" set \{\{RUN_ID\}\}\s+\\\n'
+                    r'(?:\s+\w+="\$\w+"\s+\\\n)*\s+'
+                    + re.escape(token)
+                )
             if pattern is None:
                 unchecked.append(f"{element}: no bounded structural recognizer")
                 continue
@@ -634,13 +633,26 @@ def watched_red_errors(root: Path, facts: Facts) -> list[str]:
     )
 
     control(
-        "dead-branch-token-control",
-        "guest-run-branch: operative structure not recognized",
+        "inline-comment-only-token-control",
+        "harvest-ref-namespace: operative structure not recognized",
         lambda fixture: rewrite(
             fixture,
-            FILL,
-            'branch="sbx/$run_id"',
-            'branch="other/$run_id"\n    if false; then\n        branch="sbx/$run_id"\n    fi',
+            HARVEST,
+            'DEST="refs/sandbox/$RUN_ID"',
+            'DEST="refs/runs/$RUN_ID"  # DEST="refs/sandbox/$RUN_ID"',
+        ),
+    )
+
+    control(
+        "dead-branch-token-control",
+        "harvest-ref-namespace: operative structure not recognized",
+        lambda fixture: rewrite(
+            fixture,
+            HARVEST,
+            'DEST="refs/sandbox/$RUN_ID"',
+            'DEST="refs/runs/$RUN_ID"\n    if false; then\n'
+            '        if true; then echo nested; fi\n'
+            '        DEST="refs/sandbox/$RUN_ID"\n    fi',
         ),
     )
 
@@ -723,7 +735,11 @@ def main() -> int:
     )
     print(
         "watched-red: document and code SHA field-name divergence, unfollowable "
-        "citation, code token drift"
+        "citation, code token drift, full-line and inline comment-only tokens"
+    )
+    print(
+        "watched-red: nested dead-region token, duplicate row, unchecked row, "
+        "genuine operative non-vacuity"
     )
     return 0
 

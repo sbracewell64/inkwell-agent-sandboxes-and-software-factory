@@ -1,8 +1,8 @@
-HD-11 watched-red control matrix (operative-structure revision)
+HD-11 watched-red control matrix (conservative-exclusion revision)
 document: docs/architecture/REPOSITORY_OWNERSHIP.md
 harness: docs/validation/check_source_custody_authority.py watched_red_errors()
 authority: Browser Sol, captain-delegated authority, control issue 4 comment 5310771128; data/captain-rulings-2026-08-17-discovery-is-not-identity.md
-method: each control copies the cited files into a throwaway root, mutates one property, and requires observed-bad or could-not-observe for the named reason. Recipe comments and literal-false blocks are removed before bounded structural recognition. The unmutated fixture must have every row structurally verified and no unchecked row.
+method: each control copies the cited files into a throwaway root, mutates one property, and requires observed-bad or could-not-observe for the named reason. Recipe sanitization over-removes comments beginning at a line start or whitespace-prefixed # and truncates at a recognized always-false condition. It performs no quote tracking or construct balancing. Every row then requires a bounded recognizer; the unmutated fixture must have every row verified and no unchecked row.
 observed controls:
 - hard-coded-upstream: observed-bad — clone claim names upstream
 - missing-fill-pointer: observed-bad — FILL pointer absent
@@ -12,12 +12,13 @@ observed controls:
 - code-sha-field-divergence: observed-bad — derived persisted/schema row absent
 - unfollowable-citation: observed-bad — cited path cannot be opened
 - code-token-drift: could-not-observe — harvest-ref-namespace operative structure unrecognized
-- comment-only-token: could-not-observe — harvest-ref-namespace token in comment cannot confirm structure
-- dead-branch-token: could-not-observe — guest-run-branch token in literal-false block cannot confirm structure
+- full-line-comment-only-token: could-not-observe — comment cannot confirm harvest-ref-namespace
+- inline-comment-only-token: could-not-observe — inline comment cannot confirm harvest-ref-namespace
+- nested-dead-region-token: could-not-observe — inner if/fi cannot re-expose harvest-ref-namespace after always-false truncation
 - duplicate-row: observed-bad — duplicate origin-derivation row rejected
 - unchecked-row: could-not-observe — fill-head-gate named unchecked and overall satisfaction refused
 - genuine-operative/non-vacuity: observed-good — all 22 rows verified; unchecked none
 coverage output: both PASS and FAIL print the structurally verified row names and unchecked row names/reasons.
 absent-input controls: missing document and missing code authority remain could-not-observe.
-classification: 8 observed-bad controls, 4 could-not-observe controls, 1 observed-good non-vacuity control.
+classification: 8 observed-bad controls, 5 could-not-observe controls, 1 observed-good non-vacuity control.
 scope: source-custody document and validator only; no recipe, lifecycle, sandbox behavior, run-record schema, or historical B2-002 record changed.
