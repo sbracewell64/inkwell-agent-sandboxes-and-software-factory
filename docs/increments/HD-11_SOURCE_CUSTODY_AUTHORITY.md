@@ -79,7 +79,7 @@ The unmutated copy stays green and provides the genuine-operative non-vacuity co
 
 `python3 docs/validation/check_source_custody_authority.py`
 
-Result: `HD-11 source custody authority: PASS` — 22 contract elements reconciled, eight watched-red controls plus the non-vacuity control.
+Result: `HD-11 source custody authority: PASS` — 22 contract elements reconciled, fifteen watched-red controls plus the non-vacuity control.
 
 `python3 docs/validation/check_ci_contract.py`
 
