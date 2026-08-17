@@ -26,8 +26,10 @@ import argparse
 import ast
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -46,6 +48,18 @@ OBS_QUERY_SOURCE = ROOT / sqlite_authority.OBS_QUERY
 VISUALIZER_DB_SOURCE = ROOT / sqlite_authority.VISUALIZER_DB
 VISUALIZER_SERVER_SOURCE = ROOT / sqlite_authority.VISUALIZER_SERVER
 AUTHORITY_DOC = ROOT / "docs/reference/SQLITE_AUTHORITY.md"
+
+# The visualizer read surface is TypeScript. This stdlib check cannot execute it,
+# so it does not pretend to: a separate Bun exercise runs it and records the exact
+# source digests it ran against, and this check proves those bytes have not moved
+# since. Comparing digests needs no Bun; executing does.
+EXERCISE_SCRIPT = ROOT / "docs/validation/exercise_visualizer_read_surface.ts"
+EXERCISE_EVIDENCE = ROOT / "docs/evidence/hd13/visualizer-read-surface-exercise.json"
+EXERCISE_ID = "hd13.visualizer-read-surface.v1"
+EXERCISE_SOURCES = (
+    sqlite_authority.VISUALIZER_DB,
+    sqlite_authority.VISUALIZER_SERVER,
+)
 
 FIXTURE_ADW = "hd13-fixture-adw"
 
@@ -817,6 +831,180 @@ def observation_errors(temp: Path, fixture: Path) -> list[str]:
     return errors
 
 
+def file_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def public_read_methods(text: str) -> set[str]:
+    """Public read methods declared on the visualizer reader, from its own bytes."""
+    declared = set(re.findall(r"^  (?!private |readonly |constructor)([A-Za-z][A-Za-z0-9_]*)\(", text, flags=re.MULTILINE))
+    # setArchived is the triage write and close() is lifecycle; neither is a read.
+    return declared - {"setArchived", "close"}
+
+
+def exercise_binding_errors() -> tuple[list[str], list[str], list[str]]:
+    """Bind the recorded Bun exercise to the TypeScript bytes present right now.
+
+    Returns (contradictions, absences, notes). An absent or unparsable record is
+    could-not-observe -- never a pass, and never silently the same thing as a
+    record that shows the read surface mutating. A digest that no longer matches
+    the current source is a contradiction: the TypeScript has changed since it was
+    last actually exercised, so nothing has executed these bytes.
+    """
+    contradictions: list[str] = []
+    absences: list[str] = []
+    notes: list[str] = []
+
+    if not EXERCISE_SCRIPT.is_file():
+        absences.append(f"the visualizer read-surface exercise is missing: {EXERCISE_SCRIPT.name}")
+    if not EXERCISE_EVIDENCE.is_file():
+        absences.append(
+            "no recorded visualizer read-surface exercise; the read surface has not been "
+            "executed against any known bytes"
+        )
+        return contradictions, absences, notes
+
+    try:
+        record = json.loads(EXERCISE_EVIDENCE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        absences.append(f"the recorded exercise could not be read: {exc}")
+        return contradictions, absences, notes
+
+    if record.get("schema_version") != 1 or record.get("exercise") != EXERCISE_ID:
+        absences.append(
+            f"the recorded exercise is not {EXERCISE_ID} v1; refusing to interpret it"
+        )
+        return contradictions, absences, notes
+
+    if record.get("observation") != "observed-good":
+        contradictions.append(
+            f"the recorded exercise itself observed {record.get('observation')!r}"
+        )
+
+    fixture = record.get("fixture") or {}
+    digests = (
+        fixture.get("digest_before"),
+        fixture.get("digest_after_reads"),
+        fixture.get("digest_after_mutation_attempt"),
+    )
+    if not fixture.get("unchanged") or len(set(digests)) != 1 or None in digests:
+        contradictions.append(
+            f"the exercise recorded the fixture database changing: {fixture}"
+        )
+
+    mutation = record.get("mutation") or {}
+    if not mutation.get("attempted"):
+        contradictions.append(
+            "the exercise recorded no mutation attempt, so it proves the surface runs "
+            "but nothing about read-only-ness"
+        )
+    if not mutation.get("refused"):
+        contradictions.append(
+            f"the exercise recorded a mutation through the read surface SUCCEEDING: {mutation}"
+        )
+
+    recorded_sources = record.get("sources") or {}
+    for relative in EXERCISE_SOURCES:
+        path = ROOT / relative
+        if not path.is_file():
+            absences.append(f"exercised source is gone: {relative}")
+            continue
+        current = file_digest(path)
+        recorded = recorded_sources.get(relative)
+        if recorded is None:
+            contradictions.append(f"the exercise recorded no digest for {relative}")
+        elif recorded != current:
+            contradictions.append(
+                f"{relative} has changed since it was last executed: recorded {recorded}, "
+                f"present {current}. Re-run the exercise; nothing has exercised these bytes."
+            )
+        else:
+            notes.append(f"{current}  {relative}")
+
+    for stale in set(recorded_sources) - set(EXERCISE_SOURCES):
+        contradictions.append(f"the exercise records a source outside its declared set: {stale}")
+
+    reader = VISUALIZER_DB_SOURCE.read_text(encoding="utf-8")
+    exercised = set(record.get("reads", {}).get("methods") or [])
+    if not exercised:
+        contradictions.append("the exercise recorded no read methods")
+    missing = public_read_methods(reader) - exercised
+    if missing:
+        contradictions.append(
+            f"public read methods never exercised against a fixture: {sorted(missing)}"
+        )
+
+    notes.append(
+        "bun {version} ran {script} at {when}".format(
+            version=(record.get("runtime") or {}).get("version", "?"),
+            script=EXERCISE_SCRIPT.relative_to(ROOT),
+            when=record.get("observed_at", "?"),
+        )
+    )
+    return contradictions, absences, notes
+
+
+def exercise_control_errors() -> list[str]:
+    """Watched red: a moved byte must break the binding, and a bad record must be rejected."""
+    errors: list[str] = []
+    if not EXERCISE_EVIDENCE.is_file():
+        return errors
+
+    record = json.loads(EXERCISE_EVIDENCE.read_text(encoding="utf-8"))
+    original = EXERCISE_EVIDENCE.read_bytes()
+    reader_path = ROOT / sqlite_authority.VISUALIZER_DB
+
+    def rewrite(mutate) -> tuple[list[str], list[str]]:
+        altered = json.loads(json.dumps(record))
+        mutate(altered)
+        EXERCISE_EVIDENCE.write_text(
+            json.dumps(altered, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        contradictions, absences, _ = exercise_binding_errors()
+        return contradictions, absences
+
+    try:
+        # One byte of the visualizer source moves, with no re-run of the exercise.
+        drifted, _ = rewrite(
+            lambda r: r["sources"].__setitem__(
+                sqlite_authority.VISUALIZER_DB,
+                hashlib.sha256(reader_path.read_bytes() + b" ").hexdigest(),
+            )
+        )
+        if not any("has changed since it was last executed" in item for item in drifted):
+            errors.append("negative control: a changed visualizer source did not break the binding")
+
+        refused, _ = rewrite(lambda r: r["mutation"].__setitem__("refused", False))
+        if not any("SUCCEEDING" in item for item in refused):
+            errors.append(
+                "negative control: a record showing the read surface mutating was accepted"
+            )
+
+        changed, _ = rewrite(
+            lambda r: r["fixture"].__setitem__("digest_after_reads", "0" * 64)
+        )
+        if not any("fixture database changing" in item for item in changed):
+            errors.append("negative control: a record showing the fixture changing was accepted")
+
+        no_attempt, _ = rewrite(lambda r: r["mutation"].__setitem__("attempted", False))
+        if not any("proves the surface runs" in item for item in no_attempt):
+            errors.append("negative control: a record with no mutation attempt was accepted")
+
+        dropped, _ = rewrite(lambda r: r["reads"].__setitem__("methods", ["sessions"]))
+        if not any("never exercised against a fixture" in item for item in dropped):
+            errors.append("negative control: an incomplete read-method list was accepted")
+
+        EXERCISE_EVIDENCE.unlink()
+        _, missing, _ = exercise_binding_errors()
+        if not any("has not been executed" in item for item in missing):
+            errors.append(
+                "negative control: an absent exercise record was not could-not-observe"
+            )
+    finally:
+        EXERCISE_EVIDENCE.write_bytes(original)
+    return errors
+
+
 def documentation_errors() -> list[str]:
     """Governed documents may not restate a claim the code refutes."""
     errors: list[str] = []
@@ -877,6 +1065,44 @@ def documentation_control_errors() -> list[str]:
 
 
 # ── entry point ──────────────────────────────────────────────────────────────
+
+
+def run_visualizer_exercise(bun: str) -> int:
+    """Execute the real visualizer read surface and record what was observed.
+
+    Bun is required here and nowhere else. It is absent -> could-not-observe, which
+    is never a pass: the recorded evidence is not written, and the stdlib check keeps
+    reporting that the read surface has not been executed against known bytes.
+    """
+    executable = shutil.which(bun) or (bun if Path(bun).is_file() else None)
+    if executable is None:
+        print(f"visualizer read-surface exercise: could-not-observe -- no Bun at {bun!r}")
+        print("Nothing was executed, so nothing is recorded. This is not a pass.")
+        return 2
+
+    with tempfile.TemporaryDirectory(prefix="sssf-hd13-exercise-") as raw_temp:
+        fixture = Path(raw_temp) / "fixture.db"
+        build_fixture(fixture)
+        completed = subprocess.run(
+            [
+                executable,
+                str(EXERCISE_SCRIPT),
+                "--db",
+                str(fixture),
+                "--adw-id",
+                FIXTURE_ADW,
+                "--out",
+                str(EXERCISE_EVIDENCE),
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+    print(completed.stdout.rstrip())
+    if completed.returncode != 0:
+        print(f"visualizer read-surface exercise: exit {completed.returncode}")
+    return completed.returncode
 
 
 def report_controls(temp: Path, fixture: Path) -> None:
@@ -956,6 +1182,22 @@ def report_controls(temp: Path, fixture: Path) -> None:
         print(f"  {error}")
     print()
 
+    print("visualizer read-surface binding controls:")
+    for label, error in (
+        ("shipped record accepted", None),
+        *[("rejected", item) for item in exercise_control_errors()],
+    ):
+        if error is None:
+            bad, absent, notes = exercise_binding_errors()
+            print(f"  binding holds for the present bytes: {not bad and not absent}")
+            for note in notes:
+                print(f"    {note}")
+        else:
+            print(f"  CONTROL FAILED: {error}")
+    print("  drifted source / mutating record / changed fixture / no attempt /")
+    print("  incomplete method list / absent record: each detected (see errors above if not)")
+    print()
+
     print("shipped-sentence documentation controls:")
     patterns = {claim["id"]: claim["pattern"] for claim in sqlite_authority.REFUTED_CLAIMS}
     for claim_id, sentence in HISTORICAL_CLAIMS:
@@ -973,9 +1215,26 @@ def main() -> int:
         action="store_true",
         help="Also print what every negative control observed.",
     )
+    parser.add_argument(
+        "--exercise-visualizer",
+        action="store_true",
+        help=(
+            "Run the visualizer read surface through Bun against a fixture and record "
+            "the result, including the digests of the TypeScript it executed."
+        ),
+    )
+    parser.add_argument(
+        "--bun",
+        default="bun",
+        help="Bun executable for --exercise-visualizer (default: bun on PATH).",
+    )
     args = parser.parse_args()
 
+    if args.exercise_visualizer:
+        return run_visualizer_exercise(args.bun)
+
     errors: list[str] = []
+    binding_notes: list[str] = []
     with tempfile.TemporaryDirectory(prefix="sssf-hd13-") as raw_temp:
         temp = Path(raw_temp)
         fixture = temp / "fixture.db"
@@ -992,6 +1251,12 @@ def main() -> int:
         errors.extend(observation_errors(temp, fixture))
         errors.extend(documentation_errors())
         errors.extend(documentation_control_errors())
+
+        binding_bad, binding_absent, notes = exercise_binding_errors()
+        binding_notes.extend(notes)
+        errors.extend(binding_bad)
+        errors.extend(f"could-not-observe: {item}" for item in binding_absent)
+        errors.extend(exercise_control_errors())
 
         if args.controls:
             report_controls(temp, fixture)
@@ -1010,6 +1275,14 @@ def main() -> int:
     print("missing, zero-byte, unreadable and row-less databases are could-not-observe")
     print("a contradiction alongside an absence stays observed-bad")
     print("governed documents restate no claim the code refutes")
+    print()
+    print("visualizer read surface: this check did NOT execute it -- it is TypeScript.")
+    print("It was executed by the recorded Bun exercise below, and these digests prove the")
+    print("bytes present now are the bytes that were executed. This check alone is not")
+    print("proof that the read surface was exercised; the recorded exercise is.")
+    for note in binding_notes:
+        print(f"  {note}")
+    print(f"  record: {EXERCISE_EVIDENCE.relative_to(ROOT)}")
     return 0
 
 

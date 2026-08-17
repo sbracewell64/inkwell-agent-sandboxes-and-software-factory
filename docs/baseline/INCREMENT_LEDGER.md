@@ -29,7 +29,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | HD-02 | PASS | Static synchronization for installed/template/generated ADWs | nonempty static inventory, generated import-only smoke, and sixteen watched-red mutations passed without provider execution |
 | HD-03 | PASS | Nonvacuous three-valued gate outcomes | 15 focused controls prove PASS/FAIL/CNO, fail-closed migration, trace provenance, and non-green CNO rendering |
 | HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
-| HD-13 | PASS | Field-level authority matrix for record surfaces; read-only surfaces cannot mutate and only the archive route changes triage state | 158 authority rows reconciled against the tracer/run-record/manifest/query owners' own bytes; documentation control watched red against the real uncorrected files at `bee9296a`; whole-file digest and cell-level diffs with seven detectable negative controls |
+| HD-13 | PASS | Field-level authority matrix for record surfaces; read-only surfaces cannot mutate and only the archive route changes triage state | 158 authority rows reconciled against the tracer/run-record/manifest/query owners' own bytes; documentation control watched red against the real uncorrected files at `bee9296a`; whole-file digest and cell-level diffs with detectable negative controls; the visualizer read surface executed under Bun 1.3.14 and digest-bound so the stdlib CI gate fails when those sources change without a re-run |
 
 ## Future increments
 

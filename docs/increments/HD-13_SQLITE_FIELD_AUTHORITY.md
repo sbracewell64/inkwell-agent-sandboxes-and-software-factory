@@ -103,6 +103,12 @@ Every claim is asserted as a property, never as a proxy:
   schema-only and row-less databases each return CNO and exit `2`.
 - **archiving never changes terminal acceptance or evidence hashes** — proven by the same
   cell-level diff, which covers `phases.status`, `gate_results.outcome` and every other column.
+- **the visualizer read surface is executed, not inspected** — `exercise_visualizer_read_surface.ts`
+  runs the real `SssfDb` under Bun against a fixture built from the tracer's real DDL, requires the
+  whole-file digest unchanged across every public read method, and requires a mutation through the
+  connection those methods use to fail. It records the SHA-256 of the TypeScript it ran, and the
+  stdlib CI check fails when the present source differs — so the exercise cannot decay into a claim
+  about bytes that have moved. Only that exercise needs Bun; the CI gate stays stdlib-only.
 
 ### Watched-red controls
 
@@ -117,9 +123,14 @@ Each of these must be observable going red, or the green above proves nothing:
 6. an unowned column alongside zero rows, which must stay observed-bad rather than being narrowed
    to CNO;
 7. each superseded sentence exactly as it shipped, which must still be rejected after the real
-   documents are corrected.
+   documents are corrected;
+8. one changed byte of the visualizer source with no re-run of the exercise, which must fail the
+   digest binding;
+9. an absent exercise record, which must be could-not-observe rather than a pass;
+10. a recorded exercise claiming the mutation succeeded, the fixture changed, no attempt was made, or
+    an incomplete read-method list — each must be rejected.
 
-Controls 2–7 run inside the validator on every invocation, so a control that stops being able to go
+Controls 2–10 run inside the validator on every invocation, so a control that stops being able to go
 red fails the validator instead of quietly passing.
 
 ### Semantic review
@@ -138,6 +149,13 @@ Independent review is delegated to the required no-mistakes pipeline before publ
 - corrected-state capture: `docs/evidence/hd13/corrected-state-green.txt` — the same validator,
   exit 0, with every negative control still detectable. The two captures differ only in the
   documents, so the red is not a different program from the green.
+- executed read-surface record: `docs/evidence/hd13/visualizer-read-surface-exercise.json` — Bun
+  1.3.14 ran the real `SssfDb`; ten public read methods left the fixture digest unchanged and a
+  mutation through their own connection was refused (`attempt to write a readonly database`)
+- digest-drift watched red: `docs/evidence/hd13/visualizer-digest-drift-red.txt` — one byte of
+  `db.ts` changed without a re-run, exit 1, both digests printed
+- unexercised watched red: `docs/evidence/hd13/visualizer-unexercised-cno.txt` — the record removed,
+  reported as could-not-observe rather than a pass, exit 1
 - test result: validator prints `HD-13 SQLite field authority: PASS` over 158 authority rows
 
 ## Documentation changed
@@ -160,10 +178,16 @@ is evidence, not current runtime authority, and source custody forbids rewriting
 supersession is recorded in `docs/reference/SQLITE_AUTHORITY.md`, and the validator asserts that
 notice is present rather than leaving the limit undiscoverable.
 
-The visualizer's read-only and triage contracts are asserted against its real source bytes and its
-real extracted statement. Executing the TypeScript surface itself would need Bun, which the offline
-stdlib validator deliberately does not require; that residual gap is stated rather than claimed as
-covered.
+The visualizer's read surface is genuinely executed under Bun and digest-bound to the bytes it ran
+against, so the stdlib gate stays runnable without a JavaScript toolchain while the executed proof
+stays true for exactly the source it covers. Re-running the exercise is required whenever the
+visualizer server sources change; the check names that requirement rather than leaving it to
+discipline.
+
+The triage contract is asserted by executing the archive statement extracted from the visualizer's
+own bytes, not by driving the HTTP route end to end. A route that stopped calling `setArchived`
+would be caught by the single-write-statement and single-POST-route assertions rather than by
+observing a request, and that distinction is stated rather than claimed as covered.
 
 ## Follow-ups
 

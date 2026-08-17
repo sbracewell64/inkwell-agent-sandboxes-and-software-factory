@@ -1,0 +1,13 @@
+HD-13 watched-red capture -- the visualizer source moved without re-running the exercise
+
+setup:       one byte of .claude/skills/sssf/apps/visualizer/server/db.ts changed
+             (DEFAULT_LIMIT 500 -> 501); the Bun exercise was deliberately NOT re-run.
+command:     python3 docs/validation/check_sqlite_authority.py
+expectation: RED. CI cannot execute TypeScript, but it can establish that the
+             TypeScript has changed since it was last actually exercised. Without
+             this, the recorded exercise decays into a claim about bytes that moved.
+
+HD-13 SQLite field authority: FAIL
+- .claude/skills/sssf/apps/visualizer/server/db.ts has changed since it was last executed: recorded 57624bd6e7738b14e0e425f0cc7871f4ee0dd976538757a22fc53df4679a08fd, present 9b549dea59f17edaa19c7e017435e076f15f9934aa3bdaff8941e7a75154cf62. Re-run the exercise; nothing has exercised these bytes.
+
+exit: 1

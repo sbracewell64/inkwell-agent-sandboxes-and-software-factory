@@ -105,6 +105,40 @@ observation and must never collapse CNO into PASS or FAIL.
 contradiction reachable without opening the file is still reported when the file cannot be read, so
 an unreadable database never masks a real violation it would otherwise have revealed.
 
+## The visualizer read surface is executed, not inspected
+
+The visualizer's reader is TypeScript, so the stdlib validator cannot run it. Asserting a
+read-only property from source bytes would be reading the construction site instead of running the
+thing, so the surface is genuinely executed:
+
+`docs/validation/exercise_visualizer_read_surface.ts` runs under Bun against a fixture built from
+the tracer's real DDL. It calls every public read method on the real `SssfDb`, then attempts a
+mutation through the very connection those methods used, and requires two properties: the fixture's
+whole-file digest is unchanged, and the mutation **fails**. An exercise that only showed the surface
+running would prove nothing about read-only-ness, so the refused mutation is mandatory.
+
+The exercise records the exact SHA-256 of the TypeScript it executed, into
+`docs/evidence/hd13/visualizer-read-surface-exercise.json`.
+
+**The stdlib check binds that record to the bytes present now.** It cannot execute TypeScript, but
+it can establish whether the TypeScript has changed since it was last actually exercised — and
+comparing digests needs no Bun. A single changed byte in `db.ts` or `index.ts` without a re-run
+fails the check with both digests printed. This is what keeps a separately-run control from decaying
+into a claim about source that has since moved.
+
+So the CI result lets a reader establish, without Bun:
+
+- **which** bytes were executed — both source digests are printed on success;
+- **when**, and by what — the Bun version, script and timestamp are printed;
+- **that the current bytes are those bytes** — otherwise the check is red.
+
+The passing output states plainly that this check did **not** execute the read surface, so the
+stdlib check alone cannot be mistaken for proof that it was exercised. The recorded exercise is that
+proof; the check proves the proof still applies.
+
+An absent or unreadable exercise record is **could-not-observe** — never a pass, and never confused
+with a record showing the surface mutating, which is observed-bad.
+
 ## Commands
 
 ```text
@@ -113,7 +147,12 @@ python3 tools/sqlite_authority.py render
 python3 tools/sqlite_authority.py observe --db <path>
 python3 docs/validation/check_sqlite_authority.py
 python3 docs/validation/check_sqlite_authority.py --controls
+python3 docs/validation/check_sqlite_authority.py --exercise-visualizer [--bun <path>]
 ```
+
+Only `--exercise-visualizer` needs Bun, and it is not the CI entry point: the registered check stays
+stdlib-only, because a check that cannot run is worth less than a weaker check that does. Re-run the
+exercise whenever the visualizer server sources change; the check will tell you when that is.
 
 `--controls` prints what each negative control observed, so the record shows the controls are
 red-capable rather than merely asserting it.

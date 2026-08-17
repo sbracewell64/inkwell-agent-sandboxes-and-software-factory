@@ -58,9 +58,37 @@ Cost:
   entry in the same change;
 - the generated Markdown block must be regenerated with `python3 tools/sqlite_authority.py render`
   rather than hand-edited;
-- the visualizer's contracts are asserted against its source bytes and its extracted statement
-  rather than by executing TypeScript, which keeps the validator stdlib-only at the cost of a
-  stated residual gap.
+- the visualizer read surface must be re-exercised under Bun whenever its server sources change,
+  or the stdlib gate goes red on the digest binding — deliberately, since that red is the whole
+  mechanism keeping the executed proof true.
+
+## Executing the visualizer read surface
+
+The visualizer's reader is TypeScript. Three options were weighed for proving its read-only
+property, and the chosen one carries an addition without which it decays.
+
+- **Make the CI gate execute it under Bun.** Rejected. This program already has a validator that is
+  documented as the authority for its contract yet sits outside CI because of a toolchain
+  dependency. A check that cannot run is worth less than a weaker check that does.
+- **Assert it from source bytes only.** Rejected. Reading the construction site is not running the
+  thing, and it is the defect class this campaign has been closing.
+- **Chosen: execute it in a separate Bun-only control, and bind that control's result to the exact
+  bytes it ran against.** `docs/validation/exercise_visualizer_read_surface.ts` runs the real
+  `SssfDb`, requires the fixture digest unchanged across every read method, and requires a mutation
+  through the connection those methods use to fail. It records the SHA-256 of the TypeScript it
+  executed. The stdlib CI check fails when the current source digest differs from the recorded one.
+
+The addition is not optional. A separately documented control is executed once and then not again;
+its result becomes a claim about bytes that have since moved, and an unexecuted documented control is
+prose. CI cannot execute TypeScript, but it can determine whether the TypeScript has changed since it
+was last actually exercised, and comparing digests needs no Bun. That converts a decaying document
+into a maintained one, keeps the gate stdlib-only, and makes the real proof real for exactly the
+bytes it covers.
+
+A reader of the CI result must be able to establish which bytes were executed, when, and that the
+current bytes are those bytes — so the passing output prints both digests, the Bun version, the
+script and the timestamp, and states plainly that the stdlib check did not itself execute the read
+surface. An absent record is could-not-observe, never a pass.
 
 ## Alternatives considered
 

@@ -1,0 +1,12 @@
+HD-13 watched-red capture -- no recorded visualizer read-surface exercise
+
+setup:       docs/evidence/hd13/visualizer-read-surface-exercise.json removed.
+command:     python3 docs/validation/check_sqlite_authority.py
+expectation: RED as could-not-observe. An unexecuted read surface is not a pass and
+             is not the same observation as a read surface that was executed and
+             mutated. The stdlib check alone never stands in for the exercise.
+
+HD-13 SQLite field authority: FAIL
+- no recorded visualizer read-surface exercise; the read surface has not been executed against any known bytes
+
+exit: 1

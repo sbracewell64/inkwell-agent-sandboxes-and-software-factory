@@ -126,7 +126,10 @@
 | HD-13 failure outranks could-not-observe | an unowned column alongside zero session rows stayed observed-bad while retaining the absence it outranked | PASS — WATCHED RED |
 | HD-13 documentation control is nonvacuous | the shipped superseded sentences are still rejected after the real documents were corrected; the pre-fix run against the real files was red at `bee9296a` with eleven sites | PASS — WATCHED RED |
 | HD-13 governed documents agree with the code | root architecture and both skill references corrected; the generated matrix is embedded verbatim in the reference | PASS |
-| HD-13 visualizer TypeScript execution | asserted from real source bytes and the real extracted statement; executing the Bun surface is deliberately outside this offline stdlib validator | CNO — HONEST REFUSAL |
+| HD-13 visualizer read surface executed | `exercise_visualizer_read_surface.ts` ran the real `SssfDb` under Bun 1.3.14 against a fixture built from the tracer's real DDL: every public read method left the whole-file digest unchanged, and a mutation through the connection those methods use was refused by SQLite | PASS |
+| HD-13 executed bytes are the present bytes | the exercise records the SHA-256 of `db.ts` and `index.ts`; the stdlib CI check fails when either differs from the source present now, so an unexecuted change cannot pass | PASS — WATCHED RED |
+| HD-13 unexercised read surface is could-not-observe | an absent or unreadable exercise record is could-not-observe, distinct from a record showing the surface mutating, which is observed-bad | PASS — WATCHED RED |
+| HD-13 CI gate needs no JavaScript toolchain | the registered check is stdlib-only; only `--exercise-visualizer` needs Bun, so the gate cannot become a check that will not run | PASS |
 | HD-13 `specs/scaffold.md` superseded claim | retained as generated history under source custody; supersession recorded in `docs/reference/SQLITE_AUTHORITY.md` and asserted by the validator | RETAINED BY DESIGN |
 
 ## Rule
