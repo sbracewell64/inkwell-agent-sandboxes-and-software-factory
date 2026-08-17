@@ -221,6 +221,17 @@ project, Bun is absent on this worktree's host, and its typecheck/lint/build cou
 not be observed here. Shipping unverified TypeScript to close a rendering gap
 would trade a stated gap for an unproven claim.
 
+The shipped template's permission enforcement has never carried the installed
+runtime's bounded byte preservation; that absence was verified at base
+`bee9296`, so it is not an HD-04 regression. The drift was seen, identified as
+owned by the mapped-surface reconciliation increment, and deliberately not
+addressed here. Under Browser Sol's ruling on control issue 3, comment
+`5308853615`, that increment delivers the reconciliation template-ward; its diff
+was verified to add `preserve`, `_restore`, `RECOVERED`, `RECOVERED_LIMIT`, and
+`PRESERVE_MAX_BYTES` to the template plus the `preserved_before` wiring. This
+increment records the ruled omission and leaves the work there rather than
+duplicating it.
+
 ## Failure modes and rollback
 
 A discrepancy in either direction is a gate FAIL and returns to the same agent

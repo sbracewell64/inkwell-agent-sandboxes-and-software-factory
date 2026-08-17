@@ -1,4 +1,4 @@
-# ADR-0004 — One mutation fact, compared in both directions, with a stated boundary
+# ADR-0005 — One mutation fact, compared in both directions, with a stated boundary
 
 **Status:** Accepted
 **Date:** 2026-08-16
