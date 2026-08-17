@@ -1130,16 +1130,31 @@ def interruption_control_errors(temp: Path) -> tuple[list[str], list[str], list[
     defective_environment = guarded_environment.copy()
     defective_environment["SSSF_HD13_CONTROL_EVIDENCE"] = str(stand_in)
     calibration_detected = False
-    for delay in delays:
-        stand_in.write_bytes(original)
-        killed, unchanged = sample(
-            defective_script, stand_in, delay, defective_environment
+    stand_in.write_bytes(original)
+    try:
+        child = subprocess.Popen(
+            [sys.executable, str(defective_script)],
+            cwd=ROOT,
+            env=defective_environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
-        if killed and not unchanged:
-            calibration_detected = True
+        deadline = time.monotonic() + 30
+        while child.poll() is None and time.monotonic() < deadline:
+            if file_digest(stand_in) != file_digest(EXERCISE_EVIDENCE):
+                child.kill()
+                child.wait(timeout=5)
+                calibration_detected = child.returncode == -signal.SIGKILL
+                break
+            time.sleep(0.005)
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=5)
+    except (OSError, subprocess.SubprocessError) as exc:
+        absences.append(f"could not construct the defective SIGKILL control: {exc}")
     if not calibration_detected:
         errors.append(
-            "negative control: sampled SIGKILL never caught the defective validator "
+            "negative control: SIGKILL never caught the defective validator "
             "leaving its stand-in evidence synthetic or absent"
         )
 
