@@ -117,6 +117,16 @@
 | HD-08 identity and integrity refusal | wrong identities, failed unrelated item, tamper, duplicate/reorder, descriptor-relative traversal/symlink races, final/root symlinks, identity change, unsupported host, and malformed schema controls observed red/CNO as specified | PASS |
 | HD-08 intermediate-component stat-to-open race | component swapped for an outside-root symlink between its no-follow stat and its descriptor-relative open; shipped implementation refused non-PASS with empty checked inventory and no outside-root bytes read, calibrated watched-red against a content-addressed defective variant with both intermediate protections removed | PASS |
 | HD-08 runtime acceptance integration | intentionally deferred to HD-09 | NOT PROVEN |
+| HD-15 derived-source population | 400 tracked files enumerated on this branch; zero provenance records and zero marker-bearing files; nothing exists to certify | NOT APPLICABLE — CNO |
+| HD-15 exact-identity binding | every recorded commit, tree, blob, and content hash is resolved through a retained immutable input and recomputed from bytes; a branch or tag name that resolves to the correct commit is still refused | PASS — WATCHED RED |
+| HD-15 no claim exceeds its input proof | a derived range wider than the input range it cites, and an input range citing lines beyond the proven input, are both refused | PASS — WATCHED RED |
+| HD-15 B3 caveat visibility | a record without `OVERALL_B3_NOT_COMPLETE` is refused | PASS — WATCHED RED |
+| HD-15 absence is not a pass | an empty universe reports NOT_APPLICABLE; the defective variant that returns PASS instead is watched red | PASS — WATCHED RED |
+| HD-15 precedence | one violating record alongside one unverifiable record reports FAIL while the could-not-observe finding is still printed | PASS — WATCHED RED |
+| HD-15 control taxonomy | 40 executable controls: 30 refusals and ten green-side controls; PIPELINE CUSTODY FIXES added external-bundle, filename-identity, symlink-bundle, and worktree-isolation controls; the range-completeness ruling added uncovered-derived-region, incomplete-partition, overlap, complete-partition, and unmarked-file controls; the cross-record partition ruling added contradiction, ambiguous-double-claim, combined-gap, and complementary-multi-input controls | PASS — COUNTED FROM ENFORCER |
+| HD-15 unretained immutable input | untracked, external, non-`HEAD`, and symlink bundle paths fail; bundle verification materialises committed Git blob bytes, so worktree replacement cannot supply unretained input | PASS — WATCHED RED |
+| HD-15 derived-source compliance | no derived source exists, so no derived source is proven to comply with this contract | NOT PROVEN — NOTHING TO PROVE |
+| HD-15 cited ruling document | `data/captain-rulings-2026-08-17-discovery-is-not-identity.md` is absent from this repository at `bee9296a` and from `git log --all`; the laws are implemented as stated in the task brief, but the cited path itself is unconfirmed | CNO |
 
 ## Rule
 

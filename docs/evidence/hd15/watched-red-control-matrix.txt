@@ -1,0 +1,120 @@
+HD-15 derived-source provenance: negative controls watched red before any green
+source_head: bee9296a4c94b1dc3da6991acd1755a91fa681eb
+shipped_program: docs/validation/check_derived_source_provenance.py
+shipped_program_sha256: d240b9f9c046e97a2996a78c70a87d79f7761d34819b823bf869652ab92856ce
+
+control_taxonomy_after_cross_record_partition_ruling: 40 controls; 30 refusals
+and 10 green-side controls. Review added external-bundle, filename-identity, and
+symlink-bundle refusals plus the worktree-isolation green control as PIPELINE
+CUSTODY FIXES. The range-completeness ruling added uncovered-derived-region,
+incomplete-partition, overlap, complete-partition, and unmarked-file controls.
+The cross-record partition ruling added contradiction, ambiguous-double-claim,
+combined-gap, and complementary-multi-input controls. The count describes the
+executable suite, and the additions are named because a changed count with no
+account of what changed is not independently checkable.
+
+regeneration: this matrix was regenerated against the FINAL shipped bytes.
+An earlier revision named program digest `1b85e144...`, which was correct when
+written but went stale when commit `a357834` corrected a one-line docstring in
+the validator. The digest was NOT patched in place: every defect variant was
+rebuilt from the final source, re-hashed, and re-run, and the observations below
+are the output those exact bytes produced. Swapping a digest would make this
+file assert that observations came from bytes that never produced them.
+
+Each control below runs the SHIPPED calibration harness against a deliberately
+defective copy of the validator. A control that cannot be watched failing is
+not a control, so every defective variant is content-addressed and its exact
+observed output is retained here.
+
+execution: each generated `dN.py` was loaded directly from its content-addressed
+path and `calibration_errors()` was called; the findings below are its returned
+strings in order.
+
+--- DEFECT-1: exact-identity matching weakened to "any non-empty string" ---
+defect_sha256: b8e56424fb2df8ccbc2737d1687decd3315a9eda54e8556a1ce4d1f4c61f5034
+mutation: `_require_hex` accepts any non-empty string instead of matching the
+          40/64 lowercase-hex pattern.
+expected: the branch and tag controls stop being red, because a name would then
+          be accepted as identity.
+observed_output:
+branch name as identity: expected FAIL, observed PASS (())
+tag name as identity: expected FAIL, observed PASS (())
+classification: observed-bad (control watched red)
+note: the calibration input repository carries branch
+      `assessment/hardening-source` and tag `assessment-v1` pointing at the
+      correct commit. This variant PASSED with those names, which proves the
+      names genuinely resolve and that the shipped refusal is about identity,
+      not about a failed lookup. Discovery is not identity.
+
+--- DEFECT-2: recorded hashes substituted for recomputed ones ---
+defect_sha256: c20638ac8b80af9c19f18f83c26bf40c35107b5f4c42c8261b33dd62331df366
+mutation: `verify_input` compares the claim to itself instead of hashing the
+          input bytes; the destination hash comparison is disabled.
+expected: tamper controls stop being red.
+observed_output:
+input content hash not verified against bytes: expected FAIL, observed PASS (())
+destination hash not verified against bytes: expected FAIL, observed PASS (())
+classification: observed-bad (control watched red)
+note: this is the "a field nothing verifies is prose with punctuation" control.
+      The output is retained exactly as observed against the shipped bytes.
+
+--- DEFECT-3: extent arithmetic removed ---
+defect_sha256: c8c09d896d047f16832f59daef44ed48ba4a4715e13b22857936b49a96055c59
+mutation: the derived-versus-input extent comparison and the input-range bound
+          against the proven input are both disabled.
+expected: a claim wider than its proof becomes acceptable.
+observed_output:
+derived range exceeds input proof: expected FAIL, observed PASS (())
+input range beyond the proven input: expected FAIL, observed PASS (())
+classification: observed-bad (control watched red)
+
+--- DEFECT-4: absence rounded into a pass ---
+defect_sha256: 435ccebaa7fdc83366c32fcbefb8cb5174f713f0e7eb3252628bc7a483d2db9c
+mutation: an empty record set yields Verdict.PASS instead of NOT_APPLICABLE.
+expected: the absence control goes red.
+observed_output:
+absence control: expected NOT_APPLICABLE, observed PASS (())
+absence control: absence was rendered as a pass
+unmarked-file control: an unmarked file was treated as proven independent instead of NOT_APPLICABLE (observed PASS)
+classification: observed-bad (control watched red)
+note: this is the "absence is not a pass" law expressed as an executable
+      control. Zero findings is cleanliness only within a stated universe.
+
+--- DEFECT-5: total-partition enforcement removed ---
+defect_sha256: 1d27917f2c72968341b8e29fe9aa598e35f73a731b6326911a1395f5ab53cc0d
+mutation: global per-path partition verification returns without evaluating
+          any declared classifications.
+expected: uncovered derived content, any uncovered line, and contradictory
+          overlap all become acceptable.
+observed_output:
+cross-record derived/non-derived contradiction: expected FAIL, observed PASS (())
+cross-record ambiguous derived double claim: expected FAIL, observed PASS (())
+cross-record combined partition gap: expected FAIL, observed PASS (())
+derived region outside every declaration: expected FAIL, observed PASS (())
+incomplete derived and non-derived partition: expected FAIL, observed PASS (())
+non-derived declaration overlaps a derived range: expected FAIL, observed PASS (())
+classification: observed-bad (controls watched red)
+note: the first two controls enforce only the checkable property: an uncovered
+      line in a marked file. They do not claim to infer undeclared derivation.
+
+--- DEFECT-6: claims reconciled only within one record ---
+defect_sha256: 67a1de7baeeb4756647b0021045ef46e40826d6d6bf36a803ede26871f561999
+mutation: per-path verification skips paths whose claims come from more than
+          one record, preserving single-record checks but removing registry-wide
+          reconciliation.
+expected: cross-record contradiction, ambiguous double derivation, and a gap
+          in the combined partition all become acceptable while the disjoint
+          complementary multi-input control remains green.
+observed_output:
+cross-record derived/non-derived contradiction: expected FAIL, observed PASS (())
+cross-record ambiguous derived double claim: expected FAIL, observed PASS (())
+cross-record combined partition gap: expected FAIL, observed PASS (())
+classification: observed-bad (controls watched red)
+note: this variant demonstrates that the check must aggregate the whole record
+      registry per destination path rather than validate entries in isolation.
+
+--- SHIPPED PROGRAM ---
+observed_output:
+calibration findings: 0
+classification: observed-good, and non-vacuous because all six defect classes
+                above were watched red first.

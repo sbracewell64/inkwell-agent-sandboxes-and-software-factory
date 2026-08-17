@@ -27,6 +27,11 @@
       "timeout_seconds": 60
     },
     {
+      "id": "derived-source-provenance-validator",
+      "command": ["{python}", "docs/validation/check_derived_source_provenance.py"],
+      "timeout_seconds": 120
+    },
+    {
       "id": "executor-supervisor-and-pi-adapter-validator",
       "command": ["{python}", "docs/validation/check_executor_supervisor.py"],
       "timeout_seconds": 60

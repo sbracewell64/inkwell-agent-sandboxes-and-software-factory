@@ -1,0 +1,50 @@
+HD-15 derived-source population: the observed universe on this branch
+source_head: bee9296a4c94b1dc3da6991acd1755a91fa681eb
+command: python3 docs/validation/check_derived_source_provenance.py
+observed_output:
+HD-15 derived-source provenance contract: PASS
+HD-15 derived-source population: NOT_APPLICABLE (records=0, marked-files=0, tracked-universe=400, verified-bindings=0)
+HD-15 population note: the universe was enumerated and holds no derived source, so there is nothing to certify. NOT_APPLICABLE is a could-not-observe result and is not a pass; it does not state that any derived source complies.
+contract: template is schema-shaped and is refused as a real record
+watched-red: missing commit/tree, branch-name and tag-name identity, missing OVERALL_B3_NOT_COMPLETE, over-reaching derived and input ranges
+watched-red: tampered input content/tree/commit/path/slice, tampered destination and license bytes, unchanged base blob, non-ancestor base, placeholder custody
+watched-red: untracked/external/symlink immutable input fails; committed bytes remain authoritative; unusable retained input is CNO; absence is NOT_APPLICABLE, not a pass
+watched-red: a violation alongside an incomplete universe still reports FAIL
+migration: none authorised, none performed; this validator creates no import path
+
+observed_exit: 0
+
+classification, stated precisely so a later reader cannot widen it:
+
+  The CONTRACT is observed-good. The gate is installed, structurally sound, and
+  demonstrably red-capable; see watched-red-control-matrix.txt in this
+  directory.
+
+  The POPULATION is NOT_APPLICABLE, a form of could-not-observe. 400 tracked
+  files were enumerated and none is identified as derived source, so there is
+  nothing to certify. This is "we checked and there is none". It is NOT "there
+  is none and we proved it complies", and it is NOT "we did not look".
+
+  The exit code of 0 reports the contract, never the population. A reader must
+  not convert this green check into a certification that any derived source
+  complies with anything, because no derived source exists here to comply.
+
+corroborating searches, run by hand at the same head:
+
+  git log --all --grep for migration/derivation/import/assessment terms: empty.
+  repository-wide grep for an assessment-derived marker: empty; every literal
+  match for the word "derived" in tracked files is an unrelated computational
+  sense (derived state, derived gate outcome, derived column).
+  git tag: no tag names an assessment source.
+
+  Those searches are DISCOVERY. They identify that there are no candidates.
+  They establish no identity and certify nothing, which is exactly why the
+  population verdict is NOT_APPLICABLE rather than PASS.
+
+known could-not-observe at collection time:
+
+  `data/captain-rulings-2026-08-17-discovery-is-not-identity.md`, cited as the
+  source of the two standing laws, does not exist in this repository at this
+  head, and no `data/` directory exists in the tracked tree or anywhere in
+  `git log --all`. The laws are implemented here as stated in the task brief;
+  the cited file path itself is could-not-observe, not confirmed.

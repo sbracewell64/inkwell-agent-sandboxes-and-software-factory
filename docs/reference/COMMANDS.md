@@ -91,6 +91,19 @@ python3 docs/validation/check_evidence_manifest.py
 
 Manifest v1 validation is offline evidence checking only. It does not authorize runtime acceptance; HD-09 owns that integration.
 
+## Derived-source provenance contract
+
+```text
+python3 docs/validation/check_derived_source_provenance.py
+```
+
+The first printed line is the contract state. The second is a separate
+four-valued population verdict and must not be collapsed into the first.
+
+The population is `NOT_APPLICABLE` today: the universe was enumerated and holds
+no derived source, so there is nothing to certify. That is a could-not-observe
+result, never a pass. See `docs/reference/DERIVED_SOURCE_PROVENANCE.md`.
+
 ## Identity warning
 
 `run-id` and `adw-id` are different.
