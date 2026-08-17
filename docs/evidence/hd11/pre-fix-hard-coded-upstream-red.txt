@@ -1,0 +1,47 @@
+HD-11 pre-fix hard-coded upstream control (watched red against the real document)
+base_commit: bee9296a4c94b1dc3da6991acd1755a91fa681eb
+document: docs/architecture/REPOSITORY_OWNERSHIP.md
+document_blob_sha1: aa8cf91261dd4fe0e7fb89146414aca7b2da035b
+acquisition: tracked working-tree bytes at base_commit, unmodified by this increment at the time of the run
+command: python3 docs/validation/check_source_custody_authority.py
+expected_exit: nonzero (1) because the shipped document attributes a hard-coded upstream clone to FILL
+observed_exit: 1
+observed_output:
+HD-11 source custody authority: FAIL
+- observed-bad: hard-coded clone authority: a clone claim names the repository 'https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git' — FILL derives its source from the host checkout's origin and names none: 'The current `fill` lifecycle recipe clones a hard-coded public repository: `https://github.com/disler/inkwell-agent-sand'
+- observed-bad: hard-coded clone authority: a clone claim attributes the sandbox source to upstream owner 'disler': 'The current `fill` lifecycle recipe clones a hard-coded public repository: `https://github.com/disler/inkwell-agent-sand'
+- observed-bad: hard-coded clone authority: a clone claim attributes the sandbox source to upstream owner 'disler': "This does not yet solve sandbox source ownership. The current FILL implementation still clones Disler's repository. B2-0"
+- observed-bad: missing pointer: document never cites `just/sandbox/lifecycle/fill.just`
+- observed-bad: missing pointer: document never cites `just/sandbox/lifecycle/setup.just`
+- observed-bad: missing pointer: document never cites `just/sandbox/manage/harvest.just`
+- observed-bad: missing pointer: document never cites `sandbox_mount/host/run_record.py`
+- observed-bad: missing pointer: document never cites `docs/increments/B2-002_SANDBOX_SOURCE_CONTRACT.md`
+- observed-bad: missing pointer: document never cites `docs/evidence/B2-002_SOURCE_PROOF_RUN_RECORD.json`
+- observed-bad: missing pointer: document never cites `docs/validation/check_source_custody_authority.py`
+- observed-bad: contract table omits canonical-remote-url: `docs/validation/check_repository_ownership.py` owns `https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git`
+- observed-bad: contract table omits default-pin-is-host-head: `just/sandbox/lifecycle/fill.just` owns `PIN="$(git rev-parse HEAD)"`
+- observed-bad: contract table omits dirty-host-refusal: `just/sandbox/lifecycle/fill.just` owns `host working tree is dirty`
+- observed-bad: contract table omits exact-pin-shape: `just/sandbox/lifecycle/fill.just` owns `^[0-9a-f]{40}$`
+- observed-bad: contract table omits fill-head-gate: `just/sandbox/lifecycle/fill.just` owns `GATE FAILED`
+- observed-bad: contract table omits guest-run-branch: `just/sandbox/lifecycle/fill.just` owns `branch="sbx/$run_id"`
+- observed-bad: contract table omits harvest-ref-namespace: `just/sandbox/manage/harvest.just` owns `DEST="refs/sandbox/$RUN_ID"`
+- observed-bad: contract table omits harvest-run-branch: `just/sandbox/manage/harvest.just` owns `BRANCH="sbx/$RUN_ID"`
+- observed-bad: contract table omits origin-derivation: `just/sandbox/lifecycle/fill.just` owns `git remote get-url origin`
+- observed-bad: contract table omits persisted-commit-sha: `just/sandbox/lifecycle/fill.just` owns `commit_sha="$HEAD_SHA"`
+- observed-bad: contract table omits persisted-source-repo: `just/sandbox/lifecycle/fill.just` owns `source_repo="$REPO"`
+- observed-bad: contract table omits persisted-source-sha: `just/sandbox/lifecycle/fill.just` owns `source_sha="$PIN"`
+- observed-bad: contract table omits public-clone-restriction: `just/sandbox/lifecycle/fill.just` owns `https://github.com/*)`
+- observed-bad: contract table omits schema-commit-sha: `sandbox_mount/host/run_record.py` owns `"commit_sha",`
+- observed-bad: contract table omits schema-source-repo: `sandbox_mount/host/run_record.py` owns `"source_repo",`
+- observed-bad: contract table omits schema-source-sha: `sandbox_mount/host/run_record.py` owns `"source_sha",`
+- observed-bad: contract table omits setup-clean-tree-recheck: `just/sandbox/lifecycle/setup.just` owns `the tree must be clean`
+- observed-bad: contract table omits setup-head-recheck: `just/sandbox/lifecycle/setup.just` owns `HEAD does not match the recorded commit_sha`
+- observed-bad: contract table omits setup-origin-recheck: `just/sandbox/lifecycle/setup.just` owns `origin does not match recorded source_repo`
+- observed-bad: contract table omits upstream-push-disabled: `docs/validation/check_repository_ownership.py` owns `"--push", "upstream"`
+- observed-bad: contract table omits upstream-remote-url: `docs/validation/check_repository_ownership.py` owns `https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git`
+- observed-bad: document never names persisted field `source_repo`
+- observed-bad: document never names persisted field `source_sha`
+- observed-bad: document never names persisted field `commit_sha`
+- observed-bad: document does not state in prose that FILL resolves the sandbox source with `git remote get-url origin`
+classification: watched-red on the present-day defect, not on a synthetic fixture
+scope: proves the control detects the real divergence between REPOSITORY_OWNERSHIP.md and just/sandbox/lifecycle/fill.just. It does not claim the recipe is wrong; the recipe already derives origin.

@@ -117,6 +117,12 @@
 | HD-08 identity and integrity refusal | wrong identities, failed unrelated item, tamper, duplicate/reorder, descriptor-relative traversal/symlink races, final/root symlinks, identity change, unsupported host, and malformed schema controls observed red/CNO as specified | PASS |
 | HD-08 intermediate-component stat-to-open race | component swapped for an outside-root symlink between its no-follow stat and its descriptor-relative open; shipped implementation refused non-PASS with empty checked inventory and no outside-root bytes read, calibrated watched-red against a content-addressed defective variant with both intermediate protections removed | PASS |
 | HD-08 runtime acceptance integration | intentionally deferred to HD-09 | NOT PROVEN |
+| HD-11 source custody document is current | `docs/architecture/REPOSITORY_OWNERSHIP.md` states the origin derivation, public-clone restriction, exact pin, dirty-host rule, guest run branch and FILL gate, persisted `source_repo`/`source_sha`/`commit_sha`, SETUP recheck, and harvest namespace; 22 elements reconciled against the recipes and the run-record schema | PASS |
+| HD-11 citations are followable | every cited path in the document exists and every published token occurs verbatim in the file it cites | PASS |
+| HD-11 hard-coded upstream detection | the control was watched red against the shipped pre-fix document, not a synthetic fixture: `docs/evidence/hd11/pre-fix-hard-coded-upstream-red.txt` | PASS — WATCHED RED ON THE REAL DEFECT |
+| HD-11 watched-red controls | missing FILL pointer, missing B2-002 pointer, canonical URL divergence, document-side and code-side SHA field-name divergence, unfollowable citation, and code token drift each made the validator red; the unmutated copy stayed green | PASS |
+| HD-11 live sandbox behavior | no recipe, lifecycle, or sandbox behavior was changed or exercised by this documentation increment | NOT EXERCISED — NOT CLAIMED |
+| HD-11 host offline gate completeness | `just` is absent on the authoring host, so `inkwell-unit-tests` was could-not-observe and `check_obs_query.py` raised `FileNotFoundError` instead of returning a typed could-not-observe; both predate this increment and run in deterministic CI | CNO ON HOST; SEPARATE DEFECT RECORDED |
 
 ## Rule
 

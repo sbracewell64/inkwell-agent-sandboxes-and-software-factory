@@ -29,6 +29,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | HD-02 | PASS | Static synchronization for installed/template/generated ADWs | nonempty static inventory, generated import-only smoke, and sixteen watched-red mutations passed without provider execution |
 | HD-03 | PASS | Nonvacuous three-valued gate outcomes | 15 focused controls prove PASS/FAIL/CNO, fail-closed migration, trace provenance, and non-green CNO rendering |
 | HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
+| HD-11 | PASS | Current, authoritative source-custody record enforced against the code | 22 contract elements reconciled with FILL/SETUP/HARVEST and the run-record schema; hard-coded-upstream control watched red on the shipped document before the fix; eight watched-red controls plus non-vacuity |
 
 ## Future increments
 

@@ -38,6 +38,9 @@ EXPECTED_CHECKS = {
     "sandbox-source-contract-validator": (
         "{python}", "docs/validation/check_sandbox_source_contract.py"
     ),
+    "source-custody-authority-validator": (
+        "{python}", "docs/validation/check_source_custody_authority.py"
+    ),
     "executor-supervisor-and-pi-adapter-validator": (
         "{python}", "docs/validation/check_executor_supervisor.py"
     ),

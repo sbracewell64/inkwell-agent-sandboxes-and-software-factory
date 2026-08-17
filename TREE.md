@@ -119,6 +119,10 @@ docs/validation/check_executor_supervisor.py
 docs/validation/check_production_extension_path.py
                           shipped harness_engineering rosters drive the real agent_pi launch
                           path; extensions must be forwarded as -e, never rejected.
+docs/validation/check_source_custody_authority.py
+                          reconciles docs/architecture/REPOSITORY_OWNERSHIP.md with FILL,
+                          SETUP, HARVEST, and the run-record schema. Offline: file bytes
+                          only, no network, no git, no subprocess.
 ```
 
 ## `tools/` — repository-owned utilities

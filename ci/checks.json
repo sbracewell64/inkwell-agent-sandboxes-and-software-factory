@@ -27,6 +27,11 @@
       "timeout_seconds": 60
     },
     {
+      "id": "source-custody-authority-validator",
+      "command": ["{python}", "docs/validation/check_source_custody_authority.py"],
+      "timeout_seconds": 60
+    },
+    {
       "id": "executor-supervisor-and-pi-adapter-validator",
       "command": ["{python}", "docs/validation/check_executor_supervisor.py"],
       "timeout_seconds": 60
