@@ -380,6 +380,8 @@ def validate_taxonomy(
 
 TABLE_ROW = re.compile(r"^\|\s*`(?P<invocation>[^`]+)`\s*\|(?P<rest>.*)\|\s*$")
 FENCE = re.compile(r"^```")
+HEADING = re.compile(r"^(?P<marks>#{1,6})\s+(?P<title>.*?)\s*$")
+CONTRACT_HEADING = re.compile(r"^`(?P<identifier>[^`]+)`(?:\s+—.*)?$")
 
 
 def _normalise_prose(text: str) -> str:
@@ -392,12 +394,45 @@ def _normalise_prose(text: str) -> str:
     return " ".join(text.replace("`", "").split())
 
 
+def _contract_sections(text: str) -> tuple[dict[tuple[str, str], str], list[str]]:
+    sections: dict[tuple[str, str], list[str]] = {}
+    issues: list[str] = []
+    group: str | None = None
+    active: tuple[str, str] | None = None
+
+    for line in text.splitlines():
+        heading = HEADING.match(line)
+        if heading:
+            level = len(heading.group("marks"))
+            title = heading.group("title")
+            if level == 2:
+                group = {"Lanes": "lane", "Exceptions": "exception"}.get(title)
+            if level <= 3:
+                active = None
+            contract = CONTRACT_HEADING.match(title) if level == 3 and group else None
+            if contract:
+                key = (group, contract.group("identifier"))
+                if key in sections:
+                    issues.append(
+                        f"FRONT_DOOR_LANES.md: duplicate {group} section `{key[1]}`"
+                    )
+                else:
+                    sections[key] = []
+                    active = key
+            continue
+        if active is not None:
+            sections[active].append(line)
+
+    return {key: "\n".join(lines) for key, lines in sections.items()}, issues
+
+
 def check_lanes_document(document: dict[str, object], text: str) -> list[str]:
     """Every registered front door must appear in the lane document's table with
     its registered lane, and every lane and exception must have a section that
     carries its cannot-claim statement word for word."""
     issues: list[str] = []
-    prose = _normalise_prose(text)
+    sections, section_issues = _contract_sections(text)
+    issues.extend(section_issues)
     rows: dict[str, str] = {}
     for line in text.splitlines():
         match = TABLE_ROW.match(line.rstrip())
@@ -427,6 +462,11 @@ def check_lanes_document(document: dict[str, object], text: str) -> list[str]:
     for group, label in ((lanes, "lane"), (exceptions, "exception")):
         for identifier, definition in sorted(group.items()):
             assert isinstance(definition, dict)
+            section = sections.get((label, identifier))
+            if section is None:
+                issues.append(f"FRONT_DOOR_LANES.md: missing {label} section `{identifier}`")
+                continue
+            prose = _normalise_prose(section)
             for statement in definition["cannot_claim"]:
                 if _normalise_prose(statement) not in prose:
                     issues.append(
