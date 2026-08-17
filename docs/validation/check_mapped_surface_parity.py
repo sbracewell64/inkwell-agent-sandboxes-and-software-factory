@@ -271,18 +271,64 @@ def ignored(rel: str, patterns: list[str]) -> bool:
     )
 
 
-def enumerate_side(base: Path, recursive: bool, ignore: list[str]) -> dict[str, Path] | None:
+def enumerate_side(base: Path, recursive: bool, ignore: list[str], findings: Findings,
+                   label: str) -> dict[str, Path] | None:
     """Relative path -> file for one side of a mapping, or None if unobservable."""
     if recursive:
+        if base.is_symlink():
+            findings.cno.append(
+                f"{label}: mapped root is a symlink and was not traversed: {base}")
+            return None
         if not base.is_dir():
             return None
-        return {
-            str(p.relative_to(base)).replace("\\", "/"): p
-            for p in sorted(base.rglob("*"))
-            if p.is_file() and not ignored(str(p.relative_to(base)), ignore)
-        }
+        observed: dict[str, Path] = {}
+        for path in sorted(base.rglob("*")):
+            rel = str(path.relative_to(base)).replace("\\", "/")
+            if ignored(rel, ignore):
+                continue
+            if path.is_symlink():
+                try:
+                    target = path.readlink()
+                except OSError as exc:
+                    findings.cno.append(
+                        f"{label}:{rel}: symlink state could not be read: {exc}")
+                    continue
+                resolved = (path.parent / target).resolve(strict=False)
+                try:
+                    resolved.relative_to(base.resolve())
+                except ValueError:
+                    findings.cno.append(
+                        f"{label}:{rel}: symlink leaves the declared tree and was not followed")
+                if not path.exists():
+                    findings.cno.append(
+                        f"{label}:{rel}: broken symlink target could not be observed")
+                elif path.is_dir():
+                    findings.cno.append(
+                        f"{label}:{rel}: directory symlink was not traversed")
+                observed[rel] = path
+            elif path.is_file():
+                observed[rel] = path
+        return observed
     # A single-file surface maps one path to one path; "" is its only member.
+    if base.is_symlink():
+        try:
+            base.readlink()
+        except OSError as exc:
+            findings.cno.append(f"{label}: symlink state could not be read: {exc}")
+            return {}
+        if not base.exists():
+            findings.cno.append(f"{label}: broken symlink target could not be observed")
+        return {"": base}
     return {"": base} if base.is_file() else {}
+
+
+def artifact_sha256(path: Path) -> str | None:
+    try:
+        payload = ("symlink\0" + str(path.readlink())).encode() if path.is_symlink() \
+            else path.read_bytes()
+        return hashlib.sha256(payload).hexdigest()
+    except OSError:
+        return None
 
 
 def top_level_names(path: Path) -> set[str] | None:
@@ -349,9 +395,11 @@ def check_exclusions(document: dict, root: Path, findings: Findings) -> None:
                 findings.cno.append(
                     f"{surface['id']}: excluded prefix not observed: {full}")
                 continue
-            descendants = [path for path in excluded_root.rglob("*")
-                           if path.is_file()
-                           and not ignored(str(path.relative_to(root)), ignore)]
+            observed = enumerate_side(
+                excluded_root, True, ignore, findings, f"{surface['id']}:{prefix}")
+            if observed is None:
+                continue
+            descendants = observed.values()
             for path in descendants:
                 rel = str(path.relative_to(root)).replace("\\", "/")
                 claimed_by_surface = any(
@@ -405,8 +453,9 @@ def validate(root: Path, contract_path: Path) -> Findings:
             continue
         recursive = bool(surface.get("recursive", False))
         live_root, template_root = root / surface["live"], root / surface["template"]
-        live = enumerate_side(live_root, recursive, ignore)
-        template = enumerate_side(template_root, recursive, ignore)
+        live = enumerate_side(live_root, recursive, ignore, findings, f"{sid}:live")
+        template = enumerate_side(
+            template_root, recursive, ignore, findings, f"{sid}:template")
         if live is None:
             findings.cno.append(f"{sid}: live root not observed: {surface['live']}")
         if template is None:
@@ -461,7 +510,7 @@ def validate(root: Path, contract_path: Path) -> Findings:
                 findings.record(DRIFT, label, kind=f"missing_{side}")
                 continue
 
-            left, right = sha256(live_path), sha256(template_path)
+            left, right = artifact_sha256(live_path), artifact_sha256(template_path)
             if left is None or right is None:
                 findings.cno.append(f"{label}: could not be read on both surfaces")
                 findings.record(UNRESOLVED, label, reason="unreadable")
@@ -516,6 +565,10 @@ CONTROLS = (
      "adws/adw_data/zz_undeclared.json", "add", "red", "zz_undeclared.json"),
     ("undeclared-sqlite-prefixed-file",
      "adws/adw_data/sssf.db-rogue", "add", "red", "sssf.db-rogue"),
+    ("directory-symlink-conceals-subtree",
+     "adws/adw_data/zz_concealed", "directory_symlink", "cno", "zz_concealed"),
+    ("broken-symlink-could-not-observe",
+     "adws/adw_data/zz_broken", "broken_symlink", "cno", "zz_broken"),
     ("malformed-contract-entry",
      None, "malformed_contract", "cno", "overrides[1]"),
     ("missing-divergence-metadata",
@@ -574,6 +627,13 @@ def apply_mutation(path: Path, kind: str) -> None:
         text = path.read_text(encoding="utf-8")
         path.write_text(text.replace("def run_inkwell_quality(", "def _removed_api("),
                         encoding="utf-8")
+    elif kind == "directory_symlink":
+        concealed = path.parents[2] / "concealed-source"
+        concealed.mkdir()
+        (concealed / "undeclared.py").write_text("# concealed\n", encoding="utf-8")
+        path.symlink_to(concealed, target_is_directory=True)
+    elif kind == "broken_symlink":
+        path.symlink_to("missing-target")
 
 
 def surface_by_id(document: dict, sid: str) -> dict:
@@ -749,6 +809,15 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
                 control.problems.append(f"{name}: mutation could not be applied: {exc}")
                 continue
             result = validate(temp, contract_path)
+            if expect == "cno":
+                introduced_cno = [line for line in result.cno
+                                  if line not in baseline_cno and names in line]
+                if not introduced_cno:
+                    control.problems.append(
+                        f"{name}: mutation did not yield CNO naming {names}")
+                else:
+                    control.log.append(f"watched-red {name}: CNO naming {names}")
+                continue
             headline = {line.split("\n", 1)[0] for line in result.fail}
             introduced = [line for line in headline
                           if line not in baseline and names in line]
@@ -830,7 +899,7 @@ def report(findings: Findings, contract_path: Path, control: RedControls | None,
                               encoding="utf-8")
     print("structured_state:")
     print(json.dumps(state, indent=2, sort_keys=True))
-    return 0 if verdict == "PASS" else 1
+    return {"PASS": 0, "FAIL": 1, "CNO": 2}[verdict]
 
 
 def main() -> int:
