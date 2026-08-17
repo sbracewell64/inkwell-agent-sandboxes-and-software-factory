@@ -107,7 +107,7 @@ after it lands unrecorded, and after an honest record is committed. These
 fixtures are calibration-only; they construct synthetic content in temporary
 directories and are not an import path.
 
-Thirty-one controls are watched. Twenty-seven of them are refusals, including
+Thirty-one controls are watched. Twenty-four of them are refusals, including
 the six the audit required. Pipeline custody fixes during review added the
 external-bundle, filename-identity, and symlink-bundle refusals plus the
 worktree-isolation green control. The count describes the executable suite; the
@@ -129,27 +129,27 @@ changed is not independently checkable:
 13. a tampered destination hash fails;
 14. a base blob not matching the destination diff fails;
 15. a base that is not an ancestor of head fails;
-16. a tampered license notice hash fails;
-17. a placeholder custody value fails;
-18. a recorded derived file that lacks the marker fails;
-19. a recorded file unchanged between base and head fails;
-20. an untracked destination path fails;
-21. a marked tracked file that no record claims fails;
-22. a contract document that stops teaching the marker fails;
-23. an immutable input path that is not retained in `HEAD` fails;
-24. an external-bundle path fails;
-25. a filename-identity mismatch between the record ID and JSON filename fails;
-26. a symlink-bundle path fails;
-27. absence of any derived source is `NOT_APPLICABLE`, not a pass.
+16. a recorded derived file that lacks the marker fails;
+17. a recorded file unchanged between base and head fails;
+18. an untracked destination path fails;
+19. a tampered license notice hash fails;
+20. a placeholder custody value fails;
+21. an immutable input path that is not retained in `HEAD` fails;
+22. an external-bundle path fails;
+23. a symlink-bundle path fails;
+24. a filename-identity mismatch between the record ID and JSON filename fails.
 
-The remaining four are the green side, without which the twenty-seven above
-would be vacuous:
+The remaining seven are the separately implemented green-side controls. This
+taxonomy names how the controls are implemented, not which verdict they expect:
 
-28. a complete, honest record passes, and the positive control additionally
+25. absence of any derived source is `NOT_APPLICABLE`, not a pass;
+26. a marked tracked file that no record claims fails;
+27. a complete, honest record passes, and the positive control additionally
     requires that at least three byte-level bindings were actually verified;
-29. a precedence control commits one violating record alongside one
+28. a precedence control commits one violating record alongside one
     unverifiable record and requires the result to be `FAIL` while the
     could-not-observe finding is still reported;
+29. a contract document that stops teaching the marker fails;
 30. a restoration control requires the honest record to still pass after the
     whole mutation sweep, so no control leaves the fixture permanently red;
 31. a worktree-isolation control replaces the checked-out bundle and requires
