@@ -173,7 +173,10 @@ def discover_front_doors(
     root: Path | None = None,
 ) -> dict[str, dict[str, object]]:
     found: dict[str, dict[str, object]] = {}
-    _scan(root_justfile, "just", root or ROOT, found, set())
+    # Canonicalize both sides of the containment check. On Windows a temporary
+    # directory may be supplied through an 8.3 alias (for example RUNNER~1),
+    # while resolving a child expands that alias to its long form.
+    _scan(root_justfile, "just", (root or ROOT).resolve(), found, set())
     if not found:
         raise DiscoveryError("the just graph yielded no front doors at all")
     return found
