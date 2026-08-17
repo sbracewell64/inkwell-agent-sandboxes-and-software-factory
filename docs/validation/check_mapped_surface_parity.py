@@ -619,29 +619,42 @@ CONTROLS = (
      "scout/system.md"),
     ("user-owned-roster-stays-classified", None, None, "clean", "roster-config"),
     ("in-tree-file-read-non-vacuous", None, None, "clean", "console.py"),
+    ("in-tree-file-materializes", None, None, "clean", "console.py"),
 )
 
 
-def materialize(document: dict, root: Path, temp: Path, control: RedControls) -> bool:
+def materialize(document: dict, root: Path, temp: Path) -> list[str]:
     """Copy every mapped surface into a disposable root, mapping preserved."""
-    wanted: list[str] = []
+    wanted: list[tuple[str, bool]] = []
     for surface in document["surfaces"]:
-        wanted.extend([surface["live"], surface["template"]])
-    wanted.extend(entry["path"] for entry in document.get("live_only", []))
-    for rel in wanted:
+        wanted.extend([
+            (surface["live"], surface["recursive"]),
+            (surface["template"], surface["recursive"]),
+        ])
+    wanted.extend((entry["path"], entry["path"].endswith("/sessions"))
+                  for entry in document.get("live_only", []))
+    probe = Findings()
+    for rel, recursive in wanted:
+        source = root / rel
+        if not source.exists() and not source.is_symlink():
+            continue
+        enumerate_side(source, recursive, document.get("ignore", []), probe,
+                       f"materialize:{rel}", root)
+    if probe.cno:
+        return probe.cno
+    for rel, _ in wanted:
         source, destination = root / rel, temp / rel
-        probe = Findings()
-        if contained_target(source, root, probe, f"materialize:{rel}") is None:
-            control.problems.extend(probe.cno)
-            return False
         if destination.exists() or not source.exists():
             continue
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if source.is_dir():
-            shutil.copytree(source, destination)
-        else:
-            shutil.copy2(source, destination)
-    return True
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if source.is_dir():
+                shutil.copytree(source, destination)
+            else:
+                shutil.copy2(source, destination)
+        except OSError as exc:
+            return [f"materialize:{rel}: copy could not be observed: {exc}"]
+    return []
 
 
 def apply_mutation(path: Path, kind: str) -> None:
@@ -677,7 +690,8 @@ def surface_by_id(document: dict, sid: str) -> dict:
     return next(s for s in document["surfaces"] if s["id"] == sid)
 
 
-def clean_precondition(name: str, root: Path, document: dict) -> tuple[bool, str]:
+def clean_precondition(name: str, root: Path, document: dict,
+                       base: Findings) -> tuple[bool, str]:
     """Confirm the condition a 'clean' control tolerates is actually present.
 
     Without this a clean control degenerates: if `quality.py` were flattened, a
@@ -686,10 +700,10 @@ def clean_precondition(name: str, root: Path, document: dict) -> tuple[bool, str
     """
     if name == "non-isomorphic-mapping-resolves":
         surface = surface_by_id(document, "prompt-engineering")
-        # The mapping is only interesting because the two roots do NOT share a
-        # relative path; a subtree diff would call these files absent.
         isomorphic = surface["template"].endswith(surface["live"])
-        live_files = list((root / surface["live"]).rglob("*.md"))
+        live_files = [entry for bucket in (MATCHED, INTENTIONAL)
+                      for entry in base.state[bucket]
+                      if entry["path"].startswith("prompt-engineering:")]
         if isomorphic or not live_files:
             return False, ("mapping is isomorphic or empty, so it cannot demonstrate "
                            "non-isomorphic resolution")
@@ -698,34 +712,54 @@ def clean_precondition(name: str, root: Path, document: dict) -> tuple[bool, str
 
     if name == "scaffold-body-divergence-stays-green":
         surface = surface_by_id(document, "adw-tree")
-        live = root / surface["live"] / "adw_modules/quality.py"
-        template = root / surface["template"] / "adw_modules/quality.py"
-        if not (live.is_file() and template.is_file()):
+        probe = Findings()
+        live_files = enumerate_side(root / surface["live"], True, [], probe,
+                                    "control:quality:live", root)
+        template_files = enumerate_side(root / surface["template"], True, [], probe,
+                                        "control:quality:template", root)
+        live = live_files.get("adw_modules/quality.py") if live_files else None
+        template = template_files.get("adw_modules/quality.py") if template_files else None
+        if probe.cno or live is None or template is None:
             return False, "quality.py missing on one surface"
-        if sha256(live) == sha256(template):
+        if artifact_sha256(live) == artifact_sha256(template):
             return False, ("quality.py bodies are identical, so this control no longer "
                            "demonstrates that a differing scaffold body stays green")
         return True, "quality.py bodies differ and are classified TEMPLATE_SCAFFOLD, not drift"
 
     if name == "user-owned-roster-stays-classified":
         surface = surface_by_id(document, "roster-config")
-        live, template = root / surface["live"], root / surface["template"]
-        if not (live.is_file() and template.is_file()):
+        probe = Findings()
+        live_files = enumerate_side(root / surface["live"], False, [], probe,
+                                    "control:roster:live", root)
+        template_files = enumerate_side(root / surface["template"], False, [], probe,
+                                        "control:roster:template", root)
+        live = live_files.get("") if live_files else None
+        template = template_files.get("") if template_files else None
+        if probe.cno or live is None or template is None:
             return False, "roster config missing on one surface"
-        if sha256(live) == sha256(template):
+        if artifact_sha256(live) == artifact_sha256(template):
             return False, ("roster configs are identical, so this control no longer "
                            "demonstrates that user-owned divergence is tolerated")
         return True, "user-owned roster differs and stays classified rather than copied or failed"
 
     if name == "in-tree-file-read-non-vacuous":
-        surface = surface_by_id(document, "adw-tree")
-        live = root / surface["live"] / "adw_modules/console.py"
-        template = root / surface["template"] / "adw_modules/console.py"
         classified = any(entry["path"] == "adw-tree:adw_modules/console.py"
-                         for entry in validate(root, DEFAULT_CONTRACT).state[MATCHED])
-        if not classified or artifact_sha256(live) is None or artifact_sha256(template) is None:
+                         for entry in base.state[MATCHED])
+        if not classified:
             return False, "console.py was not read and classified from both declared trees"
         return True, "in-tree console.py bytes were read and classified EXACT_MIRROR"
+
+    if name == "in-tree-file-materializes":
+        with tempfile.TemporaryDirectory(prefix="sssf-parity-materialize-clean-") as directory:
+            temp = Path(directory)
+            problems = materialize(document, root, temp)
+            probe = Findings()
+            files = enumerate_side(temp / "adws", True, [], probe,
+                                   "control:materialized-adws", temp)
+            console = files.get("adw_modules/console.py") if files else None
+            if problems or probe.cno or console is None or artifact_sha256(console) is None:
+                return False, "in-tree console.py did not materialize through observed paths"
+        return True, "in-tree console.py materialized and was read normally"
 
     return False, f"no precondition defined for clean control {name}"
 
@@ -760,7 +794,7 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
             classified = [entry for bucket in (MATCHED, INTENTIONAL)
                           for entry in base.state[bucket] if names in entry["path"]]
             failed = [line for line in base.fail if names in line]
-            precondition, detail = clean_precondition(name, root, document)
+            precondition, detail = clean_precondition(name, root, document, base)
             if not precondition:
                 control.problems.append(f"{name}: precondition absent — {detail}")
             elif failed:
@@ -844,7 +878,9 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
                 else:
                     control.log.append(f"watched-red {name}: CNO naming {names}")
                 continue
-            if not materialize(document, root, temp, control):
+            materialize_cno = materialize(document, root, temp)
+            if materialize_cno:
+                control.problems.extend(materialize_cno)
                 continue
             path = temp / target
             if kind == "add" and path.exists():
@@ -855,6 +891,18 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
                 apply_mutation(path, kind)
             except OSError as exc:
                 control.problems.append(f"{name}: mutation could not be applied: {exc}")
+                continue
+            if kind == "broken_symlink":
+                with tempfile.TemporaryDirectory(
+                        prefix="sssf-parity-broken-materialize-") as probe_directory:
+                    materialize_cno = materialize(document, temp, Path(probe_directory))
+                introduced = [line for line in materialize_cno if names in line]
+                if not introduced:
+                    control.problems.append(
+                        f"{name}: ordinary materialize did not yield CNO naming {names}")
+                else:
+                    control.log.append(
+                        f"watched-red {name}: materialize CNO naming {names}")
                 continue
             result = validate(temp, contract_path)
             if expect == "cno":
