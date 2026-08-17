@@ -27,6 +27,13 @@ Never hand-edit session evidence.
 - `docs/validation/check_evidence_manifest.py` — positive and watched-red controls
 - `docs/validation/fixtures/evidence_manifest/` — canonical offline fixtures
 
+## Front-door lane contracts
+
+- `docs/reference/front_door_taxonomy.json` — machine-readable lane/exception registry, sole label owner
+- `docs/reference/FRONT_DOOR_LANES.md` — lane and exception contracts, including the cannot-claim half
+- `docs/reference/COMMANDS.md` — operator command surface, each command carrying its lane
+- `docs/validation/check_front_door_lanes.py` — discovery from the `just` graph plus watched-red controls
+
 ## Sandbox orchestration
 
 - `just/sandbox/`

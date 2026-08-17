@@ -44,6 +44,9 @@ EXPECTED_CHECKS = {
     "production-extension-path-validator": (
         "{python}", "docs/validation/check_production_extension_path.py"
     ),
+    "front-door-lane-taxonomy-validator": (
+        "{python}", "docs/validation/check_front_door_lanes.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
 

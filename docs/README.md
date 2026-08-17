@@ -29,6 +29,14 @@ Read in this order:
 6. [`reference/COMMANDS.md`](reference/COMMANDS.md) — command surface.
 7. [`reference/GLOSSARY.md`](reference/GLOSSARY.md) — canonical terms.
 8. [`reference/EVIDENCE_MANIFEST.md`](reference/EVIDENCE_MANIFEST.md) — offline run-bound evidence manifest v1 (not runtime acceptance).
+9. [`reference/FRONT_DOOR_LANES.md`](reference/FRONT_DOOR_LANES.md) — which lane each front door is in, and the claims that cannot be made from it.
+
+## Lane before claim
+
+Before citing what a command's work is covered by, read its lane. `adw`, `lifecycle`, and `steering`
+are not interchangeable: only the ADW lane, and only with deterministic acceptance, may claim SSSF
+workflow success. `reference/front_door_taxonomy.json` is the machine-readable source, and
+`docs/validation/check_front_door_lanes.py` enforces it.
 
 ## Documentation authority
 
