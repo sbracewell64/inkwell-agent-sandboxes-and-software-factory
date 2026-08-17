@@ -3,6 +3,13 @@ source_head: bee9296a4c94b1dc3da6991acd1755a91fa681eb
 shipped_program: docs/validation/check_derived_source_provenance.py
 shipped_program_sha256: 694669849151046829ae98803616eccf9583592ee6b317ac1ac24113202f6418
 
+control_taxonomy_after_pipeline_custody_fixes: 31 controls; 27 refusals and
+4 green-side controls. Review added external-bundle, filename-identity, and
+symlink-bundle refusals plus the worktree-isolation green control. These are
+PIPELINE CUSTODY FIXES, not part of the original design. The count describes
+the executable suite, and the additions are named because a changed count with
+no account of what changed is not independently checkable.
+
 Each control below runs the SHIPPED calibration harness against a deliberately
 defective copy of the validator. A control that cannot be watched failing is
 not a control, so every defective variant is content-addressed and its exact

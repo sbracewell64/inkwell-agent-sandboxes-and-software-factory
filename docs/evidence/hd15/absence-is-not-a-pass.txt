@@ -8,7 +8,7 @@ HD-15 population note: the universe was enumerated and holds no derived source, 
 contract: template is schema-shaped and is refused as a real record
 watched-red: missing commit/tree, branch-name and tag-name identity, missing OVERALL_B3_NOT_COMPLETE, over-reaching derived and input ranges
 watched-red: tampered input content/tree/commit/path/slice, tampered destination and license bytes, unchanged base blob, non-ancestor base, placeholder custody
-watched-red: unretained immutable input is CNO; absence is NOT_APPLICABLE, not a pass
+watched-red: untracked/external/symlink immutable input fails; committed bytes remain authoritative; unusable retained input is CNO; absence is NOT_APPLICABLE, not a pass
 watched-red: a violation alongside an incomplete universe still reports FAIL
 migration: none authorised, none performed; this validator creates no import path
 observed_exit: 0

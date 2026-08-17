@@ -107,8 +107,12 @@ after it lands unrecorded, and after an honest record is committed. These
 fixtures are calibration-only; they construct synthetic content in temporary
 directories and are not an import path.
 
-Twenty-seven controls are watched. Twenty-four of them are refusals, including
-the six the audit required:
+Thirty-one controls are watched. Twenty-seven of them are refusals, including
+the six the audit required. Pipeline custody fixes during review added the
+external-bundle, filename-identity, and symlink-bundle refusals plus the
+worktree-isolation green control. The count describes the executable suite; the
+four additions are named because a changed count without an account of what
+changed is not independently checkable:
 
 1. a record missing the exact source commit fails;
 2. a record missing the exact source tree fails;
@@ -132,19 +136,24 @@ the six the audit required:
 20. an untracked destination path fails;
 21. a marked tracked file that no record claims fails;
 22. a contract document that stops teaching the marker fails;
-23. an unretained immutable input is `CANNOT_OBSERVE`, not a pass;
-24. absence of any derived source is `NOT_APPLICABLE`, not a pass.
+23. an immutable input path that is not retained in `HEAD` fails;
+24. an external-bundle path fails;
+25. a filename-identity mismatch between the record ID and JSON filename fails;
+26. a symlink-bundle path fails;
+27. absence of any derived source is `NOT_APPLICABLE`, not a pass.
 
-The remaining three are the green side, without which the twenty-four above
+The remaining four are the green side, without which the twenty-seven above
 would be vacuous:
 
-25. a complete, honest record passes, and the positive control additionally
+28. a complete, honest record passes, and the positive control additionally
     requires that at least three byte-level bindings were actually verified;
-26. a precedence control commits one violating record alongside one
+29. a precedence control commits one violating record alongside one
     unverifiable record and requires the result to be `FAIL` while the
     could-not-observe finding is still reported;
-27. a restoration control requires the honest record to still pass after the
-    whole mutation sweep, so no control leaves the fixture permanently red.
+30. a restoration control requires the honest record to still pass after the
+    whole mutation sweep, so no control leaves the fixture permanently red;
+31. a worktree-isolation control replaces the checked-out bundle and requires
+    the retained `HEAD` bytes to remain authoritative.
 
 ### Semantic review, if required
 
