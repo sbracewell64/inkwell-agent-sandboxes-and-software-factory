@@ -17,8 +17,10 @@ observed controls:
 - nested-dead-region-token: could-not-observe — inner if/fi cannot re-expose harvest-ref-namespace after always-false truncation
 - duplicate-row: observed-bad — duplicate origin-derivation row rejected
 - unchecked-row: could-not-observe — fill-head-gate named unchecked and overall satisfaction refused
+- missing-code-authority-coverage: could-not-observe — coverage could not be established; no empty-complete coverage claim
+- missing-operative-run-record-write-coverage: could-not-observe — coverage could not be established; no empty-complete coverage claim
 - genuine-operative/non-vacuity: observed-good — all 22 rows verified; unchecked none
-coverage output: both PASS and FAIL print the structurally verified row names and unchecked row names/reasons.
+coverage output: established coverage prints structurally verified and unchecked rows; early code-fact CNO prints coverage could-not-establish with its reason. Document evaluation is independent, so document-side CNO preserves established code coverage.
 absent-input controls: missing document and missing code authority remain could-not-observe.
-classification: 8 observed-bad controls, 5 could-not-observe controls, 1 observed-good non-vacuity control.
+classification: 8 observed-bad controls, 7 could-not-observe controls, 1 observed-good non-vacuity control.
 scope: source-custody document and validator only; no recipe, lifecycle, sandbox behavior, run-record schema, or historical B2-002 record changed.

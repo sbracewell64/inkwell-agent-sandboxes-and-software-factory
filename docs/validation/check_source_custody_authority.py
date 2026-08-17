@@ -86,6 +86,15 @@ class Coverage:
     unchecked: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class Assessment:
+    facts: Facts | None
+    bad: tuple[str, ...]
+    cno: tuple[str, ...]
+    coverage: Coverage | None
+    coverage_reason: str | None
+
+
 def read(root: Path, rel: str) -> str:
     target = root / rel
     try:
@@ -488,18 +497,53 @@ def document_errors(root: Path, facts: Facts) -> list[str]:
     return errors
 
 
-def evaluate(root: Path) -> tuple[list[str], list[str]]:
-    """(observed-bad, could-not-observe). Neither list empty is ever a pass."""
+def assess(root: Path) -> Assessment:
+    bad: list[str] = []
+    cno: list[str] = []
     try:
         facts = code_facts(root)
     except Unobservable as exc:
-        return [], [str(exc)]
+        reason = str(exc)
+        return Assessment(None, (), (reason,), None, reason)
+
+    coverage: Coverage | None = None
+    coverage_reason: str | None = None
     try:
-        bad = document_errors(root, facts)
         coverage = structural_coverage(root, required_rows(facts))
-        return bad, list(coverage.unchecked)
+        cno.extend(coverage.unchecked)
     except Unobservable as exc:
-        return [], [str(exc)]
+        coverage_reason = str(exc)
+        cno.append(coverage_reason)
+
+    try:
+        bad.extend(document_errors(root, facts))
+    except Unobservable as exc:
+        cno.append(str(exc))
+
+    return Assessment(
+        facts,
+        tuple(bad),
+        tuple(cno),
+        coverage,
+        coverage_reason,
+    )
+
+
+def evaluate(root: Path) -> tuple[list[str], list[str]]:
+    """(observed-bad, could-not-observe). Neither list empty is ever a pass."""
+    result = assess(root)
+    return list(result.bad), list(result.cno)
+
+
+def coverage_lines(result: Assessment) -> list[str]:
+    if result.coverage is None:
+        reason = result.coverage_reason or "required code facts were not established"
+        return [f"coverage: could-not-establish: {reason}"]
+    return [
+        "structurally verified: "
+        + (", ".join(result.coverage.verified) or "none"),
+        "unchecked: " + ("; ".join(result.coverage.unchecked) or "none"),
+    ]
 
 
 # ── watched-red controls ────────────────────────────────────────────────────
@@ -555,6 +599,25 @@ def watched_red_errors(root: Path, facts: Facts) -> list[str]:
                 errors.append(
                     f"{name}: went red for the wrong reason: {(bad + cno)[:2]!r}"
                 )
+
+    def early_cno_control(name: str, mutate) -> None:
+        with tempfile.TemporaryDirectory(prefix="sssf-hd11-") as raw:
+            fixture = Path(raw) / "repo"
+            build_fixture(root, fixture)
+            if not mutate(fixture):
+                errors.append(f"{name}: control could not be applied")
+                return
+            result = assess(fixture)
+            rendered = coverage_lines(result)
+            if not result.cno or result.coverage is not None:
+                errors.append(f"{name}: did not produce early could-not-observe")
+            elif any(
+                line in {"unchecked: none", "structurally verified: none"}
+                for line in rendered
+            ):
+                errors.append(f"{name}: falsely reported empty complete coverage")
+            elif not any("coverage: could-not-establish:" in line for line in rendered):
+                errors.append(f"{name}: omitted coverage-not-established reason")
 
     # Non-vacuity: the shipped document passes an unmutated copy of itself.
     with tempfile.TemporaryDirectory(prefix="sssf-hd11-") as raw:
@@ -677,6 +740,21 @@ def watched_red_errors(root: Path, facts: Facts) -> list[str]:
         ),
     )
 
+    early_cno_control(
+        "missing-code-authority-coverage-control",
+        lambda fixture: (fixture / OWNERSHIP).unlink() is None,
+    )
+
+    early_cno_control(
+        "missing-operative-run-record-write-coverage-control",
+        lambda fixture: rewrite(
+            fixture,
+            FILL,
+            '"$RR" set {{RUN_ID}}',
+            '"$RR" record {{RUN_ID}}',
+        ),
+    )
+
     return errors
 
 
@@ -691,26 +769,18 @@ def main() -> int:
     args = parser.parse_args()
     root = args.root.resolve()
 
-    bad: list[str] = []
-    cno: list[str] = []
-    facts: Facts | None = None
-    coverage = Coverage((), ())
-
-    try:
-        facts = code_facts(root)
-        bad = document_errors(root, facts)
-        coverage = structural_coverage(root, required_rows(facts))
-        cno.extend(coverage.unchecked)
-    except Unobservable as exc:
-        cno.append(str(exc))
+    result = assess(root)
+    facts = result.facts
+    bad = list(result.bad)
+    cno = list(result.cno)
 
     if facts is not None and not bad and not cno:
         bad.extend(watched_red_errors(root, facts))
 
     if bad or cno or facts is None:
         print("HD-11 source custody authority: FAIL")
-        print("structurally verified: " + (", ".join(coverage.verified) or "none"))
-        print("unchecked: " + ("; ".join(coverage.unchecked) or "none"))
+        for line in coverage_lines(result):
+            print(line)
         for error in bad:
             print(f"- observed-bad: {error}")
         for error in cno:
@@ -719,7 +789,7 @@ def main() -> int:
 
     print("HD-11 source custody authority: PASS")
     print(f"document: {DOC}")
-    print("structurally verified: " + ", ".join(coverage.verified))
+    print("structurally verified: " + ", ".join(result.coverage.verified))
     print("unchecked: none")
     print(
         f"{len(required_rows(facts))} contract elements reconciled against "
@@ -739,7 +809,8 @@ def main() -> int:
     )
     print(
         "watched-red: nested dead-region token, duplicate row, unchecked row, "
-        "genuine operative non-vacuity"
+        "early code-authority CNO, absent operative write, genuine operative "
+        "non-vacuity"
     )
     return 0
 
