@@ -139,6 +139,24 @@ HISTORICAL_CLAIMS = (
         "2. make the host `obs` recipes query SQLite through Python so no external CLI is "
         "required.",
     ),
+    (
+        "wholly-read-only-visualizer",
+        "Read-only observability UI for the Super Simple Software Factory — polls sssf.db in a "
+        "target repo.",
+    ),
+    (
+        "wholly-read-only-visualizer",
+        "Types shared by the read-only server and the Vue client.",
+    ),
+    (
+        "queryable-mirror",
+        "agent_sessions — the queryable mirror of agent_map.json. Supplies lane labels "
+        "(`name · model`).",
+    ),
+    (
+        "queryable-mirror",
+        "Files are the raw record; sssf.db is the queryable mirror the UI polls.",
+    ),
 )
 
 
@@ -1169,17 +1187,59 @@ def interruption_control_errors(temp: Path) -> tuple[list[str], list[str], list[
     return errors, absences, notes
 
 
-def documentation_errors() -> list[str]:
-    """Governed documents may not restate a claim the code refutes."""
+def tracked_text_files() -> tuple[list[tuple[str, str]], list[str]]:
+    """Git-tracked, UTF-8-readable files outside the closed declared exclusions."""
     errors: list[str] = []
-    for relative in sqlite_authority.GOVERNED_DOCUMENTS:
-        path = ROOT / relative
-        if not path.is_file():
-            errors.append(f"governed document is missing: {relative}")
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=ROOT,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return [], [f"could not enumerate the git-tracked documentation universe: {exc}"]
+
+    files: list[tuple[str, str]] = []
+    for raw_relative in result.stdout.split(b"\0"):
+        if not raw_relative:
             continue
-        text = path.read_text(encoding="utf-8")
+        relative = raw_relative.decode("utf-8", errors="surrogateescape")
+        if any(
+            relative == excluded or relative.startswith(excluded)
+            for excluded in sqlite_authority.DOCUMENTATION_SCAN_EXCLUSIONS
+        ):
+            continue
+        path = ROOT / relative
+        try:
+            files.append((relative, path.read_text(encoding="utf-8")))
+        except (UnicodeDecodeError, OSError):
+            # Binary/non-text tracked files are outside this prose-claim universe.
+            continue
+    if not files:
+        errors.append("git-tracked documentation universe contained zero text-readable files")
+    return files, errors
+
+
+def claim_is_qualified(text: str, match: re.Match[str]) -> bool:
+    """A whole-surface read-only phrase is true when its triage write is nearby."""
+    window = text[max(0, match.start() - 240) : min(len(text), match.end() + 240)]
+    return bool(re.search(r"archive.{0,80}triage|triage.{0,80}archive", window, re.IGNORECASE))
+
+
+def documentation_errors(scan_notes: list[str] | None = None) -> list[str]:
+    """Tracked current text may not restate a claim the code refutes."""
+    errors: list[str] = []
+    files, universe_errors = tracked_text_files()
+    errors.extend(universe_errors)
+    if scan_notes is not None:
+        scan_notes.append(f"documentation universe: scanned {len(files)} git-tracked text files")
+    for relative, text in files:
         for claim in sqlite_authority.REFUTED_CLAIMS:
             for match in re.finditer(claim["pattern"], text, flags=re.IGNORECASE):
+                if claim["id"] == "wholly-read-only-visualizer" and claim_is_qualified(text, match):
+                    continue
                 line = text[: match.start()].count("\n") + 1
                 errors.append(
                     f"{relative}:{line} restates the refuted claim `{claim['id']}` "
@@ -1225,6 +1285,23 @@ def documentation_control_errors() -> list[str]:
         errors.append(
             f"refuted claims with no shipped-sentence control: {sorted(unfired)}"
         )
+    accurate = (
+        "The visualizer is read-only over run and evidence state; its one write is the "
+        "archive triage flag."
+    )
+    whole_surface = re.search(
+        patterns["wholly-read-only-visualizer"], accurate, flags=re.IGNORECASE
+    )
+    if whole_surface is None:
+        errors.append("qualification control: the whole-surface characterization was not matched")
+    elif not claim_is_qualified(accurate, whole_surface):
+        errors.append("qualification control: an accurate bounded triage qualification was rejected")
+    for narrow in (
+        "the visualizer read connection is opened readonly",
+        "read-only surfaces cannot mutate",
+    ):
+        if re.search(patterns["wholly-read-only-visualizer"], narrow, flags=re.IGNORECASE):
+            errors.append(f"narrow-statement control: accurate statement was rejected: {narrow!r}")
     return errors
 
 
@@ -1401,6 +1478,7 @@ def main() -> int:
     errors: list[str] = []
     binding_notes: list[str] = []
     interruption_notes: list[str] = []
+    scan_notes: list[str] = []
     with tempfile.TemporaryDirectory(prefix="sssf-hd13-") as raw_temp:
         temp = Path(raw_temp)
         fixture = temp / "fixture.db"
@@ -1415,7 +1493,7 @@ def main() -> int:
         errors.extend(defective_helper_errors(temp, fixture))
         errors.extend(triage_errors(fixture))
         errors.extend(observation_errors(temp, fixture))
-        errors.extend(documentation_errors())
+        errors.extend(documentation_errors(scan_notes))
         errors.extend(documentation_control_errors())
 
         binding_bad, binding_absent, notes = exercise_binding_errors()
@@ -1435,6 +1513,8 @@ def main() -> int:
     if evidence_digest_before is not None and file_digest(EXERCISE_EVIDENCE) != evidence_digest_before:
         errors.append("the validation run changed the tracked visualizer exercise evidence")
 
+    for note in scan_notes:
+        print(note)
     if errors:
         print("HD-13 SQLite field authority: FAIL")
         for error in errors:

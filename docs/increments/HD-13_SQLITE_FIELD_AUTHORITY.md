@@ -29,7 +29,9 @@ read-only surfaces cannot mutate, and only the archive route can change triage s
 ## Non-goals
 
 - no change to the tracer's write paths, the visualizer's behaviour, or the read-only query helper —
-  all three were found correct; only stale contract comments and guidance are corrected;
+  all three were found correct; only package metadata, docstrings, comments and guidance are
+  corrected in `visualizer/package.json:6`, `visualizer/shared/types.ts:2-3,156`,
+  `adws/adw_modules/tracer.py:3`, and the template tracer's matching line 3;
 - no new runtime acceptance authority; observation is reporting, not a gate;
 - no rewrite of `specs/`, which is retained history under `SOURCE_OF_TRUTH.md`;
 - no claim that a green observation authorizes deleting or rebuilding a trace database.
@@ -162,7 +164,10 @@ Independent review is delegated to the required no-mistakes pipeline before publ
 
 Root architecture observability document, two skill references, new field-authority reference,
 ADR-0004, increment ledger, proof matrix, file map, command reference, glossary, documentation
-router, and CI check registration.
+router, CI check registration, visualizer package metadata and shared type comments, plus the
+installed/template tracer module docstrings. The local corrections are package line 6, shared types
+lines 2–3 and 156, and line 3 of each tracer copy. Their write paths, queries and behaviour are
+unchanged.
 
 ## Result
 

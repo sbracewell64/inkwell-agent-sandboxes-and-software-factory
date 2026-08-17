@@ -508,14 +508,29 @@ REFUTED_CLAIMS: tuple[dict[str, str], ...] = (
             "a governed document must not propose a fix that is complete"
         ),
     },
+    {
+        "id": "wholly-read-only-visualizer",
+        "pattern": (
+            r"read-?only\s+(?:observability\s+)?(?:ui|app|application|server|visualizer|reader)\b"
+            r"|(?:visualizer|observability\s+ui)\s+is\s+"
+            r"(?:(?:wholly|entirely|completely)\s+)?read-?only\b"
+        ),
+        "why": (
+            "the visualizer is read-only over run and evidence state, but its archive route "
+            "owns the sessions.archived triage write"
+        ),
+    },
 )
 
-GOVERNED_DOCUMENTS = (
-    "docs/architecture/OBSERVABILITY.md",
-    "docs/reference/SQLITE_AUTHORITY.md",
-    ".claude/skills/sssf/references/observability.md",
-    ".claude/skills/sssf/references/handoff.md",
-)
+# Closed exclusions from the git-tracked, text-readable documentation-claim
+# universe. Every omission is explicit and carries its source-of-truth reason.
+DOCUMENTATION_SCAN_EXCLUSIONS = {
+    "specs/": "generated run history under SOURCE_OF_TRUTH; retained, not rewritten",
+    "app_docs/": "generated application history under SOURCE_OF_TRUTH; retained, not rewritten",
+    "docs/evidence/": "watched-red captures intentionally quote refuted sentences verbatim",
+    "tools/sqlite_authority.py": "owns the refuted patterns as executable data",
+    "docs/validation/check_sqlite_authority.py": "contains patterns and negative controls as data",
+}
 
 # Retained history that is NOT governed: `specs/` is evidence produced by past
 # runs, and source custody forbids rewriting it. The superseding statement is

@@ -1,6 +1,6 @@
 """Tracer: every event lands in JSONL and SQLite AS IT HAPPENS.
 
-Events are dual-written; sssf.db owns canonical run state for the UI.
+Files are raw sources; sssf.db is canonical run state — only events are dual-written.
 No push transport — the flow is always: agents -> sqlite -> web ui.
 WAL mode so the UI can read while ADW processes write.
 """

@@ -172,12 +172,30 @@ custody forbids rewriting it. Its "Two stores, one truth" section still states t
 mirror claim. **That section is superseded by this document.** It is deliberately left in place and
 is deliberately outside the validator's governed set; the fact is recorded here rather than hidden.
 
-Governed documents, which the validator does check:
+The validator derives its documentation universe from `git ls-files`: every tracked file that is
+UTF-8 text-readable is scanned, minus the closed exclusions declared with reasons in
+`tools/sqlite_authority.py`. Those exclusions are generated history (`specs/`, `app_docs/`),
+watched-red quotations (`docs/evidence/`), and the two source files that necessarily carry the
+patterns and controls as data. Re-run the universe enumeration with:
 
-- `docs/architecture/OBSERVABILITY.md`
-- `docs/reference/SQLITE_AUTHORITY.md`
-- `.claude/skills/sssf/references/observability.md`
-- `.claude/skills/sssf/references/handoff.md`
+```bash
+python3 - <<'PY'
+import pathlib, subprocess
+excluded = ("specs/", "app_docs/", "docs/evidence/", "tools/sqlite_authority.py",
+            "docs/validation/check_sqlite_authority.py")
+for raw in subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0"):
+    if not raw:
+        continue
+    relative = raw.decode()
+    if any(relative == item or relative.startswith(item) for item in excluded):
+        continue
+    try:
+        pathlib.Path(relative).read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        continue
+    print(relative)
+PY
+```
 
 ## The matrix
 
