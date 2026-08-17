@@ -27,6 +27,12 @@ Never hand-edit session evidence.
 - `docs/validation/check_evidence_manifest.py` — positive and watched-red controls
 - `docs/validation/fixtures/evidence_manifest/` — canonical offline fixtures
 
+## Source custody authority
+
+- `docs/architecture/REPOSITORY_OWNERSHIP.md` — authoritative source-custody record
+- `docs/validation/check_source_custody_authority.py` — reconciles that document with the code
+- `docs/evidence/hd11/` — pre-fix watched-red observation and the control matrix
+
 ## Sandbox orchestration
 
 - `just/sandbox/`

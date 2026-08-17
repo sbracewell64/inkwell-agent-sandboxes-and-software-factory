@@ -91,6 +91,14 @@ python3 docs/validation/check_evidence_manifest.py
 
 Manifest v1 validation is offline evidence checking only. It does not authorize runtime acceptance; HD-09 owns that integration.
 
+## Source custody authority
+
+```text
+python3 docs/validation/check_source_custody_authority.py
+```
+
+Reconciles `docs/architecture/REPOSITORY_OWNERSHIP.md` with the FILL/SETUP/HARVEST recipes and the run-record schema, offline. It is enumerated in `ci/checks.json`, so the ordinary pull-request gate runs it too.
+
 ## Identity warning
 
 `run-id` and `adw-id` are different.
