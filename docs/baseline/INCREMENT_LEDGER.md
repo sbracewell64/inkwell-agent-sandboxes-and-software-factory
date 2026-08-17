@@ -28,6 +28,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | HD-01 | PASS | One authoritative strict LF working-tree contract | default + doctor strict owner; CRLF/missing/wrong-attribute watched-red controls; hostile-`core.autocrlf=true` fresh clone remained `i/lf w/lf` |
 | HD-02 | PASS | Static synchronization for installed/template/generated ADWs | nonempty static inventory, generated import-only smoke, and sixteen watched-red mutations passed without provider execution |
 | HD-03 | PASS | Nonvacuous three-valued gate outcomes | 15 focused controls prove PASS/FAIL/CNO, fail-closed migration, trace provenance, and non-green CNO rendering |
+| HD-04 | PASS | One code-computed mutation fact, reconciled bidirectionally against envelope claims, shared by the claim gate and the permission check, with a stated observation boundary | 15 CI-registered controls plus 17 typed-layer tests; eleven disposable mutations each watched red before green; the pre-HD-04 path-existence and line-count surfaces retained as calibration cases |
 | HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
 
 ## Future increments

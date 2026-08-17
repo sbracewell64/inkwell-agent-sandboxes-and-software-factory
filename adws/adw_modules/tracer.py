@@ -22,6 +22,44 @@ from .data_types import (
 )
 from .utils import ensure_dir, new_id, now_iso
 
+
+def _sql_values(members) -> str:
+    """The closed enum, spelled for a SQL CHECK. Generated, never hand-listed:
+    a literal list drifts silently the first time the enum gains a member."""
+    return ",".join(f"'{member.value}'" for member in members)
+
+
+GATE_RESULTS_SCHEMA = f"""
+CREATE TABLE IF NOT EXISTS gate_results (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  adw_id        TEXT REFERENCES sessions,
+  phase_id      TEXT REFERENCES phases,
+  attempt       INTEGER,
+  gate          TEXT,
+  passed        INTEGER,            -- compatibility projection: 1 PASS, 0 FAIL, NULL CNO
+  outcome       TEXT NOT NULL CHECK(outcome IN ('PASS','FAIL','COULD_NOT_OBSERVE')),
+  cno_reason    TEXT,
+  cno_source    TEXT,
+  nonempty_required INTEGER NOT NULL CHECK(nonempty_required IN (0,1)),
+  violations_json TEXT,
+  checks_json   TEXT,               -- [{{item, ok, note}}] — WHAT the gate verified
+  scope_json    TEXT,               -- {{observed, out_of_scope, unobservable}} — the
+                                    -- universe the verdict covers, so a green is
+                                    -- never readable as an unqualified clean
+  created_at    TEXT,
+  CHECK((outcome='COULD_NOT_OBSERVE'
+         AND cno_reason IN ({_sql_values(GateCNOReason)})
+         AND cno_source IN ({_sql_values(GateCNOSource)}))
+     OR (outcome IN ('PASS','FAIL') AND cno_reason IS NULL AND cno_source IS NULL))
+);
+"""
+
+GATE_RESULTS_COLUMNS = (
+    "id", "adw_id", "phase_id", "attempt", "gate", "passed", "outcome",
+    "cno_reason", "cno_source", "nonempty_required", "violations_json",
+    "checks_json", "scope_json", "created_at",
+)
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
   adw_id        TEXT PRIMARY KEY,
@@ -65,27 +103,6 @@ CREATE TABLE IF NOT EXISTS envelopes (
   attempt       INTEGER,
   created_at    TEXT
 );
-CREATE TABLE IF NOT EXISTS gate_results (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  adw_id        TEXT REFERENCES sessions,
-  phase_id      TEXT REFERENCES phases,
-  attempt       INTEGER,
-  gate          TEXT,
-  passed        INTEGER,            -- compatibility projection: 1 PASS, 0 FAIL, NULL CNO
-  outcome       TEXT NOT NULL CHECK(outcome IN ('PASS','FAIL','COULD_NOT_OBSERVE')),
-  cno_reason    TEXT,
-  cno_source    TEXT,
-  nonempty_required INTEGER NOT NULL CHECK(nonempty_required IN (0,1)),
-  violations_json TEXT,
-  checks_json   TEXT,               -- [{item, ok, note}] — WHAT the gate verified
-  created_at    TEXT,
-  CHECK((outcome='COULD_NOT_OBSERVE' AND cno_reason IN (
-          'NO_REQUIRED_OBSERVATIONS','NO_GATES_DISCOVERED','GATE_RAISED',
-          'INVALID_GATE_RETURN','LEGACY_BOOLEAN_ONLY','MALFORMED_TYPED_OUTCOME')
-        AND cno_source IN ('GATE_REPORT','AGENT_CALL','GATE_EXECUTION',
-          'GATE_ADAPTER','SCHEMA_MIGRATION','TRACE_READER'))
-     OR (outcome IN ('PASS','FAIL') AND cno_reason IS NULL AND cno_source IS NULL))
-);
 CREATE TABLE IF NOT EXISTS processes (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   adw_id        TEXT REFERENCES sessions,
@@ -118,7 +135,8 @@ MIGRATIONS = [("agent_sessions", "color", "TEXT"),
               ("gate_results", "outcome", "TEXT"),
               ("gate_results", "cno_reason", "TEXT"),
               ("gate_results", "cno_source", "TEXT"),
-              ("gate_results", "nonempty_required", "INTEGER")]
+              ("gate_results", "nonempty_required", "INTEGER"),
+              ("gate_results", "scope_json", "TEXT")]
 
 
 class Tracer:
@@ -132,6 +150,7 @@ class Tracer:
         self.conn.execute("PRAGMA synchronous=NORMAL;")
         self.conn.execute("PRAGMA busy_timeout=5000;")
         self.conn.executescript(SCHEMA)
+        self.conn.executescript(GATE_RESULTS_SCHEMA)
         self._migrate()
 
     def _migrate(self) -> None:
@@ -164,11 +183,15 @@ class Tracer:
             (*malformed, GateStatus.PASS.value, GateStatus.FAIL.value,
              GateStatus.COULD_NOT_OBSERVE.value),
         )
+        # Placeholder counts are generated from the enums. Hand-written ones
+        # silently become the wrong query the first time a closed set grows.
+        reasons = ",".join("?" * len(GateCNOReason))
+        sources = ",".join("?" * len(GateCNOSource))
         self.conn.execute(
             "UPDATE gate_results SET outcome=?, cno_reason=?, cno_source=? "
             "WHERE (outcome IN (?,?) AND (cno_reason IS NOT NULL OR cno_source IS NOT NULL)) "
             "OR (outcome=? AND (cno_reason IS NULL OR cno_source IS NULL "
-            "OR cno_reason NOT IN (?,?,?,?,?,?) OR cno_source NOT IN (?,?,?,?,?,?)))",
+            f"OR cno_reason NOT IN ({reasons}) OR cno_source NOT IN ({sources})))",
             (*malformed, GateStatus.PASS.value, GateStatus.FAIL.value,
              GateStatus.COULD_NOT_OBSERVE.value,
              *(reason.value for reason in GateCNOReason),
@@ -190,6 +213,50 @@ class Tracer:
         self.conn.execute(
             "UPDATE gate_results SET passed = CASE outcome WHEN ? THEN 1 WHEN ? THEN 0 ELSE NULL END",
             (GateStatus.PASS.value, GateStatus.FAIL.value),
+        )
+        self._readmit_closed_gate_values()
+
+    def _readmit_closed_gate_values(self) -> None:
+        """Rebuild gate_results when its CHECK predates a closed-set member.
+
+        `CREATE TABLE IF NOT EXISTS` never revisits an existing table, so a db
+        written by an older SSSF keeps that release's CHECK — and a CNO carrying
+        a reason or source added since would be REFUSED at insert time. The
+        failure would arrive as an IntegrityError mid-run, on the very path that
+        exists to record unavailable evidence.
+
+        Rebuilding is safe in one direction only, which is the direction taken:
+        the constraint is widened, never narrowed, so every row that satisfied
+        the old CHECK still satisfies the new one. It runs after the
+        normalization above, so every row already carries a legal outcome.
+        """
+        row = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='gate_results'"
+        ).fetchone()
+        if row is None:
+            return
+        current = row[0] or ""
+        if all(f"'{member.value}'" in current
+               for member in (*GateCNOReason, *GateCNOSource)):
+            return
+
+        columns = {r[1] for r in self.conn.execute("PRAGMA table_info(gate_results)")}
+        carried = [c for c in GATE_RESULTS_COLUMNS if c in columns]
+        names = ", ".join(carried)
+        # Whatever the connection's foreign-key enforcement was, it is what it
+        # goes back to. A migration that silently switched it on would change
+        # how every later insert behaves, which is not a migration's business.
+        keys_on = self.conn.execute("PRAGMA foreign_keys").fetchone()[0]
+        self.conn.executescript(
+            "PRAGMA foreign_keys=OFF;\n"
+            "BEGIN;\n"
+            "ALTER TABLE gate_results RENAME TO gate_results_superseded;\n"
+            f"{GATE_RESULTS_SCHEMA}\n"
+            f"INSERT INTO gate_results ({names}) "
+            f"SELECT {names} FROM gate_results_superseded;\n"
+            "DROP TABLE gate_results_superseded;\n"
+            "COMMIT;\n"
+            f"PRAGMA foreign_keys={'ON' if keys_on else 'OFF'};"
         )
 
     # ── events ──────────────────────────────────────────────────────────────
@@ -316,15 +383,20 @@ class Tracer:
         outcome = report.outcome
         passed = (1 if outcome.status == GateStatus.PASS else
                   0 if outcome.status == GateStatus.FAIL else None)
+        scope = getattr(report, "scope", None)
         self.conn.execute(
             "INSERT INTO gate_results (adw_id, phase_id, attempt, gate, passed, outcome,"
             " cno_reason, cno_source, nonempty_required, violations_json, checks_json,"
-            " created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            " scope_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (phase.adw_id, phase.phase_id, attempt, gate, passed, outcome.status.value,
              outcome.reason.value if outcome.reason else None,
              outcome.source.value if outcome.source else None,
              int(report.nonempty_required), json.dumps(report.violations),
-             json.dumps([c.model_dump() for c in report.checks]), now_iso()),
+             json.dumps([c.model_dump() for c in report.checks]),
+             # The universe the verdict covers travels with it: a stored PASS
+             # that cannot say what it did NOT look at is a green with no bound.
+             json.dumps(scope.model_dump()) if scope is not None else None,
+             now_iso()),
         )
 
     def agent_session_row(self, adw_id: str, agent: AgentConfig, session_id: str,

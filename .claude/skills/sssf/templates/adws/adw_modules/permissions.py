@@ -15,6 +15,12 @@ after the fact, against the repo itself. `snapshot()` fingerprints the working
 tree's change-set before an agent runs; `enforce()` compares it afterwards and
 fails the phase if the agent touched anything outside its allowlist.
 
+The change-set itself is not computed here. `mutation_fact` owns it, and the
+claim gate reads the same fact this module enforces against — `enforce(...,
+after=...)` takes the fact rather than taking a second snapshot. Two snapshots
+of the same tree, read at two moments, are two sources of truth that disagree
+the instant either one moves. One fact, two consumers.
+
 Comparing change-sets, rather than watching for writes, is what catches the
 `git checkout` case: a path that was modified before the agent ran and is clean
 afterwards has been reverted, and a reversion is a modification. Appearing,
@@ -35,43 +41,32 @@ import re
 import subprocess
 from pathlib import Path
 
+from . import mutation_fact
 from .data_types import AgentConfig, SSSFConfig
+from .mutation_fact import TreeFact
 
 
 class PermissionBreach(RuntimeError):
     """An agent modified a path it was not permitted to modify."""
 
 
-def _git(args: list[str], cwd) -> str:
-    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
-    return result.stdout if result.returncode == 0 else ""
-
-
-def snapshot(run) -> dict[str, str]:
+def snapshot(run) -> TreeFact:
     """Fingerprint every path the working tree currently differs on.
 
-    Tracked files carry their numstat counts, so an edit to an already-dirty
-    file still registers as a change. Untracked files are listed by name.
-    Gitignored paths never appear, which is why the session runtime under
-    `data_dir` — where handoff files legitimately land — needs no special case.
+    One call into the shared fact, so the permission check and the claim gate
+    measure the same thing. Content identity, not line counts: the old numstat
+    fingerprint was blind to an edit that replaced a line with another of the
+    same shape, which is precisely the edit an agent makes on a file that was
+    already dirty. Gitignored paths never appear, which is why the session
+    runtime under `data_dir` — where handoff files legitimately land — needs no
+    special case.
     """
-    fingerprints: dict[str, str] = {}
-    for line in _git(["diff", "HEAD", "--numstat"], run.repo_root).splitlines():
-        fields = line.split("\t")
-        if len(fields) >= 3:
-            path = fields[-1].strip()
-            fingerprints[path] = f"{fields[0]},{fields[1]}"
-    for path in _git(["ls-files", "--others", "--exclude-standard"],
-                     run.repo_root).splitlines():
-        if path.strip():
-            fingerprints[path.strip()] = "untracked"
-    return fingerprints
+    return mutation_fact.observe(run.repo_root)
 
 
-def changed_paths(before: dict[str, str], after: dict[str, str]) -> list[str]:
-    """Every path whose state differs — appeared, vanished, or was rewritten."""
-    return sorted({p for p in set(before) | set(after)
-                   if before.get(p) != after.get(p)})
+def changed_paths(before: TreeFact, after: TreeFact) -> list[str]:
+    """Every path whose content identity differs — appeared, vanished, rewritten."""
+    return [m.path for m in mutation_fact.mutations(before, after)]
 
 
 def _glob(pattern: str) -> re.Pattern:
@@ -143,13 +138,14 @@ def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str]) ->
     uncommitted work there, and discarding it to tidy up would be the same harm
     this module exists to prevent, committed by the cleanup instead of the agent.
     """
-    if path in before:
+    if path in before.states:
         # Already dirty beforehand. If it is gone from the diff now, the agent
         # reverted an engineer's uncommitted work and the content is not ours
         # to reconstruct — say so loudly rather than pretend it was handled.
         return "REVERTED-BY-AGENT (uncommitted work lost, cannot restore)" \
-            if path not in after else "left as-is (was already modified)"
-    if after.get(path) == "untracked":
+            if path not in after.states else "left as-is (was already modified)"
+    landed = after.states.get(path)
+    if landed is not None and not landed.tracked:
         try:
             (Path(run.repo_root) / path).unlink()
             return "deleted"
@@ -160,17 +156,23 @@ def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str]) ->
     return "rolled back" if result.returncode == 0 else "could not roll back"
 
 
-def enforce(run, phase, agent: AgentConfig, before: dict[str, str]) -> list[str]:
+def enforce(run, phase, agent: AgentConfig, before: TreeFact,
+            after: TreeFact | None = None) -> list[str]:
     """Compare the tree against `before`; undo and raise if the agent overstepped.
 
     Returns the paths it legitimately changed, so the trace records what an
     agent actually touched rather than only what it claimed in its envelope.
 
+    `after` is the fact the claim gate already reconciled against. Passing it in
+    is the point: a second snapshot taken here would be a second source of truth,
+    and the two would disagree about any path that moved in between. Only when a
+    phase recorded no fact at all does this observe one itself.
+
     Detection alone would leave the repo holding the unauthorized change while
     reporting a failure, so anything the agent introduced outside its allowlist
     is rolled back before the phase dies. What it cannot undo, it names.
     """
-    after = snapshot(run)
+    after = snapshot(run) if after is None else after
     touched = changed_paths(before, after)
     breaches = [p for p in touched if not permitted(p, agent, run.cfg)]
     if not breaches:

@@ -84,6 +84,15 @@
 | HD-03 explicit failed gate check | focused negative fixture | FAIL |
 | HD-03 qualifying nonempty gate evidence | exact nonempty artifact fixture across existence/content/claim gates | PASS |
 | HD-03 malformed/legacy gate outcome | parser, adapter, migration, console, and trace controls | CNO/REFUSED; NEVER BOOLEAN PASS |
+| HD-04 claimed path that did not change | reconciliation control plus the retained pre-HD-04 path-existence proxy observed green on the same fixture | FAIL |
+| HD-04 actual changed path not claimed | omitted-path, extra-path, and empty-claim controls, each with the path-existence proxy observed green or non-red on the same fixture | FAIL |
+| HD-04 honest exact claim set | modified/added/deleted covered by content identity, zero discrepancies, complete universe | PASS |
+| HD-04 content change on an already-dirty file | content-identity mutation observed while the pre-HD-04 line-count fingerprint is asserted identical either side of the edit | PASS |
+| HD-04 rename, deletion, untracked determinism | rename linked by exact content identity and unchanged under `diff.renames=true`/`false`; ambiguous pairing stable across repeated observation; truthful deletion claim agrees while the pre-HD-04 proxy refused it; untracked resolves as an addition | PASS |
+| HD-04 one fact, two consumers | the claim gate and `permissions.enforce` consume the same observation object; `enforce` taking a second snapshot observed red | PASS |
+| HD-04 verdict states its boundary | scope carried on the report, rendered by the console, persisted in `gate_results.scope_json`; an ignored write really happened and is really absent from the fact | PASS |
+| HD-04 incomplete universe | an unreadable candidate, and a repository that does not exist, refuse a negative verdict | COULD_NOT_OBSERVE; NEVER CLEAN |
+| HD-04 ignored files, out-of-repository writes, network and process effects | outside the fact set by construction; named, not observed | NOT PROVEN — OUT OF SCOPE |
 | B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual intervention | NOT PROVEN |
 | B4-001 offline check discovery | run `31907345967` at `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: each OS discovered and executed 6/6 checks | PASS |
 | B4-001 non-vacuous projection | each job retained 6 observed-good, 0 observed-bad, and 0 could-not-observe results | PASS |
