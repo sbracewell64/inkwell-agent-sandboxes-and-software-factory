@@ -271,9 +271,23 @@ def ignored(rel: str, patterns: list[str]) -> bool:
     )
 
 
+def contained_target(path: Path, boundary: Path, findings: Findings,
+                     label: str) -> Path | None:
+    try:
+        resolved = path.resolve(strict=False)
+        resolved.relative_to(boundary.resolve(strict=True))
+    except (OSError, RuntimeError, ValueError) as exc:
+        findings.cno.append(
+            f"{label}: path leaves or cannot be resolved within the declared tree: {exc}")
+        return None
+    return resolved
+
+
 def enumerate_side(base: Path, recursive: bool, ignore: list[str], findings: Findings,
-                   label: str) -> dict[str, Path] | None:
+                   label: str, declared_root: Path) -> dict[str, Path] | None:
     """Relative path -> file for one side of a mapping, or None if unobservable."""
+    if contained_target(base, declared_root, findings, label) is None:
+        return None
     if recursive:
         if base.is_symlink():
             findings.cno.append(
@@ -293,18 +307,16 @@ def enumerate_side(base: Path, recursive: bool, ignore: list[str], findings: Fin
                     findings.cno.append(
                         f"{label}:{rel}: symlink state could not be read: {exc}")
                     continue
-                resolved = (path.parent / target).resolve(strict=False)
-                try:
-                    resolved.relative_to(base.resolve())
-                except ValueError:
-                    findings.cno.append(
-                        f"{label}:{rel}: symlink leaves the declared tree and was not followed")
+                if contained_target(path, base, findings, f"{label}:{rel}") is None:
+                    continue
                 if not path.exists():
                     findings.cno.append(
                         f"{label}:{rel}: broken symlink target could not be observed")
+                    continue
                 elif path.is_dir():
                     findings.cno.append(
                         f"{label}:{rel}: directory symlink was not traversed")
+                    continue
                 observed[rel] = path
             elif path.is_file():
                 observed[rel] = path
@@ -316,8 +328,11 @@ def enumerate_side(base: Path, recursive: bool, ignore: list[str], findings: Fin
         except OSError as exc:
             findings.cno.append(f"{label}: symlink state could not be read: {exc}")
             return {}
+        if contained_target(base, base.parent, findings, label) is None:
+            return {}
         if not base.exists():
             findings.cno.append(f"{label}: broken symlink target could not be observed")
+            return {}
         return {"": base}
     return {"": base} if base.is_file() else {}
 
@@ -391,12 +406,14 @@ def check_exclusions(document: dict, root: Path, findings: Findings) -> None:
         for prefix in surface.get("exclude_live", []) or []:
             full = f"{live_root}/{prefix}"
             excluded_root = root / full
+            if contained_target(excluded_root, root, findings, full) is None:
+                continue
             if not excluded_root.exists():
                 findings.cno.append(
                     f"{surface['id']}: excluded prefix not observed: {full}")
                 continue
             observed = enumerate_side(
-                excluded_root, True, ignore, findings, f"{surface['id']}:{prefix}")
+                excluded_root, True, ignore, findings, f"{surface['id']}:{prefix}", root)
             if observed is None:
                 continue
             descendants = observed.values()
@@ -427,8 +444,14 @@ def check_coupled(document: dict, root: Path, findings: Findings) -> None:
             continue
         for side in ("template", "live"):
             base = root / surface[side]
-            present = [m for m in group["members"] if (base / m).is_file()]
-            absent = [m for m in group["members"] if not (base / m).is_file()]
+            present: list[str] = []
+            absent: list[str] = []
+            for member in group["members"]:
+                path = base / member
+                if contained_target(path, base, findings,
+                                    f"{surface['id']}:{side}:{member}") is None:
+                    continue
+                (present if path.is_file() else absent).append(member)
             if present and absent:
                 findings.fail.append(
                     f"{surface['id']}: coupled group split on the {side} surface — "
@@ -453,9 +476,10 @@ def validate(root: Path, contract_path: Path) -> Findings:
             continue
         recursive = bool(surface.get("recursive", False))
         live_root, template_root = root / surface["live"], root / surface["template"]
-        live = enumerate_side(live_root, recursive, ignore, findings, f"{sid}:live")
+        live = enumerate_side(
+            live_root, recursive, ignore, findings, f"{sid}:live", root)
         template = enumerate_side(
-            template_root, recursive, ignore, findings, f"{sid}:template")
+            template_root, recursive, ignore, findings, f"{sid}:template", root)
         if live is None:
             findings.cno.append(f"{sid}: live root not observed: {surface['live']}")
         if template is None:
@@ -532,6 +556,8 @@ def validate(root: Path, contract_path: Path) -> Findings:
 
     for entry in document.get("live_only", []):
         target = root / entry["path"]
+        if contained_target(target, root, findings, entry["path"]) is None:
+            continue
         if target.exists():
             findings.record(INTENTIONAL, entry["path"], relation="LIVE_ONLY",
                             owner=entry.get("owner", "unspecified"))
@@ -569,6 +595,8 @@ CONTROLS = (
      "adws/adw_data/zz_concealed", "directory_symlink", "cno", "zz_concealed"),
     ("broken-symlink-could-not-observe",
      "adws/adw_data/zz_broken", "broken_symlink", "cno", "zz_broken"),
+    ("out-of-tree-single-file-symlink",
+     ".env.sample", "external_single_symlink", "cno", "env-sample:live"),
     ("malformed-contract-entry",
      None, "malformed_contract", "cno", "overrides[1]"),
     ("missing-divergence-metadata",
@@ -590,10 +618,11 @@ CONTROLS = (
      ".claude/skills/sssf/templates/prompt_engineering/scout/system.md", "truncate", "red",
      "scout/system.md"),
     ("user-owned-roster-stays-classified", None, None, "clean", "roster-config"),
+    ("in-tree-file-read-non-vacuous", None, None, "clean", "console.py"),
 )
 
 
-def materialize(document: dict, root: Path, temp: Path) -> None:
+def materialize(document: dict, root: Path, temp: Path, control: RedControls) -> bool:
     """Copy every mapped surface into a disposable root, mapping preserved."""
     wanted: list[str] = []
     for surface in document["surfaces"]:
@@ -601,6 +630,10 @@ def materialize(document: dict, root: Path, temp: Path) -> None:
     wanted.extend(entry["path"] for entry in document.get("live_only", []))
     for rel in wanted:
         source, destination = root / rel, temp / rel
+        probe = Findings()
+        if contained_target(source, root, probe, f"materialize:{rel}") is None:
+            control.problems.extend(probe.cno)
+            return False
         if destination.exists() or not source.exists():
             continue
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -608,6 +641,7 @@ def materialize(document: dict, root: Path, temp: Path) -> None:
             shutil.copytree(source, destination)
         else:
             shutil.copy2(source, destination)
+    return True
 
 
 def apply_mutation(path: Path, kind: str) -> None:
@@ -634,6 +668,9 @@ def apply_mutation(path: Path, kind: str) -> None:
         path.symlink_to(concealed, target_is_directory=True)
     elif kind == "broken_symlink":
         path.symlink_to("missing-target")
+    elif kind == "external_single_symlink":
+        path.unlink()
+        path.symlink_to("/dev/null")
 
 
 def surface_by_id(document: dict, sid: str) -> dict:
@@ -679,6 +716,16 @@ def clean_precondition(name: str, root: Path, document: dict) -> tuple[bool, str
             return False, ("roster configs are identical, so this control no longer "
                            "demonstrates that user-owned divergence is tolerated")
         return True, "user-owned roster differs and stays classified rather than copied or failed"
+
+    if name == "in-tree-file-read-non-vacuous":
+        surface = surface_by_id(document, "adw-tree")
+        live = root / surface["live"] / "adw_modules/console.py"
+        template = root / surface["template"] / "adw_modules/console.py"
+        classified = any(entry["path"] == "adw-tree:adw_modules/console.py"
+                         for entry in validate(root, DEFAULT_CONTRACT).state[MATCHED])
+        if not classified or artifact_sha256(live) is None or artifact_sha256(template) is None:
+            return False, "console.py was not read and classified from both declared trees"
+        return True, "in-tree console.py bytes were read and classified EXACT_MIRROR"
 
     return False, f"no precondition defined for clean control {name}"
 
@@ -797,7 +844,8 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
                 else:
                     control.log.append(f"watched-red {name}: CNO naming {names}")
                 continue
-            materialize(document, root, temp)
+            if not materialize(document, root, temp, control):
+                continue
             path = temp / target
             if kind == "add" and path.exists():
                 control.problems.append(
@@ -812,9 +860,14 @@ def red_controls(root: Path, contract_path: Path) -> RedControls:
             if expect == "cno":
                 introduced_cno = [line for line in result.cno
                                   if line not in baseline_cno and names in line]
+                introduced_fail = [line for line in result.fail
+                                   if line.split("\n", 1)[0] not in baseline]
                 if not introduced_cno:
                     control.problems.append(
                         f"{name}: mutation did not yield CNO naming {names}")
+                elif kind == "external_single_symlink" and introduced_fail:
+                    control.problems.append(
+                        f"{name}: escaped target influenced FAIL: {introduced_fail[0]}")
                 else:
                     control.log.append(f"watched-red {name}: CNO naming {names}")
                 continue
