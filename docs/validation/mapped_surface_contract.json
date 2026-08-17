@@ -175,9 +175,36 @@
       "path": "adws/adw_data/sssf.db",
       "relation": "LIVE_ONLY",
       "presence": "RUNTIME_OPTIONAL",
-      "match": "FILE_PREFIX",
+      "match": "EXACT",
       "owner": "runtime",
       "rationale": "Created at runtime and gitignored; never stamped.",
+      "evidence": ".claude/skills/sssf/cookbooks/install.md section 'What gets stamped'"
+    },
+    {
+      "path": "adws/adw_data/sssf.db-wal",
+      "relation": "LIVE_ONLY",
+      "presence": "RUNTIME_OPTIONAL",
+      "match": "EXACT",
+      "owner": "SQLite runtime",
+      "rationale": "SQLite WAL sidecar created at runtime and gitignored; never stamped.",
+      "evidence": ".claude/skills/sssf/references/observability.md section 'Location and lifecycle'"
+    },
+    {
+      "path": "adws/adw_data/sssf.db-shm",
+      "relation": "LIVE_ONLY",
+      "presence": "RUNTIME_OPTIONAL",
+      "match": "EXACT",
+      "owner": "SQLite runtime",
+      "rationale": "SQLite shared-memory sidecar created at runtime and gitignored; never stamped.",
+      "evidence": ".claude/skills/sssf/references/observability.md section 'Location and lifecycle'"
+    },
+    {
+      "path": "adws/adw_data/sssf.db-journal",
+      "relation": "LIVE_ONLY",
+      "presence": "RUNTIME_OPTIONAL",
+      "match": "EXACT",
+      "owner": "SQLite runtime",
+      "rationale": "SQLite rollback-journal sidecar may be created at runtime and is gitignored; never stamped.",
       "evidence": ".claude/skills/sssf/cookbooks/install.md section 'What gets stamped'"
     }
   ]

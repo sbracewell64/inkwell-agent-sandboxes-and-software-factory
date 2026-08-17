@@ -238,12 +238,9 @@ def load_contract(path: Path, findings: Findings) -> dict | None:
             findings.cno.append(
                 f"live_only {entry_path!r} has unknown presence: {presence!r}")
         match = entry.get("match")
-        if match not in {"EXACT", "FILE_PREFIX"}:
+        if match != "EXACT":
             findings.cno.append(
                 f"live_only {entry_path!r} has unknown match: {match!r}")
-        if match == "FILE_PREFIX" and presence != "RUNTIME_OPTIONAL":
-            findings.cno.append(
-                f"live_only {entry_path!r} FILE_PREFIX requires RUNTIME_OPTIONAL")
     for index, group in enumerate(document["coupled"]):
         if not isinstance(group, dict):
             findings.cno.append(
@@ -364,8 +361,6 @@ def check_exclusions(document: dict, root: Path, findings: Findings) -> None:
                 claimed_live_only = any(
                     rel == entry["path"]
                     or rel.startswith(entry["path"] + "/")
-                    or (entry["match"] == "FILE_PREFIX"
-                        and rel.startswith(entry["path"]))
                     for entry in live_only_claims)
                 if not claimed_by_surface and not claimed_live_only:
                     findings.fail.append(
@@ -519,6 +514,8 @@ CONTROLS = (
      "adws/adw_modules/zz_undeclared.py", "add", "red", "zz_undeclared.py"),
     ("undeclared-excluded-prefix-addition",
      "adws/adw_data/zz_undeclared.json", "add", "red", "zz_undeclared.json"),
+    ("undeclared-sqlite-prefixed-file",
+     "adws/adw_data/sssf.db-rogue", "add", "red", "sssf.db-rogue"),
     ("malformed-contract-entry",
      None, "malformed_contract", "cno", "overrides[1]"),
     ("missing-divergence-metadata",
