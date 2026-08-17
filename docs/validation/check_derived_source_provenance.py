@@ -364,8 +364,29 @@ def record_shape(record: object, label: str, findings: _Findings) -> dict | None
 # ---------------------------------------------------------------------------
 
 
-def _open_bundle(root: Path, bundle_rel: str, label: str, findings: _Findings, scratch: Path):
-    bundle = (root / bundle_rel).resolve()
+def _open_bundle(
+    root: Path,
+    bundle_rel: str,
+    label: str,
+    findings: _Findings,
+    scratch: Path,
+    tracked: set[str],
+):
+    relative = Path(bundle_rel)
+    if relative.is_absolute() or bundle_rel not in tracked:
+        findings.bad.append(
+            f"{label}: immutable input bundle {bundle_rel!r} must be a tracked "
+            "repository-relative file"
+        )
+        return None
+    bundle = (root / relative).resolve()
+    try:
+        bundle.relative_to(root.resolve())
+    except ValueError:
+        findings.bad.append(
+            f"{label}: immutable input bundle {bundle_rel!r} resolves outside this repository"
+        )
+        return None
     if not bundle.is_file():
         findings.cno.append(
             f"{label}: immutable input bundle {bundle_rel!r} is absent, so the claim "
@@ -411,13 +432,18 @@ def _read_blob(repo: Path, treeish: str, path: str, label: str, findings: _Findi
 
 
 def verify_input(
-    root: Path, document: dict, label: str, findings: _Findings, scratch: Path
+    root: Path,
+    document: dict,
+    label: str,
+    findings: _Findings,
+    scratch: Path,
+    tracked: set[str],
 ) -> bytes | None:
     source = document["input"]
     immutable = source.get("immutable_input")
     if not isinstance(immutable, dict) or not isinstance(immutable.get("path"), str):
         return None
-    view = _open_bundle(root, immutable["path"], label, findings, scratch)
+    view = _open_bundle(root, immutable["path"], label, findings, scratch, tracked)
     if view is None:
         return None
 
@@ -732,6 +758,11 @@ def assess(root: Path, marker_doc_paths: tuple[str, ...] = MARKER_DOC_PATHS) -> 
         parsed_records.append((label, parsed))
         before_shape = len(findings.bad)
         document = record_shape(parsed, label, findings)
+        if isinstance(document, dict) and document.get("record_id") != Path(name).stem:
+            findings.bad.append(
+                f"{label}.record_id: must match filename stem {Path(name).stem!r}, "
+                f"observed {document.get('record_id')!r}"
+            )
         # Byte-level verification reads fields the shape stage just proved present;
         # a structurally broken record is already red and is not probed further.
         if document is not None and len(findings.bad) == before_shape:
@@ -756,7 +787,7 @@ def assess(root: Path, marker_doc_paths: tuple[str, ...] = MARKER_DOC_PATHS) -> 
         universe_set = set(universe)
         for label, document in documents:
             before_bad = len(findings.bad)
-            payload = verify_input(root, document, label, findings, scratch)
+            payload = verify_input(root, document, label, findings, scratch, universe_set)
             if len(findings.bad) == before_bad:
                 document["_input_payload"] = payload
                 verify_destination(root, document, label, findings, universe_set)
@@ -1468,10 +1499,38 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
         honest,
         "unretained immutable input",
         missing_bundle,
-        Verdict.CANNOT_OBSERVE,
-        "cannot be verified against its input",
+        Verdict.FAIL,
+        "must be a tracked repository-relative file",
         errors,
     )
+
+    def external_bundle(record: dict) -> None:
+        record["input"]["immutable_input"]["path"] = str(bundle)
+
+    _expect_red(
+        repo,
+        honest,
+        "external immutable input",
+        external_bundle,
+        Verdict.FAIL,
+        "must be a tracked repository-relative file",
+        errors,
+    )
+
+    mismatched_path = repo / RECORDS_DIR / "wrong-record-name.json"
+    _write(mismatched_path, (json.dumps(honest, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+    git(repo, "add", str(mismatched_path.relative_to(repo)))
+    mismatched = assess(repo)
+    mismatch_findings = mismatched.observed_bad + mismatched.could_not_observe
+    if mismatched.verdict is not Verdict.FAIL:
+        errors.append(
+            "record filename identity: expected FAIL, observed "
+            f"{mismatched.verdict.value} ({mismatch_findings})"
+        )
+    elif not any("must match filename stem" in finding for finding in mismatch_findings):
+        errors.append(f"record filename identity: went FAIL for the wrong reason ({mismatch_findings})")
+    mismatched_path.unlink()
+    git(repo, "add", "--all")
 
     # Precedence: a real violation must not be masked by an incomplete universe.
     mixed = clone_of(honest)
@@ -1479,8 +1538,12 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
     write_record(repo, mixed)
     unverifiable = clone_of(honest)
     unverifiable["record_id"] = "calibration-unverifiable"
-    unverifiable["input"]["immutable_input"]["path"] = "docs/evidence/hd15/absent.bundle"
+    unavailable_bundle = repo / "docs/evidence/hd15/unavailable-input.bundle"
+    unverifiable["input"]["immutable_input"]["path"] = str(unavailable_bundle.relative_to(repo))
     write_record(repo, unverifiable)
+    _write(unavailable_bundle, bundle.read_bytes())
+    git(repo, "add", str(unavailable_bundle.relative_to(repo)))
+    unavailable_bundle.unlink()
     precedence = assess(repo)
     if precedence.verdict is not Verdict.FAIL:
         errors.append(
@@ -1490,6 +1553,7 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
     if not precedence.could_not_observe:
         errors.append("precedence control: the could-not-observe finding was discarded")
     (repo / RECORDS_DIR / "calibration-unverifiable.json").unlink()
+    git(repo, "add", "--all")
     _restore(repo, honest)
 
     # The marker scan is only meaningful while the documents that teach the marker
@@ -1583,7 +1647,10 @@ def main() -> int:
         "watched-red: tampered input content/tree/commit/path/slice, tampered destination and "
         "license bytes, unchanged base blob, non-ancestor base, placeholder custody"
     )
-    print("watched-red: unretained immutable input is CNO; absence is NOT_APPLICABLE, not a pass")
+    print(
+        "watched-red: untracked/external immutable input fails; tracked but unavailable input "
+        "is CNO; absence is NOT_APPLICABLE, not a pass"
+    )
     print("watched-red: a violation alongside an incomplete universe still reports FAIL")
     print("migration: none authorised, none performed; this validator creates no import path")
     return 0
