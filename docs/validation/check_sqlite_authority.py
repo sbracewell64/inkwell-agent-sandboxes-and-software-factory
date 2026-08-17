@@ -27,13 +27,16 @@ import ast
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -1014,6 +1017,143 @@ def exercise_control_errors(temp: Path) -> list[str]:
     return errors
 
 
+def interruption_control_errors(temp: Path) -> tuple[list[str], list[str], list[str]]:
+    errors: list[str] = []
+    absences: list[str] = []
+    notes: list[str] = []
+    if os.environ.get("SSSF_HD13_NO_INTERRUPTION_CONTROL") == "1":
+        return errors, absences, notes
+    if os.name != "posix" or not hasattr(signal, "SIGKILL"):
+        absences.append("sampled SIGKILL interruption control is unavailable on this platform")
+        return errors, absences, notes
+    if not EXERCISE_EVIDENCE.is_file():
+        absences.append("sampled interruption control has no tracked exercise evidence")
+        return errors, absences, notes
+
+    guarded_environment = os.environ.copy()
+    # Child validators must skip this control or each sample would recursively fork.
+    guarded_environment["SSSF_HD13_NO_INTERRUPTION_CONTROL"] = "1"
+    command = [sys.executable, str(Path(__file__).resolve())]
+    started = time.monotonic()
+    try:
+        baseline = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=guarded_environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        absences.append(f"could not spawn the sampled interruption control: {exc}")
+        return errors, absences, notes
+    duration = time.monotonic() - started
+    if baseline.returncode != 0:
+        errors.append(
+            f"interruption-control baseline child exited {baseline.returncode}, expected 0"
+        )
+        return errors, absences, notes
+
+    delays = tuple(max(0.01, duration * fraction) for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
+
+    def sample(script: Path, artifact: Path, delay: float, environment: dict[str, str]) -> tuple[bool, bool]:
+        expected = file_digest(artifact) if artifact.is_file() else None
+        try:
+            child = subprocess.Popen(
+                [sys.executable, str(script)],
+                cwd=ROOT,
+                env=environment,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            time.sleep(delay)
+            killed = child.poll() is None
+            if killed:
+                child.kill()
+            child.wait(timeout=5)
+        except (OSError, subprocess.SubprocessError) as exc:
+            absences.append(f"could not construct a SIGKILL sample: {exc}")
+            return False, False
+        present = file_digest(artifact) if artifact.is_file() else None
+        return killed and child.returncode == -signal.SIGKILL, present == expected
+
+    tracked_digest = file_digest(EXERCISE_EVIDENCE)
+    killed_samples = 0
+    for delay in delays:
+        killed, unchanged = sample(
+            Path(__file__).resolve(), EXERCISE_EVIDENCE, delay, guarded_environment
+        )
+        killed_samples += int(killed)
+        if not unchanged:
+            errors.append(
+                f"SIGKILL at {delay:.3f}s changed the tracked visualizer exercise evidence"
+            )
+    if killed_samples < 3:
+        errors.append(
+            f"sampled interruption control killed only {killed_samples} children; "
+            "the offsets did not span the running validator"
+        )
+    if file_digest(EXERCISE_EVIDENCE) != tracked_digest:
+        errors.append("sampled interruption control changed the tracked exercise evidence")
+
+    defective_script = temp / "defective_check_sqlite_authority.py"
+    stand_in = temp / "tracked-exercise-stand-in.json"
+    original = EXERCISE_EVIDENCE.read_bytes()
+    stand_in.write_bytes(original)
+    source = Path(__file__).read_text(encoding="utf-8")
+    source = source.replace(
+        "ROOT = Path(__file__).resolve().parents[2]",
+        f"ROOT = Path({str(ROOT)!r})",
+        1,
+    )
+    source = source.replace(
+        'record = json.loads(EXERCISE_EVIDENCE.read_bytes())',
+        'record = json.loads(EXERCISE_EVIDENCE.read_bytes())\n    original = EXERCISE_EVIDENCE.read_bytes()',
+        1,
+    )
+    source = source.replace(
+        'control_evidence = temp / "visualizer-read-surface-exercise.json"',
+        'control_evidence = Path(os.environ["SSSF_HD13_CONTROL_EVIDENCE"])',
+        1,
+    )
+    source = source.replace(
+        'control_evidence.write_text(sqlite_authority.canonical_json(altered), encoding="utf-8")',
+        'control_evidence.write_text(sqlite_authority.canonical_json(altered), encoding="utf-8")\n        time.sleep(0.2)',
+        1,
+    )
+    source = source.replace(
+        "    return errors\n\n\ndef documentation_errors",
+        "    control_evidence.write_bytes(original)\n    return errors\n\n\ndef documentation_errors",
+        1,
+    )
+    defective_script.write_text(source, encoding="utf-8")
+    defective_environment = guarded_environment.copy()
+    defective_environment["SSSF_HD13_CONTROL_EVIDENCE"] = str(stand_in)
+    calibration_detected = False
+    for delay in delays:
+        stand_in.write_bytes(original)
+        killed, unchanged = sample(
+            defective_script, stand_in, delay, defective_environment
+        )
+        if killed and not unchanged:
+            calibration_detected = True
+    if not calibration_detected:
+        errors.append(
+            "negative control: sampled SIGKILL never caught the defective validator "
+            "leaving its stand-in evidence synthetic or absent"
+        )
+
+    notes.append(
+        f"sampled SIGKILL at {len(delays)} offsets across a {duration:.3f}s baseline; "
+        f"{killed_samples} live children killed, tracked digest unchanged"
+    )
+    notes.append(
+        "the same harness observed the defective copy corrupting its temporary stand-in: "
+        f"{calibration_detected}"
+    )
+    return errors, absences, notes
+
+
 def documentation_errors() -> list[str]:
     """Governed documents may not restate a claim the code refutes."""
     errors: list[str] = []
@@ -1194,7 +1334,7 @@ def report_controls(temp: Path, fixture: Path) -> None:
     print("visualizer read-surface binding controls:")
     for label, error in (
         ("shipped record accepted", None),
-        *[("rejected", item) for item in exercise_control_errors()],
+        *[("rejected", item) for item in exercise_control_errors(temp)],
     ):
         if error is None:
             bad, absent, notes = exercise_binding_errors()
@@ -1245,6 +1385,7 @@ def main() -> int:
     evidence_digest_before = file_digest(EXERCISE_EVIDENCE) if EXERCISE_EVIDENCE.is_file() else None
     errors: list[str] = []
     binding_notes: list[str] = []
+    interruption_notes: list[str] = []
     with tempfile.TemporaryDirectory(prefix="sssf-hd13-") as raw_temp:
         temp = Path(raw_temp)
         fixture = temp / "fixture.db"
@@ -1267,6 +1408,10 @@ def main() -> int:
         errors.extend(binding_bad)
         errors.extend(f"could-not-observe: {item}" for item in binding_absent)
         errors.extend(exercise_control_errors(temp))
+        interruption_bad, interruption_absent, notes = interruption_control_errors(temp)
+        interruption_notes.extend(notes)
+        errors.extend(interruption_bad)
+        errors.extend(f"could-not-observe: {item}" for item in interruption_absent)
 
         if args.controls:
             report_controls(temp, fixture)
@@ -1288,6 +1433,8 @@ def main() -> int:
     print("missing, zero-byte, unreadable and row-less databases are could-not-observe")
     print("a contradiction alongside an absence stays observed-bad")
     print("governed documents restate no claim the code refutes")
+    for note in interruption_notes:
+        print(note)
     print()
     print("visualizer read surface: this check did NOT execute it -- it is TypeScript.")
     print("It was executed by the recorded Bun exercise below, and these digests prove the")
