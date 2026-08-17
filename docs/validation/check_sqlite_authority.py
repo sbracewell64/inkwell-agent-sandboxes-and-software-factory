@@ -53,7 +53,34 @@ FIXTURE_ADW = "hd13-fixture-adw"
 # from db.ts rather than retyped, so widening it there widens it here too.
 EXPECTED_ARCHIVE_SQL = "UPDATE sessions SET archived = ? WHERE adw_id = ?"
 
-WRITE_VERBS = ("INSERT", "UPDATE", "DELETE", "REPLACE", "DROP", "ALTER", "CREATE")
+WRITE_KEYWORDS = {
+    "ALTER",
+    "ANALYZE",
+    "ATTACH",
+    "CREATE",
+    "DELETE",
+    "DETACH",
+    "DROP",
+    "INSERT",
+    "REINDEX",
+    "REPLACE",
+    "UPDATE",
+    "VACUUM",
+}
+WRITABLE_PRAGMAS = {
+    "APPLICATION_ID",
+    "AUTO_VACUUM",
+    "INCREMENTAL_VACUUM",
+    "JOURNAL_MODE",
+    "LEGACY_FILE_FORMAT",
+    "MAX_PAGE_COUNT",
+    "OPTIMIZE",
+    "SCHEMA_VERSION",
+    "SECURE_DELETE",
+    "USER_VERSION",
+    "WAL_CHECKPOINT",
+}
+ACTION_PRAGMAS = {"INCREMENTAL_VACUUM", "OPTIMIZE", "WAL_CHECKPOINT"}
 
 # The superseded sentences exactly as they stood before this increment. The
 # documentation control is calibrated against the text that actually shipped,
@@ -136,16 +163,67 @@ def tracer_schema(path: Path) -> dict[str, list[str]]:
     return observed
 
 
+def javascript_string_literals(text: str) -> list[str]:
+    literals: list[str] = []
+    index = 0
+    while index < len(text):
+        if text.startswith("//", index):
+            newline = text.find("\n", index + 2)
+            index = len(text) if newline < 0 else newline + 1
+            continue
+        if text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            index = len(text) if end < 0 else end + 2
+            continue
+        quote = text[index]
+        if quote not in "'\"`":
+            index += 1
+            continue
+        index += 1
+        value: list[str] = []
+        while index < len(text):
+            char = text[index]
+            if char == "\\" and index + 1 < len(text):
+                escaped = text[index + 1]
+                value.append({"n": "\n", "r": "\r", "t": "\t"}.get(escaped, escaped))
+                index += 2
+                continue
+            if char == quote:
+                index += 1
+                break
+            value.append(char)
+            index += 1
+        literals.append("".join(value))
+    return literals
+
+
+def sql_tokens(statement: str) -> list[str]:
+    scrubbed = re.sub(r"/\*.*?\*/|--[^\n]*", " ", statement, flags=re.DOTALL)
+    scrubbed = re.sub(r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"", " ", scrubbed)
+    return re.findall(r"[A-Za-z_][A-Za-z_0-9]*|[=()]", scrubbed.upper())
+
+
+def is_sql_write(statement: str) -> bool:
+    tokens = sql_tokens(statement)
+    if not tokens:
+        return False
+    if any(token in WRITE_KEYWORDS for token in tokens):
+        return True
+    if tokens[0] != "PRAGMA" or len(tokens) < 2:
+        return False
+    pragma = tokens[1]
+    return pragma in ACTION_PRAGMAS or (
+        pragma in WRITABLE_PRAGMAS and ("=" in tokens or "(" in tokens)
+    )
+
+
 def archive_statements(text: str) -> list[str]:
     """Every SQL string literal in the visualizer reader that writes."""
-    literals = re.findall(r'"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)*)`', text, flags=re.DOTALL)
-    found = []
-    for double, backtick in literals:
-        literal = double or backtick
-        stripped = literal.strip()
-        if any(stripped.upper().startswith(verb) for verb in WRITE_VERBS):
-            found.append(" ".join(stripped.split()))
-    return found
+    return [
+        " ".join(literal.strip().split())
+        for literal in javascript_string_literals(text)
+        if is_sql_write(literal)
+    ]
 
 
 # ── fixtures ─────────────────────────────────────────────────────────────────
@@ -615,14 +693,24 @@ def triage_errors(fixture: Path) -> list[str]:
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
     conn.close()
 
-    # Negative control: a second write statement in the reader must go red.
-    tampered = VISUALIZER_DB_SOURCE.read_text(encoding="utf-8").replace(
-        f'"{EXPECTED_ARCHIVE_SQL}"',
-        f'"{EXPECTED_ARCHIVE_SQL}"; this.writer.query("DELETE FROM events WHERE adw_id = ?")',
-        1,
-    )
-    if len(archive_statements(tampered)) < 2:
-        errors.append("negative control: a second visualizer write statement was not detected")
+    # Negative controls: each supported spelling of a second write must go red.
+    reader = VISUALIZER_DB_SOURCE.read_text(encoding="utf-8")
+    controls = {
+        "single-quoted write": "this.writer.query('DELETE FROM events WHERE adw_id = ?')",
+        "writable pragma": "this.writer.query(`PRAGMA user_version = 13`)",
+        "WITH-prefixed write": (
+            'this.writer.query("WITH doomed AS (SELECT event_id FROM events) '
+            'DELETE FROM events WHERE event_id IN (SELECT event_id FROM doomed)")'
+        ),
+    }
+    for label, injected in controls.items():
+        tampered = reader.replace(
+            f'"{EXPECTED_ARCHIVE_SQL}"',
+            f'"{EXPECTED_ARCHIVE_SQL}"; {injected}',
+            1,
+        )
+        if len(archive_statements(tampered)) < 2:
+            errors.append(f"negative control: the {label} was not detected")
     return errors
 
 
