@@ -78,6 +78,21 @@ a nonempty `harness_engineering` agent, then drives each one through the real
 configured extension is forwarded as `-e`. It exists because a strict-adapter
 rewrite once rejected those extensions and the rest of the gate did not notice.
 
+`docs/validation/check_derived_source_provenance.py` is the preventive gate for
+any future assessment-derived source. It reports two results that must never be
+collapsed: the exit code carries the CONTRACT state, and a separate printed line
+carries a four-valued POPULATION verdict with precedence
+`FAIL > CANNOT_OBSERVE > NOT_APPLICABLE > PASS`. Its calibration builds a
+throwaway assessment input from pinned Git object identities, bundles it, and
+drives a throwaway destination through three states so the empty, unrecorded,
+and honest cases are each reachable. Those fixtures are calibration-only and are
+not an import path.
+
+Read a green result here precisely. It means the gate is installed and
+red-capable. It does not mean any derived source is certified, because no
+derived source exists; the population is `NOT_APPLICABLE`, which is a
+could-not-observe result. See `docs/reference/DERIVED_SOURCE_PROVENANCE.md`.
+
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and
 sandbox source invariants that do not need the network remain enumerated.

@@ -29,6 +29,7 @@ Read in this order:
 6. [`reference/COMMANDS.md`](reference/COMMANDS.md) — command surface.
 7. [`reference/GLOSSARY.md`](reference/GLOSSARY.md) — canonical terms.
 8. [`reference/EVIDENCE_MANIFEST.md`](reference/EVIDENCE_MANIFEST.md) — offline run-bound evidence manifest v1 (not runtime acceptance).
+9. [`reference/DERIVED_SOURCE_PROVENANCE.md`](reference/DERIVED_SOURCE_PROVENANCE.md) — preventive exact-provenance contract for any future derived source (no migration is authorised).
 
 ## Documentation authority
 

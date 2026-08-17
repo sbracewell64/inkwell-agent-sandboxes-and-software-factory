@@ -1,0 +1,68 @@
+HD-15 derived-source provenance: negative controls watched red before any green
+source_head: bee9296a4c94b1dc3da6991acd1755a91fa681eb
+shipped_program: docs/validation/check_derived_source_provenance.py
+shipped_program_sha256: 694669849151046829ae98803616eccf9583592ee6b317ac1ac24113202f6418
+
+Each control below runs the SHIPPED calibration harness against a deliberately
+defective copy of the validator. A control that cannot be watched failing is
+not a control, so every defective variant is content-addressed and its exact
+observed output is retained here.
+
+command: python3 -c "import dN; dN.calibration_errors()"
+
+--- DEFECT-1: exact-identity matching weakened to "any non-empty string" ---
+defect_sha256: 1e46621edc771797312928ac30a6aaae4080451740eafa0f0f35f9aae102ea1b
+mutation: `_require_hex` accepts any non-empty string instead of matching the
+          40/64 lowercase-hex pattern.
+expected: the branch and tag controls stop being red, because a name would then
+          be accepted as identity.
+observed_output:
+branch name as identity: expected FAIL, observed PASS (())
+tag name as identity: expected FAIL, observed PASS (())
+classification: observed-bad (control watched red)
+note: the calibration input repository carries branch
+      `assessment/hardening-source` and tag `assessment-v1` pointing at the
+      correct commit. This variant PASSED with those names, which proves the
+      names genuinely resolve and that the shipped refusal is about identity,
+      not about a failed lookup. Discovery is not identity.
+
+--- DEFECT-2: recorded hashes substituted for recomputed ones ---
+defect_sha256: aa1db9e23b85f34c9cc8c6e8f43a4991a19e1e4d05d565e54af0dafd649a6b0a
+mutation: `verify_input` compares the claim to itself instead of hashing the
+          input bytes; the destination hash comparison is disabled.
+expected: tamper controls stop being red, and the precedence control degrades.
+observed_output:
+input content hash not verified against bytes: expected FAIL, observed PASS (())
+destination hash not verified against bytes: went FAIL for the wrong reason (("docs/provenance/derived_source/calibration-derived-gate.json.transformed_files[0]: the working-tree copy of 'apps/example/derived_gate.py' differs from the recorded destination head, so the record no longer describes the shipped bytes",))
+precedence control: a violation alongside an incomplete universe reported CANNOT_OBSERVE instead of FAIL
+classification: observed-bad (control watched red)
+note: this is the "a field nothing verifies is prose with punctuation" control.
+      It also demonstrates the precedence law: with the real violation no longer
+      detected, an incomplete universe masked it as CANNOT_OBSERVE.
+
+--- DEFECT-3: extent arithmetic removed ---
+defect_sha256: 4a7d1baaf4fba3be293a584f633ebfbb8efbb88c6be0e5ab6585bc133541c5ce
+mutation: the derived-versus-input extent comparison and the input-range bound
+          against the proven input are both disabled.
+expected: a claim wider than its proof becomes acceptable.
+observed_output:
+derived range exceeds input proof: expected FAIL, observed PASS (())
+input range beyond the proven input: expected FAIL, observed PASS (())
+classification: observed-bad (control watched red)
+
+--- DEFECT-4: absence rounded into a pass ---
+defect_sha256: 127c8e1267dcc5cf68e9a310bbcce260f508e096e60e2d11e90f598aa34e3c82
+mutation: an empty record set yields Verdict.PASS instead of NOT_APPLICABLE.
+expected: the absence control goes red.
+observed_output:
+absence control: expected NOT_APPLICABLE, observed PASS (())
+absence control: absence was rendered as a pass
+classification: observed-bad (control watched red)
+note: this is the "absence is not a pass" law expressed as an executable
+      control. Zero findings is cleanliness only within a stated universe.
+
+--- SHIPPED PROGRAM ---
+observed_output:
+calibration findings: 0
+classification: observed-good, and non-vacuous because all four defect classes
+                above were watched red first.

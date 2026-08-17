@@ -29,6 +29,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | HD-02 | PASS | Static synchronization for installed/template/generated ADWs | nonempty static inventory, generated import-only smoke, and sixteen watched-red mutations passed without provider execution |
 | HD-03 | PASS | Nonvacuous three-valued gate outcomes | 15 focused controls prove PASS/FAIL/CNO, fail-closed migration, trace provenance, and non-green CNO rendering |
 | HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
+| HD-15 | PASS (CONTRACT) — POPULATION NOT APPLICABLE / CNO | Preventive exact-provenance contract for any future derived source | Contract and sole enforcer installed and proven red-capable by 27 controls, 24 of them refusals, calibrated against four content-addressed defective variants; the derived-source population is NOT_APPLICABLE because 398 tracked files were enumerated and none is derived, so nothing is certified clean; no migration authorised, none performed, no import path created |
 
 ## Future increments
 

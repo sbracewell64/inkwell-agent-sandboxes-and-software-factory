@@ -27,6 +27,13 @@ Never hand-edit session evidence.
 - `docs/validation/check_evidence_manifest.py` — positive and watched-red controls
 - `docs/validation/fixtures/evidence_manifest/` — canonical offline fixtures
 
+## Derived-source provenance contract
+
+- `docs/reference/DERIVED_SOURCE_PROVENANCE.md` — contract, template, and the two standing laws
+- `docs/validation/check_derived_source_provenance.py` — sole enforcer and its watched-red controls
+- `docs/provenance/derived_source/` — record registry; empty, and emptiness is not a certification
+- `docs/evidence/hd15/` — retained negative controls and the observed population
+
 ## Sandbox orchestration
 
 - `just/sandbox/`
