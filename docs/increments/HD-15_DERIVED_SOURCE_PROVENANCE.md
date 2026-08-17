@@ -185,12 +185,12 @@ Not required. Every claim above is decided by executable code.
 Six independent negative controls were run against deliberately defective
 copies of the validator, and each was watched red before the real check was
 trusted: weakening exact-identity matching accepted the branch and tag names;
-substituting recorded hashes for recomputed ones accepted a tampered input and
-broke the precedence control; removing the extent arithmetic accepted a claim
-exceeding its input proof; rounding the empty universe to `PASS` was caught by
-the absence control; removing partition enforcement accepted uncovered and
-contradictory declarations; and removing the global per-path reconciliation
-accepted cross-record contradiction, ambiguous derivation, and a combined gap.
+substituting recorded hashes for recomputed ones accepted tampered input and
+destination content; removing the extent arithmetic accepted a claim exceeding
+its input proof; rounding the empty universe to `PASS` was caught by the absence
+control; removing partition enforcement accepted uncovered and contradictory
+declarations; and removing the global per-path reconciliation accepted
+cross-record contradiction, ambiguous derivation, and a combined gap.
 Full output is retained in
 `docs/evidence/hd15/watched-red-control-matrix.txt`.
 
