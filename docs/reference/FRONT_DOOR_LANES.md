@@ -25,7 +25,7 @@ Only the ADW lane, and only when the workflow it ran executed a deterministic te
 - An ADW record cannot claim provenance over work it did not perform. Steering turns taken before, during, or after the run leave nothing in its trace, so its ADW ID does not vouch for them.
 - An ADW record cannot claim that a commit on the branch is its own output merely because the two are adjacent in history.
 
-**May claim ADW acceptance:** yes  
+**May claim ADW acceptance:** yes
 **May claim SSSF workflow success:** yes
 
 The ADW lane's entitlement is a ceiling, not a grant. An individual ADW front door may claim SSSF workflow success only when the workflow it runs executes a deterministic test or quality block; the table below records that per front door.
@@ -40,7 +40,7 @@ The ADW lane's entitlement is a ceiling, not a grant. An individual ADW front do
 - A lifecycle command cannot claim SSSF workflow success. A zero exit says the command did what it was asked; it says nothing about whether any workflow was accepted.
 - A lifecycle command that launches a workflow elsewhere cannot claim that workflow's outcome. It holds a process identifier, not a result, and the workflow's own trace is the only record of what happened.
 
-**May claim ADW acceptance:** **no**  
+**May claim ADW acceptance:** **no**
 **May claim SSSF workflow success:** **no**
 
 ### `steering`
@@ -54,7 +54,7 @@ The ADW lane's entitlement is a ceiling, not a grant. An individual ADW front do
 - A steering turn cannot claim SSSF workflow success, and a later reader cannot infer one from the commit it produced or from the terminal output it printed.
 - A steering turn cannot be cited under the trace and acceptance guarantees of the ADW lane. Those guarantees never wrapped its work, and citing them over it is the exact defect this taxonomy exists to prevent.
 
-**May claim ADW acceptance:** **no**  
+**May claim ADW acceptance:** **no**
 **May claim SSSF workflow success:** **no**
 
 ## Exceptions
@@ -77,7 +77,7 @@ An exception is narrow: it names a bounded set of front doors, states what that 
 - A direct Claude steering turn cannot claim SSSF workflow success for source it edited or committed. The smallest counterfactual is `just sbx run agent`: it can edit and commit, and no ADW ID, typed envelope, permission fact, gate, usage record, or `run.finish()` exists for that turn.
 - A direct Claude steering turn cannot claim that Claude ran as an ADW coding agent. `adws/adw_modules/agent_cc.py` raises NotImplementedError for `coding_agent claude_code` in v1, so Claude work in this repository is steering-lane work by construction.
 
-**May claim ADW acceptance:** **no**  
+**May claim ADW acceptance:** **no**
 **May claim SSSF workflow success:** **no**
 
 **Front doors under this exception:** `just local cc`, `just sbx orch cc`, `just sbx run agent`.
@@ -97,7 +97,7 @@ An exception is narrow: it names a bounded set of front doors, states what that 
 - A direct Pi steering turn cannot claim SSSF workflow success for source it edited or committed.
 - A direct Pi steering turn cannot claim the process accounting the ADW lane gives a Pi turn. No processes row is written, so just obs procs cannot find it and just obs kill cannot stop it.
 
-**May claim ADW acceptance:** **no**  
+**May claim ADW acceptance:** **no**
 **May claim SSSF workflow success:** **no**
 
 **Front doors under this exception:** `just local ipi`, `just local pi`, `just sbx orch pi`.
@@ -117,7 +117,7 @@ An exception is narrow: it names a bounded set of front doors, states what that 
 - A host-orchestrator turn cannot claim an ADW ID, a phase, a gate, or acceptance for anything it decided or changed on the host.
 - A host-orchestrator turn cannot claim SSSF workflow success on behalf of a sandbox it mounted. The guest run's own trace is the only record of that, and it has to be read on the guest.
 
-**May claim ADW acceptance:** **no**  
+**May claim ADW acceptance:** **no**
 **May claim SSSF workflow success:** **no**
 
 **Front doors under this exception:** `just sbx orch cc`, `just sbx orch pi`.
@@ -137,7 +137,7 @@ An exception is narrow: it names a bounded set of front doors, states what that 
 - An ADW record cannot claim per-descendant tool, model, permission, or usage provenance. Usage is accounted per Pi turn, not per process that turn started.
 - An ADW record cannot claim that bounded subprocess supervision covered the run. The production launch path is `agent_pi.run`, and the supervised adapter in `adws/adw_modules/pi_json_adapter.py` is not imported by `adws/adw_modules/agents.py`.
 
-**May claim ADW acceptance:** yes  
+**May claim ADW acceptance:** yes
 **May claim SSSF workflow success:** yes
 
 Those two entitlements are the ADW lane's, inherited unchanged and still capped by the front door's own deterministic acceptance. What this exception removes is narrower and stated above: the record covers the Pi turn, not what the Pi turn started.

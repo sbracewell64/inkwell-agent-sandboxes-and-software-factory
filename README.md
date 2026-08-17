@@ -102,10 +102,14 @@ Three command tiers, and each one commands only the tier inside it:
 
 Work crosses the boundary on one of two paths, and the difference is who pulls the trigger inside:
 
-| Path | Verb | Mechanism |
-| --- | --- | --- |
-| **Direct** | a command | `just sbx lifecycle execute` detaches the factory process itself: reproducible, pid-tracked, zero orchestration tokens |
-| **Agent-mediated** | a delegation | `just sbx run agent` briefs the in-sandbox orchestrator, and *it* launches the factory: judgment at the kickoff, conversational, resumable |
+| Path | Lane | Verb | Mechanism |
+| --- | --- | --- | --- |
+| **Direct** | lifecycle | a command | `just sbx lifecycle execute` detaches the factory process itself: reproducible, pid-tracked, zero orchestration tokens |
+| **Agent-mediated** | steering | a delegation | `just sbx run agent` briefs the in-sandbox orchestrator, and *it* launches the factory: judgment at the kickoff, conversational, resumable |
+
+The steering path is intentionally outside the ADW trace. Its lifecycle run ID and Claude session UUID
+do not establish ADW acceptance or SSSF workflow success; see the authoritative
+[front-door lane and exception contracts](docs/reference/FRONT_DOOR_LANES.md).
 
 Every delegation opens with the equip line, so the in-box agent routes instead of improvising:
 
@@ -188,8 +192,8 @@ just sbx manage doctor            # must end with: sbx doctor: OK
 just sbx mount my-feature         # prints the resolved run id and two URLs
 
 # 2. put work in (pick one path)
-just sbx lifecycle execute <run-id> "add a word-count badge to the editor footer"   # direct, detached
-just sbx run agent       <run-id> "READ and EXECUTE .claude/skills/sssf/SKILL.md. Then: <work>"  # delegated
+just sbx lifecycle execute <run-id> "add a word-count badge to the editor footer"   # lifecycle: direct, detached
+just sbx run agent       <run-id> "READ and EXECUTE .claude/skills/sssf/SKILL.md. Then: <work>"  # steering: delegated, not ADW acceptance
 
 # 3. watch from outside
 just sbx manage list              # every run: state, VM alive, spend

@@ -43,7 +43,7 @@ Mount intentionally stops after observe.
 just sbx manage list
 ```
 
-## Direct work path
+## Direct work path (`lifecycle` lane)
 
 ```bat
 just sbx lifecycle execute <run-id> "<prompt>"
@@ -51,13 +51,15 @@ just sbx lifecycle execute <run-id> "<prompt>"
 
 This starts an ADW deterministically, normally detached.
 
-## Agent-mediated path
+## Agent-mediated path (`steering` lane)
 
 ```bat
 just sbx run agent <run-id> "READ and EXECUTE .claude/skills/sssf/SKILL.md. Then: <work>"
 ```
 
-Use when kickoff judgment is needed.
+Use when kickoff judgment is needed. This deliberately runs outside the ADW trace and cannot claim
+ADW acceptance or SSSF workflow success; the authoritative limits are in
+[`FRONT_DOOR_LANES.md`](../reference/FRONT_DOOR_LANES.md).
 
 ## Inspect the sandbox
 
