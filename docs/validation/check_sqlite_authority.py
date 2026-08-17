@@ -1041,12 +1041,23 @@ def interruption_control_errors(temp: Path) -> tuple[list[str], list[str], list[
     notes: list[str] = []
     if os.environ.get("SSSF_HD13_NO_INTERRUPTION_CONTROL") == "1":
         return errors, absences, notes
-    if os.name != "posix" or not hasattr(signal, "SIGKILL"):
-        absences.append("sampled SIGKILL interruption control is unavailable on this platform")
-        return errors, absences, notes
     if not EXERCISE_EVIDENCE.is_file():
         absences.append("sampled interruption control has no tracked exercise evidence")
         return errors, absences, notes
+
+    def was_force_terminated(child: subprocess.Popen[bytes], running: bool) -> bool:
+        """Recognize Popen.kill() on both POSIX and Windows.
+
+        POSIX reports the terminating signal as a negative return code. Windows
+        TerminateProcess reports a nonzero process exit code instead, so the
+        portable property is that a child observed running before kill did not
+        subsequently exit successfully.
+        """
+        if not running or child.returncode is None:
+            return False
+        if os.name == "posix" and hasattr(signal, "SIGKILL"):
+            return child.returncode == -signal.SIGKILL
+        return child.returncode != 0
 
     guarded_environment = os.environ.copy()
     # Child validators must skip this control or each sample would recursively fork.
@@ -1090,10 +1101,10 @@ def interruption_control_errors(temp: Path) -> tuple[list[str], list[str], list[
                 child.kill()
             child.wait(timeout=5)
         except (OSError, subprocess.SubprocessError) as exc:
-            absences.append(f"could not construct a SIGKILL sample: {exc}")
+            absences.append(f"could not construct a forced-termination sample: {exc}")
             return False, False
         present = file_digest(artifact) if artifact.is_file() else None
-        return killed and child.returncode == -signal.SIGKILL, present == expected
+        return was_force_terminated(child, killed), present == expected
 
     tracked_digest = file_digest(EXERCISE_EVIDENCE)
     killed_samples = 0
@@ -1104,7 +1115,8 @@ def interruption_control_errors(temp: Path) -> tuple[list[str], list[str], list[
         killed_samples += int(killed)
         if not unchanged:
             errors.append(
-                f"SIGKILL at {delay:.3f}s changed the tracked visualizer exercise evidence"
+                f"forced termination at {delay:.3f}s changed the tracked visualizer "
+                "exercise evidence"
             )
     if killed_samples < 3:
         errors.append(
@@ -1162,22 +1174,22 @@ def interruption_control_errors(temp: Path) -> tuple[list[str], list[str], list[
             if file_digest(stand_in) != file_digest(EXERCISE_EVIDENCE):
                 child.kill()
                 child.wait(timeout=5)
-                calibration_detected = child.returncode == -signal.SIGKILL
+                calibration_detected = was_force_terminated(child, True)
                 break
             time.sleep(0.005)
         if child.poll() is None:
             child.kill()
             child.wait(timeout=5)
     except (OSError, subprocess.SubprocessError) as exc:
-        absences.append(f"could not construct the defective SIGKILL control: {exc}")
+        absences.append(f"could not construct the defective interruption control: {exc}")
     if not calibration_detected:
         errors.append(
-            "negative control: SIGKILL never caught the defective validator "
+            "negative control: forced termination never caught the defective validator "
             "leaving its stand-in evidence synthetic or absent"
         )
 
     notes.append(
-        f"sampled SIGKILL at {len(delays)} offsets across a {duration:.3f}s baseline; "
+        f"sampled forced termination at {len(delays)} offsets across a {duration:.3f}s baseline; "
         f"{killed_samples} live children killed, tracked digest unchanged"
     )
     notes.append(
