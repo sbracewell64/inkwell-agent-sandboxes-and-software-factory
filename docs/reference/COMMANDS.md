@@ -91,6 +91,26 @@ python3 docs/validation/check_evidence_manifest.py
 
 Manifest v1 validation is offline evidence checking only. It does not authorize runtime acceptance; HD-09 owns that integration.
 
+## Record authority
+
+```text
+python3 tools/sqlite_authority.py matrix
+python3 tools/sqlite_authority.py render
+python3 tools/sqlite_authority.py observe --db adws/adw_data/sssf.db
+python3 docs/validation/check_sqlite_authority.py
+python3 docs/validation/check_sqlite_authority.py --controls
+python3 docs/validation/check_sqlite_authority.py --exercise-visualizer [--bun <path>]
+```
+
+`observe` is three-valued: exit `0` observed-good, `1` observed-bad, `2` could-not-observe. A
+missing or empty database is could-not-observe, never an empty pass. `--controls` prints what each
+negative control observed, so a green result can be audited rather than trusted.
+
+`--exercise-visualizer` is the only invocation that needs Bun. It executes the visualizer's real
+read surface against a fixture and records the digests of the TypeScript it ran. The CI-registered
+invocation stays stdlib-only and fails when those sources change without a re-run, so the recorded
+exercise cannot decay into a claim about bytes that have moved.
+
 ## Identity warning
 
 `run-id` and `adw-id` are different.

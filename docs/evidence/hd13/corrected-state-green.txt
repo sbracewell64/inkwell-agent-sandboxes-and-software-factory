@@ -1,0 +1,68 @@
+HD-13 green capture -- the honest corrected state
+
+documents:   corrected by this increment
+validator:   identical to the one used for documentation-claims-red.txt; only the
+             documents differ between the two runs.
+command:     python3 docs/validation/check_sqlite_authority.py --controls
+expectation: PASS, with every negative control still demonstrably detectable, so the
+             green is not vacuous.
+
+## negative controls (each of these MUST be detectable)
+
+real mutation, digest before: d15644fcd87577427648b85e4a1fc4859741b58e3e3676c4013eb9a0cd4eba0a
+real mutation, digest after:  90ee0dceec6f5fe537f40167f0f196d79f87e8a920bd5ab421e1f15d42f1d325
+digest detected the mutation: True
+logical dump detected it:     True
+
+widened archive statement: UPDATE sessions SET archived = ?, status = 'triaged' WHERE adw_id = ?
+cells moved outside sessions.archived: [('sessions', '1', 'status')]
+
+write statements in the shipped reader: ['UPDATE sessions SET archived = ? WHERE adw_id = ?']
+write statements in a tampered reader:  ['UPDATE sessions SET archived = ? WHERE adw_id = ?', 'DELETE FROM events WHERE adw_id = ?']
+
+observe            populated fixture: observed-good      []
+observe                      missing: could-not-observe  ['DATABASE_ABSENT']
+observe                    zero-byte: could-not-observe  ['DATABASE_EMPTY']
+observe                  schema-only: could-not-observe  ['NO_CANONICAL_ROWS']
+observe                   unreadable: could-not-observe  ['DATABASE_UNREADABLE']
+observe   unowned column + zero rows: observed-bad       ['NO_CANONICAL_ROWS', 'UNDECLARED_FIELD']
+
+defective read helper (mode=ro and query_only removed):
+  guards present in the shipped helper: True
+  control observed a mutation: True
+
+visualizer read-surface binding controls:
+  binding holds for the present bytes: True
+    57624bd6e7738b14e0e425f0cc7871f4ee0dd976538757a22fc53df4679a08fd  .claude/skills/sssf/apps/visualizer/server/db.ts
+    06921688aa5bf1fc688c8dc23eebe2c98366fd8b664f69060d7b8fd583022696  .claude/skills/sssf/apps/visualizer/server/index.ts
+    bun 1.3.14 ran docs/validation/exercise_visualizer_read_surface.ts at 2026-08-17T07:13:32Z
+  drifted source / mutating record / changed fixture / no attempt /
+  incomplete method list / absent record: each detected (see errors above if not)
+
+shipped-sentence documentation controls:
+  rejected=True queryable-mirror               '**Files are the raw record** (`raw_output.jsonl` streams, `envel'
+  rejected=True loses-nothing                  '**Files are the raw record; the db is the queryable mirror.** Lo'
+  rejected=True queryable-mirror               '`agent_sessions` in `sssf.db` is the queryable mirror of this fi'
+  rejected=True queryable-mirror               'agent_sessions ( -- the queryable mirror of agent_map.json'
+  rejected=True rebuildable-from-files         "Losing the db loses nothing that can't be rebuilt from files."
+  rejected=True rebuildable-from-files         "Losing `sssf.db` loses nothing that can't be rebuilt from `raw_o"
+  rejected=True completed-sqlite-cli-proposal  'A later increment should either: 1. install a supported SQLite C'
+
+HD-13 SQLite field authority: PASS
+158 fields carry exactly one authority and mutation owner
+read-only surfaces left the fixture byte-identical and refused a write
+the archive statement moved sessions.archived and nothing else
+missing, zero-byte, unreadable and row-less databases are could-not-observe
+a contradiction alongside an absence stays observed-bad
+governed documents restate no claim the code refutes
+
+visualizer read surface: this check did NOT execute it -- it is TypeScript.
+It was executed by the recorded Bun exercise below, and these digests prove the
+bytes present now are the bytes that were executed. This check alone is not
+proof that the read surface was exercised; the recorded exercise is.
+  57624bd6e7738b14e0e425f0cc7871f4ee0dd976538757a22fc53df4679a08fd  .claude/skills/sssf/apps/visualizer/server/db.ts
+  06921688aa5bf1fc688c8dc23eebe2c98366fd8b664f69060d7b8fd583022696  .claude/skills/sssf/apps/visualizer/server/index.ts
+  bun 1.3.14 ran docs/validation/exercise_visualizer_read_surface.ts at 2026-08-17T07:13:32Z
+  record: docs/evidence/hd13/visualizer-read-surface-exercise.json
+
+exit: 0

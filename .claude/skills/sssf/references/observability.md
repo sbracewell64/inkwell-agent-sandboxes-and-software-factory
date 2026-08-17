@@ -2,9 +2,14 @@
 
 The event schema, the seven SQLite tables, and the polling contract — the one data path is **agents → sqlite → web ui**.
 
-## Two stores, one truth
+## Two stores, one authority
 
-**Files are the raw record** (`raw_output.jsonl` streams, `envelope.json`, `agent_map.json`); **SQLite (`sssf.db`) is the queryable mirror** the UI reads. `tracer.py` writes both. Losing the db loses nothing that can't be rebuilt from files.
+**Files are raw sources** (`raw_output.jsonl` streams, `envelope.json`, `agent_map.json`); **SQLite (`sssf.db`) is canonical run state** — not a derived copy of them, and not reconstructible from them.
+
+`tracer.py` appends every **event** to both `events.jsonl` and SQLite. Nothing else is dual-written: session, phase, process, gate, invalid-envelope, usage and agent-session rows are SQLite-only, or only partially represented by overwrite-style files. `envelope.json` is written only for a **valid** envelope and is overwritten, so a rejected attempt exists only in `envelopes`. `agent_map.json` carries resume identity only. `processes` has no file counterpart at all — delete the db and a hung run's pid is gone.
+
+Every table and field has exactly one authority and one mutation owner. The matrix is
+`docs/reference/SQLITE_AUTHORITY.md` in the SSSF repo, owned executably by `tools/sqlite_authority.py`. Read it before deleting, rebuilding, relocating or archiving a trace db.
 
 Location comes from `observability.db` in `sssf.config.yaml`, default `adws/adw_data/sssf.db` — inside the **target** repo, gitignored.
 
@@ -55,11 +60,13 @@ The gate event payload carries `attempt` too, so the table and event stream reta
 ```sql
 sessions (
   adw_id        TEXT PRIMARY KEY,
+  adw_name      TEXT,              -- ADW script(s) run, e.g. "adw_plan + adw_build_test"
   request       TEXT,              -- the engineer's ask
   status        TEXT,              -- running | success | fail
   engineer      TEXT,
   started_at    TEXT, ended_at TEXT,
-  total_tokens  INTEGER, total_cost REAL
+  total_tokens  INTEGER, total_cost REAL,
+  archived      INTEGER DEFAULT 0  -- review triage, set by the UI; never by a run
 );
 
 phases (
@@ -125,7 +132,7 @@ processes (                        -- adw_id → pid, so a stuck run can be stop
   started_at    TEXT, ended_at TEXT -- ended_at NULL = believed alive
 );
 
-agent_sessions (                   -- the queryable mirror of agent_map.json
+agent_sessions (                   -- canonical; agent_map.json carries only session_id/model/coding_agent
   adw_id        TEXT REFERENCES sessions,
   agent         TEXT,
   coding_agent  TEXT, model TEXT, color TEXT,   -- color: the config's lane swatch
@@ -153,7 +160,9 @@ PRAGMA synchronous=NORMAL;
 PRAGMA busy_timeout=5000;
 ```
 
-WAL allows readers during writes. Writers are the tracers of running ADW processes; concurrent writers are fine given one small transaction per event plus `busy_timeout`. The visualizer reads on a readonly connection with exactly one exception: archiving a session (`POST /api/sessions/:adw_id/archive`) opens a second connection to set `sessions.archived`. That flag is review triage — it says a human has looked at the run — so it is the reader's state living on the row, and no tracer ever writes or reads it.
+WAL allows readers during writes. Writers are the tracers of running ADW processes; concurrent writers are fine given one small transaction per event plus `busy_timeout`. The visualizer reads on a readonly connection with exactly one exception: archiving a session (`POST /api/sessions/:adw_id/archive`) opens a second connection to set `sessions.archived`. That flag is review triage — it says a human has looked at the run — so it is the reader's state living on the row, and no tracer ever writes or reads it. Archiving touches exactly that one column: it never changes terminal acceptance, phase or gate outcome, or any evidence hash.
+
+**A missing or empty db is could-not-observe**, not an empty result and not a pass. `python3 tools/sqlite_authority.py observe --db <path>` returns the three-valued answer (exit `0` observed-good, `1` observed-bad, `2` CNO); observed-bad outranks CNO, which outranks observed-good, so an unreadable db never masks a violation it would otherwise have revealed.
 
 ## Polling contract
 

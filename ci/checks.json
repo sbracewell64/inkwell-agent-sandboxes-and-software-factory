@@ -32,6 +32,11 @@
       "timeout_seconds": 60
     },
     {
+      "id": "sqlite-field-authority-validator",
+      "command": ["{python}", "docs/validation/check_sqlite_authority.py"],
+      "timeout_seconds": 60
+    },
+    {
       "id": "production-extension-path-validator",
       "command": ["{python}", "docs/validation/check_production_extension_path.py"],
       "timeout_seconds": 60

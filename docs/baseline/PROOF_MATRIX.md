@@ -117,6 +117,21 @@
 | HD-08 identity and integrity refusal | wrong identities, failed unrelated item, tamper, duplicate/reorder, descriptor-relative traversal/symlink races, final/root symlinks, identity change, unsupported host, and malformed schema controls observed red/CNO as specified | PASS |
 | HD-08 intermediate-component stat-to-open race | component swapped for an outside-root symlink between its no-follow stat and its descriptor-relative open; shipped implementation refused non-PASS with empty checked inventory and no outside-root bytes read, calibrated watched-red against a content-addressed defective variant with both intermediate protections removed | PASS |
 | HD-08 runtime acceptance integration | intentionally deferred to HD-09 | NOT PROVEN |
+| HD-13 field-level record authority | 158 fields across raw transport, canonical run state, query projection, triage state, archived evidence copy and lifecycle run record each carry exactly one authority and one mutation owner | PASS |
+| HD-13 matrix reconciles with the owners' own bytes | SQLite tables/columns read from the tracer's own `SCHEMA`/`MIGRATIONS`, run-record fields from `run_record.py` `FIELDS`, manifest fields from `evidence_manifest.py`, and projected columns from the executed `obs_query` cursors | PASS |
+| HD-13 read-only surfaces cannot mutate | every `obs_query` surface ran against a fixture built from the real DDL; whole-file SHA-256 and full cell dump both unchanged; a real `UPDATE` through the shipped `connect_read_only()` helper raised and left both unchanged | PASS — WATCHED RED |
+| HD-13 only the archive route changes triage state | the archive `UPDATE` extracted from the visualizer's own bytes moved `sessions.archived` and no other cell of any table; a widened statement and a second write statement were both detected | PASS — WATCHED RED |
+| HD-13 archiving cannot change acceptance or evidence hashes | the same cell-level diff covers `phases.status`, `gate_results.outcome` and every other column; nothing outside `sessions.archived` moved | PASS |
+| HD-13 missing or empty database is could-not-observe | missing, zero-byte, unreadable, schema-only and row-less databases each returned could-not-observe and exit 2; the missing case created no database | PASS |
+| HD-13 failure outranks could-not-observe | an unowned column alongside zero session rows stayed observed-bad while retaining the absence it outranked | PASS — WATCHED RED |
+| HD-13 documentation control is nonvacuous | the shipped superseded sentences are still rejected after the real documents were corrected; the pre-fix run against the real files was red at `bee9296a` with eleven sites | PASS — WATCHED RED |
+| HD-13 governed documents agree with the code | root architecture and both skill references corrected; the generated matrix is embedded verbatim in the reference | PASS |
+| HD-13 runtime fence preserved during documentation correction | tracer and visualizer write paths, queries and behaviour are unchanged; only `visualizer/package.json:6` metadata, `visualizer/shared/types.ts:2-3,156` comments, and line 3 of the installed/template `tracer.py` module docstrings were corrected | PASS |
+| HD-13 visualizer read surface executed | `exercise_visualizer_read_surface.ts` ran the real `SssfDb` under Bun 1.3.14 against a fixture built from the tracer's real DDL: every public read method left the whole-file digest unchanged, and a mutation through the connection those methods use was refused by SQLite | PASS |
+| HD-13 executed bytes are the present bytes | the exercise records the SHA-256 of `db.ts` and `index.ts`; the stdlib CI check fails when either differs from the source present now, so an unexecuted change cannot pass | PASS — WATCHED RED |
+| HD-13 unexercised read surface is could-not-observe | an absent or unreadable exercise record is could-not-observe, distinct from a record showing the surface mutating, which is observed-bad | PASS — WATCHED RED |
+| HD-13 CI gate needs no JavaScript toolchain | the registered check is stdlib-only; only `--exercise-visualizer` needs Bun, so the gate cannot become a check that will not run | PASS |
+| HD-13 `specs/scaffold.md` superseded claim | retained as generated history under source custody; supersession recorded in `docs/reference/SQLITE_AUTHORITY.md` and asserted by the validator | RETAINED BY DESIGN |
 
 ## Rule
 

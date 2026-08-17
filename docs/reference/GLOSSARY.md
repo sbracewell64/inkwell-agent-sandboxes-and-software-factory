@@ -44,3 +44,23 @@ An immutable source state with recorded proof and known limitations.
 
 **increment**  
 A bounded change from one trusted state to another, including proof and documentation.
+
+**authority**
+
+The single component whose copy of a field is definitive when copies disagree.
+
+**mutation owner**
+
+The single component permitted to change a field. A query projection and an archived evidence copy have none.
+
+**canonical run state**
+
+The SQLite rows that define what a run did. Not a derived copy of the run's files and not reconstructible from them.
+
+**raw source**
+
+Per field: which file, if any, still carries the fact once the trace database is gone — `none`, `complete:<file>`, or `partial:<file>`.
+
+**triage state**
+
+`sessions.archived`. A human's "I have looked at this run", written only by the visualizer's archive route and never by a run.

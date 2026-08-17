@@ -156,6 +156,8 @@ adws/adw_data/sessions/{adw_id}/
 
 This map is the key that lets a later ADW rejoin each agent's **existing context window**. Run `adw_build.py --adw-id a1b2c3d4` after `adw_plan.py` and the builder resumes its own session rather than starting cold.
 
-The map records the model each session was created with. If config drift changes an agent's model, that agent starts a **fresh** session and the map is updated — never a bad resume. `agent_sessions` in `sssf.db` is the queryable mirror of this file.
+The map records the model each session was created with. If config drift changes an agent's model, that agent starts a **fresh** session and the map is updated — never a bad resume. This file carries resume identity only — `session_id`, `model`, `coding_agent`. The `agent_sessions` table in `sssf.db` is canonical and holds more: lane colour, context occupancy against the model's window, and creation/last-used timestamps.
 
-**Files are the raw record; the db is the queryable mirror.** Losing `sssf.db` loses nothing that can't be rebuilt from `raw_output.jsonl`, `envelope.json`, and `agent_map.json`.
+**Files are raw sources; the db is canonical run state.** `tracer.py` appends every event to both `events.jsonl` and SQLite, but nothing else is dual-written. Session, phase, process, gate, invalid-envelope, usage and agent-session rows are SQLite-only or only partially represented: `envelope.json` is written only for a **valid** envelope and is overwritten, so a rejected attempt exists only in `envelopes`, and `processes` has no file counterpart at all. Losing `sssf.db` destroys canonical run state that `raw_output.jsonl`, `envelope.json` and `agent_map.json` do not reconstruct.
+
+Every table and field has exactly one authority and one mutation owner: see `docs/reference/SQLITE_AUTHORITY.md` in the SSSF repo, owned executably by `tools/sqlite_authority.py`.

@@ -1,5 +1,6 @@
 /**
- * Types shared by the read-only server and the Vue client.
+ * Types shared by the observability server and the Vue client. The server is
+ * read-only over run and evidence state; its one write is the archive triage flag.
  *
  * Every interface mirrors a table in sssf.db one-for-one (see
  * references/observability.md). Nothing here is derived state: phase durations,
@@ -152,7 +153,7 @@ export interface GateCheck {
   note: string;
 }
 
-/** agent_sessions — the queryable mirror of agent_map.json. Supplies lane labels (`name · model`). */
+/** agent_sessions — canonical; agent_map.json carries only session_id/model/coding_agent. */
 export interface AgentSession {
   adw_id: string;
   agent: string;
