@@ -29,6 +29,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | HD-02 | PASS | Static synchronization for installed/template/generated ADWs | nonempty static inventory, generated import-only smoke, and sixteen watched-red mutations passed without provider execution |
 | HD-03 | PASS | Nonvacuous three-valued gate outcomes | 15 focused controls prove PASS/FAIL/CNO, fail-closed migration, trace provenance, and non-green CNO rendering |
 | HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
+| HD-14 | PASS | Machine-readable front-door lane and exception contracts; documentation plus docs lint, no instrumentation | 51 `just` front doors discovered from the module/import graph bytes plus 6 documented commands, each labelled `adw`/`lifecycle`/`steering`; `unlabelled front door` watched red against the real files before repair and end-to-end against a real new recipe; out-of-taxonomy lane, missing cannot-claim, steering-claims-acceptance, and workflow-success-entitlement controls red in-lint every run |
 
 ## Future increments
 

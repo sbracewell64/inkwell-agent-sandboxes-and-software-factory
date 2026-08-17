@@ -1,0 +1,60 @@
+HD-14 watched-red controls and the positive control
+
+base_commit: bee9296a4c94b1dc3da6991acd1755a91fa681eb
+python: Python 3.14.4
+command: python3 docs/validation/check_front_door_lanes.py
+
+== 1. END-TO-END RED: a real, unlabelled front door ==
+
+just/local.just was temporarily appended with:
+
+    # a new front door nobody labelled
+    steer-quietly:
+        claude --dangerously-skip-permissions "do the thing"
+
+observed:
+    HD-14 front-door lane taxonomy: FAIL
+    - front door 'just local steer-quietly': UNLABELLED — no entry in the lane taxonomy
+    exit: 1
+
+just/local.just was then restored. git diff --stat reported: <no change>
+
+== 2. RED: a reworded cannot-claim statement in the contract document ==
+
+"cannot claim bounded permissions" was reworded to "should probably not claim
+tightly bounded permissions" in FRONT_DOOR_LANES.md.
+
+observed:
+    HD-14 front-door lane taxonomy: FAIL
+    - FRONT_DOOR_LANES.md: exception `direct-claude-steering` is missing its cannot-claim statement: A direct Claude steering turn cannot claim bounded permissions. just local cc, just sbx orch cc, and just sbx run agent all pass --dangerously-skip-permissions.
+    exit: 1
+
+The document comparison ignores markdown code formatting and line wrapping and
+nothing else, so a softened statement cannot pass as the registry's own.
+
+The document was then restored.
+
+== 3. IN-LINT WATCHED-RED CONTROLS AND THE POSITIVE CONTROL ==
+
+Each control mutates a deep copy of the REAL registry and requires the same
+validate_taxonomy() the real check runs to report at least one issue. A control
+that stays green against its own defect is reported as a failure, not a pass.
+
+The header lines below are the positive control: 51 discovered just front doors
+plus 6 documented commands, all labelled, so none of the red controls is
+vacuously red.
+
+--- stdout ---
+HD-14 front-door lane taxonomy: PASS
+discovered 51 just front doors from the module/import graph bytes
+every discovered front door carries a lane drawn from ['adw', 'lifecycle', 'steering']
+every taxonomy entry states its cannot-claim half; exceptions: ['direct-claude-steering', 'host-orchestrator', 'pi-child']
+only ADW plus deterministic acceptance is entitled to claim SSSF workflow success
+watched-red control unlabelled-front-door (at just local cc): red, 1 issue(s) — front door 'just local cc': UNLABELLED — no entry in the lane taxonomy
+watched-red control lane-value-outside-taxonomy (at just adw ask): red, 2 issue(s) — front door 'just adw ask': lane 'workflow-success' is outside the taxonomy
+watched-red control taxonomy-entry-without-cannot-claim (at direct-claude-steering): red, 1 issue(s) — exception direct-claude-steering: cannot_claim statement is missing or empty
+watched-red control steering-exception-claims-adw-acceptance (at direct-claude-steering): red, 1 issue(s) — exception direct-claude-steering: a steering exception must not claim ADW acceptance
+watched-red control steering-front-door-claims-workflow-success (at just local cc): red, 1 issue(s) — front door 'just local cc': may_claim_workflow_success is True, but lane 'steering' with deterministic_acceptance=False entitles it to False
+watched-red control adw-without-acceptance-claims-workflow-success (at just adw ask): red, 1 issue(s) — front door 'just adw ask': may_claim_workflow_success is True, but lane 'adw' with deterministic_acceptance=False entitles it to False
+watched-red control discovery-reads-the-bytes: red on a synthetic recipe
+--- exit: 0 ---

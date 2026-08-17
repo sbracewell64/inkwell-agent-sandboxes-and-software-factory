@@ -43,17 +43,21 @@ The sandbox contains the code and coding agents. Long-lived orchestration creden
 
 ## Two work-entry paths
 
-### Direct
+### Direct (`lifecycle` lane)
 
 `just sbx lifecycle execute`
 
 The host starts the ADW deterministically. Lowest orchestration overhead.
 
-### Agent-mediated
+### Agent-mediated (`steering` lane)
 
 `just sbx run agent`
 
 An in-sandbox orchestrator receives a delegation and decides which factory action to launch.
+
+The delegation is intentionally outside the ADW trace. Its lifecycle and session identities cannot
+be cited as ADW acceptance or SSSF workflow success; see
+[`FRONT_DOOR_LANES.md`](../reference/FRONT_DOOR_LANES.md).
 
 ## State identities
 

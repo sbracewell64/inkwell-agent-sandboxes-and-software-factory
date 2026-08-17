@@ -1,0 +1,72 @@
+HD-14 watched-red control: UNLABELLED FRONT DOOR
+
+base_commit: bee9296a4c94b1dc3da6991acd1755a91fa681eb
+python: Python 3.14.4
+command: python3 docs/validation/check_front_door_lanes.py
+
+Condition: the repository as the HD-14 audit found it. The lane taxonomy and the
+lane contract document do not exist, so no front door carries a label. The
+validator is the only file present that was not already in the tree.
+
+This is the audit's named control, red against the real files before repair.
+Every front door named below is a real recipe discovered from the just module and
+import graph bytes, including the three carriers the audit named: just local cc,
+just sbx orch cc, and just sbx run agent.
+
+--- stdout ---
+HD-14 front-door lane taxonomy: COULD-NOT-OBSERVE
+- 51 front doors were discovered and none of them can be shown labelled
+- the lane taxonomy is absent: docs/reference/front_door_taxonomy.json
+- the lane document is absent: docs/reference/FRONT_DOOR_LANES.md
+- UNLABELLED front door: just adw ask
+- UNLABELLED front door: just adw build
+- UNLABELLED front door: just adw build-review
+- UNLABELLED front door: just adw build-test
+- UNLABELLED front door: just adw default
+- UNLABELLED front door: just adw document
+- UNLABELLED front door: just adw plan
+- UNLABELLED front door: just adw plan-build
+- UNLABELLED front door: just adw plan-build-test-quality
+- UNLABELLED front door: just adw prompt
+- UNLABELLED front door: just adw quality
+- UNLABELLED front door: just adw scout
+- UNLABELLED front door: just adw sdlc
+- UNLABELLED front door: just adw simple-sdlc
+- UNLABELLED front door: just default
+- UNLABELLED front door: just inkwell default
+- UNLABELLED front door: just inkwell dev
+- UNLABELLED front door: just inkwell run
+- UNLABELLED front door: just inkwell test
+- UNLABELLED front door: just local cc
+- UNLABELLED front door: just local default
+- UNLABELLED front door: just local ipi
+- UNLABELLED front door: just local pi
+- UNLABELLED front door: just obs default
+- UNLABELLED front door: just obs kill
+- UNLABELLED front door: just obs phases
+- UNLABELLED front door: just obs procs
+- UNLABELLED front door: just obs rosters
+- UNLABELLED front door: just obs sessions
+- UNLABELLED front door: just obs tail
+- UNLABELLED front door: just obs ui
+- UNLABELLED front door: just sbx default
+- UNLABELLED front door: just sbx lifecycle create
+- UNLABELLED front door: just sbx lifecycle default
+- UNLABELLED front door: just sbx lifecycle execute
+- UNLABELLED front door: just sbx lifecycle fill
+- UNLABELLED front door: just sbx lifecycle observe
+- UNLABELLED front door: just sbx lifecycle setup
+- UNLABELLED front door: just sbx lifecycle teardown
+- UNLABELLED front door: just sbx manage default
+- UNLABELLED front door: just sbx manage doctor
+- UNLABELLED front door: just sbx manage harvest
+- UNLABELLED front door: just sbx manage list
+- UNLABELLED front door: just sbx manage reap
+- UNLABELLED front door: just sbx mount
+- UNLABELLED front door: just sbx orch cc
+- UNLABELLED front door: just sbx orch default
+- UNLABELLED front door: just sbx orch pi
+- UNLABELLED front door: just sbx run agent
+- UNLABELLED front door: just sbx run cmd
+- UNLABELLED front door: just sbx run default
+--- exit: 1 ---

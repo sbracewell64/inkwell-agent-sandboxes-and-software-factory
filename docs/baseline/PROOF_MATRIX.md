@@ -117,6 +117,12 @@
 | HD-08 identity and integrity refusal | wrong identities, failed unrelated item, tamper, duplicate/reorder, descriptor-relative traversal/symlink races, final/root symlinks, identity change, unsupported host, and malformed schema controls observed red/CNO as specified | PASS |
 | HD-08 intermediate-component stat-to-open race | component swapped for an outside-root symlink between its no-follow stat and its descriptor-relative open; shipped implementation refused non-PASS with empty checked inventory and no outside-root bytes read, calibrated watched-red against a content-addressed defective variant with both intermediate protections removed | PASS |
 | HD-08 runtime acceptance integration | intentionally deferred to HD-09 | NOT PROVEN |
+| HD-14 complete front-door labelling | 51 `just` front doors discovered from the module/import graph bytes and 6 documented commands each carry exactly one lane resolved structurally against the taxonomy; no lane was could-not-observe, so none was labelled by guess | PASS |
+| HD-14 unlabelled front door is red | before repair, all 51 discovered front doors reported unlabelled against the real files; after repair, a real recipe appended to `just/local.just` reported unlabelled end-to-end and the file was restored byte-identical | PASS — WATCHED RED |
+| HD-14 narrow machine-readable exceptions with the cannot-claim half | `direct-claude-steering`, `direct-pi-steering`, `host-orchestrator`, and `pi-child` each carry a nonempty structured `cannot_claim` list, verbatim in the contract document; emptying one makes the lint red | PASS — WATCHED RED |
+| HD-14 only ADW plus deterministic acceptance may claim workflow success | `may_claim_workflow_success` is recomputed and compared, not trusted; a steering front door and an ADW front door without deterministic acceptance each make the lint red when they claim it | PASS — WATCHED RED |
+| HD-14 property not proxy | the front-door set is discovered from the `just` graph bytes, and a recipe added to a copy of the graph must surface as exactly that front door; discovery refuses any uncalibrated column-0 construct, and losing the audit's three named carriers is CNO | PASS — WATCHED RED |
+| HD-14 steering-lane runtime instrumentation | intentionally deferred to HD-10; this increment documents the exception and does not capture any runtime fact | NOT PROVEN |
 
 ## Rule
 
