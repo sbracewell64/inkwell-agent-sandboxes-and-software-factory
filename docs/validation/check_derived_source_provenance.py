@@ -379,20 +379,30 @@ def _open_bundle(
             "repository-relative file"
         )
         return None
-    bundle = (root / relative).resolve()
     try:
-        bundle.relative_to(root.resolve())
-    except ValueError:
+        tree_entry = git(root, "ls-tree", "HEAD", "--", bundle_rel).decode().strip()
+    except GitError as exc:
+        findings.cno.append(f"{label}: retained bundle identity could not be read ({exc})")
+        return None
+    if not tree_entry:
         findings.bad.append(
-            f"{label}: immutable input bundle {bundle_rel!r} resolves outside this repository"
+            f"{label}: immutable input bundle {bundle_rel!r} is tracked but not retained in HEAD"
         )
         return None
-    if not bundle.is_file():
-        findings.cno.append(
-            f"{label}: immutable input bundle {bundle_rel!r} is absent, so the claim "
-            "cannot be verified against its input"
+    mode = tree_entry.split(maxsplit=1)[0]
+    if mode not in {"100644", "100755"}:
+        findings.bad.append(
+            f"{label}: immutable input bundle {bundle_rel!r} must be a retained regular file, "
+            f"observed Git mode {mode}"
         )
         return None
+    try:
+        retained_bytes = git(root, "cat-file", "blob", f"HEAD:{bundle_rel}")
+    except GitError as exc:
+        findings.cno.append(f"{label}: retained immutable input bundle could not be read ({exc})")
+        return None
+    bundle = scratch / f"bundle-{sha256_hex(bundle_rel.encode('utf-8'))[:12]}.bundle"
+    _write(bundle, retained_bytes)
     view = scratch / f"input-{sha256_hex(bundle_rel.encode('utf-8'))[:12]}.git"
     if view.exists():
         return view
@@ -1013,6 +1023,8 @@ def build_input_repository(scratch: Path) -> tuple[Path, Path, list[str]]:
 
 
 CALIBRATION_BUNDLE_REL = "docs/evidence/hd15/calibration-assessment-input.bundle"
+CALIBRATION_INVALID_BUNDLE_REL = "docs/evidence/hd15/invalid-assessment-input.bundle"
+CALIBRATION_SYMLINK_BUNDLE_REL = "docs/evidence/hd15/symlink-assessment-input.bundle"
 
 
 def build_destination_base(scratch: Path) -> Path:
@@ -1039,6 +1051,10 @@ def advance_destination(repo: Path, bundle: Path) -> dict:
     _write(repo / CALIBRATION_DEST_PATH, CALIBRATION_DEST_BYTES)
     _write(repo / CALIBRATION_UNMARKED_PATH, CALIBRATION_UNMARKED_BYTES)
     _write(repo / CALIBRATION_BUNDLE_REL, bundle.read_bytes())
+    _write(repo / CALIBRATION_INVALID_BUNDLE_REL, b"not a Git bundle\n")
+    symlink = repo / CALIBRATION_SYMLINK_BUNDLE_REL
+    symlink.parent.mkdir(parents=True, exist_ok=True)
+    symlink.symlink_to(Path(CALIBRATION_BUNDLE_REL).name)
     git(repo, "add", "--all")
     git(repo, "commit", "--quiet", "-m", "import derived gate")
     head_commit = git(repo, "rev-parse", "HEAD").decode().strip()
@@ -1517,6 +1533,30 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
         errors,
     )
 
+    def symlink_bundle(record: dict) -> None:
+        record["input"]["immutable_input"]["path"] = CALIBRATION_SYMLINK_BUNDLE_REL
+
+    _expect_red(
+        repo,
+        honest,
+        "symlink immutable input",
+        symlink_bundle,
+        Verdict.FAIL,
+        "must be a retained regular file",
+        errors,
+    )
+
+    retained_bundle = repo / CALIBRATION_BUNDLE_REL
+    retained_bundle.write_bytes(b"uncommitted replacement\n")
+    tampered_worktree = assess(repo)
+    if tampered_worktree.verdict is not Verdict.PASS:
+        errors.append(
+            "worktree bundle isolation: committed bundle bytes did not remain authoritative "
+            f"({tampered_worktree.verdict.value}: "
+            f"{tampered_worktree.observed_bad + tampered_worktree.could_not_observe})"
+        )
+    retained_bundle.write_bytes(bundle.read_bytes())
+
     mismatched_path = repo / RECORDS_DIR / "wrong-record-name.json"
     _write(mismatched_path, (json.dumps(honest, indent=2, sort_keys=True) + "\n").encode("utf-8"))
     git(repo, "add", str(mismatched_path.relative_to(repo)))
@@ -1538,12 +1578,8 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
     write_record(repo, mixed)
     unverifiable = clone_of(honest)
     unverifiable["record_id"] = "calibration-unverifiable"
-    unavailable_bundle = repo / "docs/evidence/hd15/unavailable-input.bundle"
-    unverifiable["input"]["immutable_input"]["path"] = str(unavailable_bundle.relative_to(repo))
+    unverifiable["input"]["immutable_input"]["path"] = CALIBRATION_INVALID_BUNDLE_REL
     write_record(repo, unverifiable)
-    _write(unavailable_bundle, bundle.read_bytes())
-    git(repo, "add", str(unavailable_bundle.relative_to(repo)))
-    unavailable_bundle.unlink()
     precedence = assess(repo)
     if precedence.verdict is not Verdict.FAIL:
         errors.append(
@@ -1648,8 +1684,8 @@ def main() -> int:
         "license bytes, unchanged base blob, non-ancestor base, placeholder custody"
     )
     print(
-        "watched-red: untracked/external immutable input fails; tracked but unavailable input "
-        "is CNO; absence is NOT_APPLICABLE, not a pass"
+        "watched-red: untracked/external/symlink immutable input fails; committed bytes remain "
+        "authoritative; unusable retained input is CNO; absence is NOT_APPLICABLE, not a pass"
     )
     print("watched-red: a violation alongside an incomplete universe still reports FAIL")
     print("migration: none authorised, none performed; this validator creates no import path")
