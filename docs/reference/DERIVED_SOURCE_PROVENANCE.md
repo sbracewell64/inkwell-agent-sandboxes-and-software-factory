@@ -92,15 +92,27 @@ and its emptiness is `NOT_APPLICABLE`, not a pass.
 | `destination.head_commit` | exact 40-hex commit that landed it |
 | `destination.head_tree` | exact 40-hex tree of that head |
 | `transformed_files[]` | one entry per derived destination file |
+| `transformed_files[].non_derived_ranges` | ordered non-overlapping 1-based inclusive ranges claimed not to be derived; an empty list is valid only when derived ranges cover the whole file |
 
 Each `transformed_files` entry carries `destination_path`,
 `destination_blob`, `destination_sha256`, `base_blob` (`null` when the path is
 absent at base), and a nonempty ordered `ranges` list. Each range carries
 `derived_lines`, `destination_slice_sha256`, `input_lines`, and
-`input_slice_sha256`.
+`input_slice_sha256`. The entry also carries the required
+`non_derived_ranges` list. Derived and non-derived ranges must form a complete,
+non-overlapping partition of every line in the marked destination file.
 
 Line ranges are 1-based and inclusive. A slice hash is the SHA-256 of the
 selected lines concatenated, each terminated by a single LF.
+
+An explicitly declared non-derived range is itself a claim. A false
+non-derived claim is a lie this validator cannot catch; the declaration is a
+human-authored trust boundary, not an independently inferred fact.
+
+A validator cannot detect undeclared derivation, for the same reason it cannot
+detect derivation at all. Only total coverage of a marked file is checkable.
+An unmarked file remains out of scope and reports `NOT_APPLICABLE`; out of
+scope is not clean and does not mean the file was verified independent.
 
 ## Acceptance
 
@@ -124,6 +136,9 @@ verifies, against bytes:
 6. **No claim exceeds its input proof**: a derived range may not span more
    lines than the input range it cites, and an input range may not cite lines
    beyond the proven input.
+7. Derived ranges plus explicitly declared non-derived ranges cover every line
+   of each marked destination exactly once. An uncovered line or overlap is a
+   violation.
 
 A recorded hash or immutable identity that is not verified is prose with
 punctuation. The input and destination identities, hashes, byte length, paths,
@@ -191,7 +206,8 @@ never be committed as a real record.
           "input_lines": [1, 1],
           "input_slice_sha256": "<64-hex sha256 of those input lines>"
         }
-      ]
+      ],
+      "non_derived_ranges": []
     }
   ]
 }

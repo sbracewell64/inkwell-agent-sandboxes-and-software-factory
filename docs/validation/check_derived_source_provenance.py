@@ -331,6 +331,22 @@ def record_shape(record: object, label: str, findings: _Findings) -> dict | None
         item = _require_mapping(entry, entry_label, findings)
         if item is None:
             continue
+        expected_entry_keys = {
+            "destination_path",
+            "destination_blob",
+            "destination_sha256",
+            "base_blob",
+            "ranges",
+            "non_derived_ranges",
+        }
+        observed_entry_keys = set(item)
+        if observed_entry_keys != expected_entry_keys:
+            findings.bad.append(
+                f"{entry_label}: key drift "
+                f"(missing={sorted(expected_entry_keys - observed_entry_keys)}, "
+                f"unexpected={sorted(observed_entry_keys - expected_entry_keys)})"
+            )
+            continue
         _require_prose(item, "destination_path", entry_label, findings)
         _require_hex(item, "destination_blob", entry_label, SHA1_RE, findings)
         _require_hex(item, "destination_sha256", entry_label, SHA256_RE, findings)
@@ -356,6 +372,16 @@ def record_shape(record: object, label: str, findings: _Findings) -> dict | None
                 mapping, "destination_slice_sha256", range_label, SHA256_RE, findings
             )
             _require_hex(mapping, "input_slice_sha256", range_label, SHA256_RE, findings)
+        non_derived_ranges = item.get("non_derived_ranges")
+        if not isinstance(non_derived_ranges, list):
+            findings.bad.append(f"{entry_label}.non_derived_ranges: a list is required")
+            continue
+        for position, raw_range in enumerate(non_derived_ranges):
+            _require_range(
+                raw_range,
+                f"{entry_label}.non_derived_ranges[{position}]",
+                findings,
+            )
     return document
 
 
@@ -639,6 +665,7 @@ def _verify_ranges(
 ) -> None:
     destination_lines = len(split_lines(destination_payload))
     input_lines = len(split_lines(input_payload)) if input_payload is not None else None
+    declared: list[tuple[int, int, str]] = []
     previous_end = 0
     for position, mapping in enumerate(item["ranges"]):
         range_label = f"{entry_label}.ranges[{position}]"
@@ -651,6 +678,7 @@ def _verify_ranges(
             )
             return
         previous_end = derived_end
+        declared.append((derived_start, derived_end, range_label))
 
         if derived_end > destination_lines:
             findings.bad.append(
@@ -699,6 +727,43 @@ def _verify_ranges(
             )
             continue
         findings.bindings += 1
+
+    previous_end = 0
+    for position, (start, end) in enumerate(item["non_derived_ranges"]):
+        range_label = f"{entry_label}.non_derived_ranges[{position}]"
+        if start <= previous_end:
+            findings.bad.append(
+                f"{range_label}: non-derived ranges must be ordered and non-overlapping"
+            )
+            return
+        previous_end = end
+        if end > destination_lines:
+            findings.bad.append(
+                f"{range_label}: claims through line {end} of a "
+                f"{destination_lines}-line destination file"
+            )
+            continue
+        declared.append((start, end, range_label))
+
+    expected_line = 1
+    for start, end, range_label in sorted(declared):
+        if start < expected_line:
+            findings.bad.append(
+                f"{range_label}: derived and non-derived declarations overlap"
+            )
+            return
+        if start > expected_line:
+            findings.bad.append(
+                f"{entry_label}: line {expected_line} is uncovered by derived and "
+                "non-derived declarations"
+            )
+            return
+        expected_line = end + 1
+    if expected_line <= destination_lines:
+        findings.bad.append(
+            f"{entry_label}: line {expected_line} is uncovered by derived and "
+            "non-derived declarations"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1109,6 +1174,7 @@ def advance_destination(repo: Path, bundle: Path) -> dict:
                         ),
                     }
                 ],
+                "non_derived_ranges": [[1, 4], [15, 17]],
             }
         ],
     }
@@ -1158,6 +1224,15 @@ def calibration_errors() -> list[str]:
         if empty.universe_files < 1:
             errors.append("absence control: the universe itself was empty, so nothing was checked")
 
+        unmarked = assess(repo)
+        if MARKER_BYTES in (repo / CALIBRATION_DEST_PATH).read_bytes():
+            errors.append("unmarked-file control: the fixture unexpectedly carries the marker")
+        elif unmarked.verdict is not Verdict.NOT_APPLICABLE:
+            errors.append(
+                "unmarked-file control: an unmarked file was treated as proven independent "
+                f"instead of NOT_APPLICABLE (observed {unmarked.verdict.value})"
+            )
+
         honest = advance_destination(repo, bundle)
 
         unrecorded = assess(repo)
@@ -1189,6 +1264,20 @@ def calibration_errors() -> list[str]:
             )
         if list(green.records_checked) != [f"{RECORDS_DIR}/calibration-derived-gate.json"]:
             errors.append("positive control: the record registry was not enumerated")
+
+        partition_findings = _Findings()
+        _verify_ranges(
+            honest["transformed_files"][0],
+            "complete-partition control",
+            CALIBRATION_DEST_BYTES,
+            CALIBRATION_INPUT_BYTES,
+            partition_findings,
+        )
+        if partition_findings.bad or partition_findings.cno or partition_findings.bindings != 1:
+            errors.append(
+                "complete-partition control: an honest total partition did not pass "
+                f"({partition_findings.bad + partition_findings.cno})"
+            )
 
         errors.extend(_mutation_controls(repo, honest, bundle))
     return errors
@@ -1282,9 +1371,11 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
     )
 
     def overreaching_range(record: dict) -> None:
-        entry = record["transformed_files"][0]["ranges"][0]
+        transformed = record["transformed_files"][0]
+        entry = transformed["ranges"][0]
         entry["derived_lines"] = [5, 16]
         entry["destination_slice_sha256"] = sha256_hex(slice_bytes(CALIBRATION_DEST_BYTES, 5, 16))
+        transformed["non_derived_ranges"][1] = [17, 17]
 
     _expect_red(
         repo,
@@ -1308,6 +1399,53 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
         overreaching_input,
         Verdict.FAIL,
         "exceeds its input proof",
+        errors,
+    )
+
+    def undeclared_derived_region(record: dict) -> None:
+        entry = record["transformed_files"][0]["ranges"][0]
+        entry["derived_lines"] = [5, 10]
+        entry["destination_slice_sha256"] = sha256_hex(
+            slice_bytes(CALIBRATION_DEST_BYTES, 5, 10)
+        )
+        entry["input_lines"] = [3, 8]
+        entry["input_slice_sha256"] = sha256_hex(
+            slice_bytes(CALIBRATION_INPUT_BYTES, 3, 8)
+        )
+
+    _expect_red(
+        repo,
+        honest,
+        "derived region outside every declaration",
+        undeclared_derived_region,
+        Verdict.FAIL,
+        "line 11 is uncovered",
+        errors,
+    )
+
+    def uncovered_line(record: dict) -> None:
+        record["transformed_files"][0]["non_derived_ranges"][1] = [15, 16]
+
+    _expect_red(
+        repo,
+        honest,
+        "incomplete derived and non-derived partition",
+        uncovered_line,
+        Verdict.FAIL,
+        "line 17 is uncovered",
+        errors,
+    )
+
+    def contradictory_overlap(record: dict) -> None:
+        record["transformed_files"][0]["non_derived_ranges"][0] = [1, 5]
+
+    _expect_red(
+        repo,
+        honest,
+        "non-derived declaration overlaps a derived range",
+        contradictory_overlap,
+        Verdict.FAIL,
+        "declarations overlap",
         errors,
     )
 

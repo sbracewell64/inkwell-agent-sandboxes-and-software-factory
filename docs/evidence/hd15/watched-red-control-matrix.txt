@@ -1,14 +1,15 @@
 HD-15 derived-source provenance: negative controls watched red before any green
 source_head: bee9296a4c94b1dc3da6991acd1755a91fa681eb
 shipped_program: docs/validation/check_derived_source_provenance.py
-shipped_program_sha256: cd8be2729094dda0182658b68d7a3a7d9e471937fe3dfde50082716aaccc2802
+shipped_program_sha256: f4a46a23111d65a195499178151a2a5198d22661789c89d86eb47bd0d0a540ac
 
-control_taxonomy_after_pipeline_custody_fixes: 31 controls; 24 refusals and
-7 green-side controls. Review added external-bundle, filename-identity, and
-symlink-bundle refusals plus the worktree-isolation green control. These are
-PIPELINE CUSTODY FIXES, not part of the original design. The count describes
-the executable suite, and the additions are named because a changed count with
-no account of what changed is not independently checkable.
+control_taxonomy_after_range_completeness_ruling: 36 controls; 27 refusals and
+9 green-side controls. Review added external-bundle, filename-identity, and
+symlink-bundle refusals plus the worktree-isolation green control as PIPELINE
+CUSTODY FIXES. The range-completeness ruling added uncovered-derived-region,
+incomplete-partition, overlap, complete-partition, and unmarked-file controls.
+The count describes the executable suite, and the additions are named because
+a changed count with no account of what changed is not independently checkable.
 
 regeneration: this matrix was regenerated against the FINAL shipped bytes.
 An earlier revision named program digest `1b85e144...`, which was correct when
@@ -28,7 +29,7 @@ path and `calibration_errors()` was called; the findings below are its returned
 strings in order.
 
 --- DEFECT-1: exact-identity matching weakened to "any non-empty string" ---
-defect_sha256: b56bb391057f47fafde2a4991e66fdd463ebf85312625576bcd41897c6e10c6d
+defect_sha256: 0d06b6ac25b6a135b1444acdaa029a505730c7f920756aef80f37b893ab2351f
 mutation: `_require_hex` accepts any non-empty string instead of matching the
           40/64 lowercase-hex pattern.
 expected: the branch and tag controls stop being red, because a name would then
@@ -44,27 +45,22 @@ note: the calibration input repository carries branch
       not about a failed lookup. Discovery is not identity.
 
 --- DEFECT-2: recorded hashes substituted for recomputed ones ---
-defect_sha256: 5e8a5ae7f9a91139180217f42a1d47aff1cf0a16fd888c1f2a010270fae6976f
+defect_sha256: 5470ef66f6f8d8806325352948cb64d2344bfceb065aab4dfee381e9063e396e
 mutation: `verify_input` compares the claim to itself instead of hashing the
           input bytes; the destination hash comparison is disabled.
 expected: tamper controls stop being red, and the precedence control degrades.
 observed_output:
 input content hash not verified against bytes: expected FAIL, observed PASS (())
-destination hash not verified against bytes: went FAIL for the wrong reason (("docs/provenance/derived_source/calibration-derived-gate.json.transformed_files[0]: the working-tree copy of 'apps/example/derived_gate.py' differs from the recorded destination head, so the record no longer describes the shipped bytes",))
+destination hash not verified against bytes: expected FAIL, observed PASS (())
 precedence control: a violation alongside an incomplete universe reported CANNOT_OBSERVE instead of FAIL
 classification: observed-bad (control watched red)
 note: this is the "a field nothing verifies is prose with punctuation" control.
       It also demonstrates the precedence law: with the real violation no longer
-      detected, an incomplete universe masked it as CANNOT_OBSERVE.
-      Recorded exactly as observed: the destination control still goes red, but
-      for a DIFFERENT reason than the one it calibrates. With the destination
-      hash comparison disabled, the independent working-tree comparison catches
-      the tamper instead. That is defence in depth, and it is retained here as
-      observed rather than restated as the cleaner "observed PASS" line, because
-      an evidence file that improves on what actually happened is fabrication.
+      detected, an incomplete universe masked it as CANNOT_OBSERVE. The output is
+      retained exactly as observed against the shipped bytes.
 
 --- DEFECT-3: extent arithmetic removed ---
-defect_sha256: b8e1e5623f2a643e981b82f493260b3aa48ae4298a5a1b70e2732df5b572dba0
+defect_sha256: b8fb30396f02a696ddd587dbff7e85717873b73f8ca47ed2ff86b7526edb46d1
 mutation: the derived-versus-input extent comparison and the input-range bound
           against the proven input are both disabled.
 expected: a claim wider than its proof becomes acceptable.
@@ -74,18 +70,33 @@ input range beyond the proven input: expected FAIL, observed PASS (())
 classification: observed-bad (control watched red)
 
 --- DEFECT-4: absence rounded into a pass ---
-defect_sha256: b6d67178d2f75c3c9e03c059312d632766141cb21e1bfc8f626dedffe49651cb
+defect_sha256: c435e00b8a7ccb9631a3c2c1c0c2c244446eecf9a40d594c4a3d12cf2ecd1629
 mutation: an empty record set yields Verdict.PASS instead of NOT_APPLICABLE.
 expected: the absence control goes red.
 observed_output:
 absence control: expected NOT_APPLICABLE, observed PASS (())
 absence control: absence was rendered as a pass
+unmarked-file control: an unmarked file was treated as proven independent instead of NOT_APPLICABLE (observed PASS)
 classification: observed-bad (control watched red)
 note: this is the "absence is not a pass" law expressed as an executable
       control. Zero findings is cleanliness only within a stated universe.
 
+--- DEFECT-5: total-partition enforcement removed ---
+defect_sha256: 6a9a0c7c2522fb0adccdc41dbe54ffebee7b31662ccae1c67a8d0bcb94e7c5f3
+mutation: verification returns before checking non-derived ordering, bounds,
+          overlap, and total coverage.
+expected: uncovered derived content, any uncovered line, and contradictory
+          overlap all become acceptable.
+observed_output:
+derived region outside every declaration: expected FAIL, observed PASS (())
+incomplete derived and non-derived partition: expected FAIL, observed PASS (())
+non-derived declaration overlaps a derived range: expected FAIL, observed PASS (())
+classification: observed-bad (controls watched red)
+note: the first two controls enforce only the checkable property: an uncovered
+      line in a marked file. They do not claim to infer undeclared derivation.
+
 --- SHIPPED PROGRAM ---
 observed_output:
 calibration findings: 0
-classification: observed-good, and non-vacuous because all four defect classes
+classification: observed-good, and non-vacuous because all five defect classes
                 above were watched red first.
