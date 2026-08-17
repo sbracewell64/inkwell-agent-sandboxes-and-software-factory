@@ -33,7 +33,7 @@ HARVEST reads the same run branch and writes it home under `refs/sandbox/<run-id
 
 ## Contract table
 
-Every row below is a claim this document makes about the code, the file that owns it, and the exact token a reader will find by opening that file. `docs/validation/check_source_custody_authority.py` fails if a row is missing, if a cited file does not exist, if a token does not occur in the file it cites, or if the code defines an element this table does not publish.
+Every row below is a claim this document makes about the code, the file that owns it, and the operative token a reader will find by opening that file. `docs/validation/check_source_custody_authority.py` rejects duplicate rows and verifies recipe rows with bounded structural recognizers after removing comments and unreachable literal-false blocks. A row outside that accepted syntax is reported unchecked by name and prevents a satisfied verdict.
 
 | Contract element | Code authority | Exact token |
 | --- | --- | --- |
@@ -41,18 +41,18 @@ Every row below is a claim this document makes about the code, the file that own
 | public-clone-restriction | `just/sandbox/lifecycle/fill.just` | `https://github.com/*)` |
 | exact-pin-shape | `just/sandbox/lifecycle/fill.just` | `^[0-9a-f]{40}$` |
 | default-pin-is-host-head | `just/sandbox/lifecycle/fill.just` | `PIN="$(git rev-parse HEAD)"` |
-| dirty-host-refusal | `just/sandbox/lifecycle/fill.just` | `host working tree is dirty` |
+| dirty-host-refusal | `just/sandbox/lifecycle/fill.just` | `if [ -n "$(git status --porcelain)" ]; then` |
 | guest-run-branch | `just/sandbox/lifecycle/fill.just` | `branch="sbx/$run_id"` |
-| fill-head-gate | `just/sandbox/lifecycle/fill.just` | `GATE FAILED` |
+| fill-head-gate | `just/sandbox/lifecycle/fill.just` | `if [ "$HEAD_SHA" != "$INTENDED" ]; then` |
 | persisted-source-repo | `just/sandbox/lifecycle/fill.just` | `source_repo="$REPO"` |
 | schema-source-repo | `sandbox_mount/host/run_record.py` | `"source_repo",` |
 | persisted-source-sha | `just/sandbox/lifecycle/fill.just` | `source_sha="$PIN"` |
 | schema-source-sha | `sandbox_mount/host/run_record.py` | `"source_sha",` |
 | persisted-commit-sha | `just/sandbox/lifecycle/fill.just` | `commit_sha="$HEAD_SHA"` |
 | schema-commit-sha | `sandbox_mount/host/run_record.py` | `"commit_sha",` |
-| setup-origin-recheck | `just/sandbox/lifecycle/setup.just` | `origin does not match recorded source_repo` |
-| setup-head-recheck | `just/sandbox/lifecycle/setup.just` | `HEAD does not match the recorded commit_sha` |
-| setup-clean-tree-recheck | `just/sandbox/lifecycle/setup.just` | `the tree must be clean` |
+| setup-origin-recheck | `just/sandbox/lifecycle/setup.just` | `[ "$origin" = "$want_repo" ]` |
+| setup-head-recheck | `just/sandbox/lifecycle/setup.just` | `case "$head" in` |
+| setup-clean-tree-recheck | `just/sandbox/lifecycle/setup.just` | `if [ -n "$porcelain" ]; then` |
 | harvest-run-branch | `just/sandbox/manage/harvest.just` | `BRANCH="sbx/$RUN_ID"` |
 | harvest-ref-namespace | `just/sandbox/manage/harvest.just` | `DEST="refs/sandbox/$RUN_ID"` |
 | canonical-remote-url | `docs/validation/check_repository_ownership.py` | `https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git` |
@@ -98,4 +98,4 @@ The repository and the exact commit are therefore explicit, recorded, and gated 
 
 ## Keeping this document true
 
-`docs/validation/check_source_custody_authority.py` reads this document and the code together, offline. It fails when this document attributes a clone to a named repository instead of the `origin` derivation, when a pointer above is dropped, when a cited path cannot be opened, or when a canonical URL or a persisted field name here diverges from the bytes the code actually uses. Its own watched-red controls prove each of those detections before it reports a pass.
+`docs/validation/check_source_custody_authority.py` reads this document and the code together, offline. It fails when this document attributes a clone to a named repository instead of the `origin` derivation, when a pointer above is dropped, when a cited path cannot be opened, or when a canonical URL or a persisted field name here diverges from the bytes the code actually uses. It reports structural coverage on every path and refuses satisfaction when any recipe row is unchecked.

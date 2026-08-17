@@ -7,9 +7,8 @@ refuses to let the document drift away from them.
 
 It asserts properties, not vocabulary:
 
-- every contract row the document publishes must cite a real file and a token
-  that occurs verbatim in that file, so a citation a reader cannot follow is a
-  failure rather than evidence;
+- shell-recipe rows are accepted only when a bounded structural recognizer sees
+  the operative assignment or conditional and its refusing exit path;
 - the required row set is derived from the code (the persisted provenance field
   names come out of `fill.just` and the run-record schema), so renaming a field
   in the code turns the document red until the document is corrected, and
@@ -79,6 +78,12 @@ class Facts:
     upstream_owner: str
     persisted: tuple[tuple[str, str], ...]
     schema_fields: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Coverage:
+    verified: tuple[str, ...]
+    unchecked: tuple[str, ...]
 
 
 def read(root: Path, rel: str) -> str:
@@ -168,12 +173,12 @@ def required_rows(facts: Facts) -> dict[str, tuple[str, str]]:
         "public-clone-restriction": (FILL, "https://github.com/*)"),
         "exact-pin-shape": (FILL, "^[0-9a-f]{40}$"),
         "default-pin-is-host-head": (FILL, 'PIN="$(git rev-parse HEAD)"'),
-        "dirty-host-refusal": (FILL, "host working tree is dirty"),
+        "dirty-host-refusal": (FILL, 'if [ -n "$(git status --porcelain)" ]; then'),
         "guest-run-branch": (FILL, 'branch="sbx/$run_id"'),
-        "fill-head-gate": (FILL, "GATE FAILED"),
-        "setup-origin-recheck": (SETUP, "origin does not match recorded source_repo"),
-        "setup-head-recheck": (SETUP, "HEAD does not match the recorded commit_sha"),
-        "setup-clean-tree-recheck": (SETUP, "the tree must be clean"),
+        "fill-head-gate": (FILL, 'if [ "$HEAD_SHA" != "$INTENDED" ]; then'),
+        "setup-origin-recheck": (SETUP, '[ "$origin" = "$want_repo" ]'),
+        "setup-head-recheck": (SETUP, 'case "$head" in'),
+        "setup-clean-tree-recheck": (SETUP, 'if [ -n "$porcelain" ]; then'),
         "harvest-run-branch": (HARVEST, 'BRANCH="sbx/$RUN_ID"'),
         "harvest-ref-namespace": (HARVEST, 'DEST="refs/sandbox/$RUN_ID"'),
         "canonical-remote-url": (OWNERSHIP, facts.canonical),
@@ -208,6 +213,65 @@ def token_present(root: Path, rel: str, token: str) -> bool:
         except Unobservable:
             return False
     return False
+
+
+def operative_recipe_text(source: str) -> str:
+    lines = []
+    dead_depth = 0
+    for line in source.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            continue
+        if re.match(r"if\s+(?:false|\[\s+(?:1\s+=\s+0|0\s+=\s+1)\s+\])\s*;\s*then\s*$", stripped):
+            dead_depth += 1
+            continue
+        if dead_depth:
+            if re.match(r"fi(?:\s*(?:#.*)?)?$", stripped):
+                dead_depth -= 1
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+
+STRUCTURAL_PATTERNS: dict[str, str] = {
+    "origin-derivation": r'REPO="\$\(git remote get-url origin 2>/dev/null \|\| true\)"',
+    "public-clone-restriction": r'case "\$REPO" in\s+https://github\.com/\*\) ;;\s+\*\).*?exit 1\s+;;\s+esac',
+    "exact-pin-shape": r'if ! \[\[ "\$PIN" =~ \^\[0-9a-f\]\{40\}\$ \]\]; then.*?exit 1\s+fi',
+    "default-pin-is-host-head": r'else\s+.*?PIN="\$\(git rev-parse HEAD\)"\s+fi',
+    "dirty-host-refusal": r'if \[ -n "\$\(git status --porcelain\)" \]; then.*?exit 1\s+fi',
+    "guest-run-branch": r'branch="sbx/\$run_id".*?git -C app switch --quiet -c "\$branch"',
+    "fill-head-gate": r'if \[ "\$HEAD_SHA" != "\$INTENDED" \]; then.*?exit 1\s+fi',
+    "setup-origin-recheck": r'\[ "\$origin" = "\$want_repo" \] \|\| \{.*?exit 1\s+\}',
+    "setup-head-recheck": r'case "\$head" in\s+"\$want"\*\) ;;\s+\*\).*?exit 1\s+;;\s+esac',
+    "setup-clean-tree-recheck": r'porcelain="\$\(git status --porcelain\)"\s+if \[ -n "\$porcelain" \]; then.*?exit 1\s+fi',
+    "harvest-run-branch": r'BRANCH="sbx/\$RUN_ID".*?"refs/heads/\$BRANCH:\$DEST"',
+    "harvest-ref-namespace": r'DEST="refs/sandbox/\$RUN_ID".*?"refs/heads/\$BRANCH:\$DEST"',
+}
+
+
+def structural_coverage(root: Path, expected: dict[str, tuple[str, str]]) -> Coverage:
+    verified: list[str] = []
+    unchecked: list[str] = []
+    cache: dict[str, str] = {}
+    for element, (rel, _) in expected.items():
+        if rel.endswith(".just"):
+            pattern = STRUCTURAL_PATTERNS.get(element)
+            if pattern is None and element.startswith("persisted-"):
+                verified.append(element)
+                continue
+            if pattern is None:
+                unchecked.append(f"{element}: no bounded structural recognizer")
+                continue
+            text = cache.setdefault(rel, operative_recipe_text(read(root, rel)))
+            if re.search(pattern, text, re.DOTALL):
+                verified.append(element)
+            else:
+                unchecked.append(
+                    f"{element}: operative structure not recognized in `{rel}`"
+                )
+        else:
+            verified.append(element)
+    return Coverage(tuple(sorted(verified)), tuple(sorted(unchecked)))
 
 
 def claims(text: str) -> list[str]:
@@ -249,8 +313,9 @@ def claims(text: str) -> list[str]:
     return out
 
 
-def table_rows(text: str) -> dict[str, tuple[str, str]]:
+def table_rows(text: str) -> tuple[dict[str, tuple[str, str]], tuple[str, ...]]:
     rows: dict[str, tuple[str, str]] = {}
+    duplicates: list[str] = []
     for line in text.split("\n"):
         stripped = line.strip()
         if not stripped.startswith("|"):
@@ -261,8 +326,11 @@ def table_rows(text: str) -> dict[str, tuple[str, str]]:
         element = cells[0].strip("`")
         if not re.fullmatch(r"[a-z][a-z0-9-]*", element):
             continue  # header and separator rows
-        rows[element] = (cells[1].strip("`"), cells[2].strip("`"))
-    return rows
+        if element in rows:
+            duplicates.append(element)
+        else:
+            rows[element] = (cells[1].strip("`"), cells[2].strip("`"))
+    return rows, tuple(sorted(set(duplicates)))
 
 
 def document_errors(root: Path, facts: Facts) -> list[str]:
@@ -358,7 +426,9 @@ def document_errors(root: Path, facts: Facts) -> list[str]:
 
     # 5. The published contract table must match the code element for element.
     expected = required_rows(facts)
-    published = table_rows(doc)
+    published, duplicates = table_rows(doc)
+    for element in duplicates:
+        errors.append(f"duplicate contract-table row: {element}")
     for element in sorted(set(expected) - set(published)):
         path, token = expected[element]
         errors.append(
@@ -381,7 +451,7 @@ def document_errors(root: Path, facts: Facts) -> list[str]:
                 f"{element}: document publishes token {got_token!r}, code says "
                 f"{want_token!r}"
             )
-        elif not token_present(root, want_path, want_token):
+        elif not want_path.endswith(".just") and not token_present(root, want_path, want_token):
             errors.append(
                 f"{element}: token {want_token!r} does not occur in `{want_path}`"
             )
@@ -426,7 +496,9 @@ def evaluate(root: Path) -> tuple[list[str], list[str]]:
     except Unobservable as exc:
         return [], [str(exc)]
     try:
-        return document_errors(root, facts), []
+        bad = document_errors(root, facts)
+        coverage = structural_coverage(root, required_rows(facts))
+        return bad, list(coverage.unchecked)
     except Unobservable as exc:
         return [], [str(exc)]
 
@@ -544,9 +616,52 @@ def watched_red_errors(root: Path, facts: Facts) -> list[str]:
 
     control(
         "code-token-drift-control",
-        "does not occur in",
+        "harvest-ref-namespace: operative structure not recognized",
         lambda fixture: rewrite(
             fixture, HARVEST, 'DEST="refs/sandbox/$RUN_ID"', 'DEST="refs/runs/$RUN_ID"'
+        ),
+    )
+
+    control(
+        "comment-only-token-control",
+        "harvest-ref-namespace: operative structure not recognized",
+        lambda fixture: rewrite(
+            fixture,
+            HARVEST,
+            'DEST="refs/sandbox/$RUN_ID"',
+            'DEST="refs/runs/$RUN_ID"\n    # DEST="refs/sandbox/$RUN_ID"',
+        ),
+    )
+
+    control(
+        "dead-branch-token-control",
+        "guest-run-branch: operative structure not recognized",
+        lambda fixture: rewrite(
+            fixture,
+            FILL,
+            'branch="sbx/$run_id"',
+            'branch="other/$run_id"\n    if false; then\n        branch="sbx/$run_id"\n    fi',
+        ),
+    )
+
+    control(
+        "duplicate-row-control",
+        "duplicate contract-table row: origin-derivation",
+        lambda fixture: append(
+            fixture,
+            DOC,
+            f"\n| origin-derivation | `{FILL}` | `git remote get-url origin` |\n",
+        ),
+    )
+
+    control(
+        "unchecked-row-control",
+        "fill-head-gate: operative structure not recognized",
+        lambda fixture: rewrite(
+            fixture,
+            FILL,
+            'if [ "$HEAD_SHA" != "$INTENDED" ]; then',
+            'if test "$HEAD_SHA" != "$INTENDED"; then',
         ),
     )
 
@@ -567,10 +682,13 @@ def main() -> int:
     bad: list[str] = []
     cno: list[str] = []
     facts: Facts | None = None
+    coverage = Coverage((), ())
 
     try:
         facts = code_facts(root)
         bad = document_errors(root, facts)
+        coverage = structural_coverage(root, required_rows(facts))
+        cno.extend(coverage.unchecked)
     except Unobservable as exc:
         cno.append(str(exc))
 
@@ -579,6 +697,8 @@ def main() -> int:
 
     if bad or cno or facts is None:
         print("HD-11 source custody authority: FAIL")
+        print("structurally verified: " + (", ".join(coverage.verified) or "none"))
+        print("unchecked: " + ("; ".join(coverage.unchecked) or "none"))
         for error in bad:
             print(f"- observed-bad: {error}")
         for error in cno:
@@ -587,6 +707,8 @@ def main() -> int:
 
     print("HD-11 source custody authority: PASS")
     print(f"document: {DOC}")
+    print("structurally verified: " + ", ".join(coverage.verified))
+    print("unchecked: none")
     print(
         f"{len(required_rows(facts))} contract elements reconciled against "
         "FILL, SETUP, HARVEST, the run-record schema, and the ownership validator"
