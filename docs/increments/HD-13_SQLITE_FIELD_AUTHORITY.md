@@ -29,7 +29,7 @@ read-only surfaces cannot mutate, and only the archive route can change triage s
 ## Non-goals
 
 - no change to the tracer's write paths, the visualizer's behaviour, or the read-only query helper —
-  all three were found correct and are byte-unchanged;
+  all three were found correct; only stale contract comments and guidance are corrected;
 - no new runtime acceptance authority; observation is reporting, not a gate;
 - no rewrite of `specs/`, which is retained history under `SOURCE_OF_TRUTH.md`;
 - no claim that a green observation authorizes deleting or rebuilding a trace database.

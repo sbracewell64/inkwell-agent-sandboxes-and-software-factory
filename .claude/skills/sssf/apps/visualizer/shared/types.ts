@@ -152,7 +152,7 @@ export interface GateCheck {
   note: string;
 }
 
-/** agent_sessions — the queryable mirror of agent_map.json. Supplies lane labels (`name · model`). */
+/** agent_sessions — canonical state; agent_map.json carries only resume identity. */
 export interface AgentSession {
   adw_id: string;
   agent: string;

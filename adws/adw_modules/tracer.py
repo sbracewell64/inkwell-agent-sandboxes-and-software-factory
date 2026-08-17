@@ -1,6 +1,6 @@
 """Tracer: every event lands in JSONL and SQLite AS IT HAPPENS.
 
-Files are the raw record; sssf.db is the queryable mirror the UI polls.
+Events are dual-written; sssf.db owns canonical run state for the UI.
 No push transport — the flow is always: agents -> sqlite -> web ui.
 WAL mode so the UI can read while ADW processes write.
 """

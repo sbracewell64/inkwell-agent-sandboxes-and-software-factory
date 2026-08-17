@@ -38,9 +38,10 @@ Observation of a database is three-valued and consumes HD-08's vocabulary: `obse
 `observed-bad`, `could-not-observe`, with exit codes `0`, `1`, `2`. A missing or empty database is
 CNO. Observed-bad outranks CNO, which outranks observed-good.
 
-The tracer, the visualizer and the read-only query helper are correct and are not changed. If
-satisfying this matrix ever appears to require changing a write path, the code is wrong rather than
-the document, and that is a separate increment and a separate decision.
+The tracer, the visualizer and the read-only query helper are correct; their runtime behavior and
+write paths are not changed. Stale local contract comments are corrected. If satisfying this matrix
+ever appears to require changing a write path, the code is wrong rather than the document, and that
+is a separate increment and a separate decision.
 
 ## Consequences
 

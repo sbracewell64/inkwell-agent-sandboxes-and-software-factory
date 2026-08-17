@@ -6,8 +6,9 @@ HD-13 assigns exactly one **authority** and exactly one **mutation owner** to ev
 every SSSF record surface, and supplies a deterministic validator for two assertions: read-only
 surfaces cannot mutate, and only the archive route can change triage state.
 
-This is a documentation and validation increment. It changes no write path. The tracer, the
-visualizer, and the read-only query helper were found correct and are unchanged.
+This is a documentation and validation increment. It changes no write path. The tracer's local
+contract comment is corrected, while runtime behavior and write paths were found correct and remain
+unchanged. Other stale local comments are corrected to point back to this contract.
 
 The sole executable owner of the matrix is `tools/sqlite_authority.py`. The table below is
 generated from that module; do not hand-edit it.
