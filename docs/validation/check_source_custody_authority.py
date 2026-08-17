@@ -546,6 +546,18 @@ def coverage_lines(result: Assessment) -> list[str]:
     ]
 
 
+def exit_code(result: Assessment) -> int:
+    if (
+        result.facts is None
+        or result.bad
+        or result.cno
+        or result.coverage is None
+        or result.coverage.unchecked
+    ):
+        return 1
+    return 0
+
+
 # ── watched-red controls ────────────────────────────────────────────────────
 #
 # Each control mutates one thing in a throwaway copy of the repository and
@@ -591,8 +603,9 @@ def watched_red_errors(root: Path, facts: Facts) -> list[str]:
             if not mutate(fixture):
                 errors.append(f"{name}: control could not be applied")
                 return
-            bad, cno = evaluate(fixture)
-            if not bad and not cno:
+            result = assess(fixture)
+            bad, cno = list(result.bad), list(result.cno)
+            if exit_code(result) == 0:
                 errors.append(f"{name}: did not go red")
                 return
             if not any(marker in line for line in bad + cno):
@@ -609,7 +622,9 @@ def watched_red_errors(root: Path, facts: Facts) -> list[str]:
                 return
             result = assess(fixture)
             rendered = coverage_lines(result)
-            if not result.cno or result.coverage is not None:
+            if exit_code(result) == 0:
+                errors.append(f"{name}: early could-not-observe returned success")
+            elif not result.cno or result.coverage is not None:
                 errors.append(f"{name}: did not produce early could-not-observe")
             elif any(
                 line in {"unchecked: none", "structurally verified: none"}
@@ -623,9 +638,12 @@ def watched_red_errors(root: Path, facts: Facts) -> list[str]:
     with tempfile.TemporaryDirectory(prefix="sssf-hd11-") as raw:
         fixture = Path(raw) / "repo"
         build_fixture(root, fixture)
-        bad, cno = evaluate(fixture)
-        if bad or cno:
-            errors.append(f"unmutated fixture is not green: {(bad + cno)[:3]!r}")
+        result = assess(fixture)
+        if exit_code(result) != 0:
+            errors.append(
+                "unmutated fixture verdict is not zero: "
+                f"{(result.bad + result.cno)[:3]!r}"
+            )
 
     control(
         "hard-coded-upstream-control",
@@ -773,11 +791,14 @@ def main() -> int:
     facts = result.facts
     bad = list(result.bad)
     cno = list(result.cno)
+    status = exit_code(result)
 
-    if facts is not None and not bad and not cno:
+    if status == 0 and facts is not None:
         bad.extend(watched_red_errors(root, facts))
+        if bad:
+            status = 1
 
-    if bad or cno or facts is None:
+    if status != 0:
         print("HD-11 source custody authority: FAIL")
         for line in coverage_lines(result):
             print(line)
@@ -785,7 +806,7 @@ def main() -> int:
             print(f"- observed-bad: {error}")
         for error in cno:
             print(f"- could-not-observe: {error}")
-        return 1
+        return status
 
     print("HD-11 source custody authority: PASS")
     print(f"document: {DOC}")
@@ -812,7 +833,7 @@ def main() -> int:
         "early code-authority CNO, absent operative write, genuine operative "
         "non-vacuity"
     )
-    return 0
+    return status
 
 
 if __name__ == "__main__":

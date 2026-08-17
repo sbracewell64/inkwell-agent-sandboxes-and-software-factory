@@ -39,7 +39,7 @@ It reads the document and the code together, offline — file bytes only, no net
 - The `origin` derivation must be stated in prose, not only tabulated.
 
 - The remote roles are cited as enforcement, not vocabulary: the table binds them to the `origin != CANONICAL` and push-`DISABLED` assertions in the ownership validator, so a role claim cannot survive the code dropping the check that backs it.
-- A missing or unparsable input, or a recipe row outside the accepted bounded syntax, is reported as could-not-observe by row name and is never narrowed into a pass. Structurally verified and unchecked rows are printed when coverage is established; an early code-fact CNO instead prints that coverage could not be established and its reason. Code coverage is computed independently of document evaluation, so a missing document does not suppress available code-side coverage.
+- A missing or unparsable input, or a recipe row outside the accepted bounded syntax, is reported as could-not-observe by row name and is never narrowed into a pass. Structurally verified and unchecked rows are printed when coverage is established; an early code-fact CNO instead prints that coverage could not be established and its reason. Code coverage is computed independently of document evaluation. One pure verdict function owns the CLI exit decision, and both red fixtures and the fully verified non-vacuity fixture assert its exact status.
 
 This implements the standing “discovery is not identity” and property-scoped completeness ruling from Browser Sol, captain-delegated authority, control issue 4 comment 5310771128, recorded at `data/captain-rulings-2026-08-17-discovery-is-not-identity.md`. Loose matching is used only for conservative exclusion, never confirmation. Persisted provenance is derived from the sanitized operative write region, and each persisted row has its own bounded recognizer.
 
@@ -70,8 +70,8 @@ The remaining controls copy the cited files into a throwaway root, mutate exactl
 | dead-branch-token | a token after a nested block inside a literal-false region cannot confirm structure |
 | duplicate-row | duplicated identity is rejected rather than resolved by position |
 | unchecked-row | unrecognized bounded syntax is named and prevents satisfaction |
-| missing-code-authority-coverage | an early code CNO reports coverage not established rather than empty complete coverage |
-| missing-operative-run-record-write-coverage | absent operative provenance derivation reports coverage not established and exits non-zero |
+| missing-code-authority-coverage | an early code CNO reports coverage not established and the shared verdict returns nonzero |
+| missing-operative-run-record-write-coverage | absent operative provenance derivation reports coverage not established and the shared verdict returns nonzero |
 
 The unmutated copy stays green and provides the genuine-operative non-vacuity control. Two further controls, run by hand and recorded in the same matrix, delete the document and delete a code authority: both are reported as could-not-observe rather than as a pass or a crash.
 
