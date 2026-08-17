@@ -665,7 +665,6 @@ def _verify_ranges(
 ) -> None:
     destination_lines = len(split_lines(destination_payload))
     input_lines = len(split_lines(input_payload)) if input_payload is not None else None
-    declared: list[tuple[int, int, str]] = []
     previous_end = 0
     for position, mapping in enumerate(item["ranges"]):
         range_label = f"{entry_label}.ranges[{position}]"
@@ -678,7 +677,6 @@ def _verify_ranges(
             )
             return
         previous_end = derived_end
-        declared.append((derived_start, derived_end, range_label))
 
         if derived_end > destination_lines:
             findings.bad.append(
@@ -742,28 +740,68 @@ def _verify_ranges(
                 f"{range_label}: claims through line {end} of a "
                 f"{destination_lines}-line destination file"
             )
-            continue
-        declared.append((start, end, range_label))
 
-    expected_line = 1
-    for start, end, range_label in sorted(declared):
-        if start < expected_line:
-            findings.bad.append(
-                f"{range_label}: derived and non-derived declarations overlap"
-            )
-            return
-        if start > expected_line:
-            findings.bad.append(
-                f"{entry_label}: line {expected_line} is uncovered by derived and "
-                "non-derived declarations"
-            )
-            return
-        expected_line = end + 1
-    if expected_line <= destination_lines:
-        findings.bad.append(
-            f"{entry_label}: line {expected_line} is uncovered by derived and "
-            "non-derived declarations"
-        )
+
+def _verify_global_partitions(
+    root: Path,
+    documents: list[tuple[str, dict]],
+    tracked: set[str],
+    findings: _Findings,
+) -> None:
+    claims_by_path: dict[str, list[tuple[int, int, str, str]]] = {}
+    for record_label, document in documents:
+        for index, item in enumerate(document["transformed_files"]):
+            path = item["destination_path"]
+            entry_label = f"{record_label}.transformed_files[{index}]"
+            for position, mapping in enumerate(item["ranges"]):
+                start, end = mapping["derived_lines"]
+                claims_by_path.setdefault(path, []).append(
+                    (start, end, "derived", f"{entry_label}.ranges[{position}]")
+                )
+            for position, (start, end) in enumerate(item["non_derived_ranges"]):
+                claims_by_path.setdefault(path, []).append(
+                    (
+                        start,
+                        end,
+                        "non-derived",
+                        f"{entry_label}.non_derived_ranges[{position}]",
+                    )
+                )
+
+    for path, claims in sorted(claims_by_path.items()):
+        if path not in tracked:
+            continue
+        try:
+            line_count = len(split_lines((root / path).read_bytes()))
+        except OSError:
+            continue
+        for line in range(1, line_count + 1):
+            derived = [
+                label
+                for start, end, kind, label in claims
+                if kind == "derived" and start <= line <= end
+            ]
+            non_derived = [
+                label
+                for start, end, kind, label in claims
+                if kind == "non-derived" and start <= line <= end
+            ]
+            if derived and non_derived:
+                findings.bad.append(
+                    f"{path!r}: line {line} is claimed derived by {derived} and "
+                    f"non-derived by {non_derived}"
+                )
+                break
+            if len(derived) > 1:
+                findings.bad.append(
+                    f"{path!r}: line {line} has ambiguous derived provenance from {derived}"
+                )
+                break
+            if not derived and not non_derived:
+                findings.bad.append(
+                    f"{path!r}: line {line} is uncovered by derived and non-derived declarations"
+                )
+                break
 
 
 # ---------------------------------------------------------------------------
@@ -866,6 +904,7 @@ def assess(root: Path, marker_doc_paths: tuple[str, ...] = MARKER_DOC_PATHS) -> 
             if len(findings.bad) == before_bad:
                 document["_input_payload"] = payload
                 verify_destination(root, document, label, findings, universe_set)
+        _verify_global_partitions(root, documents, universe_set, findings)
 
     if findings.bad:
         verdict = Verdict.FAIL
@@ -955,6 +994,7 @@ def contract_errors(root: Path) -> list[str]:
 
 CALIBRATION_INPUT_PATH = "src/hardening/gate.py"
 CALIBRATION_DEST_PATH = "apps/example/derived_gate.py"
+CALIBRATION_SECOND_DEST_PATH = "apps/example/secondary_derived_gate.py"
 CALIBRATION_NOTICE_PATH = "apps/example/DERIVED_LICENSE.txt"
 
 CALIBRATION_INPUT_BYTES = (
@@ -1020,6 +1060,24 @@ EXPECTED_INPUT_CONTENT_BYTES = 262
 CALIBRATION_INPUT_BRANCH = "assessment/hardening-source"
 CALIBRATION_INPUT_TAG = "assessment-v1"
 
+CALIBRATION_SECOND_INPUT_PATH = "src/hardening/secondary_gate.py"
+CALIBRATION_SECOND_INPUT_BYTES = (
+    b"# alternate assessment input\n"
+    b"def secondary(value):\n"
+    b"    if value is None:\n"
+    b'        return "CANNOT_OBSERVE"\n'
+    b"    return value\n"
+    b"\n"
+)
+EXPECTED_SECOND_INPUT_COMMIT = "9fa9e021d636ef118ca141501d9764d5a320e62d"
+EXPECTED_SECOND_INPUT_TREE = "233d1329177911911ec4f54a356b641ea0128dfa"
+EXPECTED_SECOND_INPUT_BLOB = "d7299f67bbe34eb2710e30774cad69c88a340d23"
+EXPECTED_SECOND_INPUT_CONTENT_SHA256 = (
+    "2851b1817a7786113ad5a8a281fc3790fa951e9620d0f79f97eb53362dd01f8d"
+)
+EXPECTED_SECOND_INPUT_CONTENT_BYTES = 123
+CALIBRATION_SECOND_INPUT_BRANCH = "assessment/secondary-source"
+
 
 def _write(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1071,10 +1129,32 @@ def build_input_repository(scratch: Path) -> tuple[Path, Path, list[str]]:
     git(repo, "update-ref", f"refs/heads/{CALIBRATION_INPUT_BRANCH}", commit)
     git(repo, "update-ref", f"refs/tags/{CALIBRATION_INPUT_TAG}", commit)
 
+    second_blob = _hash_blob(repo, CALIBRATION_SECOND_INPUT_BYTES)
+    second_commit = _commit_tree(
+        repo,
+        {CALIBRATION_SECOND_INPUT_PATH: second_blob},
+        "secondary hardening gate",
+        None,
+    )
+    second_tree = git(
+        repo, "rev-parse", "--verify", f"{second_commit}^{{tree}}"
+    ).decode().strip()
+    git(repo, "update-ref", f"refs/heads/{CALIBRATION_SECOND_INPUT_BRANCH}", second_commit)
+
     for label, observed, expected in (
         ("blob", blob, EXPECTED_INPUT_BLOB),
         ("tree", tree, EXPECTED_INPUT_TREE),
         ("commit", commit, EXPECTED_INPUT_COMMIT),
+    ):
+        if observed != expected:
+            problems.append(
+                f"calibration input {label} is {observed}, not the independently authored "
+                f"{expected}; the immutable input is not reproducible on this host"
+            )
+    for label, observed, expected in (
+        ("second blob", second_blob, EXPECTED_SECOND_INPUT_BLOB),
+        ("second tree", second_tree, EXPECTED_SECOND_INPUT_TREE),
+        ("second commit", second_commit, EXPECTED_SECOND_INPUT_COMMIT),
     ):
         if observed != expected:
             problems.append(
@@ -1114,6 +1194,7 @@ def advance_destination(repo: Path, bundle: Path) -> dict:
     base_blob = git(repo, "rev-parse", f"{base_commit}:{CALIBRATION_DEST_PATH}").decode().strip()
 
     _write(repo / CALIBRATION_DEST_PATH, CALIBRATION_DEST_BYTES)
+    _write(repo / CALIBRATION_SECOND_DEST_PATH, CALIBRATION_DEST_BYTES)
     _write(repo / CALIBRATION_UNMARKED_PATH, CALIBRATION_UNMARKED_BYTES)
     _write(repo / CALIBRATION_BUNDLE_REL, bundle.read_bytes())
     _write(repo / CALIBRATION_INVALID_BUNDLE_REL, b"not a Git bundle\n")
@@ -1125,6 +1206,9 @@ def advance_destination(repo: Path, bundle: Path) -> dict:
     head_commit = git(repo, "rev-parse", "HEAD").decode().strip()
     head_tree = git(repo, "rev-parse", f"{head_commit}^{{tree}}").decode().strip()
     dest_blob = git(repo, "rev-parse", f"{head_commit}:{CALIBRATION_DEST_PATH}").decode().strip()
+    second_dest_blob = git(
+        repo, "rev-parse", f"{head_commit}:{CALIBRATION_SECOND_DEST_PATH}"
+    ).decode().strip()
 
     record = {
         "schema_version": SCHEMA_VERSION,
@@ -1175,7 +1259,26 @@ def advance_destination(repo: Path, bundle: Path) -> dict:
                     }
                 ],
                 "non_derived_ranges": [[1, 4], [15, 17]],
-            }
+            },
+            {
+                "destination_path": CALIBRATION_SECOND_DEST_PATH,
+                "destination_blob": second_dest_blob,
+                "destination_sha256": sha256_hex(CALIBRATION_DEST_BYTES),
+                "base_blob": None,
+                "ranges": [
+                    {
+                        "derived_lines": [5, 14],
+                        "destination_slice_sha256": sha256_hex(
+                            slice_bytes(CALIBRATION_DEST_BYTES, 5, 14)
+                        ),
+                        "input_lines": [3, 12],
+                        "input_slice_sha256": sha256_hex(
+                            slice_bytes(CALIBRATION_INPUT_BYTES, 3, 12)
+                        ),
+                    }
+                ],
+                "non_derived_ranges": [[1, 4], [15, 17]],
+            },
         ],
     }
     return record
@@ -1194,6 +1297,49 @@ def commit_record(repo: Path, record: dict) -> None:
 
 def clone_of(value):
     return json.loads(json.dumps(value))
+
+
+def complementary_records(honest: dict) -> tuple[dict, dict]:
+    first = clone_of(honest)
+    first_entry = first["transformed_files"][0]
+    first_range = first_entry["ranges"][0]
+    first_range["derived_lines"] = [5, 10]
+    first_range["destination_slice_sha256"] = sha256_hex(
+        slice_bytes(CALIBRATION_DEST_BYTES, 5, 10)
+    )
+    first_range["input_lines"] = [3, 8]
+    first_range["input_slice_sha256"] = sha256_hex(
+        slice_bytes(CALIBRATION_INPUT_BYTES, 3, 8)
+    )
+
+    second = clone_of(honest)
+    second["record_id"] = "calibration-secondary-gate"
+    second["input"] = {
+        "source_repository": "file:///calibration/assessment-workspace.git",
+        "source_path": CALIBRATION_SECOND_INPUT_PATH,
+        "commit": EXPECTED_SECOND_INPUT_COMMIT,
+        "tree": EXPECTED_SECOND_INPUT_TREE,
+        "blob": EXPECTED_SECOND_INPUT_BLOB,
+        "content_sha256": EXPECTED_SECOND_INPUT_CONTENT_SHA256,
+        "content_bytes": EXPECTED_SECOND_INPUT_CONTENT_BYTES,
+        "immutable_input": {"kind": "git-bundle", "path": CALIBRATION_BUNDLE_REL},
+    }
+    second["transformed_files"] = [second["transformed_files"][0]]
+    second_entry = second["transformed_files"][0]
+    second_entry["non_derived_ranges"] = []
+    second_entry["ranges"] = [
+        {
+            "derived_lines": [11, 14],
+            "destination_slice_sha256": sha256_hex(
+                slice_bytes(CALIBRATION_DEST_BYTES, 11, 14)
+            ),
+            "input_lines": [3, 6],
+            "input_slice_sha256": sha256_hex(
+                slice_bytes(CALIBRATION_SECOND_INPUT_BYTES, 3, 6)
+            ),
+        }
+    ]
+    return first, second
 
 
 def calibration_errors() -> list[str]:
@@ -1273,6 +1419,12 @@ def calibration_errors() -> list[str]:
             CALIBRATION_INPUT_BYTES,
             partition_findings,
         )
+        _verify_global_partitions(
+            repo,
+            [(f"{RECORDS_DIR}/calibration-derived-gate.json", clone_of(honest))],
+            set(tracked_files(repo)),
+            partition_findings,
+        )
         if partition_findings.bad or partition_findings.cno or partition_findings.bindings != 1:
             errors.append(
                 "complete-partition control: an honest total partition did not pass "
@@ -1322,6 +1474,91 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
     head_tree = honest["destination"]["head_tree"]
     unmarked_blob = git(repo, "rev-parse", f"{head_tree}:{CALIBRATION_UNMARKED_PATH}").decode().strip()
     notice_blob = git(repo, "rev-parse", f"{head_tree}:{CALIBRATION_NOTICE_PATH}").decode().strip()
+
+    def assess_pair(first: dict, second: dict) -> PopulationResult:
+        write_record(repo, first)
+        write_record(repo, second)
+        return assess(repo)
+
+    def restore_pair() -> None:
+        second_path = repo / RECORDS_DIR / "calibration-secondary-gate.json"
+        if second_path.exists():
+            second_path.unlink()
+        git(repo, "add", "--all")
+        _restore(repo, honest)
+
+    complementary_first, complementary_second = complementary_records(honest)
+    complementary = assess_pair(complementary_first, complementary_second)
+    if complementary.verdict is not Verdict.PASS:
+        errors.append(
+            "complementary multi-input partition: disjoint derived ranges did not pass "
+            f"({complementary.verdict.value}: "
+            f"{complementary.observed_bad + complementary.could_not_observe})"
+        )
+    restore_pair()
+
+    contradictory_second = clone_of(complementary_second)
+    contradictory_second["transformed_files"][0]["non_derived_ranges"] = [[5, 10]]
+    contradictory = assess_pair(complementary_first, contradictory_second)
+    contradictory_findings = contradictory.observed_bad + contradictory.could_not_observe
+    if contradictory.verdict is not Verdict.FAIL:
+        errors.append(
+            "cross-record derived/non-derived contradiction: expected FAIL, observed "
+            f"{contradictory.verdict.value} ({contradictory_findings})"
+        )
+    elif not any("claimed derived" in finding for finding in contradictory_findings):
+        errors.append(
+            "cross-record derived/non-derived contradiction: went FAIL for the wrong reason "
+            f"({contradictory_findings})"
+        )
+    restore_pair()
+
+    duplicate_second = clone_of(complementary_second)
+    duplicate_range = duplicate_second["transformed_files"][0]["ranges"][0]
+    duplicate_range["derived_lines"] = [5, 10]
+    duplicate_range["destination_slice_sha256"] = sha256_hex(
+        slice_bytes(CALIBRATION_DEST_BYTES, 5, 10)
+    )
+    duplicate_range["input_lines"] = [1, 6]
+    duplicate_range["input_slice_sha256"] = sha256_hex(
+        slice_bytes(CALIBRATION_SECOND_INPUT_BYTES, 1, 6)
+    )
+    duplicate = assess_pair(complementary_first, duplicate_second)
+    duplicate_findings = duplicate.observed_bad + duplicate.could_not_observe
+    if duplicate.verdict is not Verdict.FAIL:
+        errors.append(
+            "cross-record ambiguous derived double claim: expected FAIL, observed "
+            f"{duplicate.verdict.value} ({duplicate_findings})"
+        )
+    elif not any("ambiguous derived provenance" in finding for finding in duplicate_findings):
+        errors.append(
+            "cross-record ambiguous derived double claim: went FAIL for the wrong reason "
+            f"({duplicate_findings})"
+        )
+    restore_pair()
+
+    gap_first = clone_of(complementary_first)
+    gap_range = gap_first["transformed_files"][0]["ranges"][0]
+    gap_range["derived_lines"] = [5, 9]
+    gap_range["destination_slice_sha256"] = sha256_hex(
+        slice_bytes(CALIBRATION_DEST_BYTES, 5, 9)
+    )
+    gap_range["input_lines"] = [3, 7]
+    gap_range["input_slice_sha256"] = sha256_hex(
+        slice_bytes(CALIBRATION_INPUT_BYTES, 3, 7)
+    )
+    gap = assess_pair(gap_first, complementary_second)
+    gap_findings = gap.observed_bad + gap.could_not_observe
+    if gap.verdict is not Verdict.FAIL:
+        errors.append(
+            "cross-record combined partition gap: expected FAIL, observed "
+            f"{gap.verdict.value} ({gap_findings})"
+        )
+    elif not any("line 10 is uncovered" in finding for finding in gap_findings):
+        errors.append(
+            f"cross-record combined partition gap: went FAIL for the wrong reason ({gap_findings})"
+        )
+    restore_pair()
 
     def drop_commit(record: dict) -> None:
         del record["input"]["commit"]
@@ -1445,7 +1682,7 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
         "non-derived declaration overlaps a derived range",
         contradictory_overlap,
         Verdict.FAIL,
-        "declarations overlap",
+        "claimed derived",
         errors,
     )
 
@@ -1713,10 +1950,17 @@ def _mutation_controls(repo: Path, honest: dict, bundle: Path) -> list[str]:
     # Precedence: a real violation must not be masked by an incomplete universe.
     mixed = clone_of(honest)
     mixed["input"]["content_sha256"] = sha256_hex(b"tampered\n")
+    mixed["transformed_files"] = [mixed["transformed_files"][0]]
     write_record(repo, mixed)
     unverifiable = clone_of(honest)
     unverifiable["record_id"] = "calibration-unverifiable"
     unverifiable["input"]["immutable_input"]["path"] = CALIBRATION_INVALID_BUNDLE_REL
+    unverifiable_entry = unverifiable["transformed_files"][0]
+    unverifiable_entry["destination_path"] = CALIBRATION_SECOND_DEST_PATH
+    unverifiable_entry["destination_blob"] = git(
+        repo, "rev-parse", f"{head_tree}:{CALIBRATION_SECOND_DEST_PATH}"
+    ).decode().strip()
+    unverifiable_entry["base_blob"] = None
     write_record(repo, unverifiable)
     precedence = assess(repo)
     if precedence.verdict is not Verdict.FAIL:
