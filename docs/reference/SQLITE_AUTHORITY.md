@@ -154,6 +154,12 @@ Only `--exercise-visualizer` needs Bun, and it is not the CI entry point: the re
 stdlib-only, because a check that cannot run is worth less than a weaker check that does. Re-run the
 exercise whenever the visualizer server sources change; the check will tell you when that is.
 
+Bun is not necessarily on `PATH`. When needed, install the CI-pinned version with
+`npm install bun@1.3.14`, then pass `node_modules/.bin/bun` with `--bun`. Without Bun, a validation
+run verifies the retained exercise's binding to the current sources rather than re-executing the
+read surface; its output states which mode ran. Re-execution is required only when the bound
+visualizer server sources change, which the check reports precisely.
+
 `--controls` prints what each negative control observed, so the record shows the controls are
 red-capable rather than merely asserting it.
 

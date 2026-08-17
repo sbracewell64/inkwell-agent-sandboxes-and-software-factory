@@ -182,7 +182,9 @@ The visualizer's read surface is genuinely executed under Bun and digest-bound t
 against, so the stdlib gate stays runnable without a JavaScript toolchain while the executed proof
 stays true for exactly the source it covers. Re-running the exercise is required whenever the
 visualizer server sources change; the check names that requirement rather than leaving it to
-discipline.
+discipline. Bun is not necessarily on `PATH`; install the pinned `bun@1.3.14` package when needed
+and pass its `node_modules/.bin/bun` executable with `--bun`. A run without Bun verifies the binding
+and identifies that mode; it does not claim a fresh execution.
 
 The triage contract is asserted by executing the archive statement extracted from the visualizer's
 own bytes, not by driving the HTTP route end to end. A route that stopped calling `setArchived`
