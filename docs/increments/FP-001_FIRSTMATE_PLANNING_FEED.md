@@ -74,6 +74,23 @@ FP-001 contract + validator
     -> PROVEN only after accepted immutable identities agree
 ```
 
+## Current implementation candidates
+
+These identities record the current isolated implementation candidates only. They are **not accepted/proven heads**, and no validation result may be carried forward automatically after either branch moves.
+
+- SSSF producer candidate: `implementation/fut-003-planning-feed` at `fa435c6ae58c2f4d0d610ba8135b49e128f26699`
+  - adds `PLANNING_EVENTS.jsonl` with the non-actionable bootstrap snapshot;
+  - adds `planning_event.schema.json`;
+  - adds `docs/validation/check_planning_events.py` with closed-state/edge, exact-source/ref, append-only, and watched-red controls.
+- FirstMate consumer candidate: `fm/sssf-planning-awareness` at `6ed152ba8c1569d3575663edd4a4cf2cdbb33e54`
+  - adds the SSSF planning-awareness adapter;
+  - binds the registered watcher shim to the exact adapter digest in addition to FirstMate's existing custom-check trust binding;
+  - keeps a private offset/prefix-hash cursor and pending generation;
+  - adds the agent-only handling skill;
+  - adds a hermetic regression for bootstrap pending/acknowledgement, unchanged-feed silence, prefix mutation refusal, and `ACTIVE` intake-without-direct-task creation.
+
+No CI, independent review, watcher-suite rebase, live enablement, landing, or canonical proof is claimed by recording these heads.
+
 ## Current restrictions
 
 This increment may be implemented and tested on its isolated branch now. It must not be merged, tagged, frozen, or represented as trusted/canonical while the governing PRE_CERTIFICATION constraints remain in force.
