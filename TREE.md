@@ -154,6 +154,8 @@ commands/prime.md     `/prime` — boots a net-new agent on this whole system.
 
 ```
 docs/reference/EVIDENCE_MANIFEST.md  authoritative manifest v1 contract and HD-09 boundary.
+docs/evidence/PR8_INCREMENT_IDENTITY_COLLISION.md  calibration record for the withdrawn,
+                      unsupported PR 8 HD-04 claim and the complete affected claim map.
 docs/validation/check_evidence_manifest.py  deterministic positive and watched-red controls.
 docs/validation/fixtures/evidence_manifest/ canonical offline manifest fixtures.
 specs/sandbox-mount-system.html   THE PLAN, and the working checklist. Live checkboxes record

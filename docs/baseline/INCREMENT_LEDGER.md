@@ -28,8 +28,16 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | HD-01 | PASS | One authoritative strict LF working-tree contract | default + doctor strict owner; CRLF/missing/wrong-attribute watched-red controls; hostile-`core.autocrlf=true` fresh clone remained `i/lf w/lf` |
 | HD-02 | PASS | Static synchronization for installed/template/generated ADWs | nonempty static inventory, generated import-only smoke, and sixteen watched-red mutations passed without provider execution |
 | HD-03 | PASS | Nonvacuous three-valued gate outcomes | 15 focused controls prove PASS/FAIL/CNO, fail-closed migration, trace provenance, and non-green CNO rendering |
-| HD-04 | CORRECTED CANDIDATE — CNO | Typed mapped-surface parity and fresh-stamp verification | Execution at head `38428b06` compared 42 governed paths and declared 21 watched-red controls: six were independently observed red against real defect builds and fourteen remain asserted and unverified. The three-valued boundary was observed as PASS 0, FAIL 1, and could-not-observe 2; a real in-tree broken symlink reached could-not-observe at exit 2 without a traceback. Earlier PASS results from this parity control, including the result reported for pull request 8 at head `f70a0bb8`, were could-not-observe rather than confirmed: a file outside the declared tree could then change the verdict, and the watched-red demonstrations had never been executed. This row records a corrected candidate only and asserts no acceptance. |
 | HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
+
+## Identity calibration
+
+The mapped-surface candidate in pull request 8 is intentionally absent from the
+row set because authoritative history does not assign it an increment ID. Its
+former `HD-04` claim collided with the mutations increment reserved by landed
+HD-03 history. The collision, the complete identity check, and the reason no
+replacement ID was invented are retained in
+[`../evidence/PR8_INCREMENT_IDENTITY_COLLISION.md`](../evidence/PR8_INCREMENT_IDENTITY_COLLISION.md).
 
 ## Future increments
 
