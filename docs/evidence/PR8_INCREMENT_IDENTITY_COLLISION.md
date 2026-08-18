@@ -1,7 +1,9 @@
 # Pull request 8 increment-identity collision calibration
 
-**Recorded:** 2026-08-17  
-**Pre-correction pull request head:** `8a644b79278f12f29d7f107dbbc38a71a3b75581`  
+**Recorded:** 2026-08-17
+
+**Pre-correction pull request head:** `8a644b79278f12f29d7f107dbbc38a71a3b75581`
+
 **Scope:** pull requests 8–13 based on trunk `bee9296a4c94b1dc3da6991acd1755a91fa681eb`
 
 This record preserves a content defect that an ordinary textual merge need not
