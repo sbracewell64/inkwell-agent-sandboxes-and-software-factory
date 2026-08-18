@@ -113,6 +113,62 @@ make trace/status inspection reliable from the Windows host and suitable for sup
 
 Qualify scout/reviewer/documenter and additional ADWs with explicit fixtures.
 
+## FUT-003 — FirstMate planning-transition awareness
+
+**Planning state: `ACTIVE`.**
+
+Architecture is governed by `ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`.
+
+Purpose:
+
+remove routine Captain relay between Browser-Sol-managed SSSF planning promotions and FirstMate without allowing planning prose to become execution authority.
+
+Implementation is split so each side can be proved and rolled back independently:
+
+1. `FP-001` — SSSF producer: append-only typed planning-event feed, bootstrap snapshot, deterministic validator, exact planning-source provenance, and retained evidence.
+2. `FM-FP-001` — FirstMate consumer: one authenticated custom-check adapter on the existing `fm-watch` cadence, private offset/prefix-hash cursor, ordered deduplicated handling, and mechanical state classification.
+
+Required ordering:
+
+```text
+ADR-0005 / planning lifecycle
+        -> FP-001 producer contract + validator
+        -> FM-FP-001 consumer against producer fixtures
+        -> rebase each side onto its settled acceptance surface
+        -> independent validation/review
+        -> live enablement
+        -> PROVEN only after accepted immutable source identities agree
+```
+
+The producer may be implemented while other SSSF PRE_CERTIFICATION work remains open, but it must not merge or claim trusted-system status in violation of those constraints.
+
+The consumer may be implemented while FirstMate watcher-related work remains open, but it must not be enabled against the production planning source until it has been rebased and requalified against the settled watcher/test surface.
+
+Bootstrap rule:
+
+- the first `PLANNING_EVENTS.jsonl` record is a non-actionable synchronization snapshot;
+- it establishes the initial cursor/current planning states and cannot create work;
+- later records are ordered transitions whose `source_commit` points to the already-existing authoritative planning commit;
+- only a later `to: ACTIVE` transition is eligible for normal FirstMate intake, and even then the named increment/docs must be fetched and admitted normally.
+
+Acceptance for `FP-001`:
+
+- valid feed passes non-vacuously;
+- malformed JSON, duplicate IDs, illegal state edges, invalid paths, missing full commit identity, and invalid `ACTIVE` bindings fail closed;
+- bootstrap snapshot is unique and mechanically non-actionable;
+- historical feed replacement/truncation is detectable by the consumer continuity contract.
+
+Acceptance for `FM-FP-001`:
+
+- no new event means silence;
+- registered-check tampering is rejected by existing trust machinery;
+- offset/prefix mismatch refuses without cursor advancement;
+- duplicate/malformed/stale events cannot create duplicate or stale effects;
+- all non-`ACTIVE` states are awareness-only;
+- bootstrap synchronization creates no work;
+- `ACTIVE` is intake eligibility, not direct execution authority;
+- retirement of the check/cursor restores the pre-bridge behavior without modifying SSSF planning truth.
+
 ## Long-range sequenced direction — FUT-001
 
 **Planning state: `SEQUENCED`, not `ACTIVE`.**
