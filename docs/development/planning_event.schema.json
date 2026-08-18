@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "sssf-planning-event/v1",
   "title": "SSSF planning event",
+  "description": "One record of the append-only planning-transition notification index. The feed is transport metadata only; FUTURE_CANDIDATES.md, accepted ADRs, ROADMAP.md, and named increment records remain authoritative. source_commit names the already-existing authoritative planning commit; the commit that appends the event is transport provenance, not the announced authority. docs/validation/check_planning_events.py is the executable contract and asserts agreement with this schema.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,7 +12,8 @@
     "kind",
     "source_commit",
     "actionability",
-    "authoritative_refs"
+    "authoritative_refs",
+    "authoritative_blobs"
   ],
   "properties": {
     "schema": {"const": "sssf-planning-event/v1"},
@@ -21,44 +23,68 @@
     "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "actionability": {"enum": ["awareness", "engineering"]},
     "item_id": {"type": "string", "pattern": "^FUT-[0-9]{3}$"},
-    "from": {"type": "string"},
-    "to": {"type": "string"},
+    "from": {"enum": ["EXPLORE", "PRESERVE", "CANDIDATE", "DECIDED", "SEQUENCED", "ACTIVE", "PROVEN", "DEFERRED", "REJECTED", "SUPERSEDED"]},
+    "to": {"enum": ["EXPLORE", "PRESERVE", "CANDIDATE", "DECIDED", "SEQUENCED", "ACTIVE", "PROVEN", "DEFERRED", "REJECTED", "SUPERSEDED"]},
     "states": {
       "type": "object",
       "minProperties": 1,
-      "additionalProperties": {"type": "string"}
+      "maxProperties": 64,
+      "propertyNames": {"pattern": "^FUT-[0-9]{3}$"},
+      "additionalProperties": {"enum": ["EXPLORE", "PRESERVE", "CANDIDATE", "DECIDED", "SEQUENCED", "ACTIVE", "PROVEN", "DEFERRED", "REJECTED", "SUPERSEDED"]}
     },
     "authoritative_refs": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 16,
       "uniqueItems": true,
-      "items": {"type": "string", "minLength": 1}
+      "items": {"type": "string", "minLength": 1, "maxLength": 200, "pattern": "^docs/[A-Za-z0-9._/-]+$"}
+    },
+    "authoritative_blobs": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 16,
+      "propertyNames": {"pattern": "^docs/[A-Za-z0-9._/-]+$"},
+      "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
     },
     "increments": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 8,
       "uniqueItems": true,
-      "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*[0-9][A-Z0-9-]*$"}
+      "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$"}
     }
   },
   "allOf": [
     {
-      "if": {"properties": {"kind": {"const": "bootstrap"}}},
+      "$comment": "The bootstrap record is a synchronization snapshot and must be mechanically incapable of carrying an intake binding.",
+      "if": {"properties": {"kind": {"const": "bootstrap"}}, "required": ["kind"]},
       "then": {
         "required": ["states"],
         "properties": {"actionability": {"const": "awareness"}},
-        "not": {"anyOf": [{"required": ["from"]}, {"required": ["to"]}, {"required": ["item_id"]}]}
+        "not": {
+          "anyOf": [
+            {"required": ["from"]},
+            {"required": ["to"]},
+            {"required": ["item_id"]},
+            {"required": ["increments"]}
+          ]
+        }
       }
     },
     {
-      "if": {"properties": {"kind": {"const": "transition"}}},
-      "then": {"required": ["item_id", "from", "to"]}
+      "if": {"properties": {"kind": {"const": "transition"}}, "required": ["kind"]},
+      "then": {"required": ["item_id", "from", "to"], "not": {"required": ["states"]}}
     },
     {
+      "$comment": "Only ACTIVE is engineering-intake eligible, and it must name a concrete increment.",
       "if": {"properties": {"to": {"const": "ACTIVE"}}, "required": ["to"]},
       "then": {
         "required": ["increments"],
         "properties": {"actionability": {"const": "engineering"}}
+      },
+      "else": {
+        "properties": {"actionability": {"const": "awareness"}},
+        "not": {"required": ["increments"]}
       }
     }
   ]
