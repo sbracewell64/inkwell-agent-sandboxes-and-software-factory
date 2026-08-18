@@ -27,6 +27,13 @@ repository:
   upstream: https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git
   accepted_branch: main
   development_branch_pattern: increment/*
+planning:
+  lifecycle: docs/development/PLANNING_LIFECYCLE.md
+  candidate_register: docs/development/FUTURE_CANDIDATES.md
+  roadmap: docs/development/ROADMAP.md
+  decisions: docs/decisions/
+  rule: preserved_does_not_mean_approved_and_sequenced_does_not_mean_active
+  activation_boundary: named_increment_under_docs/development/INCREMENT_PROTOCOL.md
 foundational_sources:
   super_simple_software_factory:
     repository: https://github.com/disler/super-simple-software-factory.git
