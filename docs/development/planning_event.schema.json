@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sssf-planning-event/v1",
+  "title": "SSSF planning event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "sequence",
+    "event_id",
+    "kind",
+    "source_commit",
+    "actionability",
+    "authoritative_refs"
+  ],
+  "properties": {
+    "schema": {"const": "sssf-planning-event/v1"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "event_id": {"type": "string", "pattern": "^plan-[0-9]{8}-[0-9]{4}$"},
+    "kind": {"enum": ["bootstrap", "transition"]},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "actionability": {"enum": ["awareness", "engineering"]},
+    "item_id": {"type": "string", "pattern": "^FUT-[0-9]{3}$"},
+    "from": {"type": "string"},
+    "to": {"type": "string"},
+    "states": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "string"}
+    },
+    "authoritative_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "increments": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*[0-9][A-Z0-9-]*$"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "bootstrap"}}},
+      "then": {
+        "required": ["states"],
+        "properties": {"actionability": {"const": "awareness"}},
+        "not": {"anyOf": [{"required": ["from"]}, {"required": ["to"]}, {"required": ["item_id"]}]}
+      }
+    },
+    {
+      "if": {"properties": {"kind": {"const": "transition"}}},
+      "then": {"required": ["item_id", "from", "to"]}
+    },
+    {
+      "if": {"properties": {"to": {"const": "ACTIVE"}}, "required": ["to"]},
+      "then": {
+        "required": ["increments"],
+        "properties": {"actionability": {"const": "engineering"}}
+      }
+    }
+  ]
+}
