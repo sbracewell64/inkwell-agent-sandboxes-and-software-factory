@@ -74,6 +74,64 @@ FP-001 contract + validator
     -> PROVEN only after accepted immutable identities agree
 ```
 
+## Producer surface
+
+| Artifact | Role |
+|---|---|
+| `docs/development/PLANNING_EVENTS.jsonl` | the append-only typed notification index |
+| `docs/development/planning_event.schema.json` | record schema |
+| `docs/reference/PLANNING_EVENTS.md` | producer contract and append procedure |
+| `docs/validation/check_planning_events.py` | deterministic offline validator and watched-red controls |
+| `ci/checks.json` / `docs/validation/check_ci_contract.py` | enumerate the validator as `planning-event-producer-validator` |
+
+Each record binds its authority on two immutable axes — the full `source_commit` plus the full
+Git blob id of every `authoritative_ref` at that commit — because CI checks out at
+`fetch-depth: 1` and consumers may hold shallow clones. An object that is genuinely absent is
+reported as could-not-observe rather than passed or failed; `--require-git-witness` upgrades
+every such axis to a failure for full-depth qualification.
+
+## Executed proof matrix
+
+Recorded from the validator's own output on this branch. Every control is a named mutation that
+must produce its own specific diagnostic; a red caused by unrelated breakage does not count.
+
+- **56 controls executed, 56 watched reds observed**, in-process on every run
+  (49 record-grammar, 7 continuity).
+- **Non-vacuity partners** (proven able to pass before any red is trusted): the honest feed; an
+  honest bootstrap + awareness-transition + `ACTIVE`-transition chain; an honest append; an
+  unchanged feed. If any partner fails, the run reports vacuity instead of reds.
+
+| Required control | Named reds |
+|---|---|
+| honest feed passes non-vacuously | the four non-vacuity partners above |
+| bootstrap unique, first, non-actionable | `second-bootstrap`, `bootstrap-not-first`, `bootstrap-actionable`, `bootstrap-carries-increments`, `bootstrap-carries-transition`, `bootstrap-missing-states` |
+| canonical one-object-per-line | `malformed-json`, `duplicate-object-key`, `non-canonical-key-order`, `non-compact-separators`, `non-object-line`, `blank-record`, `missing-trailing-lf`, `cr-framing`, `utf8-bom` |
+| unique, ordered ids and sequences | `duplicate-event-id`, `non-increasing-event-id`, `sequence-gap`, `sequence-not-integer` |
+| closed-set states and kinds | `unknown-kind`, `unknown-actionability`, `unknown-bootstrap-state`, `unknown-to-state` |
+| legal transitions only | `illegal-edge`, `terminal-state-exit`, `stale-from-state`, `unknown-item-not-from-explore` |
+| full exact Git source identities | `short-source-commit`, `uppercase-source-commit`, `symbolic-source-commit`, `missing-blob-binding`, `short-blob-id`, `blob-ref-set-mismatch` |
+| bounded, normalized authoritative refs | `ref-traversal`, `ref-absolute`, `ref-outside-docs`, `ref-double-slash`, `ref-dot-segment`, `ref-trailing-slash`, `ref-backslash`, `ref-over-length`, `refs-unsorted`, `refs-empty` |
+| `ACTIVE` requires an increment binding | `active-without-increments`, `active-awareness-actionability`, `active-bad-increment-identity`, `active-increment-not-referenced`, `non-active-carries-increments`, `non-active-engineering` |
+| prefix mutation observable | `truncation`, `record-removal`, `prefix-byte-mutation-first`, `prefix-byte-mutation-middle`, `prefix-byte-mutation-last`, `historical-replacement`, `prefix-mutation-with-honest-append` |
+
+Controls executed outside the process, against the live repository, because they mutate real Git
+or CI state:
+
+| Control | Mutation | Observed |
+|---|---|---|
+| blob-binding-mismatch | declared blob id for `ROADMAP.md` set to `0`×40 | RED — `blob binding mismatch` |
+| ref-absent-at-source | `source_commit` moved to `56b4542`, which predates the FP-001 record | RED — `authoritative ref absent at source_commit` |
+| require-git-witness | unresolvable `source_commit` under `--require-git-witness` | RED — gaps upgraded to failures |
+| ci-enumeration | validator removed from `ci/checks.json` only | RED — `enumerated offline checks differ` |
+| shallow-checkout | depth-1 clone of this worktree | GREEN, 56 reds still observed, 5 axes reported could-not-observe |
+
+Continuity against the accepted baseline currently reports **`unpublished`** — `origin/main`
+holds no feed, so there are no published bytes to compare. That is a stated third value, not a
+pass. Prefix-mutation detection is therefore proven by the seven synthetic continuity controls
+above rather than by branch history.
+
+The consumer-side matrix (`FM-FP-001`) is not proven by this increment.
+
 ## Current restrictions
 
 This increment may be implemented and tested on its isolated branch now. It must not be merged, tagged, frozen, or represented as trusted/canonical while the governing PRE_CERTIFICATION constraints remain in force.
