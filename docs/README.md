@@ -30,6 +30,19 @@ Read in this order:
 7. [`reference/GLOSSARY.md`](reference/GLOSSARY.md) — canonical terms.
 8. [`reference/EVIDENCE_MANIFEST.md`](reference/EVIDENCE_MANIFEST.md) — offline run-bound evidence manifest v1 (not runtime acceptance).
 
+## Future architecture planning
+
+Future ideas do not become implementation work merely because they were discussed.
+
+Use these records when the task concerns long-range design rather than current proven behavior:
+
+- [`development/PLANNING_LIFECYCLE.md`](development/PLANNING_LIFECYCLE.md) — promotion states from `EXPLORE` through `PROVEN`.
+- [`development/FUTURE_CANDIDATES.md`](development/FUTURE_CANDIDATES.md) — preserved/candidate/decided/sequenced future items.
+- [`development/ROADMAP.md`](development/ROADMAP.md) — dependency sequencing for approved implementation intent.
+- [`decisions/`](decisions/) — accepted architectural decisions.
+
+Planning state is not proof state. `PRESERVE`, `CANDIDATE`, `DECIDED`, and `SEQUENCED` records must not be read as claims about current executable behavior.
+
 ## Documentation authority
 
 When sources disagree, use this precedence:
@@ -64,3 +77,5 @@ Every accepted increment must update at least:
 - the affected architecture/operations/reference document
 - `baseline/PROOF_MATRIX.md` when a new claim is proven
 - an ADR when an architectural choice changes
+
+Future-planning promotions update only the smallest applicable planning surface until the item becomes `ACTIVE` under the increment protocol.
