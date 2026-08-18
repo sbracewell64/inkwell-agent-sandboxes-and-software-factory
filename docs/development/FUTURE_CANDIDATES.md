@@ -10,7 +10,7 @@ State meanings are defined in [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md).
 |---|---|---|---|---|
 | FUT-001 | Bounded autonomous DSH execution cells | SEQUENCED | `ADR-0004-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md`; long-range roadmap | SSSF owns outer authority; DSH may exercise substantial inner autonomy inside externally bounded execution cells. Cordis remains encapsulated inside DSH. |
 | FUT-002 | Awesome DSH Plugin catalog as future research/reuse source | PRESERVE | none | Consult `awesome-dsh-plugin/awesome-dsh-plugin` before implementing new post-DSH harness capabilities. Catalog inclusion never implies trust or production eligibility. |
-| FUT-003 | FirstMate planning-transition awareness | DECIDED | `ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`; unsequenced | FirstMate will consume typed planning transitions through its existing authenticated custom-check/watch path; it must never derive execution authority from planning prose, and only `ACTIVE` may enter engineering intake. |
+| FUT-003 | FirstMate planning-transition awareness | ACTIVE | `ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`; `FP-001` producer + `FM-FP-001` consumer | Implementation is authorized on isolated branches. SSSF will emit a typed append-only planning feed; FirstMate will consume it through its existing authenticated custom-check/watch path. Only `ACTIVE` may enter engineering intake. Production landing/enablement remains held by current acceptance boundaries. |
 
 ## FUT-001 — Bounded autonomous DSH execution cells
 
@@ -100,32 +100,33 @@ High-value areas already identified for later research include contract/regressi
 
 ### Status
 
-`DECIDED`
+`ACTIVE`
 
-Governing decision:
+Architecture is governed by `ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`.
 
-[`ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`](../decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md)
+Implementation authorization is split into two independently bounded increments:
 
-Decision basis evaluated against FirstMate `main` at observed commit:
+- `FP-001` — SSSF planning-event producer contract, append-only feed, validator, bootstrap snapshot, and evidence;
+- `FM-FP-001` — FirstMate consumer using the existing authenticated custom-check/watch surface, private cursor/receipts, state-only classification, and `ACTIVE`-only intake eligibility.
 
-`f4e69d6ce411750b55fc9f186f60ce0e8b0cd786`
-
-Implementation remains **unsequenced and inactive**. No FirstMate watcher change, task, or engineering intake is authorized by this decision alone.
+The producer and consumer may be implemented and proven on isolated branches now. They must not be merged, enabled against the production planning source, or promoted to `PROVEN` merely because branch-local tests pass. Current SSSF PRE_CERTIFICATION constraints and the moving FirstMate watcher surface remain acceptance boundaries.
 
 ### Problem
 
-Browser Sol now maintains a deliberate SSSF planning lifecycle (`EXPLORE -> PRESERVE -> CANDIDATE -> DECIDED -> SEQUENCED -> ACTIVE -> PROVEN`). FirstMate should learn about durable planning promotions without requiring the Captain to relay them, but it must not infer work from prose or treat every planning-document edit as authorization.
+Browser Sol maintains a deliberate SSSF planning lifecycle (`EXPLORE -> PRESERVE -> CANDIDATE -> DECIDED -> SEQUENCED -> ACTIVE -> PROVEN`). FirstMate should learn about durable planning promotions without requiring the Captain to relay them, but it must not infer work from prose or treat every planning-document edit as authorization.
 
 Without a typed signal, the alternatives are both undesirable:
 
 - manual Captain transport of planning changes; or
 - FirstMate periodically rereading planning prose and deciding semantically whether a change is actionable.
 
-The second would collapse the planning/engineering authority boundary we created.
+The second would collapse the planning/engineering authority boundary.
 
-### Evidence and existing primitives
+### Evidence and selected primitive
 
-FirstMate already has the required transport foundations:
+The candidate evaluation was completed against FirstMate `main` at observed commit `f4e69d6ce411750b55fc9f186f60ce0e8b0cd786`.
+
+FirstMate already provides the required transport foundations:
 
 1. `bin/fm-watch.sh` owns one continuous supervision cycle and runs authenticated `state/*.check.sh` checks on its existing slow cadence. A validated custom check that returns empty output stays silent; nonempty output is durably queued as a `check:` wake and closes that watcher cycle.
 2. `bin/fm-check-lib.sh` validates custom checks against a private hash-bound trust record and executes a private snapshot rather than mutable live bytes.
@@ -133,32 +134,19 @@ FirstMate already has the required transport foundations:
 4. `bin/fm-remote-delta-read.sh` already implements the continuity algorithm needed for an append-only feed: byte offset plus prefix SHA-256, bounded complete-line reads, and explicit `continuity-broken` results on truncation, replacement, or prefix mutation rather than silent rebasing.
 5. `bin/fm-procevent-remote-reply.sh` demonstrates durable cursor and idempotent-ingestion patterns over that delta contract, but process-event itself is designed for blocking external-process sources. A GitHub planning branch is periodic repository state, so adding a blocking process source would duplicate the watcher's polling role.
 
-### Decided primitive
+Selected design: **one registered FirstMate custom check** as the outer detector, running under the existing `fm-watch` cadence. No second polling daemon.
 
-Use **one registered FirstMate custom check** as the outer detector, running under the existing `fm-watch` cadence. Do not create another polling daemon.
-
-When implemented, the SSSF planning side will expose a small append-only transition feed, intended as:
+The SSSF planning side exposes an append-only notification index at:
 
 `docs/development/PLANNING_EVENTS.jsonl`
 
-The feed is a notification index, not a new source of truth. Each event points to the authoritative planning documents and exact Git identity.
+The feed is not a source of truth. Each event points at authoritative planning documents and exact Git identity.
 
-Example shape:
+### Bootstrap rule
 
-```json
-{"schema":"sssf-planning-event/v1","event_id":"plan-20260818-0007","item_id":"FUT-003","from":"CANDIDATE","to":"DECIDED","source_commit":"<sha>","authoritative_refs":["docs/development/FUTURE_CANDIDATES.md","docs/decisions/<adr>.md"],"actionability":"awareness"}
-```
+The bridge must not activate itself by replaying historical transitions. The first feed record is therefore a non-actionable bootstrap snapshot that establishes the current planning states and cursor baseline. FirstMate must consume that snapshot only as synchronization state.
 
-An activation event would instead carry `to: "ACTIVE"`, a named increment identity, and `actionability: "engineering"`.
-
-FirstMate will keep a private cursor for the feed using the same semantic fields as the existing remote-delta contract:
-
-- byte offset;
-- prefix SHA-256;
-- last handled event identity;
-- exact observed SSSF planning ref/commit.
-
-The custom check will surface the oldest unseen valid event and leave later events for later checks, preserving order and bounding each wake.
+Subsequent records are ordered transitions. A transition record's `source_commit` names the already-existing authoritative planning commit that established the state change; the later commit that appends the event is transport provenance, not the authority being announced.
 
 ### Authority split
 
@@ -166,7 +154,7 @@ The custom check will surface the oldest unseen valid event and leave later even
 
 - planning-state promotion;
 - updates to `FUTURE_CANDIDATES.md`, ADRs, and `ROADMAP.md`;
-- future append of the corresponding transition event;
+- append of the corresponding transition event after the authoritative planning commit exists;
 - the authoritative meaning of `EXPLORE` through `SEQUENCED`.
 
 **FirstMate code owns:**
@@ -185,56 +173,45 @@ The custom check will surface the oldest unseen valid event and leave later even
 
 FirstMate does not promote SSSF planning states and does not edit Browser-Sol-owned planning documents through this mechanism.
 
-### Evaluation record
+### Required producer controls
 
-| Field | Evaluation |
-|---|---|
-| Problem | FirstMate lacks deterministic awareness of Browser-Sol-managed planning promotions without Captain relay. |
-| Evidence | Existing planning lifecycle explicitly separates planning from activation; FirstMate already has authenticated watch/check and durable cursor primitives but no SSSF planning adapter was found. |
-| Primitive | Append-only SSSF planning transition feed + one authenticated FirstMate custom-check adapter. |
-| Owner | Browser Sol owns promotion/event creation; CODE owns detection/continuity/state classification; FirstMate handles the resulting typed awareness/intake event. |
-| Existing owner | Manual relay or ad hoc repository inspection. |
-| Replacement | Removes Captain relay for promoted SSSF planning state and prevents broad semantic polling of planning prose. |
-| Inputs | Exact SSSF repository/ref, `PLANNING_EVENTS.jsonl`, cursor offset/hash, event schema, referenced source commit. |
-| Outputs | One bounded typed planning-event wake, or silence when no unseen event exists. |
-| State | Append-only feed in SSSF; private FirstMate cursor/receipts under FirstMate state. |
-| Trigger | Existing `fm-watch` custom-check cadence; no second daemon. |
-| Verifier | Hermetic custom-check tests with a fake planning source plus watcher integration tests. |
-| Negative control | No appended event => no wake; tampered registered check => rejected; changed/truncated prefix => continuity break; duplicate event => no duplicate transition effect; non-`ACTIVE` event => no task; malformed or stale `ACTIVE` reference => no activation. |
-| Failure behavior | Do not advance cursor on malformed/unavailable/continuity-broken input. Surface continuity/security failure on a bounded cadence; never silently rebase. |
-| Rollback | Remove/retire the registered planning check and its private cursor. SSSF planning docs remain valid and manually inspectable. |
-| Documentation | SSSF planning lifecycle/candidate docs; FirstMate watcher/process-event or new planning-awareness doc as appropriate. |
-| Documentation verifier | Tests assert event-state semantics and that only `ACTIVE` can reach intake. |
-| Telemetry | Detection latency, duplicate wakes, continuity failures, invalid events, awareness events, attempted/accepted activations. |
-| Promotion criteria | Contract tests prove silence, ordering, dedupe, continuity-break refusal, trusted-check enforcement, `ACTIVE`-only intake, stale-source protection, and rollback. |
-| Retirement | Manual Captain transport of promoted SSSF planning changes. |
-| Net complexity | One small feed + one adapter/cursor contract, reusing existing watcher infrastructure; no new service or scheduler. |
-| Authority class | Browser Sol planning authority -> CODE transport -> FirstMate engineering intake only at `ACTIVE`. |
-| State transition | Adds a deterministic notification bridge between planning lifecycle transitions and the existing increment intake boundary; does not add a new SSSF execution state. |
-| Determinism boundary | Code parses exact event state; FirstMate cannot reinterpret a non-`ACTIVE` promotion as work authorization. |
-| Provenance | Event names exact source commit and authoritative refs; FirstMate cursor and acknowledgement bind handling to the observed feed prefix/event identity. |
+`FP-001` must prove at least:
 
-### Alternatives considered
+- the bootstrap snapshot is non-actionable and unique;
+- event IDs are unique and ordered;
+- state values are closed-set;
+- transition edges are legal under `PLANNING_LIFECYCLE.md`;
+- `ACTIVE` names a concrete increment identity and authoritative references;
+- authoritative references are relative, bounded repository paths;
+- every transition binds a full source commit identity;
+- malformed JSON, duplicate IDs, illegal edges, absent required fields, and feed replacement/truncation are non-pass conditions;
+- the honest feed passes non-vacuously.
 
-#### Process-event adapter
+### Required consumer controls
 
-Not selected as the primary detector. Process-event is well suited to a blocking external source; a GitHub planning branch must still be polled somewhere. Wrapping that polling in a blocking child would duplicate the existing watch cadence and add lifecycle machinery without clear value.
+`FM-FP-001` must prove at least:
 
-The useful part to reuse is the process-event family's cursor, acknowledgement, and continuity discipline.
+- no appended event produces no wake;
+- a tampered registered check is rejected by the existing trust mechanism;
+- changed/truncated prefix produces continuity failure and no cursor advance;
+- duplicate event produces no duplicate transition effect;
+- malformed or stale event produces no activation;
+- every non-`ACTIVE` transition is awareness-only;
+- `ACTIVE` is only intake eligibility and still requires exact referenced source validation;
+- first synchronization consumes the bootstrap snapshot without creating work;
+- rollback retires the check/cursor without changing SSSF planning truth.
 
-#### Semantic reread of planning docs
+### Rollback
 
-Rejected. A document edit is not a planning-state transition, and `SEQUENCED` is not `ACTIVE`. Letting a model infer actionability from arbitrary diffs would weaken the explicit promotion protocol.
+Producer rollback removes the feed/validator before canonical adoption; the planning lifecycle and authoritative documents remain usable without it.
 
-#### Separate planning daemon
+Consumer rollback retires the registered planning check and its private cursor/receipts; FirstMate returns to manual/ad-hoc awareness without changing SSSF planning state.
 
-Rejected. FirstMate already has the continuous watcher and custom-check lifecycle. A second polling owner would increase concurrency, lifecycle, and quiescence complexity for no demonstrated benefit.
+### Current acceptance boundary
 
-### Sequencing status
+`ACTIVE` means engineering is authorized. It does **not** mean either implementation is trusted or production-enabled.
 
-`UNSEQUENCED`
-
-The architecture is decided, but implementation should not enter `ROADMAP.md` or FirstMate engineering transport until the planning branch itself is ready to become part of the accepted SSSF documentation surface and a bounded FirstMate increment is explicitly chosen.
+Promotion to `PROVEN` requires implementation, proof, evidence, documentation, and accepted immutable Git identity on both sides. The SSSF side must respect current PRE_CERTIFICATION constraints; the FirstMate side must rebase and requalify against the settled watcher/test surface before live enablement.
 
 ## Not registered by default
 
