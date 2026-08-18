@@ -82,12 +82,13 @@ These identities record the current isolated implementation candidates only. The
   - adds `PLANNING_EVENTS.jsonl` with the non-actionable bootstrap snapshot;
   - adds `planning_event.schema.json`;
   - adds `docs/validation/check_planning_events.py` with closed-state/edge, exact-source/ref, append-only, and watched-red controls.
-- FirstMate consumer candidate: `fm/sssf-planning-awareness` at `6ed152ba8c1569d3575663edd4a4cf2cdbb33e54`
+- FirstMate consumer candidate: `fm/sssf-planning-awareness` at `92be0b407ab4952bfe1e2d3c499391b41daf17a6`
   - adds the SSSF planning-awareness adapter;
   - binds the registered watcher shim to the exact adapter digest in addition to FirstMate's existing custom-check trust binding;
   - keeps a private offset/prefix-hash cursor and pending generation;
   - adds the agent-only handling skill;
-  - adds a hermetic regression for bootstrap pending/acknowledgement, unchanged-feed silence, prefix mutation refusal, and `ACTIVE` intake-without-direct-task creation.
+  - adds a hermetic regression for bootstrap pending/acknowledgement, unchanged-feed silence, prefix mutation refusal, and `ACTIVE` intake-without-direct-task creation;
+  - replaces the initial function-level `RETURN` cleanup with a check-owned subshell/`EXIT` cleanup so helper returns cannot destroy staging mid-check.
 
 No CI, independent review, watcher-suite rebase, live enablement, landing, or canonical proof is claimed by recording these heads.
 
