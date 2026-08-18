@@ -44,6 +44,9 @@ EXPECTED_CHECKS = {
     "production-extension-path-validator": (
         "{python}", "docs/validation/check_production_extension_path.py"
     ),
+    "planning-event-producer-validator": (
+        "{python}", "docs/validation/check_planning_events.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
 

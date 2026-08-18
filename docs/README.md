@@ -37,11 +37,18 @@ Future ideas do not become implementation work merely because they were discusse
 Use these records when the task concerns long-range design rather than current proven behavior:
 
 - [`development/PLANNING_LIFECYCLE.md`](development/PLANNING_LIFECYCLE.md) — promotion states from `EXPLORE` through `PROVEN`.
-- [`development/FUTURE_CANDIDATES.md`](development/FUTURE_CANDIDATES.md) — preserved/candidate/decided/sequenced future items.
+- [`development/FUTURE_CANDIDATES.md`](development/FUTURE_CANDIDATES.md) — preserved/candidate/decided/sequenced/active future items.
 - [`development/ROADMAP.md`](development/ROADMAP.md) — dependency sequencing for approved implementation intent.
 - [`decisions/`](decisions/) — accepted architectural decisions.
 
-Planning state is not proof state. `PRESERVE`, `CANDIDATE`, `DECIDED`, and `SEQUENCED` records must not be read as claims about current executable behavior.
+FUT-003 adds a transport surface for planning promotions without changing planning authority:
+
+- [`development/PLANNING_EVENTS.jsonl`](development/PLANNING_EVENTS.jsonl) — append-only typed notification index; never the planning source of truth.
+- [`reference/PLANNING_EVENTS.md`](reference/PLANNING_EVENTS.md) — producer/consumer contract, bootstrap rule, actionability, and continuity semantics.
+- [`increments/FP-001_PLANNING_EVENT_PRODUCER.md`](increments/FP-001_PLANNING_EVENT_PRODUCER.md) — bounded producer increment and acceptance criteria.
+- [`validation/check_planning_events.py`](validation/check_planning_events.py) — deterministic producer validator and watched-red controls.
+
+Planning state is not proof state. `PRESERVE`, `CANDIDATE`, `DECIDED`, and `SEQUENCED` records must not be read as claims about current executable behavior. `ACTIVE` authorizes bounded engineering under the increment protocol but is still not `PROVEN`.
 
 ## Documentation authority
 
