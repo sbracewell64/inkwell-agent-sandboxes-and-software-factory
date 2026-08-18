@@ -10,7 +10,7 @@ State meanings are defined in [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md).
 |---|---|---|---|---|
 | FUT-001 | Bounded autonomous DSH execution cells | SEQUENCED | `ADR-0004-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md`; long-range roadmap | SSSF owns outer authority; DSH may exercise substantial inner autonomy inside externally bounded execution cells. Cordis remains encapsulated inside DSH. |
 | FUT-002 | Awesome DSH Plugin catalog as future research/reuse source | PRESERVE | none | Consult `awesome-dsh-plugin/awesome-dsh-plugin` before implementing new post-DSH harness capabilities. Catalog inclusion never implies trust or production eligibility. |
-| FUT-003 | FirstMate planning-transition awareness | CANDIDATE | candidate evaluation complete; decision not yet promoted | Use FirstMate's existing authenticated custom-check/watch path for planning transition detection; reuse remote-delta cursor/hash continuity semantics; only `ACTIVE` may enter engineering intake. |
+| FUT-003 | FirstMate planning-transition awareness | DECIDED | `ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`; unsequenced | FirstMate will consume typed planning transitions through its existing authenticated custom-check/watch path; it must never derive execution authority from planning prose, and only `ACTIVE` may enter engineering intake. |
 
 ## FUT-001 — Bounded autonomous DSH execution cells
 
@@ -100,13 +100,17 @@ High-value areas already identified for later research include contract/regressi
 
 ### Status
 
-`CANDIDATE`
+`DECIDED`
 
-Candidate evaluation completed against FirstMate `main` at observed commit:
+Governing decision:
+
+[`ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`](../decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md)
+
+Decision basis evaluated against FirstMate `main` at observed commit:
 
 `f4e69d6ce411750b55fc9f186f60ce0e8b0cd786`
 
-No FirstMate implementation is authorized by this candidate state.
+Implementation remains **unsequenced and inactive**. No FirstMate watcher change, task, or engineering intake is authorized by this decision alone.
 
 ### Problem
 
@@ -129,11 +133,11 @@ FirstMate already has the required transport foundations:
 4. `bin/fm-remote-delta-read.sh` already implements the continuity algorithm needed for an append-only feed: byte offset plus prefix SHA-256, bounded complete-line reads, and explicit `continuity-broken` results on truncation, replacement, or prefix mutation rather than silent rebasing.
 5. `bin/fm-procevent-remote-reply.sh` demonstrates durable cursor and idempotent-ingestion patterns over that delta contract, but process-event itself is designed for blocking external-process sources. A GitHub planning branch is periodic repository state, so adding a blocking process source would duplicate the watcher's polling role.
 
-### Recommended primitive
+### Decided primitive
 
 Use **one registered FirstMate custom check** as the outer detector, running under the existing `fm-watch` cadence. Do not create another polling daemon.
 
-The SSSF planning side should expose a small append-only transition feed, proposed as:
+When implemented, the SSSF planning side will expose a small append-only transition feed, intended as:
 
 `docs/development/PLANNING_EVENTS.jsonl`
 
@@ -147,14 +151,14 @@ Example shape:
 
 An activation event would instead carry `to: "ACTIVE"`, a named increment identity, and `actionability: "engineering"`.
 
-FirstMate should keep a private cursor for the feed using the same semantic fields as the existing remote-delta contract:
+FirstMate will keep a private cursor for the feed using the same semantic fields as the existing remote-delta contract:
 
 - byte offset;
 - prefix SHA-256;
 - last handled event identity;
 - exact observed SSSF planning ref/commit.
 
-The custom check should surface the oldest unseen valid event and leave later events for later checks, preserving order and bounding each wake.
+The custom check will surface the oldest unseen valid event and leave later events for later checks, preserving order and bounding each wake.
 
 ### Authority split
 
@@ -162,7 +166,7 @@ The custom check should surface the oldest unseen valid event and leave later ev
 
 - planning-state promotion;
 - updates to `FUTURE_CANDIDATES.md`, ADRs, and `ROADMAP.md`;
-- append of the corresponding transition event;
+- future append of the corresponding transition event;
 - the authoritative meaning of `EXPLORE` through `SEQUENCED`.
 
 **FirstMate code owns:**
@@ -181,7 +185,7 @@ The custom check should surface the oldest unseen valid event and leave later ev
 
 FirstMate does not promote SSSF planning states and does not edit Browser-Sol-owned planning documents through this mechanism.
 
-### Candidate evaluation
+### Evaluation record
 
 | Field | Evaluation |
 |---|---|
@@ -190,7 +194,7 @@ FirstMate does not promote SSSF planning states and does not edit Browser-Sol-ow
 | Primitive | Append-only SSSF planning transition feed + one authenticated FirstMate custom-check adapter. |
 | Owner | Browser Sol owns promotion/event creation; CODE owns detection/continuity/state classification; FirstMate handles the resulting typed awareness/intake event. |
 | Existing owner | Manual relay or ad hoc repository inspection. |
-| Replacement | Removes Captain relay for promoted planning state and prevents broad semantic polling of planning prose. |
+| Replacement | Removes Captain relay for promoted SSSF planning state and prevents broad semantic polling of planning prose. |
 | Inputs | Exact SSSF repository/ref, `PLANNING_EVENTS.jsonl`, cursor offset/hash, event schema, referenced source commit. |
 | Outputs | One bounded typed planning-event wake, or silence when no unseen event exists. |
 | State | Append-only feed in SSSF; private FirstMate cursor/receipts under FirstMate state. |
@@ -214,7 +218,7 @@ FirstMate does not promote SSSF planning states and does not edit Browser-Sol-ow
 
 #### Process-event adapter
 
-Not recommended as the primary detector. Process-event is well suited to a blocking external source; a GitHub planning branch must still be polled somewhere. Wrapping that polling in a blocking child would duplicate the existing watch cadence and add lifecycle machinery without clear value.
+Not selected as the primary detector. Process-event is well suited to a blocking external source; a GitHub planning branch must still be polled somewhere. Wrapping that polling in a blocking child would duplicate the existing watch cadence and add lifecycle machinery without clear value.
 
 The useful part to reuse is the process-event family's cursor, acknowledgement, and continuity discipline.
 
@@ -226,11 +230,11 @@ Rejected. A document edit is not a planning-state transition, and `SEQUENCED` is
 
 Rejected. FirstMate already has the continuous watcher and custom-check lifecycle. A second polling owner would increase concurrency, lifecycle, and quiescence complexity for no demonstrated benefit.
 
-### Recommended next promotion
+### Sequencing status
 
-If the architecture is accepted, promote FUT-003 to `DECIDED` and record the invariant that **FirstMate consumes typed planning transitions; it never derives execution authority from planning prose.**
+`UNSEQUENCED`
 
-Implementation should remain unsequenced until the planning branch itself is ready to become part of the accepted SSSF documentation surface and a bounded FirstMate increment is chosen.
+The architecture is decided, but implementation should not enter `ROADMAP.md` or FirstMate engineering transport until the planning branch itself is ready to become part of the accepted SSSF documentation surface and a bounded FirstMate increment is explicitly chosen.
 
 ## Not registered by default
 
