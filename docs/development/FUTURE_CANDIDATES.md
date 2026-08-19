@@ -18,8 +18,9 @@ State meanings are defined in [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md).
 | FUT-008 | Hierarchical probabilistic-verifier evidence and cost telemetry | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | Required governed evidence substrate before production use of the other verifier candidates; verifier authority remains advisory. |
 | FUT-009 | SSSF architecture-unit contract and generated governance views | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | Collapse future ADR/ownership/artifact/validator/lineage catalogs into one small machine-readable architecture contract plus deterministic generated projections. |
 | FUT-010 | Compact SSSF architectural laws | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | Extract a small SSSF-native law set into the existing Boundary Law surface; do not create an AE-style Constitution or governance runtime. |
-| FUT-011 | Instruction-artifact governance | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | One semantic owner per durable instruction, real consumers, truthful bounds, and generated inventory where useful; increasingly relevant as DSH expands prompts/subagents. |
+| FUT-011 | Instruction-artifact governance | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; `AGENT_ENGINEERING_SKILLS_RESEARCH.md`; unsequenced | One semantic owner per durable instruction, real consumers, truthful bounds, generated inventory where useful, and behavioral/pressure qualification where the instruction claims to change agent behavior. |
 | FUT-012 | Deterministic derived documentation | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | Generate mechanically derivable indexes/ownership/status views from canonical machine state; authored rationale remains authored and authoritative only in its proper domain. |
+| FUT-013 | Agent engineering skill repositories as research sources | PRESERVE | `AGENT_ENGINEERING_SKILLS_RESEARCH.md` | Preserve exact-reviewed agent-skills, Superpowers, Matt Pocock skills, and agent-rules-books as idea/source material; do not install a competing router or import skills wholesale. |
 
 ## FUT-001 — Bounded autonomous DSH execution cells
 
@@ -263,6 +264,7 @@ Before any of FUT-005 through FUT-008 advances to `DECIDED` or `SEQUENCED`, re-e
 Detailed candidate evaluations, required controls, complexity constraints, and relationships to Sandbox -> DSH live in:
 
 - [`AE_GOVERNANCE_RESEARCH.md`](AE_GOVERNANCE_RESEARCH.md)
+- [`AGENT_ENGINEERING_SKILLS_RESEARCH.md`](AGENT_ENGINEERING_SKILLS_RESEARCH.md) for additional instruction-governance and simplicity evidence relevant primarily to FUT-010/FUT-011.
 
 All four are **unsequenced**. The 67-document AE corpus was reviewed as architectural evidence, but AE itself is not a source of present SSSF authority and its Runtime/Repository/Registry/EIA topology is explicitly not adopted.
 
@@ -280,6 +282,34 @@ Shared constraints:
 - architecture/governance machinery is admitted only when it reduces net complexity or closes a demonstrated recurrence class.
 
 Potential dependency shape for later evaluation is `FUT-010 -> FUT-009/FUT-011 -> selective FUT-012`, but this is not roadmap sequencing. No implementation authority follows from this registration.
+
+## FUT-013 — Agent engineering skill research family
+
+### Status
+
+`PRESERVE`
+
+Preserved exact-reviewed sources:
+
+- `addyosmani/agent-skills` — instruction/skill structural, routing, behavioral and pressure evaluation;
+- `obra/superpowers` — pressure-tested process documentation, fresh-context task/review patterns, durable recovery and instruction de-duplication;
+- `mattpocock/skills` — focused planning/design primitives including deep-module/seam discipline and facts-versus-decisions/frontier reasoning;
+- `mattpocock/agent-rules-books` — compact on-demand engineering doctrine/reference packs.
+
+Detailed exact source identities, extracted mechanisms, non-adoption constraints, and possible FirstMate/DSH use live in:
+
+- [`AGENT_ENGINEERING_SKILLS_RESEARCH.md`](AGENT_ENGINEERING_SKILLS_RESEARCH.md)
+
+The primary architectural effect is new evidence for existing candidates rather than new workflow machinery:
+
+- `FUT-011` should evaluate structural + applicability/routing + behavioral falsifiability for operational instruction artifacts where appropriate;
+- `FUT-010` should consider real-seam/deep-owner and smallest-effective-mechanism laws;
+- DSH-3/DSH-6 may later evaluate fresh-context briefs/reviews and bounded reviewer loops;
+- Wayfinder-style issue maps remain `EXPLORE/REFERENCE` because SSSF already has an authoritative planning lifecycle and adding another planning truth would increase complexity.
+
+Direct use of an external `SKILL.md` by FirstMate is permitted only as a future qualification question. FirstMate already has code-owned supervision and an owned `.agents/skills` surface, so any import/adaptation must first demonstrate a real semantic gap, reduce to the smallest needed judgment instruction, prove trigger/consumer behavior, avoid collision with existing skills, and preserve FirstMate's SELF_HANDLE/BROWSER_SOL/CAPTAIN/EXTERNAL_DEPENDENCY authority model.
+
+No repository in this family is an allowlist, package dependency, active router, or implementation instruction by virtue of `PRESERVE` status.
 
 ## Not registered by default
 
