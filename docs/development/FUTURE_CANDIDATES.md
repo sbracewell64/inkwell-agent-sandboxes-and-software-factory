@@ -11,6 +11,11 @@ State meanings are defined in [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md).
 | FUT-001 | Bounded autonomous DSH execution cells | SEQUENCED | `ADR-0004-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md`; long-range roadmap | SSSF owns outer authority; DSH may exercise substantial inner autonomy inside externally bounded execution cells. Cordis remains encapsulated inside DSH. |
 | FUT-002 | Awesome DSH Plugin catalog as future research/reuse source | PRESERVE | none | Consult `awesome-dsh-plugin/awesome-dsh-plugin` before implementing new post-DSH harness capabilities. Catalog inclusion never implies trust or production eligibility. |
 | FUT-003 | FirstMate planning-transition awareness | ACTIVE | `ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`; `FP-001` producer + `FM-FP-001` consumer | Implementation is authorized on isolated branches. SSSF will emit a typed append-only planning feed; FirstMate will consume it through its existing authenticated custom-check/watch path. Only `ACTIVE` may enter engineering intake. Production landing/enablement remains held by current acceptance boundaries. |
+| FUT-004 | LLM-as-a-Verifier as post-DSH research source | PRESERVE | `FUT-004_LLM_AS_VERIFIER_REFERENCE.md` | Preserve exact reviewed upstream identity and ideas; no dependency/install/trust implied. |
+| FUT-005 | Verifier-guided DSH progress and refinement | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | Probabilistic progress is advisory inner-cell evidence consumed by code-owned policy. Production evaluation no earlier than DSH-2. |
+| FUT-006 | Best-of-N DSH candidate selection | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | Multiple inner candidates remain one outer attempt; serial work waits for stable DSH cells, parallel work for DSH-3. |
+| FUT-007 | Typed criteria decomposition for inner semantic evaluation | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | Criteria derive from typed work/acceptance contracts, not verifier invention; requires DSH WorkPackage/ExecutionCell semantics. |
+| FUT-008 | Hierarchical probabilistic-verifier evidence and cost telemetry | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | Required governed evidence substrate before production use of the other verifier candidates; verifier authority remains advisory. |
 
 ## FUT-001 — Bounded autonomous DSH execution cells
 
@@ -212,6 +217,35 @@ Consumer rollback retires the registered planning check and its private cursor/r
 `ACTIVE` means engineering is authorized. It does **not** mean either implementation is trusted or production-enabled.
 
 Promotion to `PROVEN` requires implementation, proof, evidence, documentation, and accepted immutable Git identity on both sides. The SSSF side must respect current PRE_CERTIFICATION constraints; the FirstMate side must rebase and requalify against the settled watcher/test surface before live enablement.
+
+## FUT-004 through FUT-008 — Post-DSH probabilistic verifier family
+
+### Status
+
+- `FUT-004` — `PRESERVE`: LLM-as-a-Verifier upstream research source.
+- `FUT-005` — `CANDIDATE`: verifier-guided DSH progress and refinement.
+- `FUT-006` — `CANDIDATE`: best-of-N DSH candidate selection.
+- `FUT-007` — `CANDIDATE`: typed criteria decomposition for inner semantic evaluation.
+- `FUT-008` — `CANDIDATE`: hierarchical probabilistic-verifier evidence and cost telemetry.
+
+Detailed hypotheses, DSH gates, required evaluations, negative controls, and preserved upstream identity live in:
+
+- [`FUT-004_LLM_AS_VERIFIER_REFERENCE.md`](FUT-004_LLM_AS_VERIFIER_REFERENCE.md)
+- [`VERIFIER_DSH_RESEARCH.md`](VERIFIER_DSH_RESEARCH.md)
+
+All four candidates are **unsequenced and gated behind DSH**. They do not authorize a pre-DSH verifier layer.
+
+Shared law:
+
+- probabilistic verifier output is advisory inner-cell evidence, never an SSSF acceptance oracle;
+- deterministic `FAIL` cannot be overwritten by a probabilistic score;
+- `COULD_NOT_OBSERVE` cannot be narrowed by probabilistic confidence;
+- self-verification is optimization, not independent maker/checker review;
+- code owns operational interpretation of scores, thresholds, and budgets;
+- authoritative criteria derive from Engineer intent / typed work contracts, not verifier invention;
+- generation, verification, selection, and refinement remain attributable execution units rather than being hidden behind a transparent TurboAgent-style inference proxy.
+
+Before any of FUT-005 through FUT-008 advances to `DECIDED` or `SEQUENCED`, re-evaluate it against the then-qualified DSH execution-cell boundary, the current SSSF evidence/authority model, and the then-current upstream verifier implementation at an exact source identity.
 
 ## Not registered by default
 
