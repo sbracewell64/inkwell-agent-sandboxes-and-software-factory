@@ -39,6 +39,7 @@ Use these records when the task concerns long-range design rather than current p
 - [`development/PLANNING_LIFECYCLE.md`](development/PLANNING_LIFECYCLE.md) — promotion states from `EXPLORE` through `PROVEN`.
 - [`development/FUTURE_CANDIDATES.md`](development/FUTURE_CANDIDATES.md) — preserved/candidate/decided/sequenced future items.
 - [`development/ROADMAP.md`](development/ROADMAP.md) — dependency sequencing for approved implementation intent.
+- [`development/SANDBOX_DSH_IMPLEMENTATION_PLAN.md`](development/SANDBOX_DSH_IMPLEMENTATION_PLAN.md) — detailed pre-implementation contracts, proof stages, sandbox→DSH seam, and downstream capability unlocks for B5/B6 and FUT-001.
 - [`decisions/`](decisions/) — accepted architectural decisions.
 
 Planning state is not proof state. `PRESERVE`, `CANDIDATE`, `DECIDED`, and `SEQUENCED` records must not be read as claims about current executable behavior.
