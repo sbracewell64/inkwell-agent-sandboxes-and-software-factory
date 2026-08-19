@@ -117,7 +117,7 @@ The existence of an internal loop, goal, workflow, or subagent mechanism is not 
 
 Production DSH adoption remains downstream of the existing SSSF execution/isolation proofs, including the Docker Sandbox substrate, Claude/Codex/DeepSeek backend qualification, deterministic real-PR landing/merge, and lifecycle/evidence contracts.
 
-See `docs/development/ROADMAP.md` for the long-range sequence and `docs/development/FUTURE_CANDIDATES.md` for planning state.
+`docs/development/ROADMAP.md` owns the concise long-range sequence. `docs/development/SANDBOX_DSH_IMPLEMENTATION_PLAN.md` owns the detailed pre-implementation contracts, sandbox→DSH seam, proof stages, identity/evidence spine, and downstream capability unlocks. `docs/development/FUTURE_CANDIDATES.md` owns planning state.
 
 ## Non-goals
 
