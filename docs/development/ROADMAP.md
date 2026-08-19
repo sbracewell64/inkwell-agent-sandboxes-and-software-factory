@@ -96,33 +96,37 @@ Acceptance:
 
 Do not begin replacement by editing exe.dev commands everywhere.
 
-## B6 — Local Docker sandbox implementation
+## B6 — Official Docker Sandboxes (`sbx`) implementation candidate
 
-Implement the local/free Docker provider only after B5 proves the abstraction.
+The currently commissioned replacement candidate is the official Docker Sandboxes `sbx` product, not an unreviewed generic Docker-container wrapper. Implement it only after B5 proves the provider abstraction and the pre-Docker baseline gate is satisfied. If direct feasibility evidence shows that official `sbx` cannot satisfy the accepted contract, record that observation and route the narrow replacement decision through the planning/control process before substituting a different Docker mechanism.
+
+Implementation remains gated by the stable pre-Docker baseline/unattended-PR checkpoint governed through the current baseline commission. Read-only feasibility inspection may occur before that gate; provider mutation/default-switch work may not.
 
 Required sequence:
 
-1. **SBX-3 — minimal deterministic Docker lifecycle:** exact source -> setup -> deterministic command -> evidence/harvest -> destroy, with no live agent required.
-2. **SBX-4 — security/credential/network/effect boundary:** minimum mounts, no host control-plane credentials or Docker control socket in guest, explicit runtime secret/effect/network policy.
-3. **SBX-5 — failure recovery/cancellation/quiescence:** interruption at every lifecycle boundary, identity-bound retry/recovery, harvest-before-destroy, typed cleanup uncertainty.
+1. **SBX-3 — minimal deterministic Docker Sandboxes lifecycle:** exact source -> setup -> deterministic command -> evidence/harvest -> destroy, with no live agent required. Use the SSSF-owned source-broker/disposable-clone boundary rather than exposing the canonical host checkout to a worker.
+2. **SBX-4 — security/credential/network/effect boundary:** minimum mounts, no host control-plane credentials or Docker control socket in guest, explicit runtime secret/effect/network policy, mutable shared-skill inheritance disabled for evidence-bearing workers, and pinned template/tool identity where the product supports it.
+3. **SBX-5 — failure recovery/cancellation/quiescence:** interruption at every lifecycle boundary, identity-bound retry/reconciliation, harvest-before-destroy, typed cleanup uncertainty, and provider state reported to SSSF rather than provider-owned autonomous recovery policy.
 4. **SBX-6 — observability + identity integration:** join `run_id`, provider resource, source, ADWs, future execution cells, process outcomes, evidence, and harvest without a second trace authority.
-5. **SBX-7 — parallel/resource isolation:** multiple sandboxes without collisions in ports, networks, mounts, workspaces, secrets, evidence, Git harvest, or resource accounting.
-6. **SBX-8 — portability/conformance/default switch:** compare exe.dev and Docker on shared semantics, prove the supported Windows/WSL path, then and only then consider changing the default provider.
+5. **SBX-7 — parallel/resource isolation:** multiple sandboxes without collisions in ports, networks, mounts, workspaces, secrets, evidence, Git harvest, or resource accounting; SSSF deterministic code owns admission, DAG dependencies, write/resource locks, retries, cancellation, backpressure, and result folding.
+6. **SBX-8 — portability/conformance/default switch:** compare exe.dev and official Docker Sandboxes on shared semantics, prove the supported Windows/WSL path and one real bounded contribution, then and only then consider changing the default provider and freezing a post-Docker/pre-DSH baseline.
 
 Acceptance must preserve:
 
 - host isolation and explicit mounts,
 - disposable/reproducible state,
-- exact source custody,
+- exact source custody including repository + commit + tree identity,
+- canonical host checkout as no-worker-access for mutation/review workers,
 - guest toolchain/readiness,
-- no host provisioning/control credential in guest,
+- no host provisioning/control credential or uncontrolled auth-home material in guest,
 - bounded runtime secret/effects,
 - application + observability access,
 - bounded process execution using the accepted execution-owner vocabulary,
 - Git/evidence harvest before irreversible destruction,
-- crash recovery,
+- crash recovery/reconciliation,
 - forced termination and provable quiescence,
-- deterministic cleanup of provider resources.
+- deterministic cleanup of provider resources,
+- independent maker/checker sandbox/evidence identity where review policy requires it.
 
 ## B7 — Host observability and unattended lifecycle readiness
 
@@ -214,7 +218,7 @@ SSSF deterministic outer graph
 Production-value DSH execution requires:
 
 1. deterministic SSSF real-work acceptance/landing baseline;
-2. accepted sandbox execution-environment contract and local Docker custody path;
+2. accepted sandbox execution-environment contract and official Docker Sandboxes custody path (or an explicitly re-decided equivalent after failed feasibility);
 3. accepted execution-owner terminal/cancellation/quiescence contract (B4-002 or successor);
 4. exact source/workspace and mutation/permission custody;
 5. typed evidence/three-valued observation;
@@ -226,7 +230,7 @@ Mock protocol work may start earlier; real DSH claims may not.
 
 Define and prove `ExecutionCellRequest` / `ExecutionCellResult`, identity propagation, budgets, authority-negative controls, result/evidence contract, cancellation semantics, and CNO handling with a deterministic mock.
 
-This can precede final Docker qualification and earns **protocol proof only**.
+This can precede final Docker qualification and earns **protocol proof only**. It is a separate future increment/commission from the sandbox migration; DSH work is not implicitly authorized inside the current Docker commission. Activation still requires the planning lifecycle to move the named DSH-0A increment to `ACTIVE` after its upstream contracts are stable enough to bind.
 
 ### DSH-0B — Real sandbox execution-cell custody
 
@@ -300,6 +304,6 @@ Later stages do not automatically activate because earlier stages pass. Each sta
 
 ## Rule
 
-Do not begin the local-sandbox replacement by editing exe.dev commands everywhere. First inventory semantics, define the provider contract, prove it against exe.dev, then implement Docker.
+Do not begin the sandbox replacement by editing exe.dev commands everywhere. First inventory semantics, define the provider contract, prove it against exe.dev, then implement the currently selected official Docker Sandboxes `sbx` candidate.
 
 Do not begin production DSH adoption by replacing the SSSF outer graph. Prove the execution-cell protocol, then custody in the real sandbox, then progressively increase inner autonomy as evidence permits.
