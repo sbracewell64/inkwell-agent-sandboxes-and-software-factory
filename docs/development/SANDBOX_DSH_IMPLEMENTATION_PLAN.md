@@ -3,729 +3,605 @@
 ## Status and authority
 
 - **Planning status:** `SEQUENCED`, not `ACTIVE`.
-- **Sandbox sequence:** existing roadmap B5/B6.
-- **DSH sequence:** FUT-001, governed by `docs/decisions/ADR-0004-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md`.
-- **Purpose of this document:** own the implementation depth, contracts, proof gates, and exact sandbox→DSH seam behind the concise sequencing index in `ROADMAP.md`.
+- **Sandbox sequence:** B5/B6 in `ROADMAP.md`.
+- **DSH sequence:** FUT-001 under `ADR-0004-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md`.
 - **Activation boundary:** a named increment under `docs/development/INCREMENT_PROTOCOL.md`.
+- **Purpose:** own the detailed execution contracts, stage gates, evidence requirements and exact sandbox→DSH seam behind the concise roadmap.
 
-This document does not claim that the local sandbox replacement or DSH integration exists. It prepares the work so implementation can begin from explicit contracts rather than rediscovering architecture while coding.
+This file does not claim that Docker or DSH is implemented. It is the pre-implementation specification.
 
-`ROADMAP.md` remains the sequencing index. This document is the detailed plan. Architecture documents remain authoritative for accepted/current design facts, and executable code/tests/evidence outrank all planning prose.
-
-## Governing objective
-
-Build one deterministic execution chain:
+## Governing chain
 
 ```text
 Engineer intent / typed work
         ↓
 SSSF deterministic outer graph
         ↓
-provider-neutral execution environment
+qualified AgentBackend + proven SandboxProvider
         ↓
 bounded DSH execution cell
         ↓
-SSSF deterministic verification / independent review / acceptance
+SSSF deterministic VerificationContracts
         ↓
-Git harvest / promotion / landing under SSSF authority
+assignment-distinct semantic review where required
+        ↓
+Browser Sol ruling where policy requires
+        ↓
+one-use landing authorization
+        ↓
+exact-main proof / disposition
 ```
 
-The implementation must preserve the constitutional split:
+The constitutional split is fixed:
 
-> **SSSF code owns outer sequencing, source custody, budgets, retries, verification, acceptance, promotion, and terminal state. DSH may own substantial autonomy only inside an externally bounded execution cell.**
+> **SSSF code owns outer sequencing, applicability, source custody, budgets, retries, verification, reviewer policy, acceptance, landing/promotion, recovery decisions and terminal state. Agents/DSH own reasoning only inside explicitly authorized execution domains.**
 
-The sandbox is not an orchestrator. It supplies an isolated execution environment with observable lifecycle semantics. DSH is not an outer workflow engine. It consumes a bounded cell authorization inside that environment.
+Docker is an execution boundary, not an orchestrator. DSH is an inner execution coordinator, not the SSSF outer workflow engine.
 
-## Design constraints carried forward from current SSSF
+---
 
-The future implementation must reuse and converge existing contracts rather than creating parallel mechanisms.
+# 1. Required pre-Docker substrate
 
-### Source and lifecycle custody
+Docker implementation must not begin until the stable reference SSSF has enough deterministic machinery to compare a replacement against known semantics.
 
-The current lifecycle already establishes important invariants that a replacement provider must preserve:
+## 1.1 AgentBackend and SandboxProvider are orthogonal
 
-- a durable `run_id` record exists before provider resources;
-- source identity is an exact repository + commit, not a branch-name assumption;
-- guest source is gated against the recorded source identity;
-- the host provisioning credential never enters the guest;
-- runtime credentials are disposable and bounded;
-- evidence/artifact reads and Git harvest occur before destructive teardown;
-- VM/container destruction is explicit and irreversible;
-- implicit shell-session state is not lifecycle state.
+Do not combine model execution and environment custody into one abstraction.
 
-### Process/terminal ownership
+### AgentBackend
 
-The B4-002 executor-supervisor work already defines the direction for native process ownership: shell-free launch, exact environment boundaries, closed stdin, monotonic timeout/cancellation, bounded streams, typed terminal outcomes, attempt accounting, descendant cleanup, and quiescence verification.
+`AgentBackend` answers: **how does one bounded reasoning assignment execute?**
 
-The sandbox provider and DSH adapter must **reuse or conform to this execution-owner vocabulary**. They must not introduce a second independent timeout/cancellation/process-tree authority merely because execution moved into a container or DSH.
+The SSSF-owned semantic contract is equivalent to:
 
-If B4-002 is superseded before activation, use its accepted successor contract rather than its exact current implementation.
+```text
+execute(PhaseWorkEnvelope) -> PhaseExecutionResult
+cancel(attempt_id)
+attest_binding()
+inspect_usage()
+verify_quiescence()
+```
 
-### Three-valued observation
+A backend binding must expose every policy-relevant fact SSSF can actually observe or enforce, including as applicable:
 
-Required observations remain explicit rather than Boolean:
+- product/harness/backend identity;
+- exact model identity;
+- profile/effort identity or explicit CNO;
+- attempt/session/process identity;
+- exact supplied protocol/input identity;
+- tool/capability boundary;
+- terminal outcome;
+- usage/cost source;
+- cancellation and quiescence evidence.
 
-- `PASS` / observed-good where a required positive fact was actually established;
-- `FAIL` / observed-bad where a violating fact was actually established;
-- `COULD_NOT_OBSERVE` where the required fact could not be established.
+Candidate implementations may include PiBackend, ClaudeProductBackend and CodexProductBackend. Host-native product CLIs remain host-custodied when their subscription/auth/settings identity depends on the host environment; moving such a product into a guest is a new binding, not equivalent execution by assumption.
 
-Absence, unavailable tooling, unreadable provider state, missing evidence, timeout while observing, or an unknown provider response must never become an implicit pass.
+### SandboxProvider
 
-### Unit-level transparency without a transparency layer
+`SandboxProvider` answers: **what isolated execution world exists, and what is its observed state?**
 
-Do not add an external observer whose job is to reconstruct what sandbox/DSH did after the fact when the owning code can emit the fact directly.
+It owns environment/provider mechanics only. It does not own lifecycle policy, retries, recovery choice, acceptance or promotion.
 
-Prefer one hierarchical identity spine:
+The target semantic surface is equivalent to:
+
+```text
+create(SandboxSpec)
+exec(CommandSpec)
+copy_in / copy_out       # only when the accepted source/evidence model needs them
+inspect()
+collect_artifacts()
+export_git()
+inspect_processes()
+wait_quiescent()
+stop()
+destroy(authorization)
+reconcile()
+```
+
+Use `reconcile`, not provider-owned autonomous `recover`: the provider reports actual state; SSSF code decides the next legal recovery action.
+
+## 1.2 CommandSpec is typed authority
+
+Any executable command relied upon as evidence binds at least:
+
+- argv;
+- cwd;
+- environment references/allowlist;
+- timeout;
+- stdin mode;
+- stdout/stderr policy and bounds;
+- expected exit semantics;
+- execution/attempt identity.
+
+Unstructured shell prose is not authoritative command identity.
+
+The B4-002 subprocess-supervisor substrate or its accepted successor owns the common process vocabulary: shell-free launch, closed stdin, bounded streams, monotonic timeout/cancellation, attempt accounting, descendant cleanup, typed three-valued terminal observation and quiescence. Docker and DSH must reuse/conform to that owner rather than create parallel supervisors.
+
+## 1.3 Source authority and Source Broker
+
+Source authority is:
+
+```text
+repository URL + exact commit SHA + exact tree SHA
+```
+
+A branch is convenience state only.
+
+Evidence-bearing mutation/review workers never receive the credential-bearing canonical host checkout. The SSSF-owned **Source Broker** produces disposable, credential-free **full Git clones** at exact source identity. Prefer full clones over secondary worktrees for Docker worker custody.
+
+Rules:
+
+- canonical host checkout is no-worker-access;
+- broker clone is clean at exact head/tree before use;
+- ignored host secrets/config are not copied into the clone;
+- Docker/worker remote/config mutations remain confined to the broker clone;
+- broker clone persists until all export/evidence obligations are complete, then is disposable;
+- any inability to prove clone/source identity is CNO/non-PASS.
+
+## 1.4 Immutable cognition/input boundary
+
+Evidence-bearing workers must not silently inherit mutable cross-sandbox cognition.
+
+Required policy:
+
+- shared mutable skills disabled where the selected provider/product supports such sharing;
+- instructions/skills/protocols come from the pinned source commit, immutable worker template or another content-addressed SSSF artifact;
+- worker template/toolchain identity is pinned once the mechanism is qualified;
+- exact injected reviewer protocol/input bytes are recorded by the backend execution owner.
+
+## 1.5 Verification and review are first-class contracts
+
+Before the pre-Docker freeze, acceptance-critical verifier discovery and review transport must be code-owned.
+
+Contract family:
+
+```text
+verification-contract/v1
+review-envelope/v1
+semantic-review-result/v1
+ruling-envelope/v1
+landing-authorization/v1
+```
+
+Exact names may change only through the normal architecture process; semantics must remain.
+
+### VerificationContract / ProofObligation
+
+Each acceptance-critical claim has one repository-owned contract identifying:
+
+- stable claim/contract ID and version/digest;
+- owning subsystem/increment and acceptance dimension;
+- applicability inputs;
+- required verifier(s);
+- required worlds/platforms/real seams;
+- positive/non-vacuity evidence;
+- red calibration requirements;
+- CNO policy;
+- evidence locator/digest requirements;
+- invalidation dependencies.
+
+Deterministic code compiles exact changed surfaces + declared scope into the required contract set and risk profile. Agents/reviewers cannot choose which required verifiers to omit.
+
+A required verifier that is absent, stale, skipped, wrong-head, unavailable, CNO where PASS is required, or missing required red calibration prevents landing.
+
+### Real-seam law
+
+Fixtures/mocks may calibrate a verifier. They do not prove a real OS/GitHub/runtime/custody boundary when the acceptance property concerns that real seam.
+
+Examples requiring real-seam evidence where applicable:
+
+- subprocess cancellation/quiescence;
+- control request/ruling correlation;
+- exact-head CI association;
+- merge guard behavior;
+- credential/environment refusal;
+- sandbox/source custody;
+- teardown/harvest ordering.
+
+Unavailable required real-seam proof is CNO/non-PASS according to the contract; never substitute fixture success silently.
+
+### Deterministic reviewer protocol binding
+
+Entering semantic review deterministically resolves:
+
+- reviewer role;
+- assignment identity and maker separation;
+- AgentBackend profile;
+- reviewer protocol ID/ref/digest;
+- exact protocol bytes or immutable locator;
+- exact candidate head/tree;
+- review-policy version.
+
+The runner verifies and injects the protocol bytes into the actual reviewer invocation. Missing/mismatched/unreadable protocol means reviewer does not launch and the result is CNO/non-PASS. Model self-report that it read a skill is not proof.
+
+### Typed review transport and causal invalidation
+
+`ReviewEnvelope` compiles deterministic facts and a reviewer-facing claim→evidence index. `SemanticReviewResult` binds the exact envelope/head/tree/reviewer/backend/protocol/policy. Browser Sol transport is typed and correlated to one immutable request identity. `RulingEnvelope` binds the request plus exact candidate/envelope/policy.
+
+Causal invalidation is code-owned:
+
+- candidate head/tree movement invalidates exact-head verifier/review/ruling/landing artifacts;
+- material base/applicability/compiler movement invalidates affected downstream artifacts;
+- verifier-byte or VerificationContract changes invalidate affected results/calibration;
+- reviewer role/backend/protocol/assignment changes invalidate semantic review;
+- review-policy movement invalidates affected review/ruling/authorization.
+
+The system re-enters the earliest correct state rather than relying on an agent to notice staleness.
+
+### One-use landing
+
+Browser Sol approval is not an indefinitely reusable PASS. Deterministic code creates a one-use `LandingAuthorization` only after the applicable RulingEnvelope and all local policy requirements are satisfied.
+
+It binds repository/work identity, exact base/head/tree, ReviewEnvelope, RulingEnvelope and policy version. Immediately before mutation, applicability/merge guards re-run. Any movement destroys authorization. Successful landing consumes it exactly once. Exact resulting `main` receives post-merge proof before disposition.
+
+Review cycle:
+
+```text
+CANDIDATE_READY
+→ DETERMINISTIC_REVIEW_PREFLIGHT
+→ SEMANTIC_REVIEW
+→ BROWSER_SOL_REQUESTED   # when required
+→ RULING_RECEIVED
+→ LANDING_AUTHORIZED
+→ MUTATION_TIME_RECHECK
+→ LAND
+→ POST_MERGE_EXACT_MAIN_PROOF
+→ DISPOSITION
+```
+
+## 1.6 Stable pre-Docker freeze gate
+
+Docker implementation waits until the reference baseline truthfully demonstrates:
+
+1. separate AgentBackend and SandboxProvider seams;
+2. typed CommandSpec/process ownership and quiescence;
+3. exact repo+commit+tree source authority;
+4. source/workspace/mutation custody;
+5. first-class VerificationContracts + deterministic applicability;
+6. deterministic semantic reviewer-protocol binding;
+7. typed ReviewEnvelope/RulingEnvelope transport + causal invalidation;
+8. one-use LandingAuthorization + exact-main post-merge proof;
+9. one real ordinary engineering PR through the full accepted cycle without Captain transport;
+10. no known SSSF defect hidden behind PASS/CNO wording.
+
+A genuine external dependency may remain CNO only if the governing acceptance contract permits the freeze to retain it explicitly.
+
+---
+
+# 2. Shared identity and evidence spine
+
+Do not create a new identity universe for every later feature.
+
+Preferred hierarchy:
 
 ```text
 run_id
   └─ adw_id
       └─ outer_attempt_id
           └─ execution_cell_id
-              └─ inner_unit_id
+              └─ inner_unit_id(kind=...)
 ```
 
-`inner_unit_id` is typed by `kind` rather than creating a new unrelated identity system for each later feature. Example kinds may eventually include:
+Possible inner-unit kinds include process, model-turn, refinement, subagent, candidate, verifier-call, workflow-node and external-effect unit.
 
-- model-turn;
-- process;
-- refinement;
-- subagent;
-- candidate;
-- verifier-call;
-- workflow-node;
-- tool/external-effect unit.
+Each relevant unit carries parent identity, timing, authority/budget attribution and evidence refs. Prefer the owning code emitting typed durable facts directly into accepted trace/evidence owners rather than adding a separate monitor that reconstructs activity from prose.
 
-Every relevant inner unit should carry its parent identity, timing, authority/budget attribution, and evidence references directly into the existing durable evidence/trace substrate where practical.
-
-This identity spine is an architectural target, not permission to redesign accepted trace schemas before the owning increment is activated.
+Three-valued observation remains exhaustive: `PASS`/observed-good, `FAIL`/observed-bad, `COULD_NOT_OBSERVE`. Missing state is never implicit success.
 
 ---
 
-# Part I — Sandbox program
-
-## Sandbox end-state
-
-The sandbox layer exposes a provider-neutral **Execution Environment Contract**. SSSF code owns lifecycle sequencing; provider adapters implement bounded operations.
-
-A successful environment supplies at least:
-
-- isolated disposable workspace identity;
-- exact source repository/commit identity;
-- declared writable/mounted surfaces;
-- guest toolchain/readiness facts;
-- a bounded process-execution primitive compatible with the SSSF execution-owner contract;
-- hard timeout/cancel/kill semantics;
-- resource ceilings;
-- external-effect/network policy;
-- port/exposure facts;
-- evidence/log/artifact extraction;
-- Git harvest;
-- provider state inspection;
-- explicit destruction;
-- proof of terminal quiescence and cleanup.
-
-The provider adapter does **not** own:
-
-- the outer work graph;
-- lifecycle phase sequencing;
-- retry policy;
-- acceptance;
-- source selection;
-- promotion/landing;
-- interpretation of agent results.
+# 3. Sandbox program
 
 ## SBX-0 — Reference semantics inventory
 
-**Goal:** extract the semantic contract from the current exe.dev lifecycle before designing the replacement API.
+Goal: inventory current exe.dev lifecycle semantics before designing the replacement API.
 
-Inventory each current lifecycle fact as one of:
+Classify each lifecycle fact as:
 
 - required provider-neutral semantic;
-- exe.dev-specific mechanism;
+- provider-specific mechanism;
 - current limitation;
-- historical artifact that should not survive.
+- obsolete/historical artifact.
 
-Cover at least:
+Cover create/resource identity, exact source/fill, setup/readiness, process entry, observe/ports, spend/resource facts, artifacts/Git harvest, runtime-secret lifecycle, state inspection/reconciliation, destroy/post-destroy gate.
 
-- create and provider resource identity;
-- exact source/fill;
-- setup/readiness;
-- process execution entry;
-- observe/readback;
-- app/factory port exposure;
-- spend/resource observation;
-- artifacts and Git harvest;
-- runtime credential lifecycle;
-- state inspection/recovery;
-- destroy and post-destroy gate.
+**Exit:** complete machine/validator-readable inventory with one owner per fact; no provider command is unaccounted for.
 
-**Required output:** a machine-readable or validator-readable operation/fact inventory with one owner per fact. Do not create a generic metadata framework if existing run-record/schema mechanisms can own it.
+## SBX-1 — SandboxProvider contract
 
-**Exit gate:** every provider-specific command used by lifecycle code is accounted for, and no proposed provider-neutral operation exists only because it is aesthetically convenient.
+Define the minimum contract described in §1.1, including `SandboxSpec`, `CommandSpec`, returned fact types, idempotency, retry safety, irreversibility, durable-state owner, failure classes and CNO conditions.
 
-## SBX-1 — Provider interface and lifecycle state contract
+`SandboxSpec` binds at least run/attempt identity, source repo/commit/tree, role/execution profile, clone/workspace mode, resource bounds, immutable template identity, network-policy identity, secret references, shared-skills policy and evidence root.
 
-**Goal:** define the smallest provider boundary that can express current semantics and the required future DSH execution environment.
+**Exit:** deterministic fake provider exercises every success/failure/CNO branch without exe.dev or Docker.
 
-Recommended operation families:
+## SBX-2 — ExeDevProvider conformance
 
-1. `create`
-2. `source` / exact fill
-3. `setup` / readiness
-4. `execute` / bounded process entry
-5. `inspect`
-6. `expose` / resolve ports where required
-7. `extract` / artifacts + evidence
-8. `harvest_git`
-9. `destroy`
+Refactor proven exe.dev behavior behind the provider interface without semantic change.
 
-The API may combine operations when implementation evidence shows the split is artificial; semantics matter more than method count.
+Prove source gates, credential boundary, lifecycle ordering, readiness/exposure, harvest-before-destroy, typed errors/CNO and SSSF-owned recovery/sequence.
 
-Each operation must declare:
+**Exit:** reference provider passes provider-neutral conformance; watched-red semantic drift is detected.
 
-- exact inputs;
-- returned typed facts;
-- provider resource identity;
-- idempotency/replay behavior;
-- observable failure classes;
-- CNO conditions;
-- what durable state is written and by whom;
-- what operation can safely be retried;
-- what operation is irreversible.
+## SBX-3 — Minimal DockerSbxProvider lifecycle
 
-**Important:** adapter methods report provider facts. The host lifecycle code decides sequencing and retries.
+Use official Docker Sandboxes `sbx` unless direct feasibility evidence causes a separately ruled replacement.
 
-**Exit gate:** a fake provider can exercise all contract branches, including failures, without exe.dev or Docker.
-
-## SBX-2 — exe.dev reference-adapter conformance
-
-**Goal:** pass the current provider through the new contract before replacing it.
-
-This stage is deliberately behavior-preserving. It proves the abstraction describes a system we already understand.
-
-Required proof includes:
-
-- same source identity and guest-head gates;
-- same credential boundary;
-- same lifecycle ordering;
-- same harvest-before-destroy invariant;
-- same observable port/readiness behavior;
-- same or stricter error/CNO typing;
-- no lifecycle sequencing moved into the adapter.
-
-**Exit gate:** reference-adapter contract tests pass against exe.dev, with watched-red controls showing meaningful semantic drift is detectable.
-
-## SBX-3 — Minimal local Docker provider
-
-**Goal:** implement the smallest local/free provider that can complete a provider-neutral lifecycle without live agent inference.
-
-First qualification fixture should use deterministic code only:
+First fixture is deterministic code only:
 
 ```text
 create
-→ exact source materialization
+→ broker exact source clone
 → setup/readiness
-→ run deterministic command
-→ retain bounded evidence
-→ harvest a known Git change/artifact
+→ exec(CommandSpec)
+→ bounded evidence
+→ known artifact/Git export
+→ quiescence
 → destroy
-→ prove cleanup
+→ authoritative residual-state check
 ```
 
-Do not begin with DSH, a coding agent, multiple containers, or a full application deployment. Prove the environment first.
+No live coding agent or DSH yet.
 
-Required properties:
+**Exit:** exact source, deterministic command/evidence/harvest and authoritative cleanup all proven.
 
-- no ambient host source mutation;
-- exact source commit in guest;
-- explicit mount/write policy;
-- reproducible base image/toolchain identity;
-- bounded process execution;
-- explicit resource identity;
-- no Docker socket or equivalent host-control capability in the guest unless a later separately governed capability proves a need;
-- deterministic cleanup.
+## SBX-4 — Security / credential / network / cognition boundary
 
-## SBX-4 — Security, credential, network, and external-effect boundary
+Prove:
 
-**Goal:** prove the local provider cannot accidentally widen authority merely because it runs on the Captain's machine.
+- source broker + canonical checkout no-worker-access;
+- minimum explicit mounts/writes;
+- no host provisioning/control credential or auth-home inheritance;
+- no uncontrolled Docker socket/control capability in guest;
+- runtime secrets explicit/scoped and absent from argv/evidence;
+- network/effect policy explicit, versioned/content-addressed where practical;
+- shared mutable skill inheritance disabled for evidence-bearing workers;
+- immutable worker template/toolchain identity pinned after feasibility.
 
-Required controls:
+Missing enforcement/observability is CNO, not permission.
 
-- host filesystem isolation is explicit, with minimum mounts;
-- provisioning/control-plane credentials remain host-only;
-- guest runtime secrets are explicit, scoped, revocable/retirable, and never evidence payloads;
-- no credential inheritance from ambient host environment;
-- no implicit Docker daemon/control socket access in guest;
-- network posture is explicit (`none`, bounded/default, or allowlisted policy as later required), never inferred from container defaults;
-- external effects are attributable to the execution environment/cell when observable;
-- secrets are not placed in argv, durable trace, artifact manifests, or planning/control records.
+## SBX-5 — Cancellation / reconciliation / quiescence
 
-A missing ability to observe or enforce an intended network/effect boundary is CNO, not permission.
-
-## SBX-5 — Failure recovery, cancellation, and quiescence
-
-**Goal:** make every lifecycle phase recoverable or safely terminal.
-
-Exercise interruption/crash at each material boundary:
-
-- before/after provider resource creation;
-- source/fill;
-- setup;
-- execution start and mid-execution;
-- observe/extract;
-- Git harvest;
-- credential retirement;
-- destroy;
-- post-destroy gate.
+Interrupt before/after create, source, setup, execution, observe/extract, Git harvest, secret retirement, destroy and post-destroy gate.
 
 Required behavior:
 
-- durable state lets a later process determine what was attempted;
-- retries are identity-bound and do not create silent duplicate resources;
-- destroy is idempotent where provider semantics permit;
-- evidence is never destroyed before the lifecycle has either harvested it or explicitly recorded why it could not;
-- timeout/cancel converges on the shared execution-owner terminal vocabulary;
-- provider workloads, child processes, ports, mounts/volumes, and networks are proven quiescent/retired to the degree the platform can observe;
-- inability to prove cleanup is CNO/non-clean, never success.
+- durable identity lets a later process reconcile what exists;
+- retry cannot create silent duplicate resources;
+- provider reports state; SSSF decides recovery;
+- evidence/harvest obligations precede irreversible destroy;
+- cancellation converges on shared execution-owner semantics;
+- inability to prove process/provider cleanup is non-clean CNO.
 
-## SBX-6 — Observability and identity integration
+## SBX-6 — Observability + identity integration
 
-**Goal:** make the host able to reason about a running or terminated environment without relying on a model narrative.
+Join run/provider/source/ADW/process/evidence/harvest/future-cell identities through accepted run/trace/evidence owners. No second authoritative observability DB for Docker/DSH.
 
-Join at minimum:
+Read-only inspection remains distinct from triage/archive/lifecycle mutation.
 
-- `run_id` ↔ provider resource identity;
-- source repository/commit;
-- environment status;
-- ADW identities created inside the run;
-- future execution-cell identities;
-- bounded process/terminal observations;
-- evidence/artifact/harvest references;
-- resource/cost observations where available.
+## SBX-7 — Deterministic parallelism and reviewer isolation
 
-Prefer direct writes by lifecycle/runtime owners into the accepted trace/run-record substrate. Do not add a second authoritative observability database merely for Docker/DSH.
+Represent executable parallel work as SSSF-owned `WorkNode` DAGs binding at least:
 
-Read-only inspection must remain observably distinct from triage/archive mutations or lifecycle state transitions.
+- node_id / dependencies;
+- role;
+- source commit/tree;
+- expected write set;
+- resource locks;
+- AgentBackend profile;
+- SandboxProvider profile;
+- deterministic-gate manifest;
+- acceptance manifest.
 
-## SBX-7 — Parallel sandbox and resource isolation
+Concurrency allowed only when dependency/write/resource constraints permit and a qualified target exists. SSSF owns max parallelism, queueing, admission, retry, cancellation, backpressure, collection order and aggregate result folding.
 
-**Goal:** qualify concurrency before DSH needs parallel children/candidates.
+Prove two genuine overlapping sandboxes, peer survival when one FAILs/cancels, duplicate/run-id refusal, capacity backpressure, deterministic collection and complete cleanup.
 
-Prove multiple independent environments can coexist without collision in:
+Maker/checker use distinct sandbox/attempt/session/process/evidence identities. Checker input is original spec + exact candidate + deterministic evidence, not maker hidden conversation.
 
-- names/IDs;
-- source/workspaces;
-- ports;
-- networks;
-- mounts/volumes;
-- process ownership;
-- environment variables/secrets;
-- evidence directories;
-- Git harvest targets;
-- CPU/memory/time ceilings where the provider supports them.
+## SBX-8 — Parity, default switch, pre-DSH freeze
 
-Exercise one sandbox failing or being destroyed while siblings remain healthy.
+Run the same semantic provider fixtures through ExeDevProvider and DockerSbxProvider. Require contract parity, not identical implementation. Prove supported Windows/WSL path and one real bounded engineering PR through the Docker-backed path without Captain transport.
 
-Aggregate host resource pressure must be observable enough for deterministic admission/refusal. Do not let a DSH subagent scheduler become the first component to discover that sandbox parallelism is unsafe.
-
-## SBX-8 — Portability, conformance, and provider switch
-
-**Goal:** prove the Docker/local provider is a valid replacement rather than merely a successful demo.
-
-Required comparison:
-
-- exe.dev reference adapter vs local provider against the same provider contract;
-- Linux-host behavior where applicable;
-- Windows/WSL operator path where supported;
-- clean-clone bootstrap and doctor;
-- source/evidence/harvest equivalence on shared semantic claims;
-- provider-specific differences explicitly classified, never hidden behind a generic PASS.
-
-Only after this stage may the default provider change or exe.dev become optional/retired. Keep the reference adapter as a regression oracle if its maintenance cost remains justified.
-
-## Sandbox acceptance gate for real DSH
-
-Real DSH execution may begin only when an accepted sandbox environment can provide the following facts for the exact candidate being qualified:
-
-1. exact source/workspace identity;
-2. explicit writable/mounted scope;
-3. bounded process execution;
-4. timeout/cancel/kill semantics;
-5. resource ceilings;
-6. external-effect/network policy;
-7. evidence/artifact extraction;
-8. durable identity/trace join;
-9. Git harvest without promotion authority;
-10. forceable termination plus provider/process quiescence proof.
-
-A mock DSH protocol can be developed earlier. A real DSH production-value claim cannot.
+Only then switch the default/demote exe.dev and freeze an immutable post-Docker/pre-DSH baseline.
 
 ---
 
-# Part II — DSH program
+# 4. Sandbox gate for real DSH
 
-## Stable execution-cell protocol
+Real DSH needs an accepted environment that proves for the exact candidate:
 
-Before enabling a DSH feature, SSSF needs a stable request/result boundary.
+1. exact source/workspace identity;
+2. explicit write/mount scope;
+3. typed bounded process execution;
+4. timeout/cancel/kill semantics;
+5. resource ceilings;
+6. explicit network/effect policy;
+7. evidence/artifact extraction;
+8. durable identity/trace join;
+9. Git harvest without promotion authority;
+10. forceable termination + provider/process quiescence;
+11. qualified AgentBackend binding for the stage;
+12. accepted VerificationContract/review/landing substrate.
 
-### ExecutionCellRequest — minimum semantic fields
+Mock DSH protocol design can precede this gate. Real DSH value claims cannot.
 
-The exact schema belongs to its implementation increment, but the contract must cover:
+---
 
-- `execution_cell_id`;
-- parent `run_id`, `adw_id`, and `outer_attempt_id`;
-- objective and role;
+# 5. DSH execution-cell protocol
+
+## ExecutionCellRequest
+
+Minimum semantics:
+
+- execution_cell_id + parent run/adw/outer-attempt identities;
+- objective/role;
 - exact source/workspace identity;
-- write/capability/tool authority;
-- model/backend policy;
-- resource budget;
-- wall-time budget;
-- token/cost budget where enforceable;
+- selected qualified `agent_backend_profile` and allowed backend set;
+- write/tool/capability authority;
+- time/resource/token/cost ceilings;
 - external-effect/network policy;
-- maker/checker independence policy;
+- maker/checker policy;
+- applicable VerificationContract/review-policy references;
 - evidence contract;
 - expected result schema;
-- cancellation handle/identity.
+- cancellation identity.
 
-Budgets and authority are inputs owned outside DSH. DSH may spend within them; it cannot enlarge them.
+DSH may spend within externally fixed authority/budgets. It cannot enlarge them or redefine the backend binding.
 
-### ExecutionCellResult — minimum semantic fields
+## ExecutionCellResult
 
-Return enough for SSSF to decide what to verify, without storing an acceptance verdict from DSH:
+Return observed facts, never SSSF acceptance authority:
 
 - exact cell/parent identities;
-- terminal state and reason;
+- terminal state/reason;
 - typed result/envelope;
-- observed source/workspace/mutation facts as applicable;
-- usage/cost observations and their source;
+- source/workspace/mutation facts as applicable;
+- AgentBackend execution/binding evidence;
+- usage/cost observations + source;
 - child/inner-unit summary;
 - evidence refs/digests;
 - external-effect observations;
 - cancellation/timeout facts;
 - cleanup/quiescence evidence;
-- CNO reasons for required facts that could not be observed.
+- CNO reasons.
 
-DSH must never return an authoritative SSSF `accepted=true` field. Acceptance is re-derived by SSSF.
+DSH never returns authoritative `accepted=true`. SSSF re-derives verification/review/acceptance.
 
-## DSH-0A — Protocol and mock executor
+---
 
-**May begin before final Docker qualification.**
+# 6. DSH qualification sequence
 
-Prove the request/result schemas and outer-authority boundary using a deterministic mock DSH executor.
+## DSH-0A — Protocol + deterministic mock
 
-Controls must establish:
+Prove request/result identity, authority rejection, budgets, result schema, wrong/stale source refusal, no commit/promotion/outer-graph authority, typed CNO, evidence attribution and cancellation semantics.
 
-- exact identity propagation;
-- authority/capability rejection;
-- budget bounds;
-- result-schema enforcement;
-- stale/wrong-source refusal;
-- no commit/promotion/outer-graph authority;
-- typed CNO rather than missing results;
-- attributable evidence;
-- cancellation request semantics.
+This is protocol proof only and is not implicit authority to begin DSH inside the Docker commission.
 
-This stage earns protocol confidence only, not evidence that DSH itself is qualified.
+## DSH-0B — Real sandbox custody seam
 
-## DSH-0B — Execution-cell custody in the real sandbox
+Run the mock through accepted SandboxProvider + AgentBackend/process-owner path. Prove identity joins, external budget enforcement, timeout/cancel, evidence survival, authorized mutation only, Git harvest without promotion authority and zero surviving children/processes.
 
-**Requires the real sandbox acceptance gate above.**
-
-Run the same mock cell through the actual sandbox and SSSF execution-owner path.
-
-Prove:
-
-- cell identity joins sandbox/ADW/attempt identities;
-- environment and process budgets are externally enforced;
-- forced timeout/cancellation reaches terminal state;
-- evidence survives cell/process failure;
-- no processes/children remain after closure;
-- source/workspace is unchanged except for explicitly authorized mutations;
-- SSSF can harvest results without granting DSH Git promotion authority.
-
-DSH-0B is the seam proof. Do not skip from a schema test directly to a live autonomous DSH worker.
+Do not skip from schema proof to live autonomous DSH.
 
 ## DSH-1 — Real multi-turn single-agent cell
 
-Admit one exact DSH version/build and one qualified backend/model combination.
+Admit one exact DSH build/dependency identity and one qualified AgentBackend/model profile. Exclude subagents, autonomous refinement, workflows/goals, optional plugins and self-evolution.
 
-Deliberately exclude at first:
+Prove bounded tools/effects, source integrity, typed output, usage/evidence, hard timeout/cancel, quiescence and deterministic SSSF verification/review. Compare on the same fixture with the pre-DSH baseline; successful execution alone is not value.
 
-- DSH subagents;
-- parallel candidates;
-- autonomous refinement loops;
-- DSH workflows/goals;
-- optional plugins;
-- self-evolution.
-
-Prove:
-
-- exact DSH/build/dependency identity;
-- backend/model/effort identity;
-- bounded tools/capabilities;
-- source/workspace integrity;
-- typed output;
-- usage/cost attribution where observable;
-- raw/structured evidence custody;
-- external-effect adherence;
-- hard timeout/cancel;
-- quiescence;
-- deterministic SSSF verification of the returned candidate.
-
-Compare against the pre-DSH SSSF baseline on the same qualification fixture. DSH must earn value rather than merely run successfully.
+**Unlock:** FUT-007 and early FUT-008 schema evaluation become eligible.
 
 ## DSH-2 — Bounded autonomous refinement
 
-Qualify internal iteration/Ralph-style repair inside **one outer attempt**.
+Permit internal repair/refinement inside one outer attempt with externally fixed iteration/time/token/cost ceilings. Measure deterministic acceptance, first-result acceptance, inner repair burden, outer retries, latency/cost/defects and reviewer burden versus DSH-1.
 
-Required distinctions:
+**Unlock:** FUT-005 and serial FUT-006.
 
-```text
-outer_attempt_id = one SSSF attempt
-execution_cell_id = one bounded DSH domain
-inner_unit_id(kind=refinement) = many possible iterations
-```
+## DSH-3 — Child/subagent lineage + parallelism
 
-Measure against DSH-1:
+Requires SBX-7. Qualify one child, serial children, then parallel children. Every child gets equal-or-narrower authority; aggregate budget is externally enforced. Prove lineage, per-child binding/evidence, cancellation propagation and quiescence.
 
-- deterministic final acceptance rate;
-- first-result acceptance;
-- inner repair count;
-- outer retries avoided/added;
-- wall time;
-- generation tokens/cost;
-- defect rate;
-- independent review burden.
+**Unlock:** parallel FUT-006 and governed hierarchical FUT-008.
 
-Code outside the verifier/model owns maximum refinement rounds and all hard budgets.
+## DSH-4 — Inner workflows/goals
 
-**Downstream unlock:** once DSH-2 is proven, FUT-005 (verifier-guided progress/refinement) and serial FUT-006 (Best-of-N) become eligible for formal evaluation. They do not automatically become sequenced.
+Qualify inner DSH workflows/goal graphs as descendants of one SSSF outer attempt. They cannot create/advance outer attempts/phases, alter budgets, decide acceptance or land/promote.
 
-## DSH-3 — Child/subagent lineage and parallelism
+## DSH-5 — Richer capabilities
 
-First qualify one child, then multiple serial children, then parallel children.
+Evaluate compaction, MCP, LSP/code intelligence, code mode, long/background workers, persistent terminal mechanisms and selected plugins/built-ins one at a time. Consult the preserved Awesome DSH Plugin research source before designing new post-DSH capability.
 
-Requires SBX-7 parallel/resource isolation.
+Each candidate requires exact source/dependencies, authority containment, cancellation/quiescence, evidence attribution, resource/effect boundaries, measured net value and rollback.
 
-Every child must inherit a strictly equal-or-narrower authority set and contribute to aggregate cell ceilings.
+## DSH-6 — Product subagents / maker-checker
 
-Required evidence:
+Use Claude/Codex/DeepSeek product workers only through qualified AgentBackend contracts. DSH calling multiple models does not establish review independence; SSSF reviewer policy, assignment identity and exact reviewer-protocol binding remain authoritative.
 
-- parent/child lineage;
-- model/backend identity per child;
-- child tool/effect authority;
-- per-child and aggregate budget use;
-- child outputs/evidence;
-- cancellation propagation;
-- no surviving children/processes at cell closure.
-
-**Downstream unlock:** parallel FUT-006 and production-grade hierarchical FUT-008 evaluation become eligible only after this stage's lineage and aggregate-budget proofs.
-
-## DSH-4 — Inner workflows and goals
-
-Qualify DSH workflows, `tool-workflow`, and goal-driven inner execution.
-
-An inner graph may be sophisticated, but it remains one descendant domain of the SSSF outer attempt. It cannot:
-
-- create another SSSF outer attempt;
-- advance an SSSF phase;
-- decide acceptance;
-- commit/promote/land;
-- alter its own external budget/authority.
-
-Workflow-node activity uses the same `inner_unit_id` lineage rather than a second trace universe.
-
-## DSH-5 — Richer engineering capabilities
-
-Evaluate capabilities one at a time against the last accepted baseline, including where justified:
-
-- compaction;
-- MCP;
-- LSP/code intelligence;
-- code mode;
-- long-running/background workers;
-- persistent terminal mechanisms;
-- selected DSH plugins or built-in equivalents.
-
-Before designing a new post-DSH capability, consult the preserved Awesome DSH Plugin catalog research reference. Catalog inclusion never implies admission.
-
-Each capability must prove:
-
-- exact source/build/dependency identity;
-- authority containment;
-- lifecycle/cancellation/quiescence;
-- evidence attribution;
-- resource/effect boundaries;
-- measurable value over the prior baseline;
-- rollback/retirement.
-
-## DSH-6 — Product subagents and maker/checker boundaries
-
-Qualify use of Claude/Codex/DeepSeek or other product agents as bounded inner workers only after their underlying execution contracts are independently known.
-
-A DSH ability to call two models does not by itself establish independent review. SSSF owns the independence policy and may require a separate cell/process/credential/context boundary.
-
-Same-model self-verification is optimization, not maker/checker independence.
+Same-model self-verification is optimization, not independent review.
 
 ## DSH-7 — Adaptive inner orchestration
 
-Permit DSH to choose dynamically, within the fixed cell authorization, whether to:
+Permit DSH to choose how to spend a fixed cell budget among admitted refinement/delegation/critic/tool/compaction/candidate actions. It cannot choose its budget, backend authority or outer authority.
 
-- refine;
-- delegate;
-- invoke an admitted critic/verifier;
-- choose among admitted tools;
-- compact;
-- explore an alternative candidate;
-- return early.
-
-The adaptive policy may choose how to spend a budget. It cannot choose its budget or outer authority.
-
-By this stage, probabilistic-verifier observations may participate only if the applicable FUT candidates have separately passed their own promotion/qualification gates.
+Probabilistic-verifier observations participate only after their FUT candidates independently pass qualification.
 
 ## DSH-8 — Governed self-evolution
 
-Research persistent improvement only after all preceding identity, evidence, rollback, independence, and promotion mechanisms are proven.
-
-Allowed shape:
-
-```text
-immutable running generation
-    → proposes immutable candidate generation
-    → isolated deterministic evaluation
-    → negative controls
-    → security/dependency review
-    → independent semantic review where required
-    → SSSF-owned promotion or rejection
-```
-
-A production DSH generation never silently changes its own persistent prompt, skill, workflow, plugin, memory authority, or production configuration.
+After immutable generation identity, evidence, rollback, security/dependency review, independent review and SSSF-owned promotion are proven, a running generation may propose immutable candidate generations. No production generation silently rewrites its own prompt/skill/workflow/plugin/memory/config authority.
 
 ---
 
-# Shared evidence and architecture-unit discipline
+# 7. Downstream unlock map
 
-## One fact, one owner
-
-For every new sandbox/DSH architectural fact, identify exactly one executable or machine-readable owner where practical. Documentation explains the contract and rationale; it should not become a second state store.
-
-For each material architecture unit record at least:
-
-- purpose/problem;
-- owner;
-- inputs;
-- outputs;
-- state;
-- authority gained/denied;
-- identity/parent relationship;
-- budget/effect boundary;
-- verifier;
-- watched-red/negative control;
-- evidence surface;
-- rollback/retirement;
-- documentation/ADR reference when architectural.
-
-Do this in the smallest existing appropriate schema/record. Do not create a universal architecture registry unless repeated implementation evidence shows the existing surfaces cannot express these facts without duplication.
-
-## Direct evidence emission
-
-Prefer:
-
-```text
-owning code performs state transition
-        + emits typed durable fact
-```
-
-over:
-
-```text
-owning code performs opaque activity
-        → separate monitor observes it
-        → monitor guesses durable fact
-```
-
-This is especially important for DSH inner units. DSH/adapters should emit machine-readable lifecycle/evidence facts at the seam; an external transparency process should not be required to infer them from terminal text.
-
----
-
-# Downstream unlock map
-
-An **unlock** means a preserved/candidate idea becomes eligible for formal evaluation. It does not mean `DECIDED`, `SEQUENCED`, or `ACTIVE`.
+An unlock means eligible for formal evaluation, not `DECIDED`, `SEQUENCED` or `ACTIVE`.
 
 | Proven prerequisite | Newly eligible evaluation |
 |---|---|
-| SBX-0..2 | local-provider implementation can begin |
-| SBX-3..6 | real DSH-0B custody qualification |
-| SBX-7 | DSH-3 parallel child/candidate qualification |
-| DSH-0A | typed ExecutionCell/criteria/evidence protocol refinement |
-| DSH-1 | FUT-007 criteria-decomposition evaluation; early FUT-008 evidence-schema evaluation |
-| DSH-2 | FUT-005 verifier-guided refinement; serial FUT-006 Best-of-N |
-| DSH-3 | parallel FUT-006; governed hierarchical FUT-008 production qualification |
-| DSH-5 | selected Awesome-DSH-plugin/catalog capabilities, one candidate at a time |
+| SBX-0..2 | Docker provider implementation |
+| SBX-3..6 + accepted pre-Docker review substrate | DSH-0B custody after DSH activation |
+| SBX-7 | DSH-3 parallel children/candidates |
+| DSH-0A | execution-cell protocol refinement |
+| DSH-1 | FUT-007; early FUT-008 schema |
+| DSH-2 | FUT-005; serial FUT-006 |
+| DSH-3 | parallel FUT-006; hierarchical FUT-008 |
+| DSH-5 | selected Awesome DSH Plugin candidates |
 | DSH-8 prerequisites | governed self-evolution candidates |
 
-FUT-008-style provenance/evidence fundamentals should influence the base execution-cell evidence design from DSH-0, but FUT-008 itself remains a candidate until evaluated. Production use of FUT-005/FUT-006/FUT-007 requires a qualified governed verifier-evidence substrate.
+FUT-008-style identity/provenance fundamentals influence base execution-cell evidence from DSH-0, but FUT-008 itself remains a candidate until evaluated. Probabilistic verifier evidence is advisory and can never override deterministic FAIL or narrow CNO.
 
 ---
 
-# Qualification rules for every stage
+# 8. Qualification discipline for every stage
 
-No stage advances merely because the happy path ran.
-
-Each activated increment must define, as applicable:
+Each activated increment defines as applicable:
 
 1. exact source/build/dependency identities;
 2. positive non-vacuity control;
 3. watched-red defect controls;
-4. failure and CNO behavior;
-5. authority-negative controls (what the component must be unable to do);
+4. failure/CNO behavior;
+5. authority-negative controls;
 6. interruption/cancellation controls;
 7. quiescence/cleanup controls;
-8. source/workspace integrity controls;
-9. evidence/provenance bindings;
-10. security/external-effect controls;
-11. resource/time/token/cost accounting where observable;
-12. rollback/retirement path;
-13. baseline comparison and net-complexity justification;
-14. independent review and normal SSSF acceptance/proof requirements.
+8. source/workspace integrity;
+9. VerificationContract applicability and evidence bindings;
+10. real-seam proof where the property concerns a real seam;
+11. reviewer-protocol/assignment binding where semantic review is required;
+12. security/effect/network controls;
+13. resource/time/token/cost accounting where observable;
+14. rollback/retirement;
+15. baseline/net-complexity comparison;
+16. exact-head review, landing authorization and post-merge proof under policy.
 
-A later stage invalidates no earlier proof automatically, but any changed shared contract must requalify all materially affected consumers.
+A changed shared contract requalifies every materially affected consumer; old exact-head evidence never transfers by assertion.
 
-# Readiness to activate sandbox implementation
+---
 
-The sandbox plan may move from planning to an `ACTIVE` increment only when:
+# 9. Activation readiness
 
-- current PRE_CERTIFICATION/serialized work permits a new sandbox increment;
-- the accepted current source/lifecycle/security/evidence documents are reconciled enough to serve as the reference contract;
-- B4-002 or its successor terminal/cancellation contract has a usable exact candidate identity;
-- SBX-0 scope and acceptance criteria can be stated without depending on unresolved product preference;
-- implementation can occur in an isolated branch/worktree with normal proof gates.
+## Sandbox
 
-Activation should begin at SBX-0/SBX-1, not by replacing exe.dev commands.
+SBX-0/1 can become `ACTIVE` only after the stable pre-Docker baseline gate permits new sandbox work and the named increment has bounded acceptance. Docker provider implementation itself remains blocked until the full B4/pre-Docker freeze checkpoint is satisfied.
 
-# Readiness to activate DSH implementation
+Start with semantics/contract/reference conformance, not provider-command replacement.
 
-DSH protocol work may become `ACTIVE` at DSH-0A when:
+## DSH
 
-- ADR-0004 remains applicable to then-current SSSF;
-- the execution-cell request/result authority model has no unresolved Captain-only product choice;
-- the accepted evidence/identity terminology is stable enough to avoid inventing parallel types;
-- a mock DSH adapter can be built without implying real DSH qualification.
+FUT-001 remains `SEQUENCED`, not `ACTIVE`. DSH-0A is a separate future activation from Docker and is not authorized merely because its protocol could be mocked early. Real DSH beyond 0A additionally requires the post-Docker/pre-DSH substrate, accepted SandboxProvider/AgentBackend/review contracts and normal planning activation.
 
-Real DSH work beyond DSH-0A additionally requires the sandbox acceptance gate and a qualified execution-owner/process contract.
+---
 
-# Explicit non-goals before activation
+# 10. Non-goals
 
 Do not:
 
-- replace the SSSF outer ADW graph with DSH;
-- place DSH inside SSSF merely as a hidden model proxy;
-- make the sandbox provider own orchestration/retry/acceptance;
-- introduce a second process supervisor if the accepted B4-002 successor can own the job;
-- introduce a second authoritative trace/evidence database solely for sandbox/DSH;
-- hide multiple model generations/verifier calls behind one apparent model event;
-- grant Docker/guest processes host control-plane credentials;
-- enable plugin marketplace or automatic plugin updates;
-- implement probabilistic-verifier candidates before their DSH gates;
-- begin governed self-evolution before immutable-generation promotion/rollback is proven.
+- make Herdr, a model, Docker, DSH or a provider the outer SSSF authority;
+- conflate AgentBackend with SandboxProvider;
+- expose canonical host checkout or host auth homes to mutation/review workers;
+- create provider-owned recovery policy;
+- create a second process supervisor or second authoritative trace DB when accepted owners already exist;
+- let reviewer/model discover its own required protocol/verification obligations;
+- treat Browser Sol prose approval as timeless landing permission;
+- hide multiple model/verifier operations behind one opaque event;
+- implement DSH plugins/verifier candidates before their gates;
+- implement self-evolution before immutable promotion/rollback is proven.
