@@ -16,6 +16,10 @@ State meanings are defined in [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md).
 | FUT-006 | Best-of-N DSH candidate selection | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | Multiple inner candidates remain one outer attempt; serial work waits for stable DSH cells, parallel work for DSH-3. |
 | FUT-007 | Typed criteria decomposition for inner semantic evaluation | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | Criteria derive from typed work/acceptance contracts, not verifier invention; requires DSH WorkPackage/ExecutionCell semantics. |
 | FUT-008 | Hierarchical probabilistic-verifier evidence and cost telemetry | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | Required governed evidence substrate before production use of the other verifier candidates; verifier authority remains advisory. |
+| FUT-009 | SSSF architecture-unit contract and generated governance views | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | Collapse future ADR/ownership/artifact/validator/lineage catalogs into one small machine-readable architecture contract plus deterministic generated projections. |
+| FUT-010 | Compact SSSF architectural laws | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | Extract a small SSSF-native law set into the existing Boundary Law surface; do not create an AE-style Constitution or governance runtime. |
+| FUT-011 | Instruction-artifact governance | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | One semantic owner per durable instruction, real consumers, truthful bounds, and generated inventory where useful; increasingly relevant as DSH expands prompts/subagents. |
+| FUT-012 | Deterministic derived documentation | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | Generate mechanically derivable indexes/ownership/status views from canonical machine state; authored rationale remains authored and authoritative only in its proper domain. |
 
 ## FUT-001 — Bounded autonomous DSH execution cells
 
@@ -246,6 +250,36 @@ Shared law:
 - generation, verification, selection, and refinement remain attributable execution units rather than being hidden behind a transparent TurboAgent-style inference proxy.
 
 Before any of FUT-005 through FUT-008 advances to `DECIDED` or `SEQUENCED`, re-evaluate it against the then-qualified DSH execution-cell boundary, the current SSSF evidence/authority model, and the then-current upstream verifier implementation at an exact source identity.
+
+## FUT-009 through FUT-012 — AE governance simplification family
+
+### Status
+
+- `FUT-009` — `CANDIDATE`: SSSF architecture-unit contract and generated governance views.
+- `FUT-010` — `CANDIDATE`: compact SSSF architectural laws.
+- `FUT-011` — `CANDIDATE`: instruction-artifact governance.
+- `FUT-012` — `CANDIDATE`: deterministic derived documentation.
+
+Detailed candidate evaluations, required controls, complexity constraints, and relationships to Sandbox -> DSH live in:
+
+- [`AE_GOVERNANCE_RESEARCH.md`](AE_GOVERNANCE_RESEARCH.md)
+
+All four are **unsequenced**. The 67-document AE corpus was reviewed as architectural evidence, but AE itself is not a source of present SSSF authority and its Runtime/Repository/Registry/EIA topology is explicitly not adopted.
+
+Shared extraction law:
+
+> **Use AE to identify what SSSF must know and prove, not to decide how many components SSSF must have.**
+
+Shared constraints:
+
+- existing SSSF owners must be preferred over new subsystems;
+- generated/read-only projections must not become second sources of truth;
+- architectural-law work should strengthen the existing Boundary Law rather than create a Constitution hierarchy;
+- instruction governance must not create a pre-DSH instruction runtime;
+- deterministic derived documentation is adopted selectively only where canonical machine state already exists;
+- architecture/governance machinery is admitted only when it reduces net complexity or closes a demonstrated recurrence class.
+
+Potential dependency shape for later evaluation is `FUT-010 -> FUT-009/FUT-011 -> selective FUT-012`, but this is not roadmap sequencing. No implementation authority follows from this registration.
 
 ## Not registered by default
 
