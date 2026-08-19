@@ -89,6 +89,39 @@ exact-main proof / disposition
 
 Docker is an execution boundary, not an orchestrator. DSH is an inner execution coordinator, not the SSSF outer workflow engine. Wayfinder is an operator/intent connector, not a state authority.
 
+## Cordis/DSH private-implementation research boundary
+
+The DSH plan is informed by a source-level review of:
+
+- repository: `dolphin-creator/cordis-python`;
+- reviewed commit: `e610aca184bdd823c96ba76484921f9f40aec68d`;
+- reviewed tree: `2d239a85266394b2f1099ea68f512e037eef35a5`;
+- observed commit message: `v0.11.1: harden nested session context propagation`;
+- package source at that commit still declares `__version__ = "0.11.0"`, so Git identity, not the human-facing version string, is authoritative for this research reference.
+
+This is a **research/reference identity**, not an SSSF dependency, trust grant, production plugin source, or architectural substrate.
+
+Governing rule:
+
+> **Cordis concepts may remain private inside DSH; SSSF consumes typed execution-cell contracts and evidence, not Cordis abstractions.**
+
+SSSF must not acquire public `Context`, `Fiber`, `Service`, `Effect`, plugin-reconciliation, or event-waterfall concepts merely because a DSH implementation uses them internally. DSH may use equivalent internal mechanisms when they improve bounded autonomy, but the outer SSSF contract remains implementation-independent.
+
+The strongest extracted Cordis principles are requirements/proof inputs for the DSH stages below:
+
+1. every reversible inner effect/resource has a lifecycle owner;
+2. capability/resource availability is distinct from execution authority;
+3. unauthorized capabilities are omitted from model-visible schemas where practical and authority is rechecked at final dispatch;
+4. specialized workers use private, narrow registries rather than inheriting all parent tools;
+5. delegation is structurally bounded and explicit before generic recursion is considered;
+6. effective runtime composition is deterministic, content-addressed and provenance-aware;
+7. durable historical evidence is distinct from the active model/context projection;
+8. context budgeting and deterministic compaction are CODE concerns, not model discretion;
+9. every autonomous inner unit terminates with typed evidence/manifest data;
+10. inner retries/refinements remain descendants of one SSSF outer attempt;
+11. optional internal implementations depend on stable contracts/capabilities rather than sibling implementation classes;
+12. cooperative inner cleanup never substitutes for SSSF-owned external process/environment quiescence proof.
+
 ---
 
 # 1. Near-term commissioning sequence
@@ -323,6 +356,18 @@ Each relevant unit carries parent identity, timing, authority/budget attribution
 
 Three-valued observation is exhaustive: PASS/observed-good, FAIL/observed-bad, COULD_NOT_OBSERVE. Missing state is never implicit success.
 
+DSH inner attribution must be explicit wherever the execution protocol can bind it. Do not make temporal proximity or mutable "last active worker" state authoritative for parentage. Every independently reportable inner unit should carry explicit `inner_unit_id`, `parent_unit_id`, `execution_cell_id` and `outer_attempt_id` or an exact equivalent mapping.
+
+Durable execution evidence and active model context are different owners:
+
+```text
+append-only / immutable evidence history
+                ≠
+current model-visible working projection
+```
+
+Compaction, summarization, checkpointing or context rotation may change the active projection. They must not rewrite historical evidence to make the projection look like the complete history.
+
 ---
 
 # 5. Docker sandbox program
@@ -505,6 +550,78 @@ Real DSH requires the accepted Docker baseline plus WAYFINDER-1 commission.
 
 The environment must already prove exact source/workspace identity, write/mount scope, typed bounded process execution, timeout/cancel/kill, resource ceilings, network/effect policy, evidence extraction, durable identity/trace join, Git harvest without promotion authority, provider/process quiescence, qualified AgentBackend binding and accepted verification/review/landing semantics.
 
+## 7.1 Private-runtime boundary
+
+DSH may internally use Cordis-style contexts, fibers/effects, services, scoped events, dependency reconciliation, private tool registries or equivalent mechanisms. Those remain implementation detail.
+
+The public SSSF↔DSH seam should stay small:
+
+```text
+ExecutionCellRequest
+        ↓
+opaque qualified DSH generation
+        ↓
+ExecutionCellResult + typed inner evidence
+```
+
+Do not add SSSF-visible Cordis abstractions merely to mirror an internal implementation.
+
+## 7.2 Effective runtime identity and provenance
+
+The cell must bind the **effective runtime actually authorized**, not merely a package/version label.
+
+At minimum, where applicable:
+
+- exact DSH source/build identity;
+- dependency/lock identity;
+- effective profile/composition digest;
+- capability-policy digest;
+- instruction/prompt/protocol digest(s);
+- backend/model policy identity;
+- plugin/capability generation identities admitted to the cell;
+- provenance showing which authoritative layer supplied policy-relevant effective values.
+
+Use full cryptographic digests for proof identity. A shortened display fingerprint may exist for UI convenience but is not authoritative evidence.
+
+Configuration provenance should fall out of deterministic composition where possible; do not create a separate provenance service merely to explain values code can already attribute while composing them.
+
+## 7.3 Capability availability is not authority
+
+Model/tool design must distinguish:
+
+```text
+resource/capability exists
+        ≠
+principal/cell may use it
+```
+
+`ExecutionCellRequest` therefore distinguishes available capability seams/backends from admitted authority. A mounted plugin, available executable, MCP server, browser, filesystem or subagent factory is not authorization by existence.
+
+Prefer two gates for model-facing capabilities:
+
+1. omit unauthorized tools/capabilities from the model-visible schema/context where practical;
+2. recheck current authority immediately before actual dispatch/effect.
+
+The second check is the authority boundary. Stale model context, forged tool calls or a policy change after schema construction must not bypass it.
+
+## 7.4 Inner lifecycle/effect ownership
+
+Every reversible resource created inside a cell should have one lifecycle owner, including as applicable:
+
+- tool/listener registrations;
+- child workers;
+- provider/network/browser clients;
+- MCP/LSP connections;
+- temporary files/workspaces;
+- background tasks;
+- internal processes;
+- internal plugin/capability mounts;
+- context/session projections.
+
+Cooperative cleanup should unwind all owned resources even if one cleanup fails; cleanup failures remain evidence.
+
+This is **not** terminal authority. SSSF's accepted process owner + Docker provider independently enforce timeout/cancel/kill and prove descendant/environment quiescence after DSH cooperative cleanup.
+
 ## ExecutionCellRequest
 
 Minimum semantics:
@@ -513,8 +630,11 @@ Minimum semantics:
 - objective/role;
 - exact source/workspace identity;
 - selected qualified AgentBackend profile/allowed set;
+- effective DSH/runtime/config/policy/instruction identities;
+- available capability seams/backends;
 - write/tool/capability authority;
-- time/resource/token/cost ceilings;
+- explicit allowed delegation edges/depth where children are admitted;
+- time/resource/token/cost/iteration/child ceilings;
 - effect/network policy;
 - maker/checker policy;
 - applicable VerificationContract/review-policy references;
@@ -529,19 +649,24 @@ DSH may spend inside the fixed authorization but cannot enlarge it.
 Return observed facts, never SSSF acceptance authority:
 
 - exact identities;
+- effective runtime/config/policy digests actually used;
 - terminal state/reason;
 - typed result/envelope;
 - source/workspace/mutation facts;
 - backend binding/execution evidence;
-- usage/cost observations;
-- child/inner-unit summary;
+- usage/cost observations, including exact-vs-estimated provenance where applicable;
+- child/inner-unit summary with explicit parent bindings;
+- per-inner-unit terminal manifests/evidence refs as required;
+- context/compaction actions and historical-coverage refs where relevant;
 - evidence refs/digests;
-- effect observations;
+- effect/cleanup observations;
 - cancellation/timeout facts;
 - cleanup/quiescence;
 - CNO reasons.
 
 DSH never returns authoritative `accepted=true`; SSSF derives acceptance.
+
+Child/research/verifier outputs carry provenance and a trust/authority class. A useful child result is data/evidence, not automatically instruction or execution authority.
 
 ---
 
@@ -551,17 +676,69 @@ DSH never returns authoritative `accepted=true`; SSSF derives acceptance.
 
 After WAYFINDER-1, prove request/result identity, authority rejection, budgets, result schema, stale/wrong-source refusal, no outer graph/commit/promotion authority, typed CNO, evidence attribution and cancellation using a deterministic mock.
 
+Also prove the protocol can represent, without Cordis-specific public nouns:
+
+- full effective runtime/config/policy/instruction digests;
+- policy-relevant configuration provenance;
+- capability availability separately from granted authority;
+- explicit parent/child/inner-unit identity;
+- allowed delegation edges/depth;
+- lifecycle/effect evidence classes;
+- durable-history versus active-projection identity;
+- per-inner-unit typed terminal manifests;
+- exact-vs-estimated usage provenance.
+
+Negative controls include:
+
+- capability exists but authority is absent;
+- stale/forged tool request cannot gain authority;
+- changed effective configuration without changed digest is rejected;
+- child identity without valid parent/cell binding is rejected;
+- inner unit attempts to claim outer acceptance/promotion authority;
+- shortened/display-only fingerprints are insufficient where full proof digest is required.
+
 Protocol proof does not authorize real autonomous DSH.
 
 ## DSH-0B — Real Docker custody seam
 
-Run the mock through accepted Docker SandboxProvider + AgentBackend/process-owner path. Prove identity joins, external budget enforcement, timeout/cancel, evidence survival, authorized mutation only, Git harvest without promotion authority and zero surviving processes/children.
+Run the mock through accepted Docker SandboxProvider + AgentBackend/process-owner path.
+
+Prove:
+
+- identity joins across run → ADW → outer attempt → cell → inner unit;
+- effective runtime/config/policy identity survives into evidence;
+- external budget enforcement;
+- timeout/cancel;
+- evidence survival;
+- authorized mutation only;
+- Git harvest without promotion authority;
+- cooperative DSH cleanup is observable;
+- SSSF process custody independently kills/cleans residual descendants;
+- Docker provider independently proves environment/resource quiescence;
+- zero surviving processes/children/resources at a clean terminal state.
+
+A DSH/Cordis-style `close()`/dispose success, immediate-child `process.kill()`, empty internal registry or missing process is **not** sufficient quiescence proof by itself.
 
 ## DSH-1 — Real multi-turn single-agent cell
 
 Admit one exact DSH build/dependency identity and one qualified backend/model profile. Exclude subagents, autonomous refinement, workflows/goals, optional plugins and self-evolution.
 
-Prove bounded tools/effects, source integrity, typed output, usage/evidence, hard timeout/cancel, quiescence and deterministic SSSF verification/review. Compare against the post-Docker/pre-DSH baseline.
+Require:
+
+- bounded private model-visible tool registry;
+- capability/resource existence separated from cell authority;
+- unauthorized tool omission where practical plus dispatch-time reauthorization;
+- deterministic effective runtime/config/policy fingerprinting using full proof digests;
+- deterministic context-window budgeting owned by code;
+- durable append-only/history evidence distinct from active model/context projection;
+- any compaction/checkpoint transformation recorded without rewriting historical truth;
+- exact model-visible request/event attribution where retained by the evidence contract;
+- typed terminal inner-unit manifest containing source/mutation/tool/usage/context/result/failure/cleanup facts;
+- bounded tools/effects, source integrity, typed output, hard timeout/cancel, quiescence and deterministic SSSF verification/review.
+
+Compare against the post-Docker/pre-DSH baseline.
+
+Do not initially grant DSH authority to commit/promote/land candidate Git state. Prefer dirty/disposable candidate workspace + SSSF-owned harvest/promotion until a later explicit need is proven.
 
 **Unlock:** FUT-007 and early FUT-008 schema evaluation.
 
@@ -569,11 +746,51 @@ Prove bounded tools/effects, source integrity, typed output, usage/evidence, har
 
 Permit internal repair/refinement inside one outer attempt with externally fixed iteration/time/token/cost ceilings. Measure deterministic acceptance, outer retries, latency/cost/defects and reviewer burden against DSH-1.
 
+Add typed inner-attempt/refinement evidence:
+
+- inner attempt/iteration identity;
+- failure class;
+- retryable/non-retryable classification;
+- deterministic retry reason/policy identity;
+- remaining inner budget;
+- policy/gate changes between attempts;
+- terminal manifest per material attempt or a lossless indexed summary under the evidence contract.
+
+Evaluate cheap CODE-owned loop guards before adding semantic loop observers, including:
+
+- duplicate identical tool-call suppression within one model response;
+- configurable per-turn/tool/action ceilings;
+- repeated identical read-only-call suppression while no relevant state changed;
+- invalidation of stale read suppression after writes/state changes;
+- empty-success guards such as no required change/no usable final result.
+
+These are DSH inner controls. They never mint another SSSF `outer_attempt_id`.
+
 **Unlock:** FUT-005 and serial FUT-006.
 
 ## DSH-3 — Child/subagent lineage + parallelism
 
 Requires SBX-7. Qualify one child, serial children, then parallel children. Every child gets equal-or-narrower authority; aggregate budgets are externally enforced. Prove lineage, per-child evidence, cancellation propagation and quiescence.
+
+Start with **typed structural delegation edges**, not a generic recursive worker graph. Example:
+
+```text
+builder → research
+builder → critic
+research → none
+critic   → none
+```
+
+Required properties:
+
+- each child receives a private, narrow tool/capability registry appropriate to its role;
+- parent tool visibility is not inherited by default;
+- child authority is equal-or-narrower and dispatch-time enforced;
+- `inner_unit_id`, `parent_unit_id`, `execution_cell_id` and outer-attempt binding are explicit rather than inferred from temporal order;
+- child results cross boundaries with provenance/trust classification and do not become instructions by default;
+- asymmetric one-way delegation is preferred when it bounds recursion more strongly than policy prose;
+- generic recursive spawning requires a separately demonstrated need plus externally fixed depth/child/aggregate budgets;
+- cancellation propagates through the declared child graph and external SSSF/Docker custody still proves quiescence.
 
 **Unlock:** parallel FUT-006 and hierarchical FUT-008.
 
@@ -581,13 +798,30 @@ Requires SBX-7. Qualify one child, serial children, then parallel children. Ever
 
 Qualify inner DSH workflows/goal graphs as descendants of one SSSF outer attempt. They cannot create/advance outer attempts/phases, alter budgets, decide acceptance or land/promote.
 
+Workflow nodes should reuse the same inner-unit identity/evidence model rather than introduce a separate workflow trace authority. Dependency/service reconciliation may be used internally, but DSH does not become SSSF's outer recovery engine.
+
 ## DSH-5 — Richer capabilities
 
 Evaluate compaction, MCP, LSP/code intelligence, code mode, long/background workers, persistent terminal mechanisms and selected plugins/built-ins one at a time. Consult FUT-002 before designing new post-DSH capabilities.
 
+Cordis-Python-derived evaluation requirements become explicit here:
+
+- optional implementations depend on stable capability/service contracts rather than sibling implementation classes where a real replaceable seam exists;
+- every mounted/internal capability has one lifecycle owner and reversible cleanup path where possible;
+- a new plugin/capability must not expand outer authority;
+- runtime composition/effective configuration remains content-addressed and provenance-aware;
+- newly visible model tools are separately qualified for visibility, authority and dispatch behavior;
+- context compaction changes active projection, never historical evidence;
+- background/persistent facilities remain subject to SSSF-owned hard termination and quiescence;
+- no capability is promoted merely because Cordis-Python or the Awesome DSH Plugin catalog demonstrates an implementation.
+
+Prefer deep, replaceable internal modules over atomizing trivial helpers into plugins. One concrete implementation does not by itself justify a new architectural seam; require real variation or a distinct reason to change.
+
 ## DSH-6 — Product subagents / maker-checker
 
 Use Claude/Codex/DeepSeek product workers only through qualified AgentBackend contracts. Multiple models do not establish review independence by themselves.
+
+A reviewer/checker should receive its own private capability registry and exact review protocol/input identity rather than inheriting the maker's complete tools/context. Same-model self-verification remains optimization, not independent review.
 
 FUT-011/FUT-013 instruction qualification ideas become especially relevant here for operational worker/reviewer prompts.
 
@@ -595,11 +829,15 @@ FUT-011/FUT-013 instruction qualification ideas become especially relevant here 
 
 Permit DSH to choose how to spend one fixed execution-cell budget among already admitted refinement/delegation/critic/tool/compaction/candidate actions. It cannot choose its own outer budget or authority.
 
+Adaptive choice is bounded to **admitted action classes and structural delegation edges**. It may not dynamically create a new authority class, widen policy, add an unqualified plugin, create an unbounded recursive worker graph or reinterpret CNO as permission.
+
 Probabilistic verifier observations participate only after their FUT candidates pass qualification.
 
 ## DSH-8 — Governed self-evolution
 
 A running immutable generation may propose immutable candidate prompt/skill/workflow/plugin/memory/config generations only after evidence, rollback, security/dependency review, independent review and SSSF-owned promotion are proven. No silent production self-rewrite.
+
+Self-extension occurs in a candidate/disposable workspace with the same capability, evidence and promotion boundaries as any other DSH output. A running generation may propose its successor; it does not authorize the successor.
 
 ---
 
@@ -623,6 +861,8 @@ An unlock means eligible for evaluation, not automatic promotion.
 
 FUT-008-style identity/provenance fundamentals may influence base cell evidence before FUT-008 itself is promoted. Probabilistic verifier evidence remains advisory and cannot override deterministic FAIL or narrow CNO.
 
+The reviewed Cordis-Python source is a stage-local research input, not an unlock or prerequisite of its own. Reinspect the then-current source and exact Git identity before copying/adapting implementation code or relying on a specific behavior that may have changed after `e610aca184bdd823c96ba76484921f9f40aec68d`.
+
 ---
 
 # 10. Qualification discipline
@@ -644,7 +884,17 @@ Each activated increment defines as applicable:
 13. resource/time/token/cost accounting where observable;
 14. rollback/retirement;
 15. baseline/net-complexity comparison;
-16. exact-head review, landing authorization and post-merge proof under policy.
+16. exact-head review, landing authorization and post-merge proof under policy;
+17. effective runtime/config/policy/instruction full-digest identity where DSH behavior depends on composition;
+18. capability-availability versus execution-authority separation;
+19. model-visible schema filtering plus dispatch-time authority recheck where model tools are involved;
+20. explicit inner parent/child lineage rather than temporal inference;
+21. lifecycle ownership for reversible inner resources plus recorded cleanup failures;
+22. durable-history versus active-context-projection separation for compaction/checkpoint features;
+23. typed inner-unit terminal manifest/evidence completeness;
+24. external SSSF/process/Docker quiescence proof independent of DSH cooperative cleanup;
+25. structural delegation-depth/edge controls where children are admitted;
+26. deterministic loop/retry controls before semantic monitoring when the property is mechanically enforceable.
 
 A changed shared contract requalifies materially affected consumers. Old exact-head evidence never transfers by assertion.
 
@@ -667,4 +917,12 @@ Do not:
 - implement DSH plugins/verifier candidates before their gates;
 - implement self-evolution before immutable promotion/rollback is proven;
 - ask the Engineer for facts the system can establish;
-- ask an Agent to own a deterministic state transition that Code can own.
+- ask an Agent to own a deterministic state transition that Code can own;
+- expose Cordis `Context`/`Fiber`/`Service`/`Effect`/plugin vocabulary as SSSF architecture merely because DSH uses it internally;
+- treat a mounted capability/plugin/resource as execution authority;
+- rely on model-visible tool hiding without a dispatch-time authority check;
+- infer authoritative worker parentage from mutable last-seen/session timing when explicit identity can be carried;
+- rewrite durable history because the active model projection was compacted;
+- accept immediate-child `process.kill()`, an internal `close()`/dispose result or an empty child registry as proof of process/environment quiescence;
+- allow a DSH/Cordis internal Git commit/branch operation to become SSSF promotion or landing authority;
+- adopt a Cordis-Python implementation merely because the reference repository contains it without fresh exact-source/security/qualification review.
