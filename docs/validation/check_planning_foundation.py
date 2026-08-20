@@ -1034,7 +1034,7 @@ def _materialize_fixture_references(state: dict[str, Any], root: Path) -> None:
 
 
 def _watched_symlink_escape_controls(
-    project: dict[str, Any], failures: list[str]
+    project: dict[str, Any], failures: list[str], could_not_observe: list[str]
 ) -> None:
     """Exercise ACTIVE and every retained-PROVEN evidence path with real links."""
     active_name = "symlink-escape-active-authoritative-reference"
@@ -1044,6 +1044,21 @@ def _watched_symlink_escape_controls(
         "proof_evidence_refs": "proof-evidence",
         "documentation_evidence_refs": "documentation-evidence",
     }
+    control_names = [active_name]
+    control_names.extend(
+        f"symlink-escape-proven-{label}" for label in proven_fields.values()
+    )
+
+    def create_link(link: Path, target: Path) -> bool:
+        try:
+            link.symlink_to(target)
+        except (NotImplementedError, OSError):
+            could_not_observe.extend(
+                name for name in control_names if name not in could_not_observe
+            )
+            return False
+        return True
+
     with tempfile.TemporaryDirectory(prefix="sssf-planning-symlink-controls-") as raw:
         transient = Path(raw).resolve()
         root = transient / "project"
@@ -1052,9 +1067,7 @@ def _watched_symlink_escape_controls(
         state = fixture.get("state")
         if not isinstance(state, dict):
             failures.append(active_name)
-            failures.extend(
-                f"symlink-escape-proven-{label}" for label in proven_fields.values()
-            )
+            failures.extend(control_names[1:])
             return
         _materialize_fixture_references(state, root)
         outside = transient / "outside"
@@ -1064,7 +1077,8 @@ def _watched_symlink_escape_controls(
         active_target.write_text("outside ACTIVE target\n", encoding="utf-8")
         active_link = root / "docs/development/active-authority-link.md"
         active_link.parent.mkdir(parents=True, exist_ok=True)
-        active_link.symlink_to(active_target)
+        if not create_link(active_link, active_target):
+            return
         active_reference = active_link.relative_to(root).as_posix()
         active_state = _active_state_fixture(fixture)
         active_record = next(
@@ -1088,7 +1102,8 @@ def _watched_symlink_escape_controls(
             target = outside / f"{field}.json"
             target.write_text(f"outside {field} target\n", encoding="utf-8")
             link = root / "docs" / "development" / f"{field}-link.json"
-            link.symlink_to(target)
+            if not create_link(link, target):
+                return
             proven_record["proven_proof"][field] = [
                 link.relative_to(root).as_posix()
             ]
@@ -1100,8 +1115,11 @@ def _watched_symlink_escape_controls(
                 failures.append(f"symlink-escape-proven-{label}")
 
 
-def _watched_red_controls(project: dict[str, Any]) -> list[str]:
+def _watched_red_controls(
+    project: dict[str, Any], could_not_observe: list[str] | None = None
+) -> list[str]:
     failures: list[str] = []
+    control_cno = could_not_observe if could_not_observe is not None else []
 
     stale_adr = copy.deepcopy(project)
     stale_adr["surfaces"]["adr_planning"] = stale_adr["surfaces"]["adr_planning"].replace(
@@ -1255,7 +1273,7 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
             for error in validate_state_document(escaped_reference, project)
         ):
             failures.append(name)
-    _watched_symlink_escape_controls(project, failures)
+    _watched_symlink_escape_controls(project, failures, control_cno)
 
     invented_return = copy.deepcopy(project["state"])
     deferred_record = next(item for item in invented_return["records"] if item["item_id"] == "FUT-003")
@@ -1308,7 +1326,12 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
     return failures
 
 
-def validate_project(project: dict[str, Any], *, run_controls: bool = True) -> tuple[str, list[str]]:
+def validate_project(
+    project: dict[str, Any],
+    *,
+    run_controls: bool = True,
+    control_cno: list[str] | None = None,
+) -> tuple[str, list[str]]:
     errors: list[str] = []
     cno: list[str] = []
     _check_required_files(project, errors, cno)
@@ -1325,23 +1348,26 @@ def validate_project(project: dict[str, Any], *, run_controls: bool = True) -> t
     _validate_cross_references(project, errors)
     _validate_authority_ownership(project, errors)
     if run_controls and not errors:
-        red_failures = _watched_red_controls(project)
+        red_failures = _watched_red_controls(project, control_cno)
         if red_failures:
             errors.append("watched-red controls did not go red: " + ", ".join(red_failures))
     return ("observed-bad" if errors else "observed-good"), errors
 
 
-def validate_path(root: Path = ROOT) -> tuple[str, list[str], list[str]]:
+def validate_path(
+    root: Path = ROOT, *, control_cno: list[str] | None = None
+) -> tuple[str, list[str], list[str]]:
     project = load_project(root)
-    status, errors = validate_project(project)
+    status, errors = validate_project(project, control_cno=control_cno)
     red_failures: list[str] = []
     if status == "observed-good":
-        red_failures = _watched_red_controls(project)
+        red_failures = _watched_red_controls(project, control_cno)
     return status, errors, red_failures
 
 
 def main() -> int:
-    status, errors, red_failures = validate_path(ROOT)
+    control_cno: list[str] = []
+    status, errors, red_failures = validate_path(ROOT, control_cno=control_cno)
     print(f"planning foundation validation: {status}")
     print(f"lifecycle owner: {LIFECYCLE_OWNER}")
     print(f"validation owner: {VALIDATION_OWNER}")
@@ -1374,12 +1400,17 @@ def main() -> int:
         for failure in red_failures:
             print(f"- watched-red control did not fail closed: {failure}")
         return 1
+    for control in control_cno:
+        print(f"watched-red could-not-observe (symlink unavailable): {control}")
     print("positive case: canonical lifecycle, durable SEQUENCED records, and current SBX holds")
     print("positive ACTIVE fixture: exact increment/branch/PR/source identities validate in memory")
     print("positive PROVEN fixture: accepted proof contract validates in memory")
     print("positive SUPERSEDED fixture: historical accepted proof remains valid in memory")
     print("positive DEFERRED fixture: retained return state validates in memory")
-    print("watched-red: all controls observed-bad under in-memory defects")
+    if control_cno:
+        print("watched-red: all observable controls observed-bad under in-memory defects")
+    else:
+        print("watched-red: all controls observed-bad under in-memory defects")
     print("side effects: none")
     return 0
 
