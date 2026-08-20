@@ -1,0 +1,115 @@
+{
+  "schema_version": "sssf.planning-state.v1",
+  "record_id": "sssf-planning-state",
+  "lifecycle_owner": "docs/development/PLANNING_LIFECYCLE.md",
+  "state_record_rule": "This JSON record is the durable current-state record; Git commit prose is not state.",
+  "current_main_adr_inventory": {
+    "source_commit": "991d3a64f1b96a8b9637f97060d692af3518228f",
+    "files": [
+      "ADR-0001-PROVEN-INCREMENTS.md",
+      "ADR-0002-SANDBOX-PROVIDER-ABSTRACTION.md",
+      "ADR-0003-OFFLINE-EVIDENCE-MANIFEST.md",
+      "ADR-0003-OWNED-SUBPROCESS-SUPERVISION.md",
+      "ADR-0003-THREE_VALUED_GATE_OUTCOMES.md",
+      "ADR-0004-SSSF-FIRSTMATE-WINDOWS-FRONT-DOOR.md",
+      "ADR-0006-SANDBOX-PROVIDER-CONTRACT.md"
+    ]
+  },
+  "allocated_new_identities": {
+    "fut003": "ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md",
+    "dsh": "ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md"
+  },
+  "records": [
+    {
+      "item_id": "FUT-001",
+      "state": "SEQUENCED",
+      "initial_state": "DECIDED",
+      "authoritative_refs": [
+        "docs/development/PLANNING_LIFECYCLE.md",
+        "docs/development/FUTURE_CANDIDATES.md",
+        "docs/development/ROADMAP.md",
+        "docs/decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md"
+      ],
+      "transition_history": [
+        {
+          "from": "DECIDED",
+          "to": "SEQUENCED",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md",
+            "docs/development/ROADMAP.md",
+            "docs/decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md"
+          ],
+          "evidence_note": "DSH remains a long-range sequenced direction and is not active."
+        }
+      ],
+      "active_binding": null,
+      "activation_deferred": "No DSH implementation is authorized by this planning record."
+    },
+    {
+      "item_id": "FUT-002",
+      "state": "PRESERVE",
+      "initial_state": "EXPLORE",
+      "authoritative_refs": [
+        "docs/development/PLANNING_LIFECYCLE.md",
+        "docs/development/FUTURE_CANDIDATES.md"
+      ],
+      "transition_history": [
+        {
+          "from": "EXPLORE",
+          "to": "PRESERVE",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md"
+          ],
+          "evidence_note": "The catalog is a preserved research source, not an allowlist."
+        }
+      ],
+      "active_binding": null,
+      "activation_deferred": "Preserved references do not authorize implementation."
+    },
+    {
+      "item_id": "FUT-003",
+      "state": "SEQUENCED",
+      "initial_state": "CANDIDATE",
+      "authoritative_refs": [
+        "docs/development/PLANNING_LIFECYCLE.md",
+        "docs/development/FUTURE_CANDIDATES.md",
+        "docs/development/ROADMAP.md",
+        "docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md"
+      ],
+      "transition_history": [
+        {
+          "from": "CANDIDATE",
+          "to": "DECIDED",
+          "source_commit": "2d078ca94f3f97dc85d7b17df6a13f45aa4ef2ba",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md",
+            "docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md"
+          ],
+          "evidence_note": "Immutable predecessor evidence records the architectural decision; it does not authorize implementation."
+        },
+        {
+          "from": "DECIDED",
+          "to": "SEQUENCED",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md",
+            "docs/development/ROADMAP.md",
+            "docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md"
+          ],
+          "evidence_note": "This successor records the legal sequencing edge durably; no ACTIVE binding exists."
+        }
+      ],
+      "planned_increments": [
+        {
+          "increment_id": "FP-001",
+          "status": "planned-not-active"
+        },
+        {
+          "increment_id": "FM-FP-001",
+          "status": "planned-not-active"
+        }
+      ],
+      "active_binding": null,
+      "activation_deferred": "FP-001 and FM-FP-001 do not yet have every exact branch, PR, source commit, and source tree identity required for an honest ACTIVE record."
+    }
+  ]
+}

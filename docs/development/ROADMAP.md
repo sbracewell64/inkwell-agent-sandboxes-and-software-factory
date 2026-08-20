@@ -7,11 +7,18 @@ The order below deliberately separates concerns.
 - SBX-0's sole durable provider-neutral handoff landed at `aa0dcc5e`; it does
   not establish SBX-0 exit or any promotion.
 - SBX-1 is a **landed implementation** of the provider-neutral contract and
-  deterministic fake controls. SBX-1 is not activated, not accepted, not
-  certified, and not real-provider-proven; it does not unlock SBX-2.
+  deterministic fake controls. SBX-1 is not activated. SBX-1 is not accepted.
+  SBX-1 is not certified. SBX-1 is not real-provider-proven. SBX-1 does not
+  unlock SBX-2.
 - SBX-2 is held. Docker mechanism selection, real-provider custody, and
   Windows/WSL feasibility require their own authorization and evidence; none
   is inferred from SBX-1's provider-free CI.
+
+Planning-state semantics and legal edges are owned only by
+[`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md). The durable current-state and
+transition evidence record is [`PLANNING_STATE.json`](PLANNING_STATE.json).
+A roadmap row records dependency position; it does not create a task, grant
+runtime authority, or replace the lifecycle contract.
 
 ## B1 — Baseline archive + documentation discovery
 
@@ -114,6 +121,47 @@ make trace/status inspection reliable from the Windows host and suitable for sup
 ## B8 — Broader ADW/agent qualification
 
 Qualify scout/reviewer/documenter and additional ADWs with explicit fixtures.
+
+## FUT-003 — FirstMate planning-transition awareness
+
+**Planning state: `SEQUENCED`, not `ACTIVE`.**
+
+The architectural decision is
+[`ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`](../decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md),
+and the durable state/evidence record is
+[`PLANNING_STATE.json`](PLANNING_STATE.json). The legal lifecycle contract is
+owned by [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md).
+
+`FP-001` and `FM-FP-001` are planned named increments only. The ACTIVE
+transition is deferred because the exact branch, PR, source commit, and source
+tree identities required for an honest ACTIVE record do not yet exist. No
+partial or fabricated ACTIVE record is permitted.
+
+FUT-003 remains planning-only in this increment. No FirstMate watcher,
+producer, or consumer implementation is added. No feed, task, runtime
+behavior, credential, sandbox, provider, ADW, Docker, Wayfinder, or DSH
+behavior is added. A later ACTIVE
+record would be intake eligibility only and would still require ordinary
+admission, exact source validation, review, acceptance, and current
+PRE_CERTIFICATION constraints. It would never be task creation, execution
+authority, landing authority, a PRE_CERTIFICATION exit, acceptance,
+certification, live enablement, or `PROVEN`.
+
+## Long-range sequenced direction — FUT-001
+
+**Planning state: `SEQUENCED`, not `ACTIVE`.**
+
+The governing decision is
+[`ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md`](../decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md).
+SSSF retains outer graph, source custody, budgets, external-effect policy,
+deterministic verification, acceptance, promotion, landing, and terminal-state
+authority. DSH may be considered only as a future bounded inner execution cell
+with attributable evidence, forceable termination, and no outer authority.
+
+Production DSH adoption remains downstream of the existing execution/isolation,
+backend, source-custody, lifecycle/evidence, hard-termination, quiescence, and
+acceptance proofs. No DSH or Cordis implementation is authorized by this
+roadmap row.
 
 ## Rule
 

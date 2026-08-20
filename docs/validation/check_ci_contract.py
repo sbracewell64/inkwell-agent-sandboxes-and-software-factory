@@ -50,6 +50,9 @@ EXPECTED_CHECKS = {
     "sandbox-provider-contract-validator": (
         "{python}", "docs/validation/check_sandbox_provider.py"
     ),
+    "planning-foundation-validator": (
+        "{python}", "docs/validation/check_planning_foundation.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
 

@@ -138,6 +138,10 @@
 | SBX-1 Windows/provider custody | Green Windows CI exercised the provider-free fake only; no supported Windows-host execution, Docker/provider mechanism, credential, network, or real-provider custody was observed | CNO — PROVIDER-FREE CI IS NOT HOST/PROVIDER PROOF |
 | SBX-1 Docker mechanism binding | typed capability is `deferred-to-sbx-2`; no Docker or provider side effect belongs to this increment | CNO — SBX-2 HELD; SBX-1 DOES NOT UNLOCK IT |
 
+| FUT-003 planning lifecycle contract | `docs/development/PLANNING_LIFECYCLE.md`, durable `PLANNING_STATE.json`, and offline validator with watched-red controls | OBSERVED-GOOD — planning foundation only; FUT-003 remains SEQUENCED and no implementation/runtime/PROVEN authority is claimed |
+| FUT-003 exact ACTIVE binding boundary | Validator manufactures unbound and partial ACTIVE identities red; valid exact identity fixture passes | OBSERVED-GOOD — ACTIVE remains deferred because current exact branch/PR/source identities do not exist |
+| FUT-003 planning cross-reference and ADR identity boundary | Validator manufactures stale ADR status, duplicate ADR-0007, competing lifecycle owner, broken link, and roadmap SBX regression red | OBSERVED-GOOD — current ADR-0004/0006 and SBX lifecycle holds preserved; historical ADR-0003 collisions remain out of scope |
+
 ## Rule
 
 A `NOT PROVEN`, `UNRESOLVED`, `ABSENT`, or observational row remains visible until a later increment supplies evidence or deliberately changes the contract. Documentation must not convert absence of proof into a pass.
