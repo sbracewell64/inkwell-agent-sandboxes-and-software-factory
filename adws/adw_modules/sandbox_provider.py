@@ -1083,6 +1083,33 @@ class DestroyAuthorization:
             raise ValueError("destroy authorization scope is closed")
 
 
+class DestroyAuthorizationRegistry:
+    """SSSF-owned issuance and one-use provenance for destroy capabilities."""
+
+    def __init__(self) -> None:
+        self._issued: dict[str, DestroyAuthorization] = {}
+        self._consumed: set[str] = set()
+
+    def _register(self, authorization: DestroyAuthorization) -> DestroyAuthorization:
+        existing = self._issued.get(authorization.authorization_id)
+        if existing is not None:
+            return existing
+        self._issued[authorization.authorization_id] = authorization
+        return authorization
+
+    def verifies(self, authorization: DestroyAuthorization) -> bool:
+        return self._issued.get(authorization.authorization_id) is authorization
+
+    def consumed(self, authorization: DestroyAuthorization) -> bool:
+        return authorization.authorization_id in self._consumed
+
+    def consume(self, authorization: DestroyAuthorization) -> bool:
+        if not self.verifies(authorization) or self.consumed(authorization):
+            return False
+        self._consumed.add(authorization.authorization_id)
+        return True
+
+
 @dataclass(frozen=True, slots=True)
 class LifecycleOperationRecord:
     """Append/CAS record owned by SSSF, not a provider lifecycle database."""
@@ -1393,6 +1420,7 @@ def issue_destroy_authorization(
     git: GitExportFacts,
     artifact_spec: ArtifactSpec,
     git_spec: GitExportSpec,
+    authorization_registry: DestroyAuthorizationRegistry,
     secret_retirement: SecretRetirementFacts | None = None,
     issued_at: str = "1970-01-01T00:00:00Z",
 ) -> DestroyAuthorization:
@@ -1411,6 +1439,8 @@ def issue_destroy_authorization(
         raise DestroyNotAuthorized("destroy authorization requires an applicable required artifact obligation")
     if not git_spec.applicable or not git_spec.required:
         raise DestroyNotAuthorized("destroy authorization requires an applicable required Git obligation")
+    if not isinstance(authorization_registry, DestroyAuthorizationRegistry):
+        raise DestroyNotAuthorized("destroy authorization requires the SSSF issuance registry")
     artifact_context = artifact_spec.manifest_context
     if (
         artifact_spec.operation.run_id != spec.run_id
@@ -1419,7 +1449,14 @@ def issue_destroy_authorization(
         or artifact_context.base_sha != spec.source_commit
     ):
         raise DestroyNotAuthorized("artifact obligation does not belong to the sandbox specification")
-    if git_spec.operation.run_id != spec.run_id or git_spec.source != spec.source_identity:
+    if (
+        git_spec.operation.run_id != spec.run_id
+        or git_spec.source != spec.source_identity
+        or git_spec.expected_base_commit != spec.source_commit
+        or git_spec.expected_base_tree != spec.source_tree
+        or git_spec.expected_tip_commit is None
+        or artifact_context.candidate_sha != git_spec.expected_tip_commit
+    ):
         raise DestroyNotAuthorized("Git obligation does not belong to the sandbox specification")
     artifact_check = validate_artifact_export(
         artifact_spec, artifact, provider_resource_id=identity.provider_resource_id
@@ -1451,7 +1488,7 @@ def issue_destroy_authorization(
     obligation_digest = _obligation_digest(checks)
     auth_raw = f"destroy/v1|{spec.run_id}|{identity.provider_resource_id}|{operation.idempotency_key}|{obligation_digest}"
     authorization_id = hashlib.sha256(auth_raw.encode()).hexdigest()
-    return DestroyAuthorization(
+    authorization = DestroyAuthorization(
         authorization_id=authorization_id,
         run_id=spec.run_id,
         provider_resource_id=identity.provider_resource_id,
@@ -1462,6 +1499,7 @@ def issue_destroy_authorization(
         obligations_digest=obligation_digest,
         issued_at=issued_at,
     )
+    return authorization_registry._register(authorization)
 
 
 # ---------------------------------------------------------------------------
@@ -1579,6 +1617,7 @@ class FakeSandboxProvider:
         *,
         interrupt_before: LifecycleBoundary | None = None,
         interrupt_after: LifecycleBoundary | None = None,
+        authorization_registry: DestroyAuthorizationRegistry | None = None,
     ) -> None:
         self.controls = frozenset(controls)
         self.interrupt_before = interrupt_before
@@ -1586,7 +1625,7 @@ class FakeSandboxProvider:
         self._resources: dict[SandboxIdentity, _FakeResource] = {}
         self._by_run: dict[str, SandboxIdentity] = {}
         self._create_calls: dict[str, int] = {}
-        self._used_authorizations: set[str] = set()
+        self.authorization_registry = authorization_registry or DestroyAuthorizationRegistry()
         self.calls: list[tuple[OperationKind, str]] = []
         self.external_call_count = 0
 
@@ -1973,7 +2012,9 @@ class FakeSandboxProvider:
         self._record(operation)
         if authorization is None:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization is absent; provider did not destroy", resource_id=identity.provider_resource_id), authorization_id=None)
-        if authorization.authorization_id in self._used_authorizations:
+        if not self.authorization_registry.verifies(authorization):
+            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization was not issued by the SSSF registry", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if self.authorization_registry.consumed(authorization):
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "one-use destroy authorization was already consumed", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if operation.kind is not OperationKind.DESTROY:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy call used a non-destroy operation identity", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
@@ -1991,12 +2032,14 @@ class FakeSandboxProvider:
         if target is None:
             return DestroyFacts(**self._base(operation, lookup_observation, "destroy target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "destroy target identity could not be authoritatively resolved", state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if FakeControl.ALREADY_ABSENT in self.controls:
-            self._used_authorizations.add(authorization.authorization_id)
+            if not self.authorization_registry.consume(authorization):
+                return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization provenance changed before consumption", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
             target.destroyed = True
             target.state = LifecycleState.ABSENT
             target.resources_quiescent = True
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "resource already absent; destroy is idempotent", prior=LifecycleState.ABSENT, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=False, already_absent=True, authorization_id=authorization.authorization_id)
-        self._used_authorizations.add(authorization.authorization_id)
+        if not self.authorization_registry.consume(authorization):
+            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization provenance changed before consumption", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         target.destroyed = True
         if FakeControl.DESTROY_RESIDUAL in self.controls:
             target.residual = True
@@ -2056,6 +2099,7 @@ __all__ = [
     "CopySpec",
     "CreateFacts",
     "DestroyAuthorization",
+    "DestroyAuthorizationRegistry",
     "DestroyFacts",
     "DestroyNotAuthorized",
     "DeferredCapability",

@@ -150,7 +150,8 @@ all applicable required artifact/Git obligations are observed-good, complete,
 identity-bound, and ancestry-verified (and secret retirement is observed when
 secret references exist). Authorization validates the exact sandbox spec
 digest, source-bound artifact and Git specifications, requested Git export
-reference, and an identity-bound `SecretRetirementFacts` inventory covering
+reference, source base commit/tree, evidence-manifest candidate Git tip, and an
+identity-bound `SecretRetirementFacts` inventory covering
 every requested secret reference. Therefore export and evidence obligations precede
 irreversible destroy. A provider acknowledgement is not clean terminal state:
 SSSF must reconcile authoritative absence afterward.
@@ -169,7 +170,9 @@ Inspection failure can never produce `absent`. Already-absent destroy and
 reconciliation are idempotent only where authoritative observation binds the
 exact run, sandbox/resource, and destroy operation identities and proves absence.
 Destroy requires an opaque SSSF-issued `DestroyAuthorization`, consumes it
-once, and preserves residual/ambiguous state for later reconciliation.
+once through an SSSF-owned `DestroyAuthorizationRegistry`, rejects capabilities
+without registry issuance provenance, and preserves residual/ambiguous state
+for later reconciliation.
 
 ## Aggregate fold
 
