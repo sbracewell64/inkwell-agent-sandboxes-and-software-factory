@@ -12,9 +12,10 @@ subprocess supervisor rather than creating another process owner.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
 import hashlib
+import hmac
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -1066,6 +1067,7 @@ class DestroyAuthorization:
     source_identity: SourceIdentity
     obligations_digest: str
     issued_at: str
+    authenticator: str
     scope: str = "destroy-only"
 
     def __post_init__(self) -> None:
@@ -1079,26 +1081,51 @@ class DestroyAuthorization:
             raise ValueError("authorization source identity is required")
         _digest(self.obligations_digest, "obligations_digest")
         _timestamp(self.issued_at, "authorization issued_at")
+        _digest(self.authenticator, "authorization authenticator")
         if self.scope != "destroy-only":
             raise ValueError("destroy authorization scope is closed")
 
 
-class DestroyAuthorizationRegistry:
-    """SSSF-owned issuance and one-use provenance for destroy capabilities."""
+def _destroy_authorization_payload(authorization: DestroyAuthorization) -> bytes:
+    document = {
+        "authorization_id": authorization.authorization_id,
+        "run_id": authorization.run_id,
+        "provider_resource_id": authorization.provider_resource_id,
+        "sandbox_spec_digest": authorization.sandbox_spec_digest,
+        "operation_id": authorization.operation_id,
+        "idempotency_key": authorization.idempotency_key,
+        "source_identity": asdict(authorization.source_identity),
+        "obligations_digest": authorization.obligations_digest,
+        "issued_at": authorization.issued_at,
+        "scope": authorization.scope,
+    }
+    return json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
 
-    def __init__(self) -> None:
-        self._issued: dict[str, DestroyAuthorization] = {}
-        self._consumed: set[str] = set()
 
-    def _register(self, authorization: DestroyAuthorization) -> DestroyAuthorization:
-        existing = self._issued.get(authorization.authorization_id)
-        if existing is not None:
-            return existing
-        self._issued[authorization.authorization_id] = authorization
-        return authorization
+class DestroyAuthorizationAuthority:
+    """SSSF-owned authenticated capability issuer with durable one-use state."""
+
+    def __init__(self, signing_key: bytes, *, consumed_ids: Iterable[str] = ()) -> None:
+        if not isinstance(signing_key, bytes) or len(signing_key) < 32:
+            raise ValueError("destroy authorization signing key must contain at least 32 bytes")
+        self.__signing_key = signing_key
+        self._consumed = set(_tokens(consumed_ids, "consumed authorization ids"))
+
+    def _mint(self, authorization: DestroyAuthorization) -> DestroyAuthorization:
+        authenticator = hmac.new(
+            self.__signing_key,
+            _destroy_authorization_payload(authorization),
+            hashlib.sha256,
+        ).hexdigest()
+        return replace(authorization, authenticator=authenticator)
 
     def verifies(self, authorization: DestroyAuthorization) -> bool:
-        return self._issued.get(authorization.authorization_id) is authorization
+        expected = hmac.new(
+            self.__signing_key,
+            _destroy_authorization_payload(authorization),
+            hashlib.sha256,
+        ).hexdigest()
+        return hmac.compare_digest(authorization.authenticator, expected)
 
     def consumed(self, authorization: DestroyAuthorization) -> bool:
         return authorization.authorization_id in self._consumed
@@ -1108,6 +1135,27 @@ class DestroyAuthorizationRegistry:
             return False
         self._consumed.add(authorization.authorization_id)
         return True
+
+    def snapshot(self) -> Mapping[str, object]:
+        return {
+            "schema_version": "destroy-authorization-state/v1",
+            "signing_key_hex": self.__signing_key.hex(),
+            "consumed_ids": tuple(sorted(self._consumed)),
+        }
+
+    @classmethod
+    def from_snapshot(cls, snapshot: Mapping[str, object]) -> "DestroyAuthorizationAuthority":
+        if snapshot.get("schema_version") != "destroy-authorization-state/v1":
+            raise ValueError("unsupported destroy authorization state schema")
+        signing_key_hex = snapshot.get("signing_key_hex")
+        consumed_ids = snapshot.get("consumed_ids")
+        if not isinstance(signing_key_hex, str) or not isinstance(consumed_ids, (tuple, list)):
+            raise ValueError("destroy authorization state is malformed")
+        try:
+            signing_key = bytes.fromhex(signing_key_hex)
+        except ValueError as exc:
+            raise ValueError("destroy authorization signing key encoding is malformed") from exc
+        return cls(signing_key, consumed_ids=consumed_ids)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1420,7 +1468,7 @@ def issue_destroy_authorization(
     git: GitExportFacts,
     artifact_spec: ArtifactSpec,
     git_spec: GitExportSpec,
-    authorization_registry: DestroyAuthorizationRegistry,
+    authorization_authority: DestroyAuthorizationAuthority,
     secret_retirement: SecretRetirementFacts | None = None,
     issued_at: str = "1970-01-01T00:00:00Z",
 ) -> DestroyAuthorization:
@@ -1439,8 +1487,8 @@ def issue_destroy_authorization(
         raise DestroyNotAuthorized("destroy authorization requires an applicable required artifact obligation")
     if not git_spec.applicable or not git_spec.required:
         raise DestroyNotAuthorized("destroy authorization requires an applicable required Git obligation")
-    if not isinstance(authorization_registry, DestroyAuthorizationRegistry):
-        raise DestroyNotAuthorized("destroy authorization requires the SSSF issuance registry")
+    if not isinstance(authorization_authority, DestroyAuthorizationAuthority):
+        raise DestroyNotAuthorized("destroy authorization requires the SSSF capability authority")
     artifact_context = artifact_spec.manifest_context
     if (
         artifact_spec.operation.run_id != spec.run_id
@@ -1498,8 +1546,9 @@ def issue_destroy_authorization(
         source_identity=spec.source_identity,
         obligations_digest=obligation_digest,
         issued_at=issued_at,
+        authenticator="0" * 64,
     )
-    return authorization_registry._register(authorization)
+    return authorization_authority._mint(authorization)
 
 
 # ---------------------------------------------------------------------------
@@ -1617,7 +1666,7 @@ class FakeSandboxProvider:
         *,
         interrupt_before: LifecycleBoundary | None = None,
         interrupt_after: LifecycleBoundary | None = None,
-        authorization_registry: DestroyAuthorizationRegistry | None = None,
+        authorization_verifier: DestroyAuthorizationAuthority | None = None,
     ) -> None:
         self.controls = frozenset(controls)
         self.interrupt_before = interrupt_before
@@ -1625,7 +1674,7 @@ class FakeSandboxProvider:
         self._resources: dict[SandboxIdentity, _FakeResource] = {}
         self._by_run: dict[str, SandboxIdentity] = {}
         self._create_calls: dict[str, int] = {}
-        self.authorization_registry = authorization_registry or DestroyAuthorizationRegistry()
+        self._authorization_verifier = authorization_verifier
         self.calls: list[tuple[OperationKind, str]] = []
         self.external_call_count = 0
 
@@ -2012,9 +2061,9 @@ class FakeSandboxProvider:
         self._record(operation)
         if authorization is None:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization is absent; provider did not destroy", resource_id=identity.provider_resource_id), authorization_id=None)
-        if not self.authorization_registry.verifies(authorization):
-            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization was not issued by the SSSF registry", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
-        if self.authorization_registry.consumed(authorization):
+        if self._authorization_verifier is None or not self._authorization_verifier.verifies(authorization):
+            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization has no valid SSSF authenticator", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if self._authorization_verifier.consumed(authorization):
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "one-use destroy authorization was already consumed", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if operation.kind is not OperationKind.DESTROY:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy call used a non-destroy operation identity", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
@@ -2032,13 +2081,13 @@ class FakeSandboxProvider:
         if target is None:
             return DestroyFacts(**self._base(operation, lookup_observation, "destroy target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "destroy target identity could not be authoritatively resolved", state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if FakeControl.ALREADY_ABSENT in self.controls:
-            if not self.authorization_registry.consume(authorization):
+            if not self._authorization_verifier.consume(authorization):
                 return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization provenance changed before consumption", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
             target.destroyed = True
             target.state = LifecycleState.ABSENT
             target.resources_quiescent = True
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "resource already absent; destroy is idempotent", prior=LifecycleState.ABSENT, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=False, already_absent=True, authorization_id=authorization.authorization_id)
-        if not self.authorization_registry.consume(authorization):
+        if not self._authorization_verifier.consume(authorization):
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization provenance changed before consumption", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         target.destroyed = True
         if FakeControl.DESTROY_RESIDUAL in self.controls:
@@ -2099,7 +2148,7 @@ __all__ = [
     "CopySpec",
     "CreateFacts",
     "DestroyAuthorization",
-    "DestroyAuthorizationRegistry",
+    "DestroyAuthorizationAuthority",
     "DestroyFacts",
     "DestroyNotAuthorized",
     "DeferredCapability",

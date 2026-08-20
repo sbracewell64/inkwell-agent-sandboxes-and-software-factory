@@ -169,10 +169,13 @@ SSSF must reconcile authoritative absence afterward.
 Inspection failure can never produce `absent`. Already-absent destroy and
 reconciliation are idempotent only where authoritative observation binds the
 exact run, sandbox/resource, and destroy operation identities and proves absence.
-Destroy requires an opaque SSSF-issued `DestroyAuthorization`, consumes it
-once through an SSSF-owned `DestroyAuthorizationRegistry`, rejects capabilities
-without registry issuance provenance, and preserves residual/ambiguous state
-for later reconciliation.
+Destroy requires an opaque SSSF-issued `DestroyAuthorization`, authenticates its
+serialized value through an SSSF-owned `DestroyAuthorizationAuthority`, and
+persists one-use consumption in snapshot/restore state. The provider receives
+verification authority but exposes no caller registration path. Fabricated
+capabilities are rejected, while issued capabilities and consumed status remain
+valid across serialization and supervisor restart. Residual or ambiguous state
+is preserved for later reconciliation.
 
 ## Aggregate fold
 
