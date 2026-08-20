@@ -49,6 +49,12 @@ Never hand-edit session evidence.
 - `app_docs/`
 - `ai_docs/`
 
+## Windows operator entry
+
+- `bin/sssf-firstmate.cmd` — tracked transport-only Windows handoff at canonical `E:\\SSSF`
+- `tests/test_windows_front_door.py` — caller-cwd and visible-refusal behavior checks
+- `docs/operations/INSTALL_WINDOWS.md` — Windows installation and front-door runbook
+
 ## Durable local system documentation
 
 - `docs/`

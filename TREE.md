@@ -8,17 +8,20 @@ Every file that matters, and why it exists. Three layers stack here:
 | **factory** | the Super Simple Software Factory: deterministic Python owns the graph, coding agents are bounded phases inside it | wherever it is invoked |
 | **sandbox** | six host-side phases that stand the other two up on a throwaway exe.dev VM | host only — it needs credentials a sandbox never has |
 
-The command surface mirrors that split: `just adw` (the workflows), `just sbx` (the VMs),
-`just local` (boot an orchestrator here), `just obs` (read the traces).
+The command surface mirrors that split: `just inkwell` (the app), `just adw` (the
+workflows), `just sbx` (the VMs), `just local` (boot an orchestrator here), and
+`just obs` (read the traces).
 
 ---
 
 ## Root
 
 ```
-justfile              4 namespaces and nothing else: adw, sbx, local, obs.
+justfile              5 namespaces and nothing else: inkwell, adw, sbx, local, obs.
 README.md             the three layers, the layout, and how to run each one.
 TREE.md               this file.
+bin/sssf-firstmate.cmd
+                      transport-only Windows front door from E:\SSSF into FirstMate.
 .env.sample           OPENROUTER_PROVISIONING_KEY is HOST-ONLY; the runtime key is minted
                       per sandbox. Never commit .env (gitignored).
 LICENSE               MIT.

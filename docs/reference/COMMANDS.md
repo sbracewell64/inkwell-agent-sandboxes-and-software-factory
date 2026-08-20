@@ -12,6 +12,18 @@ The Windows bootstrap and host doctor invoke that same validator. Validation is
 read-only; explicit remediation is documented in
 `docs/operations/INSTALL_WINDOWS.md`.
 
+## Windows FirstMate front door
+
+```bat
+E:\SSSF\bin\sssf-firstmate.cmd
+E:\SSSF\bin\sssf-firstmate.cmd --print-menu
+```
+
+The tracked front door validates the canonical `E:\SSSF` checkout from any
+caller directory and hands off to FirstMate's existing primary launcher.
+`--print-menu` validates and renders without creating a session; `--detach` is
+reserved for bounded host validation.
+
 ## Application
 
 ```text
