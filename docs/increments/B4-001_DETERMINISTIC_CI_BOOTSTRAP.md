@@ -83,7 +83,12 @@ The immutable action objects were observed through the GitHub API at:
 - `actions/checkout` v4.2.2 — `11bd71901bbe5b1630ceea73d27597364c9af683`;
 - `actions/setup-python` v5.6.0 — `a26af69be951a213d495a4c3e4e4022e16d87065`;
 - `oven-sh/setup-bun` v2.0.2 — `735343b667d3e6f658f44d0eca948eb6282f2b76`;
-- `extractions/setup-just` v2 — `dd310ad5a97d8e7b41793f8ef055398d51ad4de6`.
+- Pytest `8.3.5` and its exact dependency versions are installed explicitly
+  for validators whose acceptance is derived from pytest collection/report
+  events.
+- `extractions/setup-just` v2 — `dd310ad5a97d8e7b41793f8ef055398d51ad4de6`;
+  its release lookup uses the job-scoped, read-only GitHub token so bootstrap
+  does not consume the shared unauthenticated API rate limit.
 
 No declared fleet verifier exists for action-tag resolution. The API returned
 commit objects (observed-good as a direct three-valued observation), and the
