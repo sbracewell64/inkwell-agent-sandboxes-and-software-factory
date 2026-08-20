@@ -8,6 +8,8 @@ current states and transition evidence; it does not redefine this contract.
 The candidate register, roadmap, ADRs, manifest, and increment record point
 here and must not publish a competing graph.
 
+authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+
 ## Contract boundary
 
 Planning records preserve engineering intent. They are not executable
@@ -124,8 +126,8 @@ only. `ACTIVE` is never task creation. `ACTIVE` is never execution authority.
 `ACTIVE` is never acceptance. `ACTIVE` is never certification. `ACTIVE` is
 never live enablement. `ACTIVE` is never `PROVEN`.
 
-An `ACTIVE` record is honest only when every bounded increment has all of these
-exact identities in the durable record:
+An `ACTIVE` implementation binding is honest only when every bounded increment
+has all of these exact identities in the durable record:
 
 - named increment ID;
 - exact branch name;
@@ -139,10 +141,13 @@ be a canonical `https://github.com/<owner>/<repository>/pull/<positive-number>`
 URL without whitespace, a query, or a fragment.
 
 The record must also remain subject to ordinary admission, exact-source
-validation, review, acceptance, and existing repository gates. If any required
-identity does not yet exist, the canonical state is `SEQUENCED` and the
-`ACTIVE` transition is deferred. No partial, guessed, or placeholder `ACTIVE`
-record is valid.
+validation, review, acceptance, and existing repository gates. The authoritative
+planning source may mark a planning item `ACTIVE` by binding the exact planning
+source/generation and named bounded increments before implementation identities
+are accepted. That planning `ACTIVE` state is engineering authorization and
+intake eligibility only; it is not task creation, execution, landing,
+acceptance, certification, live enablement, or `PROVEN`. No partial, guessed, or
+placeholder implementation binding is valid.
 
 ### `PROVEN`
 
@@ -178,7 +183,9 @@ immutable predecessor evidence; commit subjects are not state records.
   validation owner for this planning foundation.
 
 No planning record, ADR, manifest entry, roadmap row, or validation result is
-runtime authority. The current implementation remains limited to planning
+runtime authority. The current authoritative planning generation is bound by
+exact ref/commit/tree identity in `PLANNING_STATE.json`; an older internally
+valid snapshot cannot replace it. The current implementation remains limited to planning
 records and offline validation; it does not add a FirstMate watcher, producer,
 consumer, feed, runtime, sandbox, provider, credential, ADW, Docker, Wayfinder,
 or DSH behavior.

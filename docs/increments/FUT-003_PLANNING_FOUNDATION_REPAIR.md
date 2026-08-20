@@ -3,6 +3,8 @@
 **Status:** documentation and offline-validator candidate; not a FUT-003 runtime
 implementation and not a `PROVEN` or live-enable claim
 
+authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+
 - **Starts from:** `991d3a64f1b96a8b9637f97060d692af3518228f`
 - **Starting tree:** `7b88546cd1f63e8304325ee35be37893268ae0e0`
 - **Immutable predecessor PR #16 head:** `56b4542a38af8e4435da0fa32ac12497aa6f6016`
@@ -11,6 +13,7 @@ implementation and not a `PROVEN` or live-enable claim
 - **Lifecycle owner:** [`PLANNING_LIFECYCLE.md`](../development/PLANNING_LIFECYCLE.md)
 - **State record:** [`PLANNING_STATE.json`](../development/PLANNING_STATE.json)
 - **Validation owner:** [`check_planning_foundation.py`](../validation/check_planning_foundation.py)
+- **Authoritative planning source:** `planning/future-sssf` at commit `5f83760a6d71bb798b9f652f21267fad4b743f16`, tree `6e33db5ae5f7d43bf3a7f8c351d888c599d1997d`, generation `planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d`
 
 ## Intent
 
@@ -19,9 +22,30 @@ rewriting that immutable predecessor or treating its head as current. The new
 successor is based on supplied current main, not on the predecessor's stale
 base. Reconcile
 ADR-0005, define one closed transition contract, preserve durable sequencing,
-keep FUT-001/DSH sequenced and inactive, defer FUT-003 activation until exact
-identities exist, allocate unique ADR-0007 for DSH, and preserve current
+keep FUT-001/DSH sequenced and inactive, reconcile FUT-003 to the
+authoritative ACTIVE-but-not-PROVEN generation, allocate unique ADR-0007 for
+DSH, and preserve current
 SBX-0/SBX-1/held-SBX-2 truth.
+
+## Preserved pre-correction red evidence
+
+Before this correction, PR #24 exact head `05d3addf8c9120e0824400041fa7235410a7ec4b`
+was directly reproduced as follows:
+
+- `python3 -m pytest -q tests/test_planning_foundation.py -k 'windows_symlink_privilege'`
+  selected zero tests, deselected 18, and returned 5.
+- A synthetic `Path.symlink_to` WinError 1314 caused the canonical validator to
+  print `observed-good` and return 0 while listing symlink properties as
+  could-not-observe. An unrelated `OSError`/WinError 9999 produced the same
+  result, proving capability laundering.
+- The PR #24 validator returned `observed-good` for its internally consistent
+  FUT-003 `SEQUENCED` snapshot while authoritative
+  `planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d`
+  recorded FUT-003 `ACTIVE`. The stale snapshot had no source-generation
+  binding, so the newer authority could be demoted without detection.
+
+These observations remain adverse evidence for PR #24; they are not rewritten
+or treated as a pass after the correction.
 
 ## Design and ownership
 
@@ -32,8 +56,10 @@ SBX-0/SBX-1/held-SBX-2 truth.
   lifecycle owner rather than restating a competing graph.
 - `check_planning_foundation.py` is offline, deterministic, side-effect-free,
   and owns the watched-red controls for this foundation.
-- `ACTIVE` is engineering authorization/intake eligibility only and remains
-  unrecorded for FUT-003 because FP-001/FM-FP-001 lack exact bindings.
+- `ACTIVE` is engineering authorization/intake eligibility only. The
+  authoritative planning binding records FUT-003 as ACTIVE, not PROVEN, without
+  granting task, execution, landing, acceptance, certification, or live-enable
+  authority.
 
 ## Scope
 
@@ -54,11 +80,16 @@ Run:
 ```text
 python3 docs/validation/check_planning_foundation.py
 PYTHONPATH=.:adws pytest -q tests/test_planning_foundation.py
+python3 -m pytest -q tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe
+python3 -m pytest -q tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation
+python3 -m pytest -q tests/test_planning_foundation.py::test_windows_symlink_privilege_cno_is_machine_readable_non_pass
 ```
 
 The validator positively checks the canonical lifecycle, all legal edges,
-terminal/re-entry rules, durable `SEQUENCED` records, exact ACTIVE identity
-shape, ADR inventory, current SBX holds, ownership, and links. In-memory
+terminal/re-entry rules, the exact authoritative planning source/generation,
+FUT-001/FUT-003/SBX-2 current states, durable transition records, exact ACTIVE
+implementation identity shape, ADR inventory, current SBX holds, ownership,
+and links. In-memory
 watched-red defects cover stale ADR status, illegal/unknown/skipped edges,
 missing sequencing, unbound/partial ACTIVE identity, ACTIVE authority escape,
 duplicate ADR identity, roadmap regression, competing lifecycle owners, and
@@ -72,10 +103,15 @@ out-of-root files for the ACTIVE authoritative reference plus all four retained
 PROVEN evidence categories. A lexical-only resolution/containment mutation
 makes each named symlink control red when symlink creation is available. A host
 that cannot create the transient links reports each exact symlink property as
-could-not-observe rather than treating an unexercised control as observed-good.
+canonical machine-readable `{"outcome":"CNO","status":"UNVERIFIED"}` with
+nonzero exit 2 rather than treating an unexercised control as observed-good.
+The closure owner derives selection and completion from pytest collection/report
+events and keeps FAIL > CNO > PASS property precedence, including an unrelated
+filesystem `OSError` failure and a simultaneous contradiction plus CNO control.
 
-No passing local control promotes FUT-003 to `ACTIVE` or `PROVEN`; normal
-review, acceptance, PRE_CERTIFICATION, and live-enablement authority remain
+The authoritative `ACTIVE` planning state is not `PROVEN`; no passing local
+control grants task creation, execution, landing, acceptance, certification,
+PRE_CERTIFICATION exit, or live-enablement authority. Those gates remain
 outside this candidate.
 
 ## Successor containment correction
@@ -89,8 +125,10 @@ transfer evidence from predecessor head
 `22b312002f7bde05b98ea95b04a45d70b2ba6157`.
 
 The bounded correction addresses only the assignment-distinct repository-
-containment findings: categorical remote-identity rejection before path
-conversion, and non-vacuous ACTIVE/retained-PROVEN symlink containment
-controls. FUT-001/DSH and FUT-003 remain `SEQUENCED` and inactive, and no
+containment findings, the closure-owner non-vacuity contract, Windows symlink
+CNO semantics, and exact authoritative planning-generation reconciliation.
+Categorical remote-identity rejection remains before path conversion, and
+non-vacuous ACTIVE/retained-PROVEN symlink containment controls remain. FUT-001/
+DSH is `SEQUENCED`; FUT-003 is `ACTIVE`, not `PROVEN`; SBX-2 is `HELD`; and no
 runtime, producer, consumer, provider, Docker, Wayfinder, DSH, SBX-2,
 landing, acceptance, certification, or live-enable authority is added.

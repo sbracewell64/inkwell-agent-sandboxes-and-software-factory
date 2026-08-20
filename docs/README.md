@@ -42,6 +42,8 @@ durable current state and transition evidence is
 candidate register, roadmap, ADRs, and manifest point to that owner rather than
 restating a competing lifecycle.
 
+authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+
 `ACTIVE` is engineering authorization only. `ACTIVE` is intake eligibility
 only. `ACTIVE` is never task creation. `ACTIVE` is never execution authority.
 `ACTIVE` is never landing authority. `ACTIVE` is never PRE_CERTIFICATION exit.
@@ -52,9 +54,11 @@ identity. No planning record is
 runtime authority; an ADR, manifest, roadmap row, or validation result is not
 runtime, landing, acceptance, certification, or live-enable authority.
 
-The current repair records FUT-001/DSH as `SEQUENCED` and inactive and FUT-003
-as `SEQUENCED` with its ACTIVE transition deferred until exact increment,
-branch, PR, source commit, and source tree identities exist.
+The authoritative planning generation records FUT-001/DSH as `SEQUENCED`,
+FUT-003 as `ACTIVE` but not `PROVEN`, and SBX-2 as `HELD`. The exact source
+identity/generation is bound in `PLANNING_STATE.json`; this planning state is
+never task creation, execution, landing, acceptance, certification, live
+enablement, or runtime authority.
 
 ## Documentation authority
 

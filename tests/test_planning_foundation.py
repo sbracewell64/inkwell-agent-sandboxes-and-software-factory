@@ -19,7 +19,9 @@ def _symlink_or_skip(link: Path, target: Path) -> None:
     try:
         link.symlink_to(target)
     except (NotImplementedError, OSError) as error:
-        pytest.skip(f"symlink creation unavailable: {error}")
+        if _VALIDATOR._is_windows_symlink_capability_error(error):
+            pytest.skip(f"symlink creation unavailable: {error}")
+        raise
 
 
 def _temporary_project(tmp_path: Path) -> tuple[dict[str, object], Path]:
@@ -31,10 +33,106 @@ def _temporary_project(tmp_path: Path) -> tuple[dict[str, object], Path]:
 
 
 def test_canonical_foundation_and_all_watched_red_controls_pass() -> None:
-    status, errors, red_failures = _VALIDATOR.validate_path()
+    control_cno: list[str] = []
+    status, errors, red_failures = _VALIDATOR.validate_path(control_cno=control_cno)
 
-    assert status == "observed-good", errors
+    assert status in {"observed-good", "could-not-observe"}, errors
     assert red_failures == []
+    if status == "could-not-observe":
+        assert control_cno
+        assert all("symlink-escape-" in item for item in control_cno)
+
+
+def test_closure_gate_requires_nonempty_exact_test_universe() -> None:
+    failures = _VALIDATOR._watched_test_closure_controls()
+    assert failures == []
+
+    required = ("tests/test_planning_foundation.py::required",)
+    status, errors = _VALIDATOR.evaluate_test_closure(
+        required,
+        ((required[0], "passed"),),
+        required_nodeids=required,
+    )
+    assert status == "observed-good", errors
+
+
+def test_older_consistent_snapshot_cannot_replace_authoritative_generation() -> None:
+    project = _VALIDATOR.load_project()
+    stale = copy.deepcopy(project)
+    stale["state"]["authoritative_planning_source"]["source_commit"] = "0" * 40
+    stale["state"]["authoritative_planning_source"]["source_tree"] = "1" * 40
+    stale["state"]["authoritative_planning_source"]["generation"] = "planning/future-sssf@" + "0" * 40 + ":" + "1" * 40
+    stale["state"]["records"][-1]["state"] = "SEQUENCED"
+    stale["state"]["records"][-1]["transition_history"].pop()
+    stale["state"]["records"][-1].pop("planning_authority_binding", None)
+    stale["surfaces"]["candidates"] = stale["surfaces"]["candidates"].replace(
+        "| FUT-003 | FirstMate planning-transition awareness | ACTIVE |",
+        "| FUT-003 | FirstMate planning-transition awareness | SEQUENCED |",
+    )
+
+    status, errors = _VALIDATOR.validate_project(stale, run_controls=False)
+
+    assert status == "observed-bad"
+    assert any("authoritative planning source identity/generation" in error for error in errors)
+
+
+def test_windows_symlink_privilege_cno_is_machine_readable_non_pass(monkeypatch) -> None:
+    project = _VALIDATOR.load_project()
+    original = Path.symlink_to
+
+    def denied(self: Path, target: Path, target_is_directory: bool = False) -> None:
+        error = OSError("A required privilege is not held by the client")
+        error.winerror = 1314
+        raise error
+
+    monkeypatch.setattr(Path, "symlink_to", denied)
+    control_cno: list[str] = []
+    status, errors, red_failures = _VALIDATOR.validate_path(control_cno=control_cno)
+    assert status == "could-not-observe"
+    assert errors == []
+    assert red_failures == []
+    assert set(control_cno) == {
+        "symlink-escape-active-authoritative-reference",
+        "symlink-escape-proven-acceptance-evidence",
+        "symlink-escape-proven-implementation-evidence",
+        "symlink-escape-proven-proof-evidence",
+        "symlink-escape-proven-documentation-evidence",
+    }
+    result = _VALIDATOR._machine_result(status, errors=errors, cno=control_cno)
+    assert result["outcome"] == "CNO"
+    assert result["status"] == "UNVERIFIED"
+    assert _VALIDATOR._validator_exit_code(status) != 0
+    assert _VALIDATOR._fold_property_outcome([], control_cno) == "could-not-observe"
+
+    contradictory = copy.deepcopy(project)
+    contradictory["surfaces"]["readme"] = contradictory["surfaces"]["readme"].replace(
+        "`ACTIVE` is engineering authorization only. `ACTIVE` is intake eligibility",
+        "`ACTIVE` is runtime authority.",
+        1,
+    )
+    mixed_cno: list[str] = []
+    mixed_status, mixed_errors = _VALIDATOR.validate_project(
+        contradictory, control_cno=mixed_cno
+    )
+    assert mixed_status == "observed-bad"
+    assert mixed_errors
+    assert mixed_cno
+    assert _VALIDATOR._fold_property_outcome(["contradiction"], mixed_cno) == "observed-bad"
+
+    def unrelated(self: Path, target: Path, target_is_directory: bool = False) -> None:
+        error = OSError("fixture filesystem I/O failure")
+        error.winerror = 9999
+        raise error
+
+    monkeypatch.setattr(Path, "symlink_to", unrelated)
+    unrelated_cno: list[str] = []
+    unrelated_status, unrelated_errors, _ = _VALIDATOR.validate_path(
+        control_cno=unrelated_cno
+    )
+    assert unrelated_status == "observed-bad"
+    assert unrelated_errors
+    assert unrelated_cno == []
+    monkeypatch.setattr(Path, "symlink_to", original)
 
 
 def test_valid_active_binding_is_checked_without_promoting_current_state() -> None:
@@ -45,7 +143,9 @@ def test_valid_active_binding_is_checked_without_promoting_current_state() -> No
         record["item_id"]: record["state"]
         for record in project["state"]["records"]
     }
-    assert current["FUT-003"] == "SEQUENCED"
+    assert current["FUT-003"] == "ACTIVE"
+    assert current["FUT-001"] == "SEQUENCED"
+    assert project["state"]["authoritative_planning_source"]["generation"] == _VALIDATOR.AUTHORITATIVE_PLANNING_GENERATION
 
 
 def test_active_binding_exactly_covers_planned_increments() -> None:
@@ -193,7 +293,15 @@ def test_watched_red_controls_detect_symlink_only_containment_regression(
     control_cno: list[str] = []
     failures = _VALIDATOR._watched_red_controls(project, control_cno)
     if control_cno:
-        pytest.skip("symlink creation unavailable")
+        assert failures == []
+        assert set(control_cno) == {
+            "symlink-escape-active-authoritative-reference",
+            "symlink-escape-proven-acceptance-evidence",
+            "symlink-escape-proven-implementation-evidence",
+            "symlink-escape-proven-proof-evidence",
+            "symlink-escape-proven-documentation-evidence",
+        }
+        return
 
     assert "symlink-escape-active-authoritative-reference" in failures
     assert "symlink-escape-proven-acceptance-evidence" in failures

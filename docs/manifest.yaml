@@ -38,6 +38,11 @@ planning:
   activation_boundary: named_increment_under_docs/development/INCREMENT_PROTOCOL.md
   active_requires_exact_identities: true
   planning_records_have_no_runtime_authority: true
+  authoritative_ref: planning/future-sssf
+  authoritative_commit: 5f83760a6d71bb798b9f652f21267fad4b743f16
+  authoritative_tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+  authoritative_generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+  authority_rule: exact ref, commit, tree, and generation identity outrank older internally valid snapshots
 foundational_sources:
   super_simple_software_factory:
     repository: https://github.com/disler/super-simple-software-factory.git
