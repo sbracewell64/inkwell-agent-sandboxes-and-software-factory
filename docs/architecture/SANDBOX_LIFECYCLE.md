@@ -82,8 +82,9 @@ See `operations/INSTALL_WINDOWS.md`.
 The exact SBX-0 source-bound handoff is published once in
 [`reference/SBX-0_SEMANTICS_INVENTORY.json`](../reference/SBX-0_SEMANTICS_INVENTORY.json)
 and its publication record/validator. It binds the report generation and
-content digest, preserves classifications and CNO, and assigns one owner per
-fact; it does not become a lifecycle or acceptance store.
+content digest, preserves classifications and CNO, and assigns one
+classification-compatible authority per fact; it does not become a lifecycle
+or acceptance store.
 
 The provider-neutral contract, ownership boundary, lifecycle vocabulary, bounded
 exports, reconciliation rules, and deterministic fake are owned once by

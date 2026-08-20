@@ -29,7 +29,7 @@ Never hand-edit session evidence.
 
 ## Sandbox contract and orchestration
 
-- `docs/reference/SBX-0_SEMANTICS_INVENTORY.json` — durable SBX-0 source-generation/content-digest handoff and owner-per-fact inventory
+- `docs/reference/SBX-0_SEMANTICS_INVENTORY.json` — durable SBX-0 source-generation/content-digest handoff and classification-compatible owner-per-fact inventory
 - `docs/increments/SBX-0_SEMANTICS_INVENTORY.md` — publication scope, observation rules, and non-promotion boundary
 - `docs/validation/check_sbx0_inventory.py` — deterministic inventory validator and watched-red controls
 - `adws/adw_modules/sandbox_provider.py` — SBX-1 typed provider contract, SSSF lifecycle seam, and deterministic fake

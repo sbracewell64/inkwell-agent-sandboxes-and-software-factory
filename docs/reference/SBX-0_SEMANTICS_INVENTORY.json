@@ -512,7 +512,7 @@
         "sbx1.obligation.003",
         "sbx1.obligation.008"
       ],
-      "owner_id": "legacy-exedev-lifecycle",
+      "owner_id": "sandbox-contract",
       "provider_qualification_observation": "could-not-observe",
       "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
       "section": "A. Ownership, identity, and source custody",
@@ -552,7 +552,7 @@
         "sbx1.obligation.003",
         "sbx1.obligation.008"
       ],
-      "owner_id": "legacy-exedev-lifecycle",
+      "owner_id": "sandbox-contract",
       "provider_qualification_observation": "could-not-observe",
       "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
       "section": "A. Ownership, identity, and source custody",
@@ -734,7 +734,7 @@
         "sbx1.obligation.003",
         "sbx1.obligation.008"
       ],
-      "owner_id": "legacy-exedev-lifecycle",
+      "owner_id": "sandbox-contract",
       "provider_qualification_observation": "could-not-observe",
       "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
       "section": "B. Create, setup, readiness, and environment profile",
@@ -1243,7 +1243,7 @@
         "sbx1.obligation.003",
         "sbx1.obligation.008"
       ],
-      "owner_id": "legacy-exedev-lifecycle",
+      "owner_id": "sandbox-contract",
       "provider_qualification_observation": "could-not-observe",
       "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
       "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
@@ -1385,7 +1385,7 @@
         "sbx1.obligation.003",
         "sbx1.obligation.008"
       ],
-      "owner_id": "legacy-exedev-lifecycle",
+      "owner_id": "sandbox-contract",
       "provider_qualification_observation": "could-not-observe",
       "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
       "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
@@ -1446,7 +1446,7 @@
         "sbx1.obligation.003",
         "sbx1.obligation.008"
       ],
-      "owner_id": "legacy-exedev-lifecycle",
+      "owner_id": "sandbox-contract",
       "provider_qualification_observation": "could-not-observe",
       "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
       "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
@@ -1487,7 +1487,7 @@
         "sbx1.obligation.003",
         "sbx1.obligation.008"
       ],
-      "owner_id": "legacy-exedev-lifecycle",
+      "owner_id": "sandbox-contract",
       "provider_qualification_observation": "could-not-observe",
       "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
       "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
@@ -1654,7 +1654,7 @@
       "statement": "`commit_sha` as both requested source baseline and current commit identity in legacy run record."
     }
   ],
-  "inventory_content_sha256": "bce21bc40de2f94cb03b464e1baa3ccb94d6dedf25825588947d94663a6b5a52",
+  "inventory_content_sha256": "e1c3d693b6e81b84405fb5402fc7ca071a49679c1fb8dc0b01b82069c381c974",
   "inventory_id": "sssf-sbx-0-provider-semantics",
   "inventory_revision": 1,
   "non_goals": [
@@ -1772,7 +1772,7 @@
       "qualification_observation": "could-not-observe",
       "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
       "slug": "owner-per-fact",
-      "statement": "Every fact and obligation has exactly one owner_id resolving to one owner record; inventory is not runtime authority."
+      "statement": "Every fact and obligation has exactly one owner_id resolving to one owner record, and every fact owner governs its classification; inventory is not runtime authority."
     },
     {
       "binding_observation": "observed-good",
@@ -1971,78 +1971,118 @@
   ],
   "owners": [
     {
+      "fact_classifications": [],
       "kind": "documentation-and-verification-record",
       "owner_id": "sbx0-handoff-record",
       "path": "docs/reference/SBX-0_SEMANTICS_INVENTORY.json",
       "scope": "Exact source identity, coverage, owner binding, and handoff boundary only; never runtime or acceptance authority."
     },
     {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
       "kind": "executable-contract-and-lifecycle-owner",
       "owner_id": "sandbox-contract",
       "path": "adws/adw_modules/sandbox_provider.py",
       "scope": "SandboxSpec/CommandSpec, provider facts, lifecycle record seam, destroy authorization, aggregate fold, and fake."
     },
     {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
       "kind": "executable-process-custody-owner",
       "owner_id": "process-supervisor",
       "path": "adws/adw_modules/subprocess_supervisor.py",
       "scope": "Host/provider-client process custody, bounds, retry accounting, cleanup, and typed observations."
     },
     {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
       "kind": "executable-evidence-serializer-and-validator",
       "owner_id": "evidence-manifest",
       "path": "tools/evidence_manifest.py",
       "scope": "Sole offline evidence-manifest schema, serializer, artifact validator, and typed result."
     },
     {
+      "fact_classifications": [
+        "provider-neutral-semantic"
+      ],
       "kind": "executable-three-valued-gate-owner",
       "owner_id": "gate-outcome",
       "path": "adws/adw_modules/data_types.py",
       "scope": "PASS/FAIL/CNO gate model and non-vacuous evidence rules."
     },
     {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
       "kind": "executable-source-provenance-owner",
       "owner_id": "source-custody",
       "path": "just/sandbox/lifecycle/fill.just",
       "scope": "Current source repository/commit custody; Source Broker remains unresolved."
     },
     {
+      "fact_classifications": [
+        "exe.dev/provider-mechanism",
+        "limitation",
+        "could-not-observe"
+      ],
       "kind": "historical-provider-mechanism-owner",
       "owner_id": "legacy-exedev-lifecycle",
       "path": "just/sandbox/lifecycle",
       "scope": "Historical exe.dev mechanisms only; never provider-neutral authority."
     },
     {
+      "fact_classifications": [
+        "provider-neutral-semantic"
+      ],
       "kind": "executable-observability-owner",
       "owner_id": "observability-trace",
       "path": "adws/adw_modules/tracer.py",
       "scope": "Existing SSSF trace identity/read surfaces; no second database."
     },
     {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
       "kind": "security-and-credential-policy-owner",
       "owner_id": "security-boundary",
       "path": "docs/architecture/SECURITY_AND_CREDENTIALS.md",
       "scope": "Credential, filesystem, network, effect, and secret-reference boundaries."
     },
     {
+      "fact_classifications": [],
       "kind": "existing-agent-execution-owner",
       "owner_id": "agent-backend",
       "path": "adws/adw_modules/agents.py",
       "scope": "AgentBackend/session behavior separate from SandboxProvider lifecycle."
     },
     {
+      "fact_classifications": [
+        "obsolete-artifact"
+      ],
       "kind": "documentation-authority-policy-owner",
       "owner_id": "source-of-truth-policy",
       "path": "docs/reference/SOURCE_OF_TRUTH.md",
       "scope": "Precedence and obsolete-artifact treatment; not runtime facts."
     },
     {
+      "fact_classifications": [
+        "external-dependency"
+      ],
       "kind": "planning-and-roadmap-owner",
       "owner_id": "planning-contract",
       "path": "docs/development/ROADMAP.md",
       "scope": "Planning contract and explicit deferral boundaries; not runtime facts."
     },
     {
+      "fact_classifications": [],
       "kind": "deterministic-verification-owner",
       "owner_id": "verification-controls",
       "path": "docs/validation/check_sbx0_inventory.py",

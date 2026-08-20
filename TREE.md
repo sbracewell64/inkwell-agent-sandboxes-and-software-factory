@@ -122,7 +122,7 @@ docs/validation/check_executor_supervisor.py
                           stdin inheritance and explicit Windows cleanup refusal.
 docs/validation/check_sbx0_inventory.py
                           exact SBX-0 source-generation/content-digest handoff validator,
-                          owner-per-fact coverage, and watched-red CNO controls.
+                          classification-compatible owner-per-fact coverage, and watched-red CNO controls.
 docs/validation/check_production_extension_path.py
                           shipped harness_engineering rosters drive the real agent_pi launch
                           path; extensions must be forwarded as -e, never rejected.

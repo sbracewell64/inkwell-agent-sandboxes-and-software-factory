@@ -35,7 +35,7 @@ The mutable fleet-local input was read completely before publication:
 - current SSSF handoff base: `b902cdcecd65c8ba03031875297d31e990f12c11`.
 
 The inventory content digest (computed with its digest field blank) is
-`bce21bc40de2f94cb03b464e1baa3ccb94d6dedf25825588947d94663a6b5a52`.
+`e1c3d693b6e81b84405fb5402fc7ca071a49679c1fb8dc0b01b82069c381c974`.
 The mutable report remains an evidence input. If it is absent or unreadable,
 source replay is CNO; the durable inventory does not infer PASS from that
 absence.
@@ -64,8 +64,10 @@ The source classifications are preserved as:
 - `external-dependency`; and
 - `could-not-observe`.
 
-Every fact and obligation has exactly one `owner_id`. Current owners are
-reused rather than duplicated:
+Every fact and obligation has exactly one `owner_id`. Each owner also declares
+which fact classifications its scope can govern, so registry membership alone
+cannot confer semantic authority. Current owners are reused rather than
+duplicated:
 
 | Owner | Authority |
 |---|---|
@@ -83,8 +85,11 @@ reused rather than duplicated:
 | `verification-controls` | this increment's deterministic validator |
 | `sbx0-handoff-record` | this durable inventory and its publication boundary |
 
-The handoff-record and verification owners govern the publication artifact and
-its checks only. They do not own lifecycle semantics or acceptance.
+The provider-neutral lifecycle laws for run/state identity, setup, pre-destroy
+exports, destroy, reconciliation, and idempotency are owned by
+`sandbox-contract`; their legacy exe.dev paths remain evidence, not semantic
+authority. The handoff-record and verification owners govern the publication
+artifact and its checks only. They do not own lifecycle semantics or acceptance.
 
 ## Observation rules
 
@@ -122,6 +127,7 @@ also mutates in-memory copies and requires red results for:
 - stale source generation;
 - source content-digest mismatch;
 - duplicate authority;
+- a registered but classification-incompatible fact owner;
 - dropped fact;
 - dropped obligation; and
 - CNO narrowed to absence or PASS.

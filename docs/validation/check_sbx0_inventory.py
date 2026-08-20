@@ -46,7 +46,7 @@ EXPECTED_PLANNING_SHA = "54ef67c3849b24b1eaa6e10d2ed0e49a09464a70"
 EXPECTED_REPORT_SHA = "2d16bee3db4c46062b460dfbd6752339e85228a3b6f2c5002313a4f06dc663b3"
 EXPECTED_REPORT_BYTES = 42031
 EXPECTED_REPORT_LINES = 221
-EXPECTED_INVENTORY_DIGEST = "bce21bc40de2f94cb03b464e1baa3ccb94d6dedf25825588947d94663a6b5a52"
+EXPECTED_INVENTORY_DIGEST = "e1c3d693b6e81b84405fb5402fc7ca071a49679c1fb8dc0b01b82069c381c974"
 EXPECTED_RULING = "SOL-FM-SSSF-SBX1-POSTMERGE-20260820-1203"
 
 EXPECTED_FACT_IDS = tuple(f"sbx0.fact.{number:03d}" for number in range(1, 58))
@@ -309,7 +309,12 @@ def _validate_owner_registry(
         if not isinstance(owner, dict):
             errors.append(f"owner {index} is not an object")
             continue
-        _expect_keys(owner, {"owner_id", "kind", "path", "scope"}, f"owner {index}", errors)
+        _expect_keys(
+            owner,
+            {"owner_id", "kind", "path", "scope", "fact_classifications"},
+            f"owner {index}",
+            errors,
+        )
         owner_id = owner.get("owner_id")
         if not isinstance(owner_id, str) or not owner_id:
             errors.append(f"owner {index} has no bounded owner_id")
@@ -324,6 +329,18 @@ def _validate_owner_registry(
             errors.append(f"owner {owner_id} path could not be observed: {path}")
         if not isinstance(owner.get("scope"), str) or not owner.get("scope"):
             errors.append(f"owner {owner_id} has no scope")
+        fact_classifications = owner.get("fact_classifications")
+        if (
+            not isinstance(fact_classifications, list)
+            or any(
+                not isinstance(value, str) or value not in CLASSIFICATIONS
+                for value in fact_classifications
+            )
+            or len(fact_classifications) != len(set(fact_classifications))
+        ):
+            errors.append(
+                f"owner {owner_id} fact_classifications is not a unique closed classification list"
+            )
     for owner_id, path in OWNER_REQUIRED_PATHS.items():
         owner = by_id.get(owner_id)
         if owner is None:
@@ -409,6 +426,13 @@ def _validate_facts(
         owner_id = fact.get("owner_id")
         if owner_id not in owners:
             errors.append(f"fact {fact.get('fact_id')} has no singular registered owner")
+        elif fact.get("classification") not in owners[owner_id].get(
+            "fact_classifications", []
+        ):
+            errors.append(
+                f"fact {fact.get('fact_id')} owner {owner_id} does not govern "
+                f"classification {fact.get('classification')}"
+            )
         for text_key in ("statement", "evidence", "current_contract_reason", "provider_qualification_reason", "handoff_disposition"):
             if not isinstance(fact.get(text_key), str) or not fact.get(text_key):
                 errors.append(f"fact {fact.get('fact_id')} missing {text_key}")
@@ -567,6 +591,15 @@ def _watched_red_controls(document: dict[str, Any]) -> list[str]:
     duplicate = copy.deepcopy(document)
     duplicate["owners"].append(copy.deepcopy(duplicate["owners"][0]))
     controls.append(("duplicate-authority", duplicate, "duplicate authority owner_id"))
+    wrong_owner = copy.deepcopy(document)
+    wrong_owner["facts"][0]["owner_id"] = "agent-backend"
+    controls.append(
+        (
+            "registered-incompatible-owner",
+            wrong_owner,
+            "fact sbx0.fact.001 owner agent-backend does not govern classification provider-neutral-semantic",
+        )
+    )
     dropped_fact = copy.deepcopy(document)
     dropped_fact["facts"].pop()
     dropped_fact["coverage"]["required_fact_ids"].pop()
@@ -590,11 +623,20 @@ def _watched_red_controls(document: dict[str, Any]) -> list[str]:
     return failed_to_red
 
 
-def validate_path(path: Path, *, source_report: Path | None = None) -> tuple[str, list[str], list[str]]:
+def validate_path(
+    path: Path,
+    *,
+    source_report: Path | None = None,
+    verify_inventory_digest: bool = True,
+) -> tuple[str, list[str], list[str]]:
     document, errors = _read_json(path)
     if document is None:
         return "could-not-observe", errors, []
-    status, validation_errors = validate_document(document, source_report=source_report)
+    status, validation_errors = validate_document(
+        document,
+        source_report=source_report,
+        verify_inventory_digest=verify_inventory_digest,
+    )
     red_failures = _watched_red_controls(document) if not validation_errors else []
     if red_failures:
         validation_errors = [*validation_errors, "watched-red controls did not go red: " + ", ".join(red_failures)]
@@ -611,12 +653,12 @@ def main() -> int:
     print(f"SBX-0 semantics handoff validation: {status}")
     print(f"inventory: {args.inventory}")
     print("source replay: could-not-observe (not requested; mutable source is not authority)" if args.source_report is None else f"source replay: {status}")
-    print("watched-red: stale-generation, content-digest, duplicate-authority, dropped-fact, dropped-obligation, CNO-to-absence, CNO-to-PASS")
+    print("watched-red: stale-generation, content-digest, duplicate-authority, registered-incompatible-owner, dropped-fact, dropped-obligation, CNO-to-absence, CNO-to-PASS")
     if errors:
         for error in errors:
             print(f"- {error}")
         return 1 if status == "observed-bad" else 2
-    print("owner-per-fact: singular registered owners")
+    print("owner-per-fact: singular registered classification-compatible authorities")
     print("coverage: 57 facts, 33 obligations, 33 deferred items, 8 recommendations")
     print("promotion boundary: SBX-0/SBX-1/provider/Windows/review/landing/SBX-2 remain CNO")
     return 0
