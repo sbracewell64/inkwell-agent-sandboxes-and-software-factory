@@ -1712,6 +1712,7 @@ class FakeControl(str, Enum):
     GIT_WRONG_ANCESTRY = "git-wrong-ancestry"
     STOP_PARTIAL = "stop-partial"
     DESTROY_RESIDUAL = "destroy-residual"
+    DESTROY_RESIDUAL_RECOVERY_CNO = "destroy-residual-recovery-cno"
     DESTROY_AFTER_RESERVATION_CNO = "destroy-after-reservation-cno"
     DESTROY_BEFORE_COMPLETION_CNO = "destroy-before-completion-cno"
     INSPECT_UNREACHABLE = "inspect-unreachable"
@@ -2179,6 +2180,18 @@ class FakeSandboxProvider:
         target, lookup_observation = self._resource_for(identity)
         if target is None:
             return DestroyFacts(**self._base(operation, lookup_observation, "destroy target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "destroy target identity could not be authoritatively resolved", state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if target.residual:
+            if not self._authorization_verifier.reserve(authorization):
+                return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "residual cleanup authority could not be durably reserved", state=LifecycleState.RESIDUAL, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+            if FakeControl.DESTROY_RESIDUAL_RECOVERY_CNO in self.controls and FakeControl.DESTROY_RESIDUAL_RECOVERY_CNO not in self._destroy_interruptions:
+                self._destroy_interruptions.add(FakeControl.DESTROY_RESIDUAL_RECOVERY_CNO)
+                return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "residual cleanup could not be observed", prior=LifecycleState.RESIDUAL, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+            target.residual = False
+            target.state = LifecycleState.ABSENT
+            target.resources_quiescent = True
+            if not self._authorization_verifier.complete(authorization):
+                return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "residual cleanup succeeded but completion could not be durably recorded", prior=LifecycleState.RESIDUAL, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), acknowledged=True, authorization_id=authorization.authorization_id)
+            return DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "residual resource cleanup established authoritative absence", prior=LifecycleState.RESIDUAL, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=True, authorization_id=authorization.authorization_id)
         if (target.destroyed and not target.residual) or FakeControl.ALREADY_ABSENT in self.controls:
             if not self._authorization_verifier.reserve(authorization) or not self._authorization_verifier.complete(authorization):
                 return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "destroy completion could not be durably recorded", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
@@ -2197,12 +2210,13 @@ class FakeSandboxProvider:
             target.state = LifecycleState.ABSENT
             target.resources_quiescent = True
             return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "provider failed after destroy side effect but before durable completion", prior=LifecycleState.DESTROYING, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), acknowledged=True, authorization_id=authorization.authorization_id)
-        if not self._authorization_verifier.complete(authorization):
-            return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "destroy occurred but completion could not be durably recorded", prior=LifecycleState.DESTROYING, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), acknowledged=True, authorization_id=authorization.authorization_id)
         if FakeControl.DESTROY_RESIDUAL in self.controls:
             target.residual = True
+            target.state = LifecycleState.RESIDUAL
             target.resources_quiescent = False
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy acknowledged but residual resource remains", prior=target.state, state=LifecycleState.RESIDUAL, resource_id=identity.provider_resource_id), acknowledged=True, residual_resource_ids=(identity.provider_resource_id or "",), authorization_id=authorization.authorization_id)
+        if not self._authorization_verifier.complete(authorization):
+            return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "destroy occurred but completion could not be durably recorded", prior=LifecycleState.DESTROYING, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), acknowledged=True, authorization_id=authorization.authorization_id)
         target.state = LifecycleState.ABSENT
         target.resources_quiescent = True
         fact = DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "destroy acknowledged", prior=LifecycleState.PRESENT, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=True, authorization_id=authorization.authorization_id)

@@ -177,7 +177,9 @@ atomically compare-and-swap an issued capability through `reserved` and
 `completed` states but cannot mint or record one. A reservation remains
 identity-bound and retryable after authoritative reconciliation when failure
 precedes the side effect; completion is recorded only after destruction or
-authoritative absence. Production binds that state seam to the durable SSSF owner; the
+authoritative absence. Observed residual resources and cleanup CNO retain the
+same identity-bound reservation for reconciliation and retry; neither completes
+the capability until cleanup establishes absence. Production binds that state seam to the durable SSSF owner; the
 in-memory implementation is only the deterministic fake. Fabricated capabilities
 are rejected, while issued provenance and completion status remain valid across
 serialization and supervisor restart. Residual or ambiguous state is preserved
