@@ -1,11 +1,14 @@
 # ADR-0005 — FirstMate Planning-Transition Awareness
 
-- **Status:** Accepted design direction; implementation sequenced, activation deferred; not active or proven
+authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+
+- **Status:** Accepted design direction; implementation `ACTIVE` under the authoritative planning generation; not `PROVEN` or production-enabled
 - **Date:** 2026-08-20
 - **Planning item:** FUT-003
 - **Lifecycle owner:** [`PLANNING_LIFECYCLE.md`](../development/PLANNING_LIFECYCLE.md)
 - **Durable state record:** [`PLANNING_STATE.json`](../development/PLANNING_STATE.json)
 - **FirstMate evaluation baseline:** `sbracewell64/firstmate@f4e69d6ce411750b55fc9f186f60ce0e8b0cd786`
+- **Authoritative planning source:** `planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d`
 
 ## Context
 
@@ -63,9 +66,9 @@ ACTIVE record is valid.
 ### 4. Browser Sol retains planning authority
 
 Browser Sol/Captain-controlled planning records own promotion through
-`SEQUENCED` and maintain the candidate register, ADR, roadmap, and durable
-state record. FirstMate does not promote planning state and does not edit those
-records merely because it observes them.
+`SEQUENCED` and `ACTIVE` and maintain the candidate register, ADR, roadmap, and
+durable state record. FirstMate does not promote planning state and does not
+edit those records merely because it observes them.
 
 ### 5. `PROVEN` remains downstream proof
 
@@ -89,17 +92,20 @@ by this planning repair.
 - The planning/engineering boundary is explicit and remains fail-closed.
 - No current FirstMate, SSSF producer, watcher, credential, sandbox, provider,
   ADW, Docker, Wayfinder, DSH, or live-enablement behavior changes.
-- The durable current state remains `SEQUENCED` because the exact identities
-  needed for an honest ACTIVE record do not yet exist.
+- The authoritative durable current state is `ACTIVE`, not `PROVEN`, for the
+  named bounded planning increments. This is not runtime, landing, acceptance,
+  certification, live-enable, or proof authority.
 - Future implementation must be separately bounded, reviewed, accepted, and
   requalified against current surfaces.
 
 ## Sequencing status
 
-FUT-003 is durably `SEQUENCED`, not `ACTIVE`. The planned names `FP-001` and
-`FM-FP-001` are not implementation identity bindings. The ACTIVE transition is
-legal only from the durable `SEQUENCED` record and is deferred until all exact
-identities and ordinary acceptance inputs exist.
+FUT-003 is durably `ACTIVE`, not `PROVEN`, under the exact authoritative
+planning source/generation recorded above. `FP-001` and `FM-FP-001` are named
+bounded increments in active-not-proven planning state. The ACTIVE transition is
+legal only from the durable `SEQUENCED` record; it does not bypass exact
+implementation identity, ordinary acceptance inputs, current
+PRE_CERTIFICATION constraints, or production landing/enablement gates.
 
 ## Non-goals
 
@@ -111,5 +117,5 @@ This ADR does not:
 - make `SEQUENCED` executable;
 - grant planning records runtime, landing, PRE_CERTIFICATION-exit,
   acceptance, certification, or live-enablement authority;
-- make FUT-003 `ACTIVE` or `PROVEN`; or
+- make FUT-003 `PROVEN` or production-enabled; or
 - bypass exact source validation or normal admission.

@@ -5,8 +5,10 @@ records current item state; the closed transition contract is owned only by
 [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md), and the current state/evidence
 record is [`PLANNING_STATE.json`](PLANNING_STATE.json).
 
-The register does not create tasks or runtime authority. `ACTIVE` is not used
-until the exact identity requirements in the lifecycle contract are satisfied.
+The register does not create tasks or runtime authority. `ACTIVE` is an
+engineering authorization/intake state, not `PROVEN` or runtime authority.
+
+authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
 
 ## Register
 
@@ -14,7 +16,7 @@ until the exact identity requirements in the lifecycle contract are satisfied.
 |---|---|---|---|---|
 | FUT-001 | Bounded autonomous DSH execution cells | SEQUENCED | [`ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md`](../decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md); long-range roadmap | SSSF owns outer authority; DSH may exercise bounded inner autonomy. This item is not active. |
 | FUT-002 | Awesome DSH Plugin catalog as future research/reuse source | PRESERVE | none | Catalog inclusion is not trust or production eligibility. |
-| FUT-003 | FirstMate planning-transition awareness | SEQUENCED | [`ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`](../decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md); roadmap position | The architecture is decided and sequenced, but the ACTIVE transition is deferred until every bounded increment has exact identities. |
+| FUT-003 | FirstMate planning-transition awareness | ACTIVE | [`ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`](../decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md); `FP-001` + `FM-FP-001` | Authoritative planning authorization is ACTIVE, not PROVEN; production landing/enablement remains separately held. |
 
 ## FUT-001 — Bounded autonomous DSH execution cells
 
@@ -71,18 +73,21 @@ security, isolation, lifecycle, and semantic gates.
 
 ### Status
 
-`SEQUENCED`
+`ACTIVE`, not `PROVEN`
+
+The architectural decision and bounded increment authorization are recorded
+by the authoritative planning generation. The durable state record is bound to
+that exact source identity; an older internally valid snapshot cannot demote
+this state.
 
 The architectural decision is recorded in
 [`ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`](../decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md).
 The durable state record is [`PLANNING_STATE.json`](PLANNING_STATE.json), which
-records the legal `DECIDED` to `SEQUENCED` edge.
-
-The ACTIVE transition is deferred. `FP-001` and `FM-FP-001` are planned named
-increments only; they do not have every exact branch, PR, source commit, and
-source tree identity required for an honest ACTIVE record. The exact branch,
-PR, source commit, and source tree identities are therefore absent, and no
-partial or fabricated ACTIVE state is recorded.
+records the legal `SEQUENCED` to `ACTIVE` edge and binds it to the exact
+planning source/generation above. `FP-001` and `FM-FP-001` are active-not-proven
+bounded increments named by that authoritative source. Their active planning
+state does not establish accepted implementation, landing, certification,
+live enablement, or `PROVEN`.
 
 ### Problem and decision
 
@@ -98,8 +103,9 @@ producer, consumer, task, or runtime path. It records the bounded design only.
 ### Authority boundary
 
 Browser Sol/Captain-controlled planning records own promotion through
-`SEQUENCED`. A future implementation would still require ordinary FirstMate
-admission, exact source validation, and the existing SSSF acceptance boundary.
+`SEQUENCED` and `ACTIVE`. A future implementation would still require ordinary
+FirstMate admission, exact source validation, and the existing SSSF acceptance
+boundary.
 No planning record creates a task, grants execution authority, authorizes
 landing, exits PRE_CERTIFICATION, accepts or certifies work, enables a live
 source, or means `PROVEN`.
@@ -122,6 +128,7 @@ exact identities in the durable record:
 - exact source tree SHA; and
 - bounded authoritative document references.
 
-Until all identities exist, this item remains `SEQUENCED`. No SSSF producer,
-FirstMate consumer, watcher, credential, sandbox, provider, ADW, Docker,
-Wayfinder, DSH behavior, or live enablement is part of this record.
+The authoritative `ACTIVE` planning state does not create a task or permit
+execution, landing, acceptance, certification, live enablement, or proof. No
+SSSF producer, FirstMate consumer, watcher, credential, sandbox, provider, ADW,
+Docker, Wayfinder, DSH behavior, or live enablement is part of this record.

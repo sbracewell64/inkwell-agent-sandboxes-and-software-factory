@@ -2,6 +2,20 @@
 
 The order below deliberately separates concerns.
 
+authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+
+## Authoritative Docker-first commissioning order
+
+```text
+Docker SBX-2..8
+-> Docker-backed ordinary PR
+-> immutable post-Docker/pre-DSH baseline
+-> existing Wayfinder
+-> DSH-0A
+-> DSH-0B
+-> DSH-1...
+```
+
 ## Current SBX lifecycle status
 
 - SBX-0's sole durable provider-neutral handoff landed at `aa0dcc5e`; it does
@@ -97,6 +111,8 @@ CNO or unmet.
 
 ## B6 / SBX-2+ — Free/local sandbox implementation (held)
 
+**Planning state: `HELD`.**
+
 A selected local/free provider may be implemented only after a separately
 bounded SBX-2 mechanism/feasibility increment is authorized. SBX-1 is not that
 authorization or unlock.
@@ -124,7 +140,7 @@ Qualify scout/reviewer/documenter and additional ADWs with explicit fixtures.
 
 ## FUT-003 — FirstMate planning-transition awareness
 
-**Planning state: `SEQUENCED`, not `ACTIVE`.**
+**Planning state: `ACTIVE`, not `PROVEN`.**
 
 The architectural decision is
 [`ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`](../decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md),
@@ -132,10 +148,12 @@ and the durable state/evidence record is
 [`PLANNING_STATE.json`](PLANNING_STATE.json). The legal lifecycle contract is
 owned by [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md).
 
-`FP-001` and `FM-FP-001` are planned named increments only. The ACTIVE
-transition is deferred because the exact branch, PR, source commit, and source
-tree identities required for an honest ACTIVE record do not yet exist. No
-partial or fabricated ACTIVE record is permitted.
+The authoritative planning source marks `FP-001` and `FM-FP-001` as
+active-not-proven bounded increments. This is engineering authorization and
+intake eligibility only; it is not task creation, execution, landing,
+acceptance, certification, live enablement, or `PROVEN`. The durable state
+record is bound to the authoritative planning generation above, not to an
+older snapshot.
 
 FUT-003 remains planning-only in this increment. No FirstMate watcher,
 producer, or consumer implementation is added. No feed, task, runtime

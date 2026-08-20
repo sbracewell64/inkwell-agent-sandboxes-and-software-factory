@@ -3,6 +3,16 @@
   "record_id": "sssf-planning-state",
   "lifecycle_owner": "docs/development/PLANNING_LIFECYCLE.md",
   "state_record_rule": "This JSON record is the durable current-state record; Git commit prose is not state.",
+  "authoritative_planning_source": {
+    "ref": "planning/future-sssf",
+    "source_commit": "5f83760a6d71bb798b9f652f21267fad4b743f16",
+    "source_tree": "6e33db5ae5f7d43bf3a7f8c351d888c599d1997d",
+    "generation": "planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d",
+    "identity_rule": "The ref, source commit, source tree, and generation must match this immutable authority before planning state is accepted."
+  },
+  "current_sandbox_states": {
+    "SBX-2": "HELD"
+  },
   "current_main_adr_inventory": {
     "source_commit": "991d3a64f1b96a8b9637f97060d692af3518228f",
     "files": [
@@ -68,7 +78,7 @@
     },
     {
       "item_id": "FUT-003",
-      "state": "SEQUENCED",
+      "state": "ACTIVE",
       "initial_state": "CANDIDATE",
       "authoritative_refs": [
         "docs/development/PLANNING_LIFECYCLE.md",
@@ -95,21 +105,45 @@
             "docs/development/ROADMAP.md",
             "docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md"
           ],
-          "evidence_note": "This successor records the legal sequencing edge durably; no ACTIVE binding exists."
+          "evidence_note": "The durable sequencing edge remains part of the current history."
+        },
+        {
+          "from": "SEQUENCED",
+          "to": "ACTIVE",
+          "source_commit": "5f83760a6d71bb798b9f652f21267fad4b743f16",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md",
+            "docs/increments/FUT-003_PLANNING_FOUNDATION_REPAIR.md"
+          ],
+          "evidence_note": "The authoritative planning generation marks FUT-003 ACTIVE, not PROVEN; this is planning authorization only."
         }
       ],
       "planned_increments": [
         {
           "increment_id": "FP-001",
-          "status": "planned-not-active"
+          "status": "active-not-proven"
         },
         {
           "increment_id": "FM-FP-001",
-          "status": "planned-not-active"
+          "status": "active-not-proven"
         }
       ],
       "active_binding": null,
-      "activation_deferred": "FP-001 and FM-FP-001 do not yet have every exact branch, PR, source commit, and source tree identity required for an honest ACTIVE record."
+      "planning_authority_binding": {
+        "ref": "planning/future-sssf",
+        "source_commit": "5f83760a6d71bb798b9f652f21267fad4b743f16",
+        "source_tree": "6e33db5ae5f7d43bf3a7f8c351d888c599d1997d",
+        "generation": "planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d",
+        "increment_ids": [
+          "FP-001",
+          "FM-FP-001"
+        ],
+        "authoritative_refs": [
+          "docs/development/FUTURE_CANDIDATES.md",
+          "docs/increments/FUT-003_PLANNING_FOUNDATION_REPAIR.md"
+        ]
+      },
+      "activation_deferred": "ACTIVE is engineering authorization and intake eligibility only; it does not create a task, grant execution or landing authority, or establish acceptance, certification, live enablement, or PROVEN."
     }
   ]
 }

@@ -1,10 +1,13 @@
 # ADR-0007 — SSSF Outer Authority and DSH Inner Autonomy
 
+authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+
 - **Status:** Accepted design direction; implementation sequenced, not active
 - **Date:** 2026-08-20
 - **Planning item:** FUT-001
 - **Lifecycle owner:** [`PLANNING_LIFECYCLE.md`](../development/PLANNING_LIFECYCLE.md)
 - **Current state record:** [`PLANNING_STATE.json`](../development/PLANNING_STATE.json)
+- **Authoritative planning source:** `planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d`
 
 ## Identity allocation
 
@@ -77,7 +80,8 @@ acceptance without outer-graph or promotion authority.
 
 ## Sequencing and boundary
 
-FUT-001 is `SEQUENCED`, not `ACTIVE`. Production DSH adoption remains downstream
+FUT-001 is `SEQUENCED`, not `ACTIVE`, under the authoritative planning
+source/generation. Production DSH adoption remains downstream
 of the existing SSSF execution/isolation, backend, source-custody,
 lifecycle/evidence, termination, quiescence, and acceptance proofs. This ADR
 does not authorize DSH implementation, a provider, Docker, Wayfinder, or live

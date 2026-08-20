@@ -14,6 +14,7 @@ import copy
 import json
 import posixpath
 import re
+import sys
 import tempfile
 from pathlib import Path, PureWindowsPath
 from typing import Any
@@ -83,7 +84,34 @@ EXPECTED_CURRENT_MAIN_ADRS = [
     "ADR-0004-SSSF-FIRSTMATE-WINDOWS-FRONT-DOOR.md",
     "ADR-0006-SANDBOX-PROVIDER-CONTRACT.md",
 ]
-EXPECTED_ITEM_STATES = {"FUT-001": "SEQUENCED", "FUT-002": "PRESERVE", "FUT-003": "SEQUENCED"}
+AUTHORITATIVE_PLANNING_REF = "planning/future-sssf"
+AUTHORITATIVE_PLANNING_COMMIT = "5f83760a6d71bb798b9f652f21267fad4b743f16"
+AUTHORITATIVE_PLANNING_TREE = "6e33db5ae5f7d43bf3a7f8c351d888c599d1997d"
+AUTHORITATIVE_PLANNING_GENERATION = (
+    f"{AUTHORITATIVE_PLANNING_REF}@{AUTHORITATIVE_PLANNING_COMMIT}:"
+    f"{AUTHORITATIVE_PLANNING_TREE}"
+)
+AUTHORITATIVE_PLANNING_IDENTITY_LINE = (
+    f"authoritative planning source: {AUTHORITATIVE_PLANNING_REF}; "
+    f"commit: {AUTHORITATIVE_PLANNING_COMMIT}; "
+    f"tree: {AUTHORITATIVE_PLANNING_TREE}; "
+    f"generation: {AUTHORITATIVE_PLANNING_GENERATION}"
+)
+EXPECTED_ITEM_STATES = {"FUT-001": "SEQUENCED", "FUT-002": "PRESERVE", "FUT-003": "ACTIVE"}
+EXPECTED_SANDBOX_STATES = {"SBX-2": "HELD"}
+DOCKER_FIRST_ORDER = """Docker SBX-2..8
+-> Docker-backed ordinary PR
+-> immutable post-Docker/pre-DSH baseline
+-> existing Wayfinder
+-> DSH-0A
+-> DSH-0B
+-> DSH-1..."""
+CLOSURE_REQUIRED_TESTS = (
+    "tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe",
+    "tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation",
+    "tests/test_planning_foundation.py::test_windows_symlink_privilege_cno_is_machine_readable_non_pass",
+)
+CLOSURE_EXPECTED_OUTCOMES = {nodeid: "passed" for nodeid in CLOSURE_REQUIRED_TESTS}
 PLANNING_SURFACE_KEYS = (
     "candidates",
     "roadmap",
@@ -109,6 +137,47 @@ class _DuplicateKey(ValueError):
     pass
 
 
+def _is_windows_symlink_capability_error(error: BaseException) -> bool:
+    """Return true only for the ruled Windows missing-link privilege case."""
+    if isinstance(error, OSError) and getattr(error, "winerror", None) == 1314:
+        return True
+    return isinstance(error, NotImplementedError) and sys.platform == "win32"
+
+
+def _fold_property_outcome(failures: list[str], cno: list[str]) -> str:
+    """Apply the property-local FAIL > CNO > PASS precedence."""
+    if failures:
+        return "observed-bad"
+    if cno:
+        return "could-not-observe"
+    return "observed-good"
+
+
+def _machine_result(
+    status: str,
+    *,
+    errors: list[str] | tuple[str, ...] = (),
+    cno: list[str] | tuple[str, ...] = (),
+) -> dict[str, Any]:
+    if status == "observed-good":
+        outcome, result_status = "PASS", "OBSERVED_GOOD"
+    elif status == "observed-bad":
+        outcome, result_status = "FAIL", "OBSERVED_BAD"
+    else:
+        outcome, result_status = "CNO", "UNVERIFIED"
+    return {
+        "schema": "sssf.planning-foundation-result/v1",
+        "outcome": outcome,
+        "status": result_status,
+        "errors": list(errors),
+        "unverified_controls": list(cno),
+    }
+
+
+def _validator_exit_code(status: str) -> int:
+    return {"observed-good": 0, "observed-bad": 1, "could-not-observe": 2}[status]
+
+
 def _strict_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -126,6 +195,187 @@ def _read_json(text: str) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(value, dict):
         return None, "top-level JSON value is not an object"
     return value, None
+
+
+def evaluate_test_closure(
+    collected_nodeids: list[str] | tuple[str, ...],
+    executed_reports: list[tuple[str, str]] | tuple[tuple[str, str], ...],
+    *,
+    required_nodeids: tuple[str, ...] = CLOSURE_REQUIRED_TESTS,
+    collection_errors: list[str] | tuple[str, ...] = (),
+    exit_status: int = 0,
+) -> tuple[str, list[str]]:
+    """Evaluate pytest collection/report events without trusting terminal prose."""
+    errors: list[str] = []
+    cno: list[str] = []
+    collected = list(collected_nodeids)
+    required = set(required_nodeids)
+    if not required:
+        cno.append("closure required test universe is empty")
+    if not collected:
+        cno.append("closure selected zero tests")
+    if len(collected) != len(set(collected)):
+        cno.append("closure collection contains duplicate test identities")
+    if set(collected) != required:
+        missing = sorted(required - set(collected))
+        extra = sorted(set(collected) - required)
+        if missing:
+            cno.append("closure required test identity missing or renamed: " + ", ".join(missing))
+        if extra:
+            cno.append("closure selected test universe contains unexpected identities: " + ", ".join(extra))
+    if collection_errors:
+        cno.append("closure collection failed: " + "; ".join(collection_errors))
+    reports: dict[str, list[str]] = {}
+    for nodeid, outcome in executed_reports:
+        reports.setdefault(nodeid, []).append(outcome)
+    if set(reports) != set(collected):
+        missing_reports = sorted(set(collected) - set(reports))
+        if missing_reports:
+            cno.append("closure required test did not complete: " + ", ".join(missing_reports))
+        extra_reports = sorted(set(reports) - set(collected))
+        if extra_reports:
+            cno.append("closure reported an uncollected test identity: " + ", ".join(extra_reports))
+    for nodeid in sorted(required):
+        outcomes = reports.get(nodeid, [])
+        expected = CLOSURE_EXPECTED_OUTCOMES.get(nodeid, "passed")
+        if len(outcomes) != 1:
+            if not outcomes:
+                cno.append(f"closure required identity has no executed call result: {nodeid}")
+            else:
+                cno.append(f"closure required identity executed {len(outcomes)} times: {nodeid}")
+            continue
+        actual = outcomes[0]
+        if actual != expected:
+            if actual in {"failed", "error"}:
+                errors.append(f"closure required test failed: {nodeid} ({actual})")
+            else:
+                cno.append(f"closure required test was not completed as {expected}: {nodeid} ({actual})")
+    if exit_status not in (0,):
+        cno.append(f"closure runner ended with nonzero status: {exit_status}")
+    if errors:
+        return "observed-bad", errors + cno
+    if cno:
+        return "could-not-observe", cno
+    return "observed-good", []
+
+
+class _PytestClosureRecorder:
+    """Capture collection and call reports from pytest's executed event stream."""
+
+    def __init__(self) -> None:
+        self.collected_nodeids: list[str] = []
+        self.executed_reports: list[tuple[str, str]] = []
+        self.collection_errors: list[str] = []
+        self.exit_status = 0
+
+    def pytest_collection_finish(self, session: Any) -> None:
+        self.collected_nodeids = [item.nodeid for item in session.items]
+
+    def pytest_collectreport(self, report: Any) -> None:
+        if getattr(report, "failed", False):
+            self.collection_errors.append(str(getattr(report, "longrepr", report)))
+
+    def pytest_runtest_logreport(self, report: Any) -> None:
+        if getattr(report, "when", None) == "call":
+            self.executed_reports.append((report.nodeid, report.outcome))
+
+    def pytest_sessionfinish(self, session: Any, exitstatus: Any) -> None:
+        self.exit_status = int(exitstatus)
+
+
+def run_test_closure(
+    required_nodeids: tuple[str, ...] = CLOSURE_REQUIRED_TESTS,
+) -> tuple[str, list[str]]:
+    """Run and evaluate the exact closure universe through pytest events."""
+    try:
+        import pytest
+    except Exception as error:  # pragma: no cover - environment-specific
+        return "could-not-observe", [f"pytest closure runner unavailable: {error}"]
+    recorder = _PytestClosureRecorder()
+    previous_bytecode_setting = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        pytest.main(["-q", "-p", "no:cacheprovider", *required_nodeids], plugins=[recorder])
+    except BaseException as error:  # pragma: no cover - runner-specific
+        return "could-not-observe", [f"pytest closure runner raised: {error}"]
+    finally:
+        sys.dont_write_bytecode = previous_bytecode_setting
+    return evaluate_test_closure(
+        recorder.collected_nodeids,
+        recorder.executed_reports,
+        required_nodeids=required_nodeids,
+        collection_errors=recorder.collection_errors,
+        exit_status=recorder.exit_status,
+    )
+
+
+def _watched_test_closure_controls() -> list[str]:
+    """Keep every vacuity escape causally red while retaining positive controls."""
+    required = ("tests/test_planning_foundation.py::required",)
+    cases = (
+        ("closure-zero-selection", (), (), (), 0, "could-not-observe"),
+        ("closure-selector-typo", (), (), (), 0, "could-not-observe"),
+        (
+            "closure-nonexistent-identity",
+            ("tests/test_planning_foundation.py::other",),
+            (("tests/test_planning_foundation.py::other", "passed"),),
+            (),
+            0,
+            "could-not-observe",
+        ),
+        (
+            "closure-required-identity-removed",
+            ("tests/test_planning_foundation.py::renamed",),
+            (("tests/test_planning_foundation.py::renamed", "passed"),),
+            (),
+            0,
+            "could-not-observe",
+        ),
+        (
+            "closure-collection-failure",
+            required,
+            ((required[0], "passed"),),
+            ("fixture import failed",),
+            0,
+            "could-not-observe",
+        ),
+        (
+            "closure-required-pass",
+            required,
+            ((required[0], "passed"),),
+            (),
+            0,
+            "observed-good",
+        ),
+        (
+            "closure-required-fail",
+            required,
+            ((required[0], "failed"),),
+            (),
+            0,
+            "observed-bad",
+        ),
+        (
+            "closure-fail-over-collection-cno",
+            required,
+            ((required[0], "failed"),),
+            ("fixture import failed",),
+            0,
+            "observed-bad",
+        ),
+    )
+    failures: list[str] = []
+    for name, collected, reports, collection_errors, exit_status, expected in cases:
+        status, _ = evaluate_test_closure(
+            collected,
+            reports,
+            required_nodeids=required,
+            collection_errors=collection_errors,
+            exit_status=exit_status,
+        )
+        if status != expected:
+            failures.append(name)
+    return failures
 
 
 def _normal(text: str) -> str:
@@ -292,6 +542,80 @@ def _check_required_files(project: dict[str, Any], errors: list[str], cno: list[
         cno.append(f"CI manifest could-not-observe: {project['ci_error']}")
 
 
+def _validate_authoritative_planning_source(
+    project: dict[str, Any], errors: list[str]
+) -> None:
+    state = project.get("state")
+    expected_source = {
+        "ref": AUTHORITATIVE_PLANNING_REF,
+        "source_commit": AUTHORITATIVE_PLANNING_COMMIT,
+        "source_tree": AUTHORITATIVE_PLANNING_TREE,
+        "generation": AUTHORITATIVE_PLANNING_GENERATION,
+        "identity_rule": (
+            "The ref, source commit, source tree, and generation must match this "
+            "immutable authority before planning state is accepted."
+        ),
+    }
+    if not isinstance(state, dict) or state.get("authoritative_planning_source") != expected_source:
+        errors.append(
+            "authoritative planning source identity/generation is stale, missing, or mismatched"
+        )
+    if not isinstance(state, dict) or state.get("current_sandbox_states") != EXPECTED_SANDBOX_STATES:
+        errors.append("authoritative SBX-2 state is not exactly HELD")
+    for key in ("lifecycle",) + PLANNING_SURFACE_KEYS:
+        text = project["surfaces"].get(key, "")
+        if AUTHORITATIVE_PLANNING_IDENTITY_LINE not in text:
+            errors.append(
+                f"{SURFACE_PATHS[key]} is not bound to authoritative planning generation"
+            )
+    manifest = project["surfaces"].get("manifest", "")
+    for fragment in (
+        f"authoritative_ref: {AUTHORITATIVE_PLANNING_REF}",
+        f"authoritative_commit: {AUTHORITATIVE_PLANNING_COMMIT}",
+        f"authoritative_tree: {AUTHORITATIVE_PLANNING_TREE}",
+        f"authoritative_generation: {AUTHORITATIVE_PLANNING_GENERATION}",
+    ):
+        if fragment not in manifest:
+            errors.append(f"planning manifest is missing authority identity: {fragment}")
+    candidates = project["surfaces"].get("candidates", "")
+    if _extract_register_state(candidates, "FUT-001") != "SEQUENCED":
+        errors.append("authoritative FUT-001/DSH state drifted from SEQUENCED")
+    if _extract_register_state(candidates, "FUT-003") != "ACTIVE":
+        errors.append("authoritative FUT-003 state drifted from ACTIVE")
+    if "**Planning state: `ACTIVE`, not `PROVEN`.**" not in project["surfaces"].get("roadmap", ""):
+        errors.append("roadmap does not preserve FUT-003 ACTIVE-but-not-PROVEN authority")
+    if "SBX-2 is held." not in project["surfaces"].get("roadmap", ""):
+        errors.append("roadmap does not preserve SBX-2 HELD authority")
+    if _normal(DOCKER_FIRST_ORDER) not in _normal(project["surfaces"].get("roadmap", "")):
+        errors.append("roadmap Docker-first commissioning order drifted")
+
+
+def _validate_planning_authority_binding(
+    record: dict[str, Any], project: dict[str, Any], errors: list[str]
+) -> None:
+    binding = record.get("planning_authority_binding")
+    expected = {
+        "ref": AUTHORITATIVE_PLANNING_REF,
+        "source_commit": AUTHORITATIVE_PLANNING_COMMIT,
+        "source_tree": AUTHORITATIVE_PLANNING_TREE,
+        "generation": AUTHORITATIVE_PLANNING_GENERATION,
+        "increment_ids": ["FP-001", "FM-FP-001"],
+    }
+    if not isinstance(binding, dict):
+        errors.append(f"{record.get('item_id')} ACTIVE state lacks authoritative planning binding")
+        return
+    for field, value in expected.items():
+        if binding.get(field) != value:
+            errors.append(
+                f"{record.get('item_id')} ACTIVE planning binding has stale {field}"
+            )
+    refs = binding.get("authoritative_refs")
+    if not isinstance(refs, list) or not refs or any(
+        not _repository_path_exists(project, reference) for reference in refs
+    ):
+        errors.append(f"{record.get('item_id')} ACTIVE planning binding lacks retained authoritative refs")
+
+
 def _validate_lifecycle(project: dict[str, Any], errors: list[str]) -> None:
     text = project["surfaces"]["lifecycle"]
     normalized = _normal(text)
@@ -384,7 +708,13 @@ def _validate_single_transition(
             )
         deferred_return = None
     if target == "ACTIVE":
-        _validate_active_binding(record, project, errors)
+        if (
+            record.get("active_binding") is None
+            and record.get("planning_authority_binding") is not None
+        ):
+            _validate_planning_authority_binding(record, project, errors)
+        else:
+            _validate_active_binding(record, project, errors)
     if target == "PROVEN":
         _validate_proven_proof(record, project, errors)
     return target, deferred_return
@@ -492,6 +822,8 @@ def _validate_state(
         "state_record_rule",
         "current_main_adr_inventory",
         "allocated_new_identities",
+        "authoritative_planning_source",
+        "current_sandbox_states",
         "records",
     }
     unknown = set(state) - expected_keys
@@ -586,7 +918,13 @@ def _validate_state(
         if binding is not None and not entered_active:
             errors.append(f"{item_id} has an ACTIVE binding without an ACTIVE transition")
         if current == "ACTIVE" or entered_active:
-            _validate_active_binding(record, project, errors)
+            if (
+                record.get("active_binding") is None
+                and record.get("planning_authority_binding") is not None
+            ):
+                _validate_planning_authority_binding(record, project, errors)
+            else:
+                _validate_active_binding(record, project, errors)
         if current in TERMINAL_STATES and record.get("reentry_rule") not in ("terminal", None):
             errors.append(f"{item_id} terminal state has a re-entry rule")
         if current == "DEFERRED" and record.get("return_state") != deferred_return:
@@ -620,8 +958,8 @@ def _validate_document_states(project: dict[str, Any], errors: list[str]) -> Non
         errors.append("FUT-001/DSH is not durably SEQUENCED and inactive")
     if _extract_register_state(candidates, "FUT-002") != "PRESERVE":
         errors.append("FUT-002 preserve state drifted")
-    if _extract_register_state(candidates, "FUT-003") != "SEQUENCED":
-        errors.append("FUT-003 candidate register is not SEQUENCED")
+    if _extract_register_state(candidates, "FUT-003") != "ACTIVE":
+        errors.append("FUT-003 candidate register is not ACTIVE")
     fut001 = _heading_block(candidates, "FUT-001 — Bounded autonomous DSH execution cells")
     fut003 = _heading_block(candidates, "FUT-003 — FirstMate planning-transition awareness")
     for label, block, fragments in (
@@ -634,11 +972,11 @@ def _validate_document_states(project: dict[str, Any], errors: list[str]) -> Non
             "FUT-003",
             fut003,
             (
-                "`SEQUENCED`",
-                "ACTIVE transition is deferred",
+                "`ACTIVE`",
+                "not `PROVEN`",
                 "FP-001",
                 "FM-FP-001",
-                "exact branch, PR, source commit, and source tree identities",
+                "authoritative planning generation",
             ),
         ),
     ):
@@ -653,9 +991,9 @@ def _validate_document_states(project: dict[str, Any], errors: list[str]) -> Non
         roadmap_block = roadmap_block.split("\n## ", 1)[0]
         normalized = _normal(roadmap_block)
         for fragment in (
-            "planning state: `SEQUENCED`, not `ACTIVE`",
-            "ACTIVE transition is deferred",
+            "planning state: `ACTIVE`, not `PROVEN`",
             "no FirstMate watcher, producer, or consumer implementation",
+            "authoritative planning generation",
         ):
             if _normal(fragment) not in normalized:
                 errors.append(f"roadmap FUT-003 boundary is missing: {fragment}")
@@ -670,11 +1008,10 @@ def _validate_document_states(project: dict[str, Any], errors: list[str]) -> Non
         if fragment in adr:
             errors.append(f"ADR-0005 has stale contradictory status language: {fragment}")
     for fragment in (
-        "implementation sequenced",
-        "activation deferred",
+        "implementation active",
+        "authoritative planning source",
         "normal FirstMate admission",
         "exact referenced source identity",
-        "must not be merged",
         "not proven",
         "does not create execution authority",
     ):
@@ -756,6 +1093,7 @@ def _validate_roadmap_sbx_hold(project: dict[str, Any], errors: list[str]) -> No
         "sbx-1 is not real-provider-proven",
         "does not unlock sbx-2",
         "sbx-2 is held",
+        "planning state: `held`",
         "docker mechanism selection",
         "real-provider custody",
         "windows/wsl feasibility",
@@ -864,6 +1202,8 @@ def _positive_active_fixture(project: dict[str, Any]) -> list[str]:
     record = next((item for item in state.get("records", []) if item.get("item_id") == "FUT-003"), None)
     if not isinstance(record, dict):
         return ["positive valid ACTIVE fixture has no FUT-003 record"]
+    record.pop("planning_authority_binding", None)
+    record["transition_history"] = record["transition_history"][:2]
     record["state"] = "ACTIVE"
     record["active_binding"] = {
         "increments": [
@@ -899,6 +1239,8 @@ def _positive_active_fixture(project: dict[str, Any]) -> list[str]:
 def _active_state_fixture(project: dict[str, Any]) -> dict[str, Any]:
     state = copy.deepcopy(project["state"])
     record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record.pop("planning_authority_binding", None)
+    record["transition_history"] = record["transition_history"][:2]
     record["state"] = "ACTIVE"
     record["active_binding"] = {
         "increments": [
@@ -967,6 +1309,8 @@ def _positive_superseded_proof_fixture(project: dict[str, Any]) -> list[str]:
 def _positive_deferred_fixture(project: dict[str, Any]) -> list[str]:
     state = copy.deepcopy(project["state"])
     record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record["transition_history"] = record["transition_history"][:2]
+    record.pop("planning_authority_binding", None)
     evidence = ["docs/development/FUTURE_CANDIDATES.md"]
     record["state"] = "DEFERRED"
     record["return_state"] = "SEQUENCED"
@@ -1049,13 +1393,22 @@ def _watched_symlink_escape_controls(
         f"symlink-escape-proven-{label}" for label in proven_fields.values()
     )
 
-    def create_link(link: Path, target: Path) -> bool:
+    def create_link(name: str, link: Path, target: Path) -> bool:
         try:
             link.symlink_to(target)
-        except (NotImplementedError, OSError):
-            could_not_observe.extend(
-                name for name in control_names if name not in could_not_observe
-            )
+        except (NotImplementedError, OSError) as error:
+            start = control_names.index(name)
+            remaining = control_names[start:]
+            if _is_windows_symlink_capability_error(error):
+                could_not_observe.extend(
+                    control for control in remaining if control not in could_not_observe
+                )
+            else:
+                failures.extend(
+                    f"{control}: unexpected symlink setup failure ({error})"
+                    for control in remaining
+                    if control not in failures
+                )
             return False
         return True
 
@@ -1077,7 +1430,7 @@ def _watched_symlink_escape_controls(
         active_target.write_text("outside ACTIVE target\n", encoding="utf-8")
         active_link = root / "docs/development/active-authority-link.md"
         active_link.parent.mkdir(parents=True, exist_ok=True)
-        if not create_link(active_link, active_target):
+        if not create_link(active_name, active_link, active_target):
             return
         active_reference = active_link.relative_to(root).as_posix()
         active_state = _active_state_fixture(fixture)
@@ -1102,7 +1455,7 @@ def _watched_symlink_escape_controls(
             target = outside / f"{field}.json"
             target.write_text(f"outside {field} target\n", encoding="utf-8")
             link = root / "docs" / "development" / f"{field}-link.json"
-            if not create_link(link, target):
+            if not create_link(f"symlink-escape-proven-{proven_fields[field]}", link, target):
                 return
             proven_record["proven_proof"][field] = [
                 link.relative_to(root).as_posix()
@@ -1123,7 +1476,7 @@ def _watched_red_controls(
 
     stale_adr = copy.deepcopy(project)
     stale_adr["surfaces"]["adr_planning"] = stale_adr["surfaces"]["adr_planning"].replace(
-        "implementation sequenced, activation deferred",
+        "implementation `ACTIVE` under the authoritative planning generation",
         "implementation unsequenced and inactive",
     )
     _expect_red("stale-contradictory-adr-status", stale_adr, "stale contradictory status", failures)
@@ -1151,6 +1504,7 @@ def _watched_red_controls(
 
     unbound_active = copy.deepcopy(project)
     active_record = next(item for item in unbound_active["state"]["records"] if item["item_id"] == "FUT-003")
+    active_record.pop("planning_authority_binding", None)
     active_record["state"] = "ACTIVE"
     active_record["transition_history"].append(
         {"from": "SEQUENCED", "to": "ACTIVE", "evidence_refs": ["docs/development/FUTURE_CANDIDATES.md"]}
@@ -1319,6 +1673,7 @@ def _watched_red_controls(
     broken_link["surfaces"]["candidates"] += "\n[broken planning reference](docs/missing-planning-record.md)\n"
     _expect_red("broken-planning-cross-reference", broken_link, "broken planning cross-reference", failures)
 
+    failures.extend(_watched_test_closure_controls())
     failures.extend(_positive_active_fixture(project))
     failures.extend(_positive_proven_fixture(project))
     failures.extend(_positive_superseded_proof_fixture(project))
@@ -1331,13 +1686,18 @@ def validate_project(
     *,
     run_controls: bool = True,
     control_cno: list[str] | None = None,
+    control_failures: list[str] | None = None,
 ) -> tuple[str, list[str]]:
     errors: list[str] = []
     cno: list[str] = []
+    red_failures: list[str] = []
     _check_required_files(project, errors, cno)
     if cno:
         errors.extend(cno)
+        if control_cno is not None:
+            control_cno.extend(cno)
         return "could-not-observe", errors
+    _validate_authoritative_planning_source(project, errors)
     _validate_lifecycle(project, errors)
     _validate_state(project, errors)
     _validate_document_states(project, errors)
@@ -1347,28 +1707,51 @@ def validate_project(
     _validate_manifest_and_ci(project, errors)
     _validate_cross_references(project, errors)
     _validate_authority_ownership(project, errors)
-    if run_controls and not errors:
-        red_failures = _watched_red_controls(project, control_cno)
+    state_records = project.get("state", {}).get("records") if isinstance(project.get("state"), dict) else None
+    can_run_controls = isinstance(state_records, list) and {
+        item.get("item_id") for item in state_records if isinstance(item, dict)
+    } >= set(EXPECTED_ITEM_STATES)
+    if run_controls and can_run_controls:
+        red_failures = _watched_red_controls(project, cno)
         if red_failures:
             errors.append("watched-red controls did not go red: " + ", ".join(red_failures))
-    return ("observed-bad" if errors else "observed-good"), errors
+    if control_cno is not None:
+        control_cno.extend(item for item in cno if item not in control_cno)
+    if control_failures is not None:
+        control_failures.extend(item for item in red_failures if item not in control_failures)
+    status = _fold_property_outcome(errors, cno)
+    return status, errors
 
 
 def validate_path(
     root: Path = ROOT, *, control_cno: list[str] | None = None
 ) -> tuple[str, list[str], list[str]]:
     project = load_project(root)
-    status, errors = validate_project(project, control_cno=control_cno)
     red_failures: list[str] = []
-    if status == "observed-good":
-        red_failures = _watched_red_controls(project, control_cno)
+    status, errors = validate_project(
+        project, control_cno=control_cno, control_failures=red_failures
+    )
     return status, errors, red_failures
 
 
 def main() -> int:
     control_cno: list[str] = []
     status, errors, red_failures = validate_path(ROOT, control_cno=control_cno)
+    closure_status, closure_errors = run_test_closure()
+    if closure_status == "observed-bad":
+        status = "observed-bad"
+        errors.extend("test closure: " + error for error in closure_errors)
+    elif closure_status == "could-not-observe":
+        if status != "observed-bad":
+            status = "could-not-observe"
+        control_cno.extend(
+            "test-closure: " + error
+            for error in closure_errors
+            if "test-closure: " + error not in control_cno
+        )
+    result = _machine_result(status, errors=errors, cno=control_cno)
     print(f"planning foundation validation: {status}")
+    print(json.dumps(result, sort_keys=True))
     print(f"lifecycle owner: {LIFECYCLE_OWNER}")
     print(f"validation owner: {VALIDATION_OWNER}")
     print(
@@ -1388,31 +1771,34 @@ def main() -> int:
         "symlink-escape-proven-implementation-evidence, "
         "symlink-escape-proven-proof-evidence, "
         "symlink-escape-proven-documentation-evidence, "
+        "closure-zero-selection, closure-selector-typo, closure-nonexistent-identity, "
+        "closure-required-identity-removed, closure-collection-failure, "
+        "closure-required-pass, closure-required-fail, closure-fail-over-collection-cno, "
         "active-not-proven-runtime-or-landing-authority, duplicate-adr-identity, "
         "stale-roadmap-sbx-regression, competing-lifecycle-owner, "
         "broken-planning-cross-reference"
     )
-    if errors:
+    if status == "could-not-observe":
+        for control in control_cno:
+            print(f"unverified CNO control: {control}")
+        print("symlink property was not claimed as executed")
+    elif errors:
         for error in errors:
             print(f"- {error}")
-        return 2 if status == "could-not-observe" else 1
-    if red_failures:
+        for control in control_cno:
+            print(f"unverified CNO control: {control}")
+    elif red_failures:
         for failure in red_failures:
             print(f"- watched-red control did not fail closed: {failure}")
-        return 1
-    for control in control_cno:
-        print(f"watched-red could-not-observe (symlink unavailable): {control}")
-    print("positive case: canonical lifecycle, durable SEQUENCED records, and current SBX holds")
-    print("positive ACTIVE fixture: exact increment/branch/PR/source identities validate in memory")
-    print("positive PROVEN fixture: accepted proof contract validates in memory")
-    print("positive SUPERSEDED fixture: historical accepted proof remains valid in memory")
-    print("positive DEFERRED fixture: retained return state validates in memory")
-    if control_cno:
-        print("watched-red: all observable controls observed-bad under in-memory defects")
     else:
+        print("positive case: canonical lifecycle, authoritative planning generation, and current SBX holds")
+        print("positive ACTIVE fixture: exact increment/branch/PR/source identities validate in memory")
+        print("positive PROVEN fixture: accepted proof contract validates in memory")
+        print("positive SUPERSEDED fixture: historical accepted proof remains valid in memory")
+        print("positive DEFERRED fixture: retained return state validates in memory")
         print("watched-red: all controls observed-bad under in-memory defects")
-    print("side effects: none")
-    return 0
+        print("side effects: none")
+    return _validator_exit_code(status)
 
 
 if __name__ == "__main__":

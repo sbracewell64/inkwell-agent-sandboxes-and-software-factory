@@ -80,6 +80,8 @@ Never hand-edit session evidence.
 
 ## Planning foundation
 
+authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+
 - `docs/development/PLANNING_LIFECYCLE.md` — sole closed transition-contract owner
 - `docs/development/PLANNING_STATE.json` — durable current state and transition evidence
 - `docs/development/FUTURE_CANDIDATES.md` — future item register
