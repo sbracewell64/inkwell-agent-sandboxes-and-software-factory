@@ -71,8 +71,11 @@ missing state record.
 
 ### Side exits, re-entry, and terminality
 
-- `DEFERRED` is a side exit from a resumable state. Its record must retain
-  `return_to`; the only legal return edge is `DEFERRED -> return_to`.
+- `DEFERRED` is a side exit from a resumable state. The transition entering
+  `DEFERRED` must retain that source as `return_to`, and a current deferred
+  record must retain the same value as `return_state`; the only legal return
+  edge is `DEFERRED -> return_to`. An outgoing transition cannot choose or
+  replace the retained return state.
 - `REJECTED` is terminal. It cannot be reopened by editing its state or by a
   later implementation branch.
 - `SUPERSEDED` is terminal. A replacement records a new item/version and does
@@ -144,6 +147,12 @@ implementation, deterministic proof, retained evidence, required
  documentation, and immutable source identity agree. It does not grant a new
 runtime authority; runtime behavior remains owned by executable code and its
 acceptance gates.
+
+The durable `proven_proof` record must set `accepted_implementation` to true;
+retain nonempty, existing `acceptance_evidence_refs`,
+`implementation_evidence_refs`, `proof_evidence_refs`, and
+`documentation_evidence_refs`; and bind the accepted source with exact
+40-character `source_commit` and `source_tree` identities.
 
 ## Durable records and ownership
 
