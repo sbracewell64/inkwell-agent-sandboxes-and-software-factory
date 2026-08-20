@@ -35,7 +35,7 @@ The mutable fleet-local input was read completely before publication:
 - current SSSF handoff base: `b902cdcecd65c8ba03031875297d31e990f12c11`.
 
 The inventory content digest (computed with its digest field blank) is
-`29ffac18b0de06087eb5cf068ed21f2c108a0320709307e51bee700f737833b8`.
+`bce21bc40de2f94cb03b464e1baa3ccb94d6dedf25825588947d94663a6b5a52`.
 The mutable report remains an evidence input. If it is absent or unreadable,
 source replay is CNO; the durable inventory does not infer PASS from that
 absence.

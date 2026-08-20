@@ -475,7 +475,12 @@ def _validate_deferred_and_recommendations(
                 errors.append(f"recommendation {recommendation.get('recommendation_id')} has no owner")
 
 
-def validate_document(document: dict[str, Any], *, source_report: Path | None = None) -> tuple[str, list[str]]:
+def validate_document(
+    document: dict[str, Any],
+    *,
+    source_report: Path | None = None,
+    verify_inventory_digest: bool = True,
+) -> tuple[str, list[str]]:
     """Return one of the three observations for the durable validation claim."""
     errors: list[str] = []
     _expect_keys(
@@ -517,10 +522,11 @@ def validate_document(document: dict[str, Any], *, source_report: Path | None = 
         errors.append("classification vocabulary dropped or reordered a source classification")
     if document.get("observation_vocabulary") != list(OBSERVATIONS):
         errors.append("observation vocabulary is not the closed three-valued set")
-    if document.get("inventory_content_sha256") != EXPECTED_INVENTORY_DIGEST:
-        errors.append("inventory content digest does not match the published generation")
-    elif _canonical_digest(document) != EXPECTED_INVENTORY_DIGEST:
-        errors.append("inventory content digest mismatch: fact/obligation content changed")
+    if verify_inventory_digest:
+        if document.get("inventory_content_sha256") != EXPECTED_INVENTORY_DIGEST:
+            errors.append("inventory content digest does not match the published generation")
+        elif _canonical_digest(document) != EXPECTED_INVENTORY_DIGEST:
+            errors.append("inventory content digest mismatch: fact/obligation content changed")
     _validate_authority_boundary(document, errors)
     _validate_source_snapshot(document, errors)
     owners = _validate_owner_registry(document, errors)
@@ -551,35 +557,35 @@ def validate_document(document: dict[str, Any], *, source_report: Path | None = 
 
 def _watched_red_controls(document: dict[str, Any]) -> list[str]:
     """Return control names that failed to go red; mutations stay in memory."""
-    controls: list[tuple[str, Any]] = []
+    controls: list[tuple[str, Any, str]] = []
     stale = copy.deepcopy(document)
     stale["authority_boundary"]["starting_sssf_main_sha"] = EXPECTED_REPORT_CODE_SHA
-    controls.append(("stale-source-generation", stale))
+    controls.append(("stale-source-generation", stale, "starting SSSF generation is stale"))
     digest = copy.deepcopy(document)
     digest["source_snapshot"]["content_sha256"] = "0" * 64
-    controls.append(("content-digest-mismatch", digest))
+    controls.append(("content-digest-mismatch", digest, "source_snapshot content_sha256 mismatch"))
     duplicate = copy.deepcopy(document)
     duplicate["owners"].append(copy.deepcopy(duplicate["owners"][0]))
-    controls.append(("duplicate-authority", duplicate))
+    controls.append(("duplicate-authority", duplicate, "duplicate authority owner_id"))
     dropped_fact = copy.deepcopy(document)
     dropped_fact["facts"].pop()
     dropped_fact["coverage"]["required_fact_ids"].pop()
-    controls.append(("dropped-fact", dropped_fact))
+    controls.append(("dropped-fact", dropped_fact, "fact_id coverage is incomplete"))
     dropped_obligation = copy.deepcopy(document)
     dropped_obligation["obligations"].pop()
     dropped_obligation["coverage"]["required_obligation_ids"].pop()
-    controls.append(("dropped-obligation", dropped_obligation))
+    controls.append(("dropped-obligation", dropped_obligation, "obligation_id coverage is incomplete"))
     cno_to_absence = copy.deepcopy(document)
     cno_to_absence["authority_boundary"]["sbx0_exit_observation"] = "absent"
-    controls.append(("cno-to-absence", cno_to_absence))
+    controls.append(("cno-to-absence", cno_to_absence, "sbx0_exit_observation is not a closed three-valued observation"))
     cno_to_pass = copy.deepcopy(document)
     cno_to_pass["authority_boundary"]["sbx1_acceptance_observation"] = "PASS"
-    controls.append(("cno-to-pass", cno_to_pass))
+    controls.append(("cno-to-pass", cno_to_pass, "sbx1_acceptance_observation is not a closed three-valued observation"))
 
     failed_to_red: list[str] = []
-    for name, mutated in controls:
-        status, _ = validate_document(mutated)
-        if status != "observed-bad":
+    for name, mutated, expected_error in controls:
+        status, errors = validate_document(mutated, verify_inventory_digest=False)
+        if status != "observed-bad" or not any(expected_error in error for error in errors):
             failed_to_red.append(name)
     return failed_to_red
 
