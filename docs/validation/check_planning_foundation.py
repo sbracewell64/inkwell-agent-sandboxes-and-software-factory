@@ -14,7 +14,8 @@ import copy
 import json
 import posixpath
 import re
-from pathlib import Path
+import tempfile
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -100,6 +101,8 @@ GITHUB_PR_URL = re.compile(
     r"(?P<owner>[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/"
     r"(?P<repository>[A-Za-z0-9._-]{1,100})/pull/[1-9][0-9]*"
 )
+URI_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+SCP_REMOTE_REFERENCE = re.compile(r"^(?:[^/\s:@]+@)?[^/\s:@]+:[^\s].*$")
 
 
 class _DuplicateKey(ValueError):
@@ -232,12 +235,32 @@ def _path_exists(project: dict[str, Any], reference: Any) -> bool:
     return path in _surface_paths(project) or (project["root"] / path).is_file()
 
 
+def _is_remote_reference(value: str) -> bool:
+    """Classify URL/URI and remote-reference syntax before Path sees it."""
+    return bool(
+        URI_SCHEME.match(value)
+        or value.startswith(("//", "\\\\"))
+        or SCP_REMOTE_REFERENCE.fullmatch(value)
+    )
+
+
 def _repository_path_exists(project: dict[str, Any], reference: Any) -> bool:
-    if not isinstance(reference, str) or not reference:
+    if not isinstance(reference, str) or not reference or reference != reference.strip():
+        return False
+    # Do this before splitting fragments or constructing a filesystem path.  A
+    # local directory named ``https:`` must not turn a remote identity into
+    # repository evidence by accident.
+    if _is_remote_reference(reference):
         return False
     path_text = reference.split("#", 1)[0]
+    if not path_text or _is_remote_reference(path_text):
+        return False
     path = Path(path_text)
-    if not path_text or path.is_absolute() or ".." in path.parts:
+    if (
+        path.is_absolute()
+        or PureWindowsPath(path_text).is_absolute()
+        or ".." in path.parts
+    ):
         return False
     try:
         root = project["root"].resolve(strict=True)
@@ -971,6 +994,112 @@ def _expect_red(
         failures.append(name)
 
 
+def _materialize_fixture_references(state: dict[str, Any], root: Path) -> None:
+    """Create ordinary fixture artifacts without materializing remote identities."""
+    references: set[str] = set()
+    for record in state.get("records", []):
+        if not isinstance(record, dict):
+            continue
+        for reference in record.get("authoritative_refs", []):
+            if isinstance(reference, str):
+                references.add(reference)
+        for transition in record.get("transition_history", []):
+            if isinstance(transition, dict):
+                for reference in transition.get("evidence_refs", []):
+                    if isinstance(reference, str):
+                        references.add(reference)
+
+    root.mkdir(parents=True, exist_ok=True)
+    for reference in references:
+        path_text = reference.split("#", 1)[0]
+        if (
+            not path_text
+            or _is_remote_reference(reference)
+            or _is_remote_reference(path_text)
+        ):
+            continue
+        try:
+            path = Path(path_text)
+            if (
+                path.is_absolute()
+                or PureWindowsPath(path_text).is_absolute()
+                or ".." in path.parts
+            ):
+                continue
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("planning validator transient fixture\n", encoding="utf-8")
+        except (OSError, ValueError):
+            continue
+
+
+def _watched_symlink_escape_controls(
+    project: dict[str, Any], failures: list[str]
+) -> None:
+    """Exercise ACTIVE and every retained-PROVEN evidence path with real links."""
+    active_name = "symlink-escape-active-authoritative-reference"
+    proven_fields = {
+        "acceptance_evidence_refs": "acceptance-evidence",
+        "implementation_evidence_refs": "implementation-evidence",
+        "proof_evidence_refs": "proof-evidence",
+        "documentation_evidence_refs": "documentation-evidence",
+    }
+    with tempfile.TemporaryDirectory(prefix="sssf-planning-symlink-controls-") as raw:
+        transient = Path(raw).resolve()
+        root = transient / "project"
+        fixture = copy.deepcopy(project)
+        fixture["root"] = root
+        state = fixture.get("state")
+        if not isinstance(state, dict):
+            failures.append(active_name)
+            failures.extend(
+                f"symlink-escape-proven-{label}" for label in proven_fields.values()
+            )
+            return
+        _materialize_fixture_references(state, root)
+        outside = transient / "outside"
+        outside.mkdir(parents=True, exist_ok=True)
+
+        active_target = outside / "active-authority.md"
+        active_target.write_text("outside ACTIVE target\n", encoding="utf-8")
+        active_link = root / "docs/development/active-authority-link.md"
+        active_link.parent.mkdir(parents=True, exist_ok=True)
+        active_link.symlink_to(active_target)
+        active_reference = active_link.relative_to(root).as_posix()
+        active_state = _active_state_fixture(fixture)
+        active_record = next(
+            item for item in active_state["records"] if item["item_id"] == "FUT-003"
+        )
+        active_record["active_binding"]["increments"][0]["authoritative_refs"] = [
+            active_reference
+        ]
+        active_errors = validate_state_document(active_state, fixture)
+        if not any(
+            f"authoritative reference {active_reference}" in error
+            for error in active_errors
+        ):
+            failures.append(active_name)
+
+        proven_state = _proven_state_fixture(fixture)
+        proven_record = next(
+            item for item in proven_state["records"] if item["item_id"] == "FUT-003"
+        )
+        for field in proven_fields:
+            target = outside / f"{field}.json"
+            target.write_text(f"outside {field} target\n", encoding="utf-8")
+            link = root / "docs" / "development" / f"{field}-link.json"
+            link.symlink_to(target)
+            proven_record["proven_proof"][field] = [
+                link.relative_to(root).as_posix()
+            ]
+        proven_errors = validate_state_document(proven_state, fixture)
+        for field, label in proven_fields.items():
+            if not any(
+                f"lacks retained {field}" in error for error in proven_errors
+            ):
+                failures.append(f"symlink-escape-proven-{label}")
+
+
 def _watched_red_controls(project: dict[str, Any]) -> list[str]:
     failures: list[str] = []
 
@@ -1126,9 +1255,7 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
             for error in validate_state_document(escaped_reference, project)
         ):
             failures.append(name)
-    root = project["root"].resolve()
-    if _resolved_path_within_root(root, root.parent):
-        failures.append("symlink-escape-active-authoritative-reference")
+    _watched_symlink_escape_controls(project, failures)
 
     invented_return = copy.deepcopy(project["state"])
     deferred_record = next(item for item in invented_return["records"] if item["item_id"] == "FUT-003")
@@ -1231,6 +1358,10 @@ def main() -> int:
         "remote-active-authoritative-reference, absolute-active-authoritative-reference, "
         "parent-active-authoritative-reference, "
         "symlink-escape-active-authoritative-reference, "
+        "symlink-escape-proven-acceptance-evidence, "
+        "symlink-escape-proven-implementation-evidence, "
+        "symlink-escape-proven-proof-evidence, "
+        "symlink-escape-proven-documentation-evidence, "
         "active-not-proven-runtime-or-landing-authority, duplicate-adr-identity, "
         "stale-roadmap-sbx-regression, competing-lifecycle-owner, "
         "broken-planning-cross-reference"
