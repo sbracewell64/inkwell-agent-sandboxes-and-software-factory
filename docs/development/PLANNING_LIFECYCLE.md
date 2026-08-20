@@ -152,7 +152,9 @@ The durable `proven_proof` record must set `accepted_implementation` to true;
 retain nonempty, existing `acceptance_evidence_refs`,
 `implementation_evidence_refs`, `proof_evidence_refs`, and
 `documentation_evidence_refs`; and bind the accepted source with exact
-40-character `source_commit` and `source_tree` identities.
+40-character `source_commit` and `source_tree` identities. A `proven_proof`
+claim is valid only while the durable current state is `PROVEN` and its legal
+transition history ends at `PROVEN`; no other planning state may carry it.
 
 ## Durable records and ownership
 
