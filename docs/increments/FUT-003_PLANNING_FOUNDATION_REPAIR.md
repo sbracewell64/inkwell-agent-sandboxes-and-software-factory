@@ -70,7 +70,9 @@ prove local `https:/...` aliases cannot establish repository evidence, and the
 canonical watched-red suite creates transient project-contained symlinks to
 out-of-root files for the ACTIVE authoritative reference plus all four retained
 PROVEN evidence categories. A lexical-only resolution/containment mutation
-makes each named symlink control red.
+makes each named symlink control red when symlink creation is available. A host
+that cannot create the transient links reports each exact symlink property as
+could-not-observe rather than treating an unexercised control as observed-good.
 
 No passing local control promotes FUT-003 to `ACTIVE` or `PROVEN`; normal
 review, acceptance, PRE_CERTIFICATION, and live-enablement authority remain
