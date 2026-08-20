@@ -281,7 +281,7 @@ def _validate_source_observations(
             if index >= len(EXPECTED_SOURCE_OBSERVATION_IDS) or item.get("observation_id") != EXPECTED_SOURCE_OBSERVATION_IDS[index]:
                 errors.append(f"source observation order/identity drift at index {index}")
             _expect_observation(item.get("observation"), f"source observation {item.get('observation_id')}.observation", errors)
-            if item.get("owner_id") not in owners:
+            if not _is_registered_owner(item.get("owner_id"), owners):
                 errors.append(f"source observation {item.get('observation_id')} has no singular owner")
             if not all(isinstance(item.get(key), str) and item.get(key) for key in ("command", "statement")):
                 errors.append(f"source observation {item.get('observation_id')} is missing command/statement")
@@ -293,8 +293,14 @@ def _validate_source_observations(
         _expect_observation(gap.get("observation"), "source_verifier_gap.observation", errors)
         if gap.get("observation") != "could-not-observe":
             errors.append("source verifier gap was narrowed from CNO")
-        if gap.get("owner_id") not in owners:
+        if not _is_registered_owner(gap.get("owner_id"), owners):
             errors.append("source verifier gap has no singular owner")
+
+
+def _is_registered_owner(
+    owner_id: Any, owners: dict[str, dict[str, Any]]
+) -> bool:
+    return isinstance(owner_id, str) and bool(owner_id) and owner_id in owners
 
 
 def _validate_owner_registry(
@@ -436,7 +442,7 @@ def _validate_facts(
         if fact.get("provider_qualification_observation") != "could-not-observe":
             errors.append(f"fact {fact.get('fact_id')} incorrectly claims provider qualification")
         owner_id = fact.get("owner_id")
-        if not isinstance(owner_id, str) or not owner_id or owner_id not in owners:
+        if not _is_registered_owner(owner_id, owners):
             errors.append(f"fact {fact.get('fact_id')} has no singular registered owner")
         elif classification not in owners[owner_id].get(
             "fact_classifications", []
@@ -472,7 +478,7 @@ def _validate_obligations(
         _expect_observation(obligation.get("qualification_observation"), f"obligation {obligation.get('obligation_id')}.qualification_observation", errors)
         if obligation.get("qualification_observation") != "could-not-observe":
             errors.append(f"obligation {obligation.get('obligation_id')} narrowed qualification CNO")
-        if obligation.get("owner_id") not in owners:
+        if not _is_registered_owner(obligation.get("owner_id"), owners):
             errors.append(f"obligation {obligation.get('obligation_id')} has no singular registered owner")
         if not all(isinstance(obligation.get(key), str) and obligation.get(key) for key in ("slug", "statement", "qualification_reason")):
             errors.append(f"obligation {obligation.get('obligation_id')} has an empty identity/statement/reason")
@@ -493,7 +499,7 @@ def _validate_deferred_and_recommendations(
             _expect_observation(item.get("observation"), f"deferred {item.get('item_id')}.observation", errors)
             if item.get("observation") != "could-not-observe":
                 errors.append(f"deferred item {item.get('item_id')} narrowed CNO")
-            if item.get("owner_id") not in owners:
+            if not _is_registered_owner(item.get("owner_id"), owners):
                 errors.append(f"deferred item {item.get('item_id')} has no owner")
     recommendations = document.get("recommendations")
     if not isinstance(recommendations, list):
@@ -507,7 +513,7 @@ def _validate_deferred_and_recommendations(
             _expect_observation(recommendation.get("observation"), f"recommendation {recommendation.get('recommendation_id')}.observation", errors)
             if recommendation.get("observation") != "could-not-observe":
                 errors.append(f"recommendation {recommendation.get('recommendation_id')} narrowed CNO")
-            if recommendation.get("owner_id") not in owners:
+            if not _is_registered_owner(recommendation.get("owner_id"), owners):
                 errors.append(f"recommendation {recommendation.get('recommendation_id')} has no owner")
 
 

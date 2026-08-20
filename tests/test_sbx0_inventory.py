@@ -110,6 +110,33 @@ def test_malformed_fact_fields_are_rejected(
     assert any(expected_error in error for error in errors)
 
 
+@pytest.mark.parametrize(
+    ("section", "index", "expected_error"),
+    [
+        ("source_observations", 0, "source observation sbx0.observation.001 has no singular owner"),
+        ("source_verifier_gap", None, "source verifier gap has no singular owner"),
+        ("obligations", 0, "obligation sbx1.obligation.001 has no singular registered owner"),
+        ("deferred_items", 0, "deferred item sbx0.deferred.ambiguity.01 has no owner"),
+        ("recommendations", 0, "recommendation sbx0.recommendation.01 has no owner"),
+    ],
+)
+def test_malformed_owner_references_are_rejected(
+    tmp_path: Path, section: str, index: int | None, expected_error: str
+) -> None:
+    document = json.loads(_VALIDATOR.DEFAULT_INVENTORY.read_text(encoding="utf-8"))
+    target = document[section] if index is None else document[section][index]
+    target["owner_id"] = []
+    mutated = tmp_path / "inventory.json"
+    mutated.write_text(json.dumps(document), encoding="utf-8")
+
+    status, errors, _ = _VALIDATOR.validate_path(
+        mutated, verify_inventory_digest=False
+    )
+
+    assert status == "observed-bad"
+    assert expected_error in errors
+
+
 def test_unreadable_mutable_source_is_cno(tmp_path: Path) -> None:
     missing = tmp_path / "report.md"
     status, errors, _ = _VALIDATOR.validate_path(
