@@ -651,7 +651,7 @@ class CreateFacts(FactBase):
     duplicate_resource_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         _digest(self.spec_digest, "create spec_digest")
         if not isinstance(self.resource_identity_observation, Observation):
             raise ValueError("resource identity observation must be closed")
@@ -664,7 +664,7 @@ class InspectFacts(FactBase):
     identity_observation: Observation = Observation.COULD_NOT_OBSERVE
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         if not isinstance(self.identity_observation, Observation):
             raise ValueError("identity observation must be closed")
 
@@ -676,7 +676,7 @@ class CopyFacts(FactBase):
     guest_path: str = "/"
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         if not isinstance(self.source_observation, Observation):
             raise ValueError("source observation must be closed")
         if self.source_digest is not None:
@@ -722,7 +722,7 @@ class ExecFacts(FactBase):
     cancelled: bool = False
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         for name in ("stdout_bytes_seen", "stderr_bytes_seen"):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
@@ -753,7 +753,7 @@ class ArtifactExportFacts(FactBase):
     overflowed: bool = False
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         _token(self.artifact_id, "artifact_id")
         if not isinstance(self.applicable, bool) or not isinstance(self.complete, bool):
             raise ValueError("artifact applicability/completeness must be boolean")
@@ -790,7 +790,7 @@ class GitExportFacts(FactBase):
     promotion_authority: PromotionAuthority = PromotionAuthority.NONE
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         if not isinstance(self.applicable, bool) or not isinstance(self.complete, bool):
             raise ValueError("Git applicability/completeness must be boolean")
         if self.source is not None and not isinstance(self.source, SourceIdentity):
@@ -837,7 +837,7 @@ class ProcessFacts(FactBase):
     )
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         expected = (
             (self.host_client, QuiescenceDomain.HOST_PROVIDER_CLIENT),
             (self.workload, QuiescenceDomain.SANDBOX_WORKLOAD),
@@ -854,7 +854,7 @@ class StopFacts(FactBase):
     workload_stopped: bool | None = None
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         if not isinstance(self.acknowledged, bool):
             raise ValueError("stop acknowledgement must be boolean")
         if self.workload_stopped is not None and not isinstance(self.workload_stopped, bool):
@@ -869,7 +869,7 @@ class DestroyFacts(FactBase):
     authorization_id: str | None = None
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         if not isinstance(self.acknowledged, bool) or not isinstance(self.already_absent, bool):
             raise ValueError("destroy acknowledgement flags must be boolean")
         object.__setattr__(self, "residual_resource_ids", tuple(self.residual_resource_ids))
@@ -899,7 +899,7 @@ class ReconciliationFacts(FactBase):
     identity_observation: Observation = Observation.COULD_NOT_OBSERVE
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        FactBase.__post_init__(self)
         if not isinstance(self.status, ReconciliationStatus):
             raise ValueError("reconciliation status must be closed")
         if not isinstance(self.identity_observation, Observation):
