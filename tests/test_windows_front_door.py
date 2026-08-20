@@ -53,6 +53,38 @@ def _caller_directories() -> list[Path]:
 
 
 class WindowsFrontDoorContractTests(unittest.TestCase):
+    def test_identity_output_uses_live_head_and_honest_branch_state(self) -> None:
+        source = LAUNCHER.read_text(encoding="utf-8")
+        head_lookup = "head=$(git rev-parse --verify HEAD 2>/dev/null)"
+        branch_lookup = "branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+        identity_output = "handoff=firstmate head=%%s branch=%%s"
+        self.assertIn(head_lookup, source)
+        self.assertIn(branch_lookup, source)
+        self.assertIn("case $branch in '') branch=detached", source)
+        self.assertLess(source.index(head_lookup), source.index(identity_output))
+        self.assertLess(source.index(branch_lookup), source.index(identity_output))
+
+    def test_missing_bash_git_and_grep_fail_with_dependency_specific_diagnostics(
+        self,
+    ) -> None:
+        source = LAUNCHER.read_text(encoding="utf-8")
+        bash_check = "test -x /bin/bash"
+        bash_use = '--exec /bin/bash -c'
+        git_check = "command -v git"
+        git_use = "origin=$(git config"
+        grep_check = "command -v grep"
+        grep_use = "grep -Eq"
+        for check, use, dependency, repair in (
+            (bash_check, bash_use, "Bash", "Install Bash in the WSL distribution"),
+            (git_check, git_use, "Git", "Install Git in the WSL distribution"),
+            (grep_check, grep_use, "grep", "Install grep in the WSL distribution"),
+        ):
+            with self.subTest(dependency=dependency):
+                self.assertIn(check, source)
+                self.assertIn(dependency, source)
+                self.assertIn(repair, source)
+                self.assertLess(source.index(check), source.index(use))
+
     def test_tracked_launcher_contract_is_canonical_and_transport_only(self) -> None:
         source = LAUNCHER.read_text(encoding="utf-8")
         self.assertIn('set "SSSF_ROOT=E:\\SSSF"', source)

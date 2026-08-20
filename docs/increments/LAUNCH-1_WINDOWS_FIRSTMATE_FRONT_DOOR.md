@@ -33,6 +33,7 @@ The front door refuses with an actionable message for:
 
 - a missing `E:\SSSF` checkout;
 - missing WSL;
+- missing Bash, Git, or grep in WSL, with dependency-specific repair guidance;
 - a wrong WSL root, missing Git checkout, missing required SSSF files, or a
   non-canonical origin;
 - unreadable or unregistered FirstMate configuration/scripts; and
@@ -46,14 +47,16 @@ shortcut target.
 
 ## Behavioral proof
 
-`python3 -m unittest -v tests/test_windows_front_door.py` passed three tests:
+`python3 -m unittest -v tests/test_windows_front_door.py` covers:
 
 - actual Windows CMD/WSL `--print-menu` launches from two independent caller
   directories (`C:\Windows` and `C:\Users\Public`) and reports
   `root=E:\SSSF`, the canonical repository, and `handoff=firstmate`;
 - the tracked source contract is transport-only and contains no direct factory,
-  Docker, Wayfinder, or DSH activation; and
-- an unknown argument returns a visible usage refusal with exit status `2`.
+  Docker, Wayfinder, or DSH activation;
+- an unknown argument returns a visible usage refusal with exit status `2`;
+- live HEAD and honest attached/detached branch identity derivation; and
+- dependency-specific Bash, Git, and grep preflight diagnostics before use.
 
 A direct host launch was also observed through the tracked front door in the
 named disposable Herdr lab only:
