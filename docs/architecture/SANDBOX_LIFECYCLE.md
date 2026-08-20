@@ -91,5 +91,7 @@ exports, reconciliation rules, and deterministic fake are owned once by
 [`reference/SANDBOX_PROVIDER.md`](../reference/SANDBOX_PROVIDER.md) and
 `adws/adw_modules/sandbox_provider.py`. This lifecycle document remains the
 historical exe.dev ordering reference; it does not define a second provider
-interface. SBX-1 activation/acceptance, Docker mechanics, and live provider
-behavior remain outside this publication.
+interface. SBX-1 is a **landed implementation**. SBX-1 is not activated, not
+accepted, not certified, and not real-provider-proven; it does not unlock
+SBX-2. Docker mechanics, supported Windows-host execution, and live provider
+behavior remain unobserved and outside this implementation.
