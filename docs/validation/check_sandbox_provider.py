@@ -154,7 +154,10 @@ def lifecycle_status_controls(errors: list[str]) -> None:
     errors.extend(status_surface_errors(surfaces))
 
     increment_path = Path("docs/increments/SBX-1_SANDBOX_PROVIDER_CONTRACT.md")
-    mutation_source = "SBX-1 is a **landed implementation**. SBX-1 is not activated, not accepted,\nnot certified, and not real-provider-proven; it does not unlock SBX-2."
+    mutation_source = (
+        "SBX-1 is a **landed implementation**. SBX-1 is not activated, not accepted,\n"
+        "not certified, and not real-provider-proven; it does not unlock SBX-2."
+    )
     false_claim = "SBX-1 is accepted and real-provider-proven. SBX-1 unlocks SBX-2."
     mutated = dict(surfaces)
     mutated[increment_path] = mutated.get(increment_path, "").replace(
@@ -887,7 +890,10 @@ def main() -> int:
     print("provider-calls: 0 (in-process fake; no Docker/exe.dev/network/provider side effect)")
     print("positive fake: immutable repo+commit+tree identity and typed existing-supervisor projection")
     print("positive fake: operation-keyed three-valued facts and separate client/workload/resource quiescence")
-    print("positive fake: bounded manifest/Git export, no promotion, authenticated one-use destroy/reconcile, FAIL>CNO>PASS")
+    print(
+        "positive fake: bounded manifest/Git export, no promotion, "
+        "authenticated one-use destroy/reconcile, FAIL>CNO>PASS"
+    )
     print("watched-red: ambiguity, identity, timeout/cancel/overflow, cleanup CNO, workload leak")
     print("watched-red: artifact missing/tamper/overflow, Git ancestry, stop, authorization, residue")
     print("watched-red: unreachable inspection, duplicates, idempotent absence, interruptions, aggregate precedence")
