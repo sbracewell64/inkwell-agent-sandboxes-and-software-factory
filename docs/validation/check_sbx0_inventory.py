@@ -321,7 +321,6 @@ def _validate_owner_registry(
             continue
         if owner_id in by_id:
             errors.append(f"duplicate authority owner_id: {owner_id}")
-        by_id[owner_id] = owner
         path = owner.get("path")
         if not isinstance(path, str) or Path(path).is_absolute() or ".." in Path(path).parts:
             errors.append(f"owner {owner_id} path is not a safe repository path")
@@ -341,6 +340,8 @@ def _validate_owner_registry(
             errors.append(
                 f"owner {owner_id} fact_classifications is not a unique closed classification list"
             )
+            fact_classifications = []
+        by_id[owner_id] = {**owner, "fact_classifications": fact_classifications}
     for owner_id, path in OWNER_REQUIRED_PATHS.items():
         owner = by_id.get(owner_id)
         if owner is None:

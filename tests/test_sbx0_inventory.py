@@ -7,6 +7,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 _VALIDATOR_PATH = Path(__file__).parents[1] / "docs" / "validation" / "check_sbx0_inventory.py"
 _SPEC = importlib.util.spec_from_file_location("sbx0_inventory_validator", _VALIDATOR_PATH)
@@ -61,6 +63,26 @@ def test_registered_but_incompatible_fact_owner_is_rejected(tmp_path: Path) -> N
     assert status == "observed-bad"
     assert expected in errors
     assert not any("inventory content digest" in error for error in errors)
+
+
+@pytest.mark.parametrize("malformed_scope", [None, 7])
+def test_malformed_owner_classification_scope_is_rejected(
+    tmp_path: Path, malformed_scope: object
+) -> None:
+    document = json.loads(_VALIDATOR.DEFAULT_INVENTORY.read_text(encoding="utf-8"))
+    document["owners"][0]["fact_classifications"] = malformed_scope
+    mutated = tmp_path / "inventory.json"
+    mutated.write_text(json.dumps(document), encoding="utf-8")
+
+    status, errors, _ = _VALIDATOR.validate_path(
+        mutated, verify_inventory_digest=False
+    )
+
+    assert status == "observed-bad"
+    assert any(
+        "fact_classifications is not a unique closed classification list" in error
+        for error in errors
+    )
 
 
 def test_unreadable_mutable_source_is_cno(tmp_path: Path) -> None:
