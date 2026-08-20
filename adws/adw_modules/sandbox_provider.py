@@ -925,8 +925,36 @@ def validate_artifact_export(
         return OutcomeCheck("artifact-export", Observation.OBSERVED_BAD, reason="artifact obligation identity differs")
     if not spec.applicable:
         return OutcomeCheck("artifact-export", Observation.OBSERVED_GOOD, required=False, applicable=False, reason="artifact is not applicable")
-    identity_ok = provider_resource_id is None or facts.provider_resource_id == provider_resource_id
-    complete = facts.complete and not facts.missing_paths and not facts.overflowed
+    identity_ok = (
+        facts.applicable == spec.applicable
+        and facts.operation == spec.operation
+        and (provider_resource_id is None or facts.provider_resource_id == provider_resource_id)
+    )
+    computed_inventory_digest = hashlib.sha256(
+        json.dumps(
+            [asdict(item) for item in facts.inventory],
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    digest_mismatches = tuple(
+        item.path
+        for item in facts.inventory
+        if item.expected_sha256 is not None and item.sha256 != item.expected_sha256
+    )
+    expected_digests_present = all(item.expected_sha256 is not None for item in facts.inventory)
+    total_bytes_match = facts.total_bytes == sum(item.byte_length for item in facts.inventory)
+    inventory_digest_match = facts.inventory_sha256 == computed_inventory_digest
+    tampered = bool(facts.tampered_paths or digest_mismatches)
+    complete = (
+        facts.complete
+        and not facts.missing_paths
+        and not facts.overflowed
+        and not tampered
+        and expected_digests_present
+        and total_bytes_match
+        and inventory_digest_match
+    )
     paths = tuple(item.path for item in facts.inventory)
     exact_paths = paths == spec.paths
     bounded = (
@@ -945,9 +973,16 @@ def validate_artifact_export(
         return OutcomeCheck("artifact-export", Observation.OBSERVED_BAD, reason=facts.reason)
     if facts.observation is Observation.COULD_NOT_OBSERVE:
         return OutcomeCheck("artifact-export", Observation.COULD_NOT_OBSERVE, reason=facts.reason)
+    if tampered or not total_bytes_match or not inventory_digest_match:
+        return OutcomeCheck(
+            "artifact-export",
+            Observation.OBSERVED_BAD,
+            reason="artifact tamper, item digest, inventory digest, or byte total contradiction",
+        )
     return OutcomeCheck(
         "artifact-export",
         Observation.OBSERVED_GOOD,
+        required=spec.required,
         identity_verified=identity_ok and item_identity,
         complete=complete and exact_paths and bounded,
         reason=("artifact inventory is exact and bounded" if complete and exact_paths and bounded else "artifact inventory is incomplete, unexpected, or over bound"),
@@ -962,13 +997,15 @@ def validate_git_export(
 ) -> "OutcomeCheck":
     """SSSF-side source/base/tip/tree/ancestry and no-promotion check."""
     if not spec.applicable:
-        return OutcomeCheck("git-export", Observation.OBSERVED_GOOD, required=False, applicable=False, reason="Git export is not applicable")
+        return OutcomeCheck("git-export", Observation.OBSERVED_GOOD, required=spec.required, applicable=False, reason="Git export is not applicable")
     if facts.observation is Observation.OBSERVED_BAD:
         return OutcomeCheck("git-export", Observation.OBSERVED_BAD, reason=facts.reason)
     if facts.observation is Observation.COULD_NOT_OBSERVE:
         return OutcomeCheck("git-export", Observation.COULD_NOT_OBSERVE, reason=facts.reason)
     identity_ok = (
-        (provider_resource_id is None or facts.provider_resource_id == provider_resource_id)
+        facts.applicable == spec.applicable
+        and facts.operation == spec.operation
+        and (provider_resource_id is None or facts.provider_resource_id == provider_resource_id)
         and facts.source == spec.source
         and facts.base_commit == spec.expected_base_commit
         and facts.base_tree == spec.expected_base_tree
@@ -978,10 +1015,18 @@ def validate_git_export(
         spec.expected_tip_commit is None
         or (facts.tip_commit == spec.expected_tip_commit and facts.tip_tree == spec.expected_tip_tree)
     )
-    complete = facts.complete and facts.ancestry_verified is True and facts.bundle_bytes > 0 and tip_ok
+    tip_obligation_declared = not spec.required or spec.expected_tip_commit is not None
+    complete = (
+        facts.complete
+        and facts.ancestry_verified is True
+        and 0 < facts.bundle_bytes <= spec.max_bundle_bytes
+        and tip_ok
+        and tip_obligation_declared
+    )
     return OutcomeCheck(
         "git-export",
         Observation.OBSERVED_GOOD,
+        required=spec.required,
         identity_verified=identity_ok,
         complete=complete,
         reason=("Git export identity and ancestry are verified" if identity_ok and complete else "Git export identity, ancestry, tip, or completeness is unverified"),
@@ -1099,7 +1144,8 @@ class InMemoryLifecycleRecordStore:
         return tuple(self._records)
 
     def append(self, record: LifecycleOperationRecord) -> int:
-        version = len(self._records)
+        current = self.latest(record.operation.run_id, record.operation.operation_id)
+        version = 0 if current is None else current.version + 1
         if record.version != version:
             raise ValueError("append version does not match the durable record sequence")
         self._records.append(record)
@@ -1301,8 +1347,8 @@ def issue_destroy_authorization(
     *,
     artifact: ArtifactExportFacts,
     git: GitExportFacts,
-    artifact_spec: ArtifactSpec | None = None,
-    git_spec: GitExportSpec | None = None,
+    artifact_spec: ArtifactSpec,
+    git_spec: GitExportSpec,
     secret_retirement: OutcomeCheck | None = None,
     issued_at: str = "1970-01-01T00:00:00Z",
 ) -> DestroyAuthorization:
@@ -1313,31 +1359,15 @@ def issue_destroy_authorization(
         raise DestroyNotAuthorized("destroy authorization identity is stale")
     if identity.provider_resource_id is None:
         raise DestroyNotAuthorized("destroy authorization needs a provider resource identity")
-    artifact_check = (
-        validate_artifact_export(artifact_spec, artifact, provider_resource_id=identity.provider_resource_id)
-        if artifact_spec is not None
-        else OutcomeCheck(
-            "artifact-export",
-            artifact.observation,
-            required=artifact.applicable,
-            applicable=artifact.applicable,
-            identity_verified=artifact.provider_resource_id == identity.provider_resource_id,
-            complete=artifact.complete and bool(artifact.inventory) and not artifact.missing_paths and not artifact.overflowed,
-            reason=artifact.reason,
-        )
+    if not artifact_spec.applicable or not artifact_spec.required:
+        raise DestroyNotAuthorized("destroy authorization requires an applicable required artifact obligation")
+    if not git_spec.applicable or not git_spec.required:
+        raise DestroyNotAuthorized("destroy authorization requires an applicable required Git obligation")
+    artifact_check = validate_artifact_export(
+        artifact_spec, artifact, provider_resource_id=identity.provider_resource_id
     )
-    git_check = (
-        validate_git_export(git_spec, git, provider_resource_id=identity.provider_resource_id)
-        if git_spec is not None
-        else OutcomeCheck(
-            "git-export",
-            git.observation,
-            required=git.applicable,
-            applicable=git.applicable,
-            identity_verified=git.provider_resource_id == identity.provider_resource_id,
-            complete=git.complete and (not git.applicable or (git.ancestry_verified is True and git.bundle_bytes > 0)),
-            reason=git.reason,
-        )
+    git_check = validate_git_export(
+        git_spec, git, provider_resource_id=identity.provider_resource_id
     )
     checks = [artifact_check, git_check]
     if spec.secret_refs:
@@ -1855,9 +1885,9 @@ class FakeSandboxProvider:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "one-use destroy authorization was already consumed", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if authorization.run_id != identity.run_id or authorization.provider_resource_id != identity.provider_resource_id:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization has a stale or wrong identity", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
-        self._used_authorizations.add(authorization.authorization_id)
         if self._interrupted(LifecycleBoundary.DESTROY, InterruptTiming.BEFORE):
             return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before destroy linearization", prior=LifecycleState.PRESENT, state=LifecycleState.DESTROYING, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        self._used_authorizations.add(authorization.authorization_id)
         target = self._resource_for(identity)
         if target is None or FakeControl.ALREADY_ABSENT in self.controls:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "resource already absent; destroy is idempotent", prior=LifecycleState.ABSENT, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=False, already_absent=True, authorization_id=authorization.authorization_id)
@@ -1885,7 +1915,15 @@ class FakeSandboxProvider:
             ids = tuple(sorted(self._resources))
             return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_BAD, "duplicate resources share one requested identity", state=LifecycleState.DUPLICATE, resource_id=identity.provider_resource_id), status=ReconciliationStatus.DUPLICATE, resource_ids=ids, duplicate_resource_ids=ids)
         target = self._resource_for(identity)
-        if target is None or (target.destroyed and not target.residual):
+        if target is None:
+            known_resource_id = self._by_run.get(identity.run_id)
+            known = self._resources.get(known_resource_id) if known_resource_id is not None else None
+            if known is None or known.identity.spec_digest != identity.spec_digest:
+                return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "reconciliation identity could not be resolved against authoritative enumeration", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
+            if not known.destroyed or known.residual:
+                return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "reconciliation identity differs from the authoritative resource identity", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
+            return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "authoritative enumeration positively established absence", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), status=ReconciliationStatus.ABSENT)
+        if target.destroyed and not target.residual:
             return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "authoritative resource absence observed", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), status=ReconciliationStatus.ABSENT)
         if target.residual or FakeControl.DESTROY_RESIDUAL in self.controls:
             ids = (identity.provider_resource_id or "",)

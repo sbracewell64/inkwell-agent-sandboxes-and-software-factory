@@ -10,6 +10,7 @@ positive state evidence, not merely an error string.
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -134,8 +135,8 @@ def make_git(run: SandboxSpec) -> GitExportSpec:
         source=run.source_identity,
         expected_base_commit=run.source_commit,
         expected_base_tree=run.source_tree,
-        expected_tip_commit=None,
-        expected_tip_tree=None,
+        expected_tip_commit="2" * 40,
+        expected_tip_tree="3" * 40,
         max_bundle_bytes=1024,
         export_ref="refs/sandbox/sbx-fixture-run",
     )
@@ -259,6 +260,31 @@ def artifact_and_git_controls(errors: list[str]) -> None:
     result = provider.export_git(identity, make_git(run))
     check(result.observation is Observation.OBSERVED_BAD and result.ancestry_verified is False and result.base_commit != run.source_commit, "Git wrong ancestry: no positive ancestry contradiction", errors)
 
+    provider = FakeSandboxProvider()
+    identity = create(provider, run)
+    artifact_spec = make_artifact(run)
+    valid_artifact = provider.collect_artifacts(identity, artifact_spec)
+    item = valid_artifact.inventory[0]
+    misleading_artifacts = (
+        replace(valid_artifact, tampered_paths=(item.path,)),
+        replace(valid_artifact, inventory=(replace(item, sha256="0" * 64),)),
+        replace(valid_artifact, inventory_sha256="0" * 64),
+        replace(valid_artifact, total_bytes=valid_artifact.total_bytes + 1),
+    )
+    check(
+        all(validate_artifact_export(artifact_spec, fact, provider_resource_id=identity.provider_resource_id).observation is Observation.OBSERVED_BAD for fact in misleading_artifacts),
+        "artifact validator trusted observed-good tamper, item/inventory digest, or byte-total contradictions",
+        errors,
+    )
+    git_spec = make_git(run)
+    valid_git = provider.export_git(identity, git_spec)
+    oversized_git = replace(valid_git, bundle_bytes=git_spec.max_bundle_bytes + 1)
+    check(
+        not validate_git_export(git_spec, oversized_git, provider_resource_id=identity.provider_resource_id).complete,
+        "Git validator accepted a bundle above max_bundle_bytes",
+        errors,
+    )
+
 
 def cleanup_and_authority_controls(errors: list[str]) -> None:
     run = spec()
@@ -277,7 +303,7 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     artifact = residual.collect_artifacts(identity, make_artifact(run))
     git = residual.export_git(identity, make_git(run))
     destroy_key = key(run, OperationKind.DESTROY, "residual")
-    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git)
+    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run))
     destroyed = residual.destroy(identity, destroy_key, auth)
     reconciled = residual.reconcile(identity, key(run, OperationKind.RECONCILE, "residual"))
     check(destroyed.observation is Observation.OBSERVED_BAD and destroyed.acknowledged and destroyed.residual_resource_ids, "residual destroy: acknowledgement/residue was not positive", errors)
@@ -294,7 +320,7 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     identity = create(absent, run)
     artifact = absent.collect_artifacts(identity, make_artifact(run))
     git = absent.export_git(identity, make_git(run))
-    auth = issue_destroy_authorization(run, identity, key(run, OperationKind.DESTROY, "absent"), artifact=artifact, git=git)
+    auth = issue_destroy_authorization(run, identity, key(run, OperationKind.DESTROY, "absent"), artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run))
     destroyed = absent.destroy(identity, key(run, OperationKind.DESTROY, "absent"), auth)
     check(destroyed.observation is Observation.OBSERVED_GOOD and destroyed.already_absent, "already absent: destroy was not idempotent", errors)
 
@@ -304,11 +330,39 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     check(reconciled.status.value == "duplicate" and len(reconciled.duplicate_resource_ids) == 2, "duplicate reconciliation: duplicate resources were not enumerated", errors)
 
     try:
-        issue_destroy_authorization(run, SandboxIdentity.requested(run), key(run, OperationKind.DESTROY, "no-resource"), artifact=artifact, git=git)
+        issue_destroy_authorization(run, SandboxIdentity.requested(run), key(run, OperationKind.DESTROY, "no-resource"), artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run))
     except DestroyNotAuthorized:
         pass
     else:
         errors.append("destroy authorization without provider identity was minted")
+
+    try:
+        issue_destroy_authorization(
+            run,
+            identity,
+            key(run, OperationKind.DESTROY, "inapplicable-obligation"),
+            artifact=artifact,
+            git=git,
+            artifact_spec=replace(make_artifact(run), applicable=False, required=False),
+            git_spec=make_git(run),
+        )
+    except DestroyNotAuthorized:
+        pass
+    else:
+        errors.append("destroy authorization accepted an inapplicable artifact obligation")
+
+    interrupted = FakeSandboxProvider(interrupt_before=LifecycleBoundary.DESTROY)
+    identity = create(interrupted, run)
+    artifact_spec = make_artifact(run)
+    git_spec = make_git(run)
+    artifact = interrupted.collect_artifacts(identity, artifact_spec)
+    git = interrupted.export_git(identity, git_spec)
+    destroy_key = key(run, OperationKind.DESTROY, "retry-before-linearization")
+    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=artifact_spec, git_spec=git_spec)
+    first = interrupted.destroy(identity, destroy_key, auth)
+    interrupted.interrupt_before = None
+    retry = interrupted.destroy(identity, destroy_key, auth)
+    check(first.observation is Observation.COULD_NOT_OBSERVE and retry.acknowledged, "pre-linearization destroy interruption consumed retry authority", errors)
 
 
 def aggregate_controls(errors: list[str]) -> None:
@@ -384,7 +438,7 @@ def interruption_controls(errors: list[str]) -> None:
     after_artifact = after_destroy.collect_artifacts(after_identity, make_artifact(run))
     after_git = after_destroy.export_git(after_identity, make_git(run))
     after_destroy_key = key(run, OperationKind.DESTROY, "after-destroy")
-    after_auth = issue_destroy_authorization(run, after_identity, after_destroy_key, artifact=after_artifact, git=after_git)
+    after_auth = issue_destroy_authorization(run, after_identity, after_destroy_key, artifact=after_artifact, git=after_git, artifact_spec=make_artifact(run), git_spec=make_git(run))
     after_destroy_fact = after_destroy.destroy(after_identity, after_destroy_key, after_auth)
     after_reconcile = after_destroy.reconcile(after_identity, key(run, OperationKind.RECONCILE, "after-destroy-reconcile"))
     check(after_destroy_fact.observation is Observation.COULD_NOT_OBSERVE and after_destroy_fact.acknowledged, "interrupt after destroy: acknowledgement/CNO was not retained", errors)
@@ -417,6 +471,15 @@ def durable_record_controls(errors: list[str]) -> None:
     store.append(record)
     check(store.latest(run.run_id, operation.operation_id) == record, "durable record store did not preserve CNO record", errors)
     check(store.latest(run.run_id, operation.operation_id).observed_state is LifecycleState.UNKNOWN, "durable record converted CNO to scalar absence", errors)
+    other_operation = key(run, OperationKind.INSPECT, "other-record-stream")
+    other_record = replace(
+        record,
+        record_id="record-2",
+        operation=other_operation,
+        attempt_id=other_operation.attempt_id,
+    )
+    store.append(other_record)
+    check(other_record.version == 0 and store.latest(run.run_id, other_operation.operation_id) == other_record, "durable record version leaked across operation streams", errors)
 
 
 def run_controls() -> list[str]:
