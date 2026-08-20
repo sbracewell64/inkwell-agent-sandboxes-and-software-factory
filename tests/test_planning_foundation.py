@@ -6,11 +6,20 @@ import copy
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 _VALIDATOR_PATH = Path(__file__).parents[1] / "docs" / "validation" / "check_planning_foundation.py"
 _SPEC = importlib.util.spec_from_file_location("planning_foundation_validator", _VALIDATOR_PATH)
 assert _SPEC is not None and _SPEC.loader is not None
 _VALIDATOR = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_VALIDATOR)
+
+
+def _symlink_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target)
+    except (NotImplementedError, OSError) as error:
+        pytest.skip(f"symlink creation unavailable: {error}")
 
 
 def _temporary_project(tmp_path: Path) -> tuple[dict[str, object], Path]:
@@ -124,7 +133,7 @@ def test_active_authoritative_symlink_to_outside_root_is_rejected(tmp_path: Path
     outside = tmp_path / "outside-active.md"
     outside.write_text("outside", encoding="utf-8")
     link = root / "docs" / "development" / "active-outside.md"
-    link.symlink_to(outside)
+    _symlink_or_skip(link, outside)
 
     state = _VALIDATOR._active_state_fixture(project)
     record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
@@ -152,7 +161,7 @@ def test_every_retained_proven_evidence_symlink_to_outside_root_is_rejected(
         outside = tmp_path / f"{field}-outside.json"
         outside.write_text("outside", encoding="utf-8")
         link = root / "docs" / "development" / f"{field}-outside.json"
-        link.symlink_to(outside)
+        _symlink_or_skip(link, outside)
         record["proven_proof"][field] = [link.relative_to(root).as_posix()]
 
     errors = _VALIDATOR.validate_state_document(state, project)
@@ -181,7 +190,10 @@ def test_watched_red_controls_detect_symlink_only_containment_regression(
 
     monkeypatch.setattr(_VALIDATOR, "_repository_path_exists", symlink_vulnerable)
 
-    failures = _VALIDATOR._watched_red_controls(project)
+    control_cno: list[str] = []
+    failures = _VALIDATOR._watched_red_controls(project, control_cno)
+    if control_cno:
+        pytest.skip("symlink creation unavailable")
 
     assert "symlink-escape-active-authoritative-reference" in failures
     assert "symlink-escape-proven-acceptance-evidence" in failures
