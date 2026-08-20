@@ -545,8 +545,12 @@ test("GET /api/tags returns distinct tag counts sorted by count DESC, tag ASC", 
   // Clear existing posts so we can test tag counts cleanly
   await api("/posts"); // ensure table initialized
   const Database = (await import("bun:sqlite")).Database;
-  const db = new Database(process.env.INKWELL_DB!);
-  db.run("DELETE FROM posts");
+  // Hand off exclusive DB ownership before direct writes; concurrent writable
+  // connections can wait on SQLite locks long enough to time out on Windows.
+  closeDb();
+  const setupDb = new Database(process.env.INKWELL_DB!);
+  setupDb.run("DELETE FROM posts");
+  setupDb.close();
 
   // Initial GET /api/tags on empty posts table
   const emptyRes = await api("/tags");
@@ -571,13 +575,16 @@ test("GET /api/tags returns distinct tag counts sorted by count DESC, tag ASC", 
   });
 
   // Now test with 'tags' column added to posts table
-  db.run("ALTER TABLE posts ADD COLUMN tags TEXT");
-  db.run("DELETE FROM posts");
+  closeDb();
+  const tagsDb = new Database(process.env.INKWELL_DB!);
+  tagsDb.run("ALTER TABLE posts ADD COLUMN tags TEXT");
+  tagsDb.run("DELETE FROM posts");
 
   // Post 1 has explicit tags, Post 2 has explicit tags with spaces, Post 3 falls back to hashtag in title
-  db.run("INSERT INTO posts (title, tags) VALUES (?, ?)", ["Explicit 1", "bun, tech, javascript"]);
-  db.run("INSERT INTO posts (title, tags) VALUES (?, ?)", ["Explicit 2", "tech, bun"]);
-  db.run("INSERT INTO posts (title, tags) VALUES (?, ?)", ["Hashtag Fallback #javascript", null]);
+  tagsDb.run("INSERT INTO posts (title, tags) VALUES (?, ?)", ["Explicit 1", "bun, tech, javascript"]);
+  tagsDb.run("INSERT INTO posts (title, tags) VALUES (?, ?)", ["Explicit 2", "tech, bun"]);
+  tagsDb.run("INSERT INTO posts (title, tags) VALUES (?, ?)", ["Hashtag Fallback #javascript", null]);
+  tagsDb.close();
 
   const tagsColRes = await api("/tags");
   expect(tagsColRes.status).toBe(200);
@@ -589,8 +596,6 @@ test("GET /api/tags returns distinct tag counts sorted by count DESC, tag ASC", 
       { tag: "tech", count: 2 },
     ],
   });
-
-  db.close();
 });
 
 test("style.css color variables meet WCAG AA contrast standards", async () => {
