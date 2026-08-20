@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -71,21 +72,72 @@ def test_unreadable_mutable_source_is_cno(tmp_path: Path) -> None:
     assert any("could not be observed" in error for error in errors)
 
 
-def test_inventory_contradiction_wins_over_unreadable_source(tmp_path: Path) -> None:
-    document = json.loads(_VALIDATOR.DEFAULT_INVENTORY.read_text(encoding="utf-8"))
-    document["facts"][0]["owner_id"] = "agent-backend"
-    mutated = tmp_path / "inventory.json"
-    mutated.write_text(json.dumps(document), encoding="utf-8")
-
-    status, errors, _ = _VALIDATOR.validate_path(
-        mutated,
-        source_report=tmp_path / "missing-report.md",
-        verify_inventory_digest=False,
+def test_source_unreadability_preserves_property_local_three_valued_precedence(
+    tmp_path: Path, monkeypatch
+) -> None:
+    readable = tmp_path / "report.md"
+    readable.write_text("matching source report\n", encoding="utf-8")
+    source_bytes = readable.read_bytes()
+    monkeypatch.setattr(
+        _VALIDATOR, "EXPECTED_REPORT_SHA", hashlib.sha256(source_bytes).hexdigest()
+    )
+    monkeypatch.setattr(_VALIDATOR, "EXPECTED_REPORT_BYTES", len(source_bytes))
+    monkeypatch.setattr(
+        _VALIDATOR, "EXPECTED_REPORT_LINES", len(source_bytes.decode().splitlines())
     )
 
-    assert status == "observed-bad"
-    assert any("does not govern classification" in error for error in errors)
-    assert any("source report could not be observed" in error for error in errors)
+    document = json.loads(_VALIDATOR.DEFAULT_INVENTORY.read_text(encoding="utf-8"))
+    document["source_snapshot"].update(
+        {
+            "content_sha256": _VALIDATOR.EXPECTED_REPORT_SHA,
+            "byte_length": _VALIDATOR.EXPECTED_REPORT_BYTES,
+            "line_count": _VALIDATOR.EXPECTED_REPORT_LINES,
+        }
+    )
+    valid = tmp_path / "valid-inventory.json"
+    valid.write_text(json.dumps(document), encoding="utf-8")
+    contradictory_document = json.loads(json.dumps(document))
+    contradictory_document["facts"][0]["owner_id"] = "agent-backend"
+    contradictory = tmp_path / "contradictory-inventory.json"
+    contradictory.write_text(json.dumps(contradictory_document), encoding="utf-8")
+    missing = tmp_path / "missing-report.md"
+
+    contradiction_unreadable = _VALIDATOR.validate_path(
+        contradictory, source_report=missing, verify_inventory_digest=False
+    )
+    valid_unreadable = _VALIDATOR.validate_path(
+        valid, source_report=missing, verify_inventory_digest=False
+    )
+    contradiction_readable = _VALIDATOR.validate_path(
+        contradictory, source_report=readable, verify_inventory_digest=False
+    )
+    valid_readable = _VALIDATOR.validate_path(
+        valid, source_report=readable, verify_inventory_digest=False
+    )
+
+    # 1. A deterministic contradiction plus source CNO remains FAIL.
+    assert contradiction_unreadable[0] == "observed-bad"
+    assert any("does not govern classification" in e for e in contradiction_unreadable[1])
+    assert any("could not be observed" in e for e in contradiction_unreadable[1])
+    # 2. Source unreadability by itself remains CNO.
+    assert valid_unreadable[0] == "could-not-observe"
+    assert all("does not govern classification" not in e for e in valid_unreadable[1])
+    # 3. A contradiction plus readable confirming source remains FAIL.
+    assert contradiction_readable[0] == "observed-bad"
+    assert any("does not govern classification" in e for e in contradiction_readable[1])
+    assert all("source report" not in e for e in contradiction_readable[1])
+    # 4. Fully readable, non-contradictory evidence retains PASS eligibility.
+    assert valid_readable[0] == "observed-good"
+    assert valid_readable[1] == []
+    # 5. Adding source unreadability cannot erase or downgrade a known failure.
+    assert contradiction_readable[0] == contradiction_unreadable[0]
+    # 6. One property's failure does not fabricate failure for the CNO property.
+    assert not any(
+        "source report content digest mismatch" in e
+        or "source report byte length mismatch" in e
+        or "source report line count mismatch" in e
+        for e in contradiction_unreadable[1]
+    )
 
 
 def test_source_content_mismatch_is_observed_bad(tmp_path: Path) -> None:
