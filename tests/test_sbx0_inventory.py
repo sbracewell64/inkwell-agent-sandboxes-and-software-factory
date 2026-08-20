@@ -71,6 +71,23 @@ def test_unreadable_mutable_source_is_cno(tmp_path: Path) -> None:
     assert any("could not be observed" in error for error in errors)
 
 
+def test_inventory_contradiction_wins_over_unreadable_source(tmp_path: Path) -> None:
+    document = json.loads(_VALIDATOR.DEFAULT_INVENTORY.read_text(encoding="utf-8"))
+    document["facts"][0]["owner_id"] = "agent-backend"
+    mutated = tmp_path / "inventory.json"
+    mutated.write_text(json.dumps(document), encoding="utf-8")
+
+    status, errors, _ = _VALIDATOR.validate_path(
+        mutated,
+        source_report=tmp_path / "missing-report.md",
+        verify_inventory_digest=False,
+    )
+
+    assert status == "observed-bad"
+    assert any("does not govern classification" in error for error in errors)
+    assert any("source report could not be observed" in error for error in errors)
+
+
 def test_source_content_mismatch_is_observed_bad(tmp_path: Path) -> None:
     changed = tmp_path / "report.md"
     changed.write_text("changed source generation\n", encoding="utf-8")

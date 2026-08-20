@@ -563,7 +563,10 @@ def validate_document(
         try:
             source_bytes = source_report.read_bytes()
         except (OSError, UnicodeError) as error:
-            return "could-not-observe", errors + [f"source report could not be observed: {error}"]
+            return (
+                "observed-bad" if errors else "could-not-observe",
+                errors + [f"source report could not be observed: {error}"],
+            )
         if hashlib.sha256(source_bytes).hexdigest() != EXPECTED_REPORT_SHA:
             errors.append("source report content digest mismatch")
         if len(source_bytes) != EXPECTED_REPORT_BYTES:
