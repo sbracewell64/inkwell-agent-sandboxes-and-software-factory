@@ -1056,6 +1056,9 @@ class DestroyAuthorization:
     authorization_id: str
     run_id: str
     provider_resource_id: str
+    sandbox_spec_digest: str
+    operation_id: str
+    idempotency_key: str
     source_identity: SourceIdentity
     obligations_digest: str
     issued_at: str
@@ -1065,6 +1068,9 @@ class DestroyAuthorization:
         _token(self.authorization_id, "authorization_id")
         _token(self.run_id, "authorization run_id")
         _token(self.provider_resource_id, "authorization provider resource")
+        _digest(self.sandbox_spec_digest, "authorization sandbox spec digest")
+        _token(self.operation_id, "authorization operation_id")
+        _token(self.idempotency_key, "authorization idempotency_key")
         if not isinstance(self.source_identity, SourceIdentity):
             raise ValueError("authorization source identity is required")
         _digest(self.obligations_digest, "obligations_digest")
@@ -1119,6 +1125,11 @@ class LifecycleOperationRecord:
                 raise ValueError("destroy authorization run identity differs")
             if self.provider_resource_id != self.destroy_authorization.provider_resource_id:
                 raise ValueError("destroy authorization resource identity differs")
+            if (
+                self.destroy_authorization.operation_id != self.operation.operation_id
+                or self.destroy_authorization.idempotency_key != self.operation.idempotency_key
+            ):
+                raise ValueError("destroy authorization operation identity differs")
 
 
 class LifecycleRecordStore(Protocol):
@@ -1391,6 +1402,9 @@ def issue_destroy_authorization(
         authorization_id=authorization_id,
         run_id=spec.run_id,
         provider_resource_id=identity.provider_resource_id,
+        sandbox_spec_digest=identity.spec_digest,
+        operation_id=operation.operation_id,
+        idempotency_key=operation.idempotency_key,
         source_identity=spec.source_identity,
         obligations_digest=obligation_digest,
         issued_at=issued_at,
@@ -1869,8 +1883,6 @@ class FakeSandboxProvider:
             return StopFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before stop", resource_id=identity.provider_resource_id))
         target = self._resource_for(identity)
         if target is None:
-            if FakeControl.ALREADY_ABSENT in self.controls:
-                return StopFacts(**self._base(operation, Observation.OBSERVED_GOOD, "stop is idempotent for an already absent resource", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=True, workload_stopped=True)
             return StopFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "stop target could not be observed", resource_id=identity.provider_resource_id))
         if FakeControl.STOP_PARTIAL in self.controls:
             target.state = LifecycleState.STOPPED
@@ -1889,16 +1901,27 @@ class FakeSandboxProvider:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization is absent; provider did not destroy", resource_id=identity.provider_resource_id), authorization_id=None)
         if authorization.authorization_id in self._used_authorizations:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "one-use destroy authorization was already consumed", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
-        if authorization.run_id != identity.run_id or authorization.provider_resource_id != identity.provider_resource_id:
+        if operation.kind is not OperationKind.DESTROY:
+            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy call used a non-destroy operation identity", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if (
+            authorization.run_id != identity.run_id
+            or authorization.provider_resource_id != identity.provider_resource_id
+            or authorization.sandbox_spec_digest != identity.spec_digest
+            or authorization.operation_id != operation.operation_id
+            or authorization.idempotency_key != operation.idempotency_key
+        ):
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization has a stale or wrong identity", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if self._interrupted(LifecycleBoundary.DESTROY, InterruptTiming.BEFORE):
             return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before destroy linearization", prior=LifecycleState.PRESENT, state=LifecycleState.DESTROYING, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         target = self._resource_for(identity)
-        if FakeControl.ALREADY_ABSENT in self.controls:
-            self._used_authorizations.add(authorization.authorization_id)
-            return DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "resource already absent; destroy is idempotent", prior=LifecycleState.ABSENT, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=False, already_absent=True, authorization_id=authorization.authorization_id)
         if target is None:
             return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "destroy target identity could not be authoritatively resolved", state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if FakeControl.ALREADY_ABSENT in self.controls:
+            self._used_authorizations.add(authorization.authorization_id)
+            target.destroyed = True
+            target.state = LifecycleState.ABSENT
+            target.resources_quiescent = True
+            return DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "resource already absent; destroy is idempotent", prior=LifecycleState.ABSENT, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=False, already_absent=True, authorization_id=authorization.authorization_id)
         self._used_authorizations.add(authorization.authorization_id)
         target.destroyed = True
         if FakeControl.DESTROY_RESIDUAL in self.controls:
@@ -1918,8 +1941,6 @@ class FakeSandboxProvider:
             return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "authoritative reconciliation could not reach the provider", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
         if self._interrupted(LifecycleBoundary.POST_DESTROY_RECONCILIATION, InterruptTiming.AFTER):
             return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted after reconciliation observation", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
-        if FakeControl.ALREADY_ABSENT in self.controls:
-            return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "authoritative absence observed", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), status=ReconciliationStatus.ABSENT)
         if FakeControl.DUPLICATE_RESOURCES in self.controls:
             ids = tuple(sorted(self._resources))
             return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_BAD, "duplicate resources share one requested identity", state=LifecycleState.DUPLICATE, resource_id=identity.provider_resource_id), status=ReconciliationStatus.DUPLICATE, resource_ids=ids, duplicate_resource_ids=ids)
@@ -1932,6 +1953,8 @@ class FakeSandboxProvider:
             if not known.destroyed or known.residual:
                 return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "reconciliation identity differs from the authoritative resource identity", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
             return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "authoritative enumeration positively established absence", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), status=ReconciliationStatus.ABSENT)
+        if FakeControl.ALREADY_ABSENT in self.controls and target.destroyed and not target.residual:
+            return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "authoritative exact-identity absence observed", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), status=ReconciliationStatus.ABSENT)
         if target.destroyed and not target.residual:
             return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "authoritative resource absence observed", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), status=ReconciliationStatus.ABSENT)
         if target.residual or FakeControl.DESTROY_RESIDUAL in self.controls:

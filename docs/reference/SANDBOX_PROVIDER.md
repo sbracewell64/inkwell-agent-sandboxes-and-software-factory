@@ -160,8 +160,9 @@ SSSF must reconcile authoritative absence afterward.
 - `residual` — residue remains after cleanup, observed-bad; and
 - `could-not-observe` — inspection/reconciliation was unavailable, CNO.
 
-Inspection failure can never produce `absent`. Already-absent stop/destroy and
-reconciliation are idempotent where the absence itself is positively observed.
+Inspection failure can never produce `absent`. Already-absent destroy and
+reconciliation are idempotent only where authoritative observation binds the
+exact run, sandbox/resource, and destroy operation identities and proves absence.
 Destroy requires an opaque SSSF-issued `DestroyAuthorization`, consumes it
 once, and preserves residual/ambiguous state for later reconciliation.
 

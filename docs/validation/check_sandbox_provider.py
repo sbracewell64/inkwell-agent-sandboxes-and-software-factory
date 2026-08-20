@@ -340,6 +340,30 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     auth = issue_destroy_authorization(run, identity, key(run, OperationKind.DESTROY, "absent"), artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run))
     destroyed = absent.destroy(identity, key(run, OperationKind.DESTROY, "absent"), auth)
     check(destroyed.observation is Observation.OBSERVED_GOOD and destroyed.already_absent, "already absent: destroy was not idempotent", errors)
+    reconciled = absent.reconcile(identity, key(run, OperationKind.RECONCILE, "absent"))
+    check(reconciled.observation is Observation.OBSERVED_GOOD and reconciled.status.value == "absent", "already absent: exact identity did not reconcile authoritatively", errors)
+
+    guarded_absent = FakeSandboxProvider({FakeControl.ALREADY_ABSENT})
+    guarded_identity = create(guarded_absent, run)
+    guarded_artifact_spec = make_artifact(run)
+    guarded_git_spec = make_git(run)
+    guarded_artifact = guarded_absent.collect_artifacts(guarded_identity, guarded_artifact_spec)
+    guarded_git = guarded_absent.export_git(guarded_identity, guarded_git_spec)
+    guarded_key = key(run, OperationKind.DESTROY, "absent-identity-guard")
+    guarded_auth = issue_destroy_authorization(run, guarded_identity, guarded_key, artifact=guarded_artifact, git=guarded_git, artifact_spec=guarded_artifact_spec, git_spec=guarded_git_spec)
+    wrong_identity = SandboxIdentity(guarded_identity.run_id, "f" * 64, guarded_identity.provider_resource_id)
+    wrong = guarded_absent.destroy(wrong_identity, guarded_key, guarded_auth)
+    wrong_reconcile = guarded_absent.reconcile(wrong_identity, key(run, OperationKind.RECONCILE, "wrong-absent"))
+    check(wrong.observation is Observation.OBSERVED_BAD and not wrong.already_absent, "already absent: wrong sandbox identity bypassed destroy binding", errors)
+    check(wrong_reconcile.observation is Observation.COULD_NOT_OBSERVE and wrong_reconcile.status.value == "could-not-observe", "already absent: wrong sandbox identity established reconciliation absence", errors)
+    wrong_operation = guarded_absent.destroy(guarded_identity, key(run, OperationKind.DESTROY, "wrong-absent-operation"), guarded_auth)
+    check(wrong_operation.observation is Observation.OBSERVED_BAD and not wrong_operation.already_absent, "already absent: wrong destruction operation bypassed authorization binding", errors)
+
+    unbound_identity = SandboxIdentity(guarded_identity.run_id, guarded_identity.spec_digest, "fake-sandbox-unbound")
+    unbound_auth = replace(guarded_auth, provider_resource_id="fake-sandbox-unbound")
+    unbound_first = guarded_absent.destroy(unbound_identity, guarded_key, unbound_auth)
+    unbound_retry = guarded_absent.destroy(unbound_identity, guarded_key, unbound_auth)
+    check(unbound_first.observation is Observation.COULD_NOT_OBSERVE and unbound_retry.observation is Observation.COULD_NOT_OBSERVE, "already absent: unbound resource identity established absence or consumed authority", errors)
 
     duplicate = FakeSandboxProvider({FakeControl.DUPLICATE_RESOURCES})
     duplicate_identity = create(duplicate, run)
@@ -391,7 +415,7 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=artifact_spec, git_spec=git_spec)
     wrong_identity = SandboxIdentity(identity.run_id, "f" * 64, identity.provider_resource_id)
     unknown = unresolved.destroy(wrong_identity, destroy_key, auth)
-    check(unknown.observation is Observation.COULD_NOT_OBSERVE and unknown.observed_state is LifecycleState.UNKNOWN and not unknown.already_absent, "unresolved destroy identity was converted to absence", errors)
+    check(unknown.observation is Observation.OBSERVED_BAD and unknown.observed_state is LifecycleState.UNKNOWN and not unknown.already_absent, "wrong destroy identity was not preserved as a contradiction without absence", errors)
 
 
 def aggregate_controls(errors: list[str]) -> None:
