@@ -76,7 +76,13 @@ def test_proven_proof_is_rejected_outside_durable_proven_state() -> None:
 
     errors = _VALIDATOR.validate_state_document(state, project)
 
-    assert any("PROVEN proof claim outside" in error for error in errors)
+    assert any("PROVEN proof claim without legal PROVEN history" in error for error in errors)
+
+
+def test_superseded_item_retains_valid_historical_proof() -> None:
+    project = _VALIDATOR.load_project()
+
+    assert _VALIDATOR._positive_superseded_proof_fixture(project) == []
 
 
 def test_active_authoritative_references_must_resolve() -> None:
@@ -90,6 +96,30 @@ def test_active_authoritative_references_must_resolve() -> None:
     errors = _VALIDATOR.validate_state_document(state, project)
 
     assert any("authoritative reference docs/does-not-exist.md" in error for error in errors)
+
+
+def test_active_authoritative_references_cannot_escape_repository(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project = _VALIDATOR.load_project()
+    outside = tmp_path / "outside.md"
+    outside.write_text("outside", encoding="utf-8")
+    link = _VALIDATOR.ROOT / "active-reference-test-link"
+    original_resolve = Path.resolve
+
+    def resolve_with_escape(path: Path, strict: bool = False) -> Path:
+        if path == link:
+            return outside
+        return original_resolve(path, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", resolve_with_escape)
+    for reference in (
+        "https://example.invalid/authority.md",
+        str(outside),
+        "../authority.md",
+        link.name,
+    ):
+        assert not _VALIDATOR._repository_path_exists(project, reference)
 
 
 def test_deferred_exit_matches_return_state_recorded_on_entry() -> None:

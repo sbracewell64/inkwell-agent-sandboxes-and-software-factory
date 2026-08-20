@@ -194,6 +194,31 @@ def _path_exists(project: dict[str, Any], reference: Any) -> bool:
     return path in _surface_paths(project) or (project["root"] / path).is_file()
 
 
+def _repository_path_exists(project: dict[str, Any], reference: Any) -> bool:
+    if not isinstance(reference, str) or not reference:
+        return False
+    path_text = reference.split("#", 1)[0]
+    path = Path(path_text)
+    if not path_text or path.is_absolute() or ".." in path.parts:
+        return False
+    try:
+        root = project["root"].resolve(strict=True)
+        candidate = (root / path).resolve(strict=True)
+        if not _resolved_path_within_root(root, candidate):
+            return False
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return candidate.is_file()
+
+
+def _resolved_path_within_root(root: Path, candidate: Path) -> bool:
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
 def _check_required_files(project: dict[str, Any], errors: list[str], cno: list[str]) -> None:
     for key, relative in SURFACE_PATHS.items():
         if not project["surfaces"].get(key):
@@ -276,7 +301,7 @@ def _validate_single_transition(
         errors.append(f"{record.get('item_id')} transition {index} has no durable evidence refs")
     else:
         for reference in transition["evidence_refs"]:
-            if not _path_exists(project, reference):
+            if not _repository_path_exists(project, reference):
                 errors.append(
                     f"broken planning cross-reference in {record.get('item_id')} transition: {reference}"
                 )
@@ -382,7 +407,7 @@ def _validate_active_binding(
                     f"increment {index} field {field}"
                 )
         for reference in increment.get("authoritative_refs", []) if isinstance(increment.get("authoritative_refs"), list) else []:
-            if not _path_exists(project, reference):
+            if not _repository_path_exists(project, reference):
                 errors.append(
                     f"unbound or partial ACTIVE identity for {record.get('item_id')}: "
                     f"authoritative reference {reference}"
@@ -483,10 +508,10 @@ def _validate_state(
             for transition in transitions
         )
         if record.get("proven_proof") is not None and (
-            current != "PROVEN" or previous != "PROVEN" or not has_proven_transition
+            current not in {"PROVEN", "SUPERSEDED"} or not has_proven_transition
         ):
             errors.append(
-                f"{item_id} has a PROVEN proof claim outside a legal durable PROVEN state"
+                f"{item_id} has a PROVEN proof claim without legal PROVEN history"
             )
         binding = record.get("active_binding")
         entered_active = any(
@@ -833,7 +858,7 @@ def _active_state_fixture(project: dict[str, Any]) -> dict[str, Any]:
     return state
 
 
-def _positive_proven_fixture(project: dict[str, Any]) -> list[str]:
+def _proven_state_fixture(project: dict[str, Any]) -> dict[str, Any]:
     state = _active_state_fixture(project)
     record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
     evidence = ["docs/development/FUTURE_CANDIDATES.md"]
@@ -850,8 +875,28 @@ def _positive_proven_fixture(project: dict[str, Any]) -> list[str]:
         "source_commit": "e" * 40,
         "source_tree": "f" * 40,
     }
+    return state
+
+
+def _positive_proven_fixture(project: dict[str, Any]) -> list[str]:
+    state = _proven_state_fixture(project)
     errors = validate_state_document(state, project)
     return [f"positive valid PROVEN fixture failed: {error}" for error in errors]
+
+
+def _positive_superseded_proof_fixture(project: dict[str, Any]) -> list[str]:
+    state = _proven_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record["state"] = "SUPERSEDED"
+    record["transition_history"].append(
+        {
+            "from": "PROVEN",
+            "to": "SUPERSEDED",
+            "evidence_refs": ["docs/development/FUTURE_CANDIDATES.md"],
+        }
+    )
+    errors = validate_state_document(state, project)
+    return [f"positive valid superseded PROVEN fixture failed: {error}" for error in errors]
 
 
 def _positive_deferred_fixture(project: dict[str, Any]) -> list[str]:
@@ -968,7 +1013,7 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
         "source_tree": "f" * 40,
     }
     if not any(
-        "PROVEN proof claim outside" in error
+        "PROVEN proof claim without legal PROVEN history" in error
         for error in validate_state_document(active_with_proof, project)
     ):
         failures.append("proven-proof-outside-proven-state")
@@ -987,6 +1032,25 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
         for error in validate_state_document(broken_active_reference, project)
     ):
         failures.append("broken-active-authoritative-reference")
+
+    for name, reference in (
+        ("remote-active-authoritative-reference", "https://example.invalid/authority.md"),
+        ("absolute-active-authoritative-reference", "/etc/hosts"),
+        ("parent-active-authoritative-reference", "../authority.md"),
+    ):
+        escaped_reference = _active_state_fixture(project)
+        escaped_record = next(
+            item for item in escaped_reference["records"] if item["item_id"] == "FUT-003"
+        )
+        escaped_record["active_binding"]["increments"][0]["authoritative_refs"] = [reference]
+        if not any(
+            f"authoritative reference {reference}" in error
+            for error in validate_state_document(escaped_reference, project)
+        ):
+            failures.append(name)
+    root = project["root"].resolve()
+    if _resolved_path_within_root(root, root.parent):
+        failures.append("symlink-escape-active-authoritative-reference")
 
     invented_return = copy.deepcopy(project["state"])
     deferred_record = next(item for item in invented_return["records"] if item["item_id"] == "FUT-003")
@@ -1034,6 +1098,7 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
 
     failures.extend(_positive_active_fixture(project))
     failures.extend(_positive_proven_fixture(project))
+    failures.extend(_positive_superseded_proof_fixture(project))
     failures.extend(_positive_deferred_fixture(project))
     return failures
 
@@ -1082,6 +1147,9 @@ def main() -> int:
         "omitted-active-increment, extra-active-increment, duplicate-active-increment, "
         "incomplete-proven-proof-contract, invented-deferred-return-state, "
         "proven-proof-outside-proven-state, broken-active-authoritative-reference, "
+        "remote-active-authoritative-reference, absolute-active-authoritative-reference, "
+        "parent-active-authoritative-reference, "
+        "symlink-escape-active-authoritative-reference, "
         "active-not-proven-runtime-or-landing-authority, duplicate-adr-identity, "
         "stale-roadmap-sbx-regression, competing-lifecycle-owner, "
         "broken-planning-cross-reference"
@@ -1097,6 +1165,7 @@ def main() -> int:
     print("positive case: canonical lifecycle, durable SEQUENCED records, and current SBX holds")
     print("positive ACTIVE fixture: exact increment/branch/PR/source identities validate in memory")
     print("positive PROVEN fixture: accepted proof contract validates in memory")
+    print("positive SUPERSEDED fixture: historical accepted proof remains valid in memory")
     print("positive DEFERRED fixture: retained return state validates in memory")
     print("watched-red: all controls observed-bad under in-memory defects")
     print("side effects: none")
