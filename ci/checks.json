@@ -47,6 +47,11 @@
       "timeout_seconds": 120
     },
     {
+      "id": "planning-foundation-validator",
+      "command": ["{python}", "docs/validation/check_planning_foundation.py"],
+      "timeout_seconds": 60
+    },
+    {
       "id": "inkwell-unit-tests",
       "command": ["just", "inkwell", "test"],
       "timeout_seconds": 180

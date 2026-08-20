@@ -27,3 +27,48 @@ repository:
   upstream: https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git
   accepted_branch: main
   development_branch_pattern: increment/*
+planning:
+  lifecycle: docs/development/PLANNING_LIFECYCLE.md
+  state_record: docs/development/PLANNING_STATE.json
+  candidate_register: docs/development/FUTURE_CANDIDATES.md
+  roadmap: docs/development/ROADMAP.md
+  decisions: docs/decisions/
+  validation_owner: docs/validation/check_planning_foundation.py
+  rule: preserved_does_not_mean_approved_and_sequenced_does_not_mean_active
+  activation_boundary: named_increment_under_docs/development/INCREMENT_PROTOCOL.md
+  active_requires_exact_identities: true
+  planning_records_have_no_runtime_authority: true
+foundational_sources:
+  super_simple_software_factory:
+    repository: https://github.com/disler/super-simple-software-factory.git
+    preservation_mirror: https://github.com/sbracewell64/super-simple-software-factory.git
+    role: foundational_inner_factory_reference
+    relationship: standalone SSSF skill and factory source from which the embedded factory layer derives
+    observed_refs:
+      main: de31374882e7a4e3e5b7bb9bd09e69dc2f779356
+      example: b2dcb8e436db9b10f7580d7568b3e251609eb36b
+    mirror_refs:
+      main: de31374882e7a4e3e5b7bb9bd09e69dc2f779356
+      example: b2dcb8e436db9b10f7580d7568b3e251609eb36b
+    reference_scope: full_git_repository_including_code_docs_skills_templates_examples_and_history
+    preservation_status: operator_owned_github_fork_preserves_main_and_example_at_pinned_git_identities
+  factory_in_a_box:
+    repository: https://github.com/disler/inkwell-agent-sandboxes-and-software-factory.git
+    role: foundational_integrated_three_tier_reference
+    relationship: integrates Inkwell, embedded SSSF, and host/sandbox orchestration layers
+    observed_refs:
+      main: 92f1701810993b8303562265ba04c727468fe070
+    reference_scope: full_git_repository_including_code_docs_skills_recipes_examples_and_history
+    preservation_status: preserved_in_canonical_fork_lineage_and_pinned_by_exact_git_identity
+foundational_source_policy:
+  instruction: >-
+    For inherited SSSF or Factory-In-A-Box architecture, inspect the relevant
+    foundational repository at an exact Git revision and consult the full source
+    tree as needed; do not rely on README summaries alone.
+  current_authority: >-
+    Foundational repositories explain lineage and reusable design. Current
+    canonical SSSF code, configuration, immutable evidence, and accepted Git
+    objects remain authoritative for present behavior.
+  freshness: >-
+    Pinned refs preserve the historical foundation. Later upstream ideas must
+    be inspected separately and recorded with their exact identity before use.

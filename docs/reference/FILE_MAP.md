@@ -60,6 +60,15 @@ Never hand-edit session evidence.
 - `tests/test_windows_front_door.py` — caller-cwd and visible-refusal behavior checks
 - `docs/operations/INSTALL_WINDOWS.md` — Windows installation and front-door runbook
 
+## Planning foundation
+
+- `docs/development/PLANNING_LIFECYCLE.md` — sole closed transition-contract owner
+- `docs/development/PLANNING_STATE.json` — durable current state and transition evidence
+- `docs/development/FUTURE_CANDIDATES.md` — future item register
+- `docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md` — FUT-003 decision boundary
+- `docs/decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md` — FUT-001 DSH decision boundary
+- `docs/validation/check_planning_foundation.py` — sole offline planning validator
+
 ## Durable local system documentation
 
 - `docs/`
