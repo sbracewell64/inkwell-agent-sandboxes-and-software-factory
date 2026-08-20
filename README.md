@@ -48,6 +48,10 @@ just sbx manage doctor               # six-check preflight: ssh, key, helpers, r
 just inkwell test                    # 30 tests green = the payload works
 ```
 
+Windows operators using the canonical `E:\SSSF` checkout can enter through the
+tracked FirstMate front door; see
+[`docs/operations/INSTALL_WINDOWS.md`](docs/operations/INSTALL_WINDOWS.md).
+
 ### Required Tech
 
 Every resource this system leans on, what it does, and whether you actually need it. The right two columns matter: **running the full loop** asks for a bit of setup, but **reading and understanding** the system asks for almost nothing.
