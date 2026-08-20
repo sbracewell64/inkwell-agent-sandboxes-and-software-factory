@@ -85,6 +85,31 @@ def test_malformed_owner_classification_scope_is_rejected(
     )
 
 
+@pytest.mark.parametrize(
+    ("field", "malformed_value", "expected_error"),
+    [
+        ("fact_id", [], "has no bounded fact_id"),
+        ("source_classification", [], "has unknown source classification"),
+        ("classification", [], "has unknown classification"),
+        ("owner_id", [], "has no singular registered owner"),
+    ],
+)
+def test_malformed_fact_fields_are_rejected(
+    tmp_path: Path, field: str, malformed_value: object, expected_error: str
+) -> None:
+    document = json.loads(_VALIDATOR.DEFAULT_INVENTORY.read_text(encoding="utf-8"))
+    document["facts"][0][field] = malformed_value
+    mutated = tmp_path / "inventory.json"
+    mutated.write_text(json.dumps(document), encoding="utf-8")
+
+    status, errors, _ = _VALIDATOR.validate_path(
+        mutated, verify_inventory_digest=False
+    )
+
+    assert status == "observed-bad"
+    assert any(expected_error in error for error in errors)
+
+
 def test_unreadable_mutable_source_is_cno(tmp_path: Path) -> None:
     missing = tmp_path / "report.md"
     status, errors, _ = _VALIDATOR.validate_path(

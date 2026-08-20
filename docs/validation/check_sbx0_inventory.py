@@ -374,7 +374,7 @@ def _validate_coverage(
         errors.append(
             f"{item_key} coverage is incomplete or reordered: expected {len(expected)}, got {len(actual_ids)}"
         )
-    if len(set(actual_ids)) != len(actual_ids):
+    if any(value in actual_ids[:index] for index, value in enumerate(actual_ids)):
         errors.append(f"duplicate {item_key} authority entries")
 
 
@@ -408,15 +408,26 @@ def _validate_facts(
             errors.append(f"fact {index} is not an object")
             continue
         _expect_keys(fact, expected_keys, f"fact {index}", errors)
-        if index >= len(EXPECTED_FACT_IDS) or fact.get("fact_id") != EXPECTED_FACT_IDS[index]:
-            errors.append(f"fact order/identity drift at index {index}: {fact.get('fact_id')!r}")
+        fact_id = fact.get("fact_id")
+        if not isinstance(fact_id, str) or not fact_id:
+            errors.append(f"fact {index} has no bounded fact_id")
+        if index >= len(EXPECTED_FACT_IDS) or fact_id != EXPECTED_FACT_IDS[index]:
+            errors.append(f"fact order/identity drift at index {index}: {fact_id!r}")
         source_class = fact.get("source_classification")
-        if source_class not in SOURCE_CLASSIFICATION_MAP:
-            errors.append(f"fact {fact.get('fact_id')} has unknown source classification")
-        elif fact.get("classification") != SOURCE_CLASSIFICATION_MAP[source_class]:
-            errors.append(f"fact {fact.get('fact_id')} classification projection changed")
-        elif fact.get("classification") not in CLASSIFICATIONS:
-            errors.append(f"fact {fact.get('fact_id')} has unknown classification")
+        classification = fact.get("classification")
+        if not isinstance(classification, str) or classification not in CLASSIFICATIONS:
+            errors.append(f"fact {fact_id} has unknown classification")
+        if (
+            not isinstance(source_class, str)
+            or source_class not in SOURCE_CLASSIFICATION_MAP
+        ):
+            errors.append(f"fact {fact_id} has unknown source classification")
+        elif (
+            isinstance(classification, str)
+            and classification in CLASSIFICATIONS
+            and classification != SOURCE_CLASSIFICATION_MAP[source_class]
+        ):
+            errors.append(f"fact {fact_id} classification projection changed")
         _expect_observation(fact.get("source_observation"), f"fact {fact.get('fact_id')}.source_observation", errors)
         _expect_observation(fact.get("current_contract_observation"), f"fact {fact.get('fact_id')}.current_contract_observation", errors)
         _expect_observation(fact.get("provider_qualification_observation"), f"fact {fact.get('fact_id')}.provider_qualification_observation", errors)
@@ -425,9 +436,9 @@ def _validate_facts(
         if fact.get("provider_qualification_observation") != "could-not-observe":
             errors.append(f"fact {fact.get('fact_id')} incorrectly claims provider qualification")
         owner_id = fact.get("owner_id")
-        if owner_id not in owners:
+        if not isinstance(owner_id, str) or not owner_id or owner_id not in owners:
             errors.append(f"fact {fact.get('fact_id')} has no singular registered owner")
-        elif fact.get("classification") not in owners[owner_id].get(
+        elif classification not in owners[owner_id].get(
             "fact_classifications", []
         ):
             errors.append(
