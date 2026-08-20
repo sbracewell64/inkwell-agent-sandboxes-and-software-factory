@@ -153,8 +153,9 @@ retain nonempty, existing `acceptance_evidence_refs`,
 `implementation_evidence_refs`, `proof_evidence_refs`, and
 `documentation_evidence_refs`; and bind the accepted source with exact
 40-character `source_commit` and `source_tree` identities. A `proven_proof`
-claim is valid only while the durable current state is `PROVEN` and its legal
-transition history ends at `PROVEN`; no other planning state may carry it.
+claim is valid only after a legal transition reaches `PROVEN`; it remains
+required historical proof if the legal `PROVEN -> SUPERSEDED` edge follows.
+An item that never reached `PROVEN` may not carry the claim.
 
 ## Durable records and ownership
 
