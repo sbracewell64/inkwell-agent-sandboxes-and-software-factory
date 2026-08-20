@@ -32,6 +32,30 @@ Read in this order:
 9. [`reference/SANDBOX_PROVIDER.md`](reference/SANDBOX_PROVIDER.md) — SBX-1 provider-neutral sandbox contract and owner boundary.
 10. [`reference/SBX-0_SEMANTICS_INVENTORY.json`](reference/SBX-0_SEMANTICS_INVENTORY.json) — exact SBX-0 source-bound handoff inventory and classification-compatible owner-per-fact coverage.
 
+## Future architecture planning
+
+Future ideas do not become implementation work merely because they were
+discussed. The canonical closed planning transition contract is
+[`development/PLANNING_LIFECYCLE.md`](development/PLANNING_LIFECYCLE.md); the
+durable current state and transition evidence is
+[`development/PLANNING_STATE.json`](development/PLANNING_STATE.json). The
+candidate register, roadmap, ADRs, and manifest point to that owner rather than
+restating a competing lifecycle.
+
+`ACTIVE` is engineering authorization only. `ACTIVE` is intake eligibility
+only. `ACTIVE` is never task creation. `ACTIVE` is never execution authority.
+`ACTIVE` is never landing authority. `ACTIVE` is never PRE_CERTIFICATION exit.
+`ACTIVE` is never acceptance. `ACTIVE` is never certification. `ACTIVE` is
+never live enablement. `ACTIVE` is never PROVEN. PROVEN is proof state requiring
+accepted implementation, retained evidence, documentation, and immutable source
+identity. No planning record is
+runtime authority; an ADR, manifest, roadmap row, or validation result is not
+runtime, landing, acceptance, certification, or live-enable authority.
+
+The current repair records FUT-001/DSH as `SEQUENCED` and inactive and FUT-003
+as `SEQUENCED` with its ACTIVE transition deferred until exact increment,
+branch, PR, source commit, and source tree identities exist.
+
 ## Documentation authority
 
 When sources disagree, use this precedence:
