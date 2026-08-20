@@ -106,7 +106,7 @@ Run the provider-free publication check with:
 ```text
 python3 docs/validation/check_sbx0_inventory.py
 python3 docs/validation/check_sbx0_inventory.py \
-  --source-report /home/shane/kun-agent-workspace/data/sssf-sbx-0/report.md
+  --source-report /path/to/data/sssf-sbx-0/report.md
 ```
 
 The optional replay verifies the mutable input's exact digest and reports a
