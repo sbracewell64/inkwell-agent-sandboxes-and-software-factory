@@ -55,8 +55,11 @@ shortcut target.
 - the tracked source contract is transport-only and contains no direct factory,
   Docker, Wayfinder, or DSH activation;
 - an unknown argument returns a visible usage refusal with exit status `2`;
-- live HEAD and honest attached/detached branch identity derivation; and
-- dependency-specific Bash, Git, and grep preflight diagnostics before use.
+- executable attached/detached checkout fixtures proving live HEAD and honest
+  branch identity, including a watched-red stale-identity variant; and
+- executable missing Bash, Git, and grep fixtures proving prerequisite-specific
+  refusals before misleading repository or registration diagnostics, including
+  watched-red preflight-omission variants.
 
 A direct host launch was also observed through the tracked front door in the
 named disposable Herdr lab only:
