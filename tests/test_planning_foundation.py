@@ -6,12 +6,19 @@ import copy
 import importlib.util
 from pathlib import Path
 
-
 _VALIDATOR_PATH = Path(__file__).parents[1] / "docs" / "validation" / "check_planning_foundation.py"
 _SPEC = importlib.util.spec_from_file_location("planning_foundation_validator", _VALIDATOR_PATH)
 assert _SPEC is not None and _SPEC.loader is not None
 _VALIDATOR = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_VALIDATOR)
+
+
+def _temporary_project(tmp_path: Path) -> tuple[dict[str, object], Path]:
+    project = _VALIDATOR.load_project()
+    root = tmp_path / "project"
+    project["root"] = root
+    _VALIDATOR._materialize_fixture_references(project["state"], root)
+    return project, root
 
 
 def test_canonical_foundation_and_all_watched_red_controls_pass() -> None:
@@ -70,6 +77,117 @@ def test_proven_evidence_must_be_retained_inside_repository() -> None:
     errors = _VALIDATOR.validate_state_document(state, project)
 
     assert any("lacks retained proof_evidence_refs" in error for error in errors)
+
+
+def test_remote_reference_syntax_cannot_alias_a_local_repository_path(
+    tmp_path: Path,
+) -> None:
+    project, root = _temporary_project(tmp_path)
+    host = "local-alias.invalid"
+    alias = root / "https:" / host
+    alias.mkdir(parents=True)
+    (alias / "authority.md").write_text("local alias", encoding="utf-8")
+    (alias / "proof.json").write_text("local alias", encoding="utf-8")
+
+    active = _VALIDATOR._active_state_fixture(project)
+    active_record = next(item for item in active["records"] if item["item_id"] == "FUT-003")
+    active_record["active_binding"]["increments"][0]["authoritative_refs"] = [
+        f"https://{host}/authority.md"
+    ]
+    active_errors = _VALIDATOR.validate_state_document(active, project)
+
+    proven = _VALIDATOR._proven_state_fixture(project)
+    proven_record = next(item for item in proven["records"] if item["item_id"] == "FUT-003")
+    proven_record["proven_proof"]["proof_evidence_refs"] = [
+        f"https://{host}/proof.json"
+    ]
+    proven_errors = _VALIDATOR.validate_state_document(proven, project)
+
+    assert any("authoritative reference https://" in error for error in active_errors)
+    assert any("lacks retained proof_evidence_refs" in error for error in proven_errors)
+    assert _VALIDATOR._repository_path_exists(
+        project, "docs/development/FUTURE_CANDIDATES.md"
+    )
+    for reference in (
+        "http://example.invalid/file",
+        "ssh://example.invalid/file",
+        "mailto:agent@example.invalid",
+        "urn:sssf:planning",
+        "git@example.invalid:owner/repository.git",
+        "//example.invalid/file",
+    ):
+        assert not _VALIDATOR._repository_path_exists(project, reference)
+
+
+def test_active_authoritative_symlink_to_outside_root_is_rejected(tmp_path: Path) -> None:
+    project, root = _temporary_project(tmp_path)
+    outside = tmp_path / "outside-active.md"
+    outside.write_text("outside", encoding="utf-8")
+    link = root / "docs" / "development" / "active-outside.md"
+    link.symlink_to(outside)
+
+    state = _VALIDATOR._active_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    reference = link.relative_to(root).as_posix()
+    record["active_binding"]["increments"][0]["authoritative_refs"] = [reference]
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    assert any(f"authoritative reference {reference}" in error for error in errors)
+
+
+def test_every_retained_proven_evidence_symlink_to_outside_root_is_rejected(
+    tmp_path: Path,
+) -> None:
+    project, root = _temporary_project(tmp_path)
+    state = _VALIDATOR._proven_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    fields = (
+        "acceptance_evidence_refs",
+        "implementation_evidence_refs",
+        "proof_evidence_refs",
+        "documentation_evidence_refs",
+    )
+    for field in fields:
+        outside = tmp_path / f"{field}-outside.json"
+        outside.write_text("outside", encoding="utf-8")
+        link = root / "docs" / "development" / f"{field}-outside.json"
+        link.symlink_to(outside)
+        record["proven_proof"][field] = [link.relative_to(root).as_posix()]
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    for field in fields:
+        assert any(f"lacks retained {field}" in error for error in errors)
+
+
+def test_watched_red_controls_detect_symlink_only_containment_regression(
+    monkeypatch,
+) -> None:
+    project = _VALIDATOR.load_project()
+
+    def symlink_vulnerable(project: dict[str, object], reference: object) -> bool:
+        if not isinstance(reference, str) or not reference:
+            return False
+        path_text = reference.split("#", 1)[0]
+        path = Path(path_text)
+        if (
+            _VALIDATOR._is_remote_reference(path_text)
+            or path.is_absolute()
+            or ".." in path.parts
+        ):
+            return False
+        return (project["root"] / path).is_file()
+
+    monkeypatch.setattr(_VALIDATOR, "_repository_path_exists", symlink_vulnerable)
+
+    failures = _VALIDATOR._watched_red_controls(project)
+
+    assert "symlink-escape-active-authoritative-reference" in failures
+    assert "symlink-escape-proven-acceptance-evidence" in failures
+    assert "symlink-escape-proven-implementation-evidence" in failures
+    assert "symlink-escape-proven-proof-evidence" in failures
+    assert "symlink-escape-proven-documentation-evidence" in failures
 
 
 def test_active_branch_and_pr_identities_are_canonical() -> None:

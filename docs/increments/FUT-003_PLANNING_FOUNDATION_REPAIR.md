@@ -64,6 +64,31 @@ missing sequencing, unbound/partial ACTIVE identity, ACTIVE authority escape,
 duplicate ADR identity, roadmap regression, competing lifecycle owners, and
 broken cross-references. It manufactures each defect without writing files.
 
+The successor containment correction also rejects URL/URI/remote-reference
+syntax before filesystem resolution. Focused ACTIVE and retained-PROVEN tests
+prove local `https:/...` aliases cannot establish repository evidence, and the
+canonical watched-red suite creates transient project-contained symlinks to
+out-of-root files for the ACTIVE authoritative reference plus all four retained
+PROVEN evidence categories. A lexical-only resolution/containment mutation
+makes each named symlink control red.
+
 No passing local control promotes FUT-003 to `ACTIVE` or `PROVEN`; normal
 review, acceptance, PRE_CERTIFICATION, and live-enablement authority remain
 outside this candidate.
+
+## Successor containment correction
+
+This branch carries the five commits of immutable predecessor PR #23 in their
+original order on exact contribution target
+`991d3a64f1b96a8b9637f97060d692af3518228f`, whose tree is
+`7b88546cd1f63e8304325ee35be37893268ae0e0`. It does not modify, merge, or
+transfer evidence from predecessor head
+`4d4c42377dfaa99ea4bf818322cf422bc8cb06f7` / tree
+`22b312002f7bde05b98ea95b04a45d70b2ba6157`.
+
+The bounded correction addresses only the assignment-distinct repository-
+containment findings: categorical remote-identity rejection before path
+conversion, and non-vacuous ACTIVE/retained-PROVEN symlink containment
+controls. FUT-001/DSH and FUT-003 remain `SEQUENCED` and inactive, and no
+runtime, producer, consumer, provider, Docker, Wayfinder, DSH, SBX-2,
+landing, acceptance, certification, or live-enable authority is added.
