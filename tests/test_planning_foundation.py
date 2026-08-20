@@ -59,6 +59,39 @@ def test_proven_requires_complete_accepted_proof_contract() -> None:
     assert any("complete proof contract" in error for error in errors)
 
 
+def test_proven_proof_is_rejected_outside_durable_proven_state() -> None:
+    project = _VALIDATOR.load_project()
+    state = _VALIDATOR._active_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    evidence = ["docs/development/FUTURE_CANDIDATES.md"]
+    record["proven_proof"] = {
+        "accepted_implementation": True,
+        "acceptance_evidence_refs": evidence,
+        "implementation_evidence_refs": evidence,
+        "proof_evidence_refs": evidence,
+        "documentation_evidence_refs": evidence,
+        "source_commit": "e" * 40,
+        "source_tree": "f" * 40,
+    }
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    assert any("PROVEN proof claim outside" in error for error in errors)
+
+
+def test_active_authoritative_references_must_resolve() -> None:
+    project = _VALIDATOR.load_project()
+    state = _VALIDATOR._active_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record["active_binding"]["increments"][0]["authoritative_refs"] = [
+        "docs/does-not-exist.md"
+    ]
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    assert any("authoritative reference docs/does-not-exist.md" in error for error in errors)
+
+
 def test_deferred_exit_matches_return_state_recorded_on_entry() -> None:
     project = _VALIDATOR.load_project()
 

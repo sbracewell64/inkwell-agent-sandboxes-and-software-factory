@@ -298,7 +298,7 @@ def _validate_single_transition(
             )
         deferred_return = None
     if target == "ACTIVE":
-        _validate_active_binding(record, errors)
+        _validate_active_binding(record, project, errors)
     if target == "PROVEN":
         _validate_proven_proof(record, project, errors)
     return target, deferred_return
@@ -330,7 +330,9 @@ def _validate_proven_proof(
             errors.append(f"{item_id} PROVEN transition lacks immutable {field}")
 
 
-def _validate_active_binding(record: dict[str, Any], errors: list[str]) -> None:
+def _validate_active_binding(
+    record: dict[str, Any], project: dict[str, Any], errors: list[str]
+) -> None:
     binding = record.get("active_binding")
     increments = binding.get("increments") if isinstance(binding, dict) else None
     if not isinstance(increments, list) or not increments:
@@ -380,18 +382,11 @@ def _validate_active_binding(record: dict[str, Any], errors: list[str]) -> None:
                     f"increment {index} field {field}"
                 )
         for reference in increment.get("authoritative_refs", []) if isinstance(increment.get("authoritative_refs"), list) else []:
-            if not _path_exists_for_active_reference(reference):
+            if not _path_exists(project, reference):
                 errors.append(
                     f"unbound or partial ACTIVE identity for {record.get('item_id')}: "
                     f"authoritative reference {reference}"
                 )
-
-
-def _path_exists_for_active_reference(reference: Any) -> bool:
-    # Active binding validation is also used by a side-effect-free synthetic
-    # fixture.  Identity shape is the concern here; project cross-references
-    # are checked on the real records below.
-    return isinstance(reference, str) and bool(reference) and not Path(reference).is_absolute() and ".." not in Path(reference).parts
 
 
 def _validate_state(
@@ -483,6 +478,16 @@ def _validate_state(
             )
         if previous != current:
             errors.append(f"{item_id} durable transition history does not end at current state {current}")
+        has_proven_transition = any(
+            isinstance(transition, dict) and transition.get("to") == "PROVEN"
+            for transition in transitions
+        )
+        if record.get("proven_proof") is not None and (
+            current != "PROVEN" or previous != "PROVEN" or not has_proven_transition
+        ):
+            errors.append(
+                f"{item_id} has a PROVEN proof claim outside a legal durable PROVEN state"
+            )
         binding = record.get("active_binding")
         entered_active = any(
             isinstance(transition, dict) and transition.get("to") == "ACTIVE"
@@ -491,7 +496,7 @@ def _validate_state(
         if binding is not None and not entered_active:
             errors.append(f"{item_id} has an ACTIVE binding without an ACTIVE transition")
         if current == "ACTIVE" or entered_active:
-            _validate_active_binding(record, errors)
+            _validate_active_binding(record, project, errors)
         if current in TERMINAL_STATES and record.get("reentry_rule") not in ("terminal", None):
             errors.append(f"{item_id} terminal state has a re-entry rule")
         if current == "DEFERRED" and record.get("return_state") != deferred_return:
@@ -948,6 +953,41 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
     if not any("PROVEN transition lacks" in error for error in validate_state_document(incomplete_proof, project)):
         failures.append("incomplete-proven-proof-contract")
 
+    active_with_proof = _active_state_fixture(project)
+    active_proof_record = next(
+        item for item in active_with_proof["records"] if item["item_id"] == "FUT-003"
+    )
+    evidence = ["docs/development/FUTURE_CANDIDATES.md"]
+    active_proof_record["proven_proof"] = {
+        "accepted_implementation": True,
+        "acceptance_evidence_refs": evidence,
+        "implementation_evidence_refs": evidence,
+        "proof_evidence_refs": evidence,
+        "documentation_evidence_refs": evidence,
+        "source_commit": "e" * 40,
+        "source_tree": "f" * 40,
+    }
+    if not any(
+        "PROVEN proof claim outside" in error
+        for error in validate_state_document(active_with_proof, project)
+    ):
+        failures.append("proven-proof-outside-proven-state")
+
+    broken_active_reference = _active_state_fixture(project)
+    broken_reference_record = next(
+        item
+        for item in broken_active_reference["records"]
+        if item["item_id"] == "FUT-003"
+    )
+    broken_reference_record["active_binding"]["increments"][0][
+        "authoritative_refs"
+    ] = ["docs/does-not-exist.md"]
+    if not any(
+        "authoritative reference docs/does-not-exist.md" in error
+        for error in validate_state_document(broken_active_reference, project)
+    ):
+        failures.append("broken-active-authoritative-reference")
+
     invented_return = copy.deepcopy(project["state"])
     deferred_record = next(item for item in invented_return["records"] if item["item_id"] == "FUT-003")
     evidence = ["docs/development/FUTURE_CANDIDATES.md"]
@@ -1041,6 +1081,7 @@ def main() -> int:
         "unbound-active-identity, partial-active-identity, "
         "omitted-active-increment, extra-active-increment, duplicate-active-increment, "
         "incomplete-proven-proof-contract, invented-deferred-return-state, "
+        "proven-proof-outside-proven-state, broken-active-authoritative-reference, "
         "active-not-proven-runtime-or-landing-authority, duplicate-adr-identity, "
         "stale-roadmap-sbx-regression, competing-lifecycle-owner, "
         "broken-planning-cross-reference"
