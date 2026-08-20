@@ -19,7 +19,8 @@ import hmac
 import json
 from pathlib import Path, PurePosixPath
 import re
-from typing import Iterable, Mapping, Protocol, Sequence
+import threading
+from typing import Iterable, Mapping, MutableMapping, Protocol, Sequence
 
 from .subprocess_supervisor import Observation, SupervisorRequest
 from tools.evidence_manifest import (
@@ -1102,14 +1103,88 @@ def _destroy_authorization_payload(authorization: DestroyAuthorization) -> bytes
     return json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
 
 
-class DestroyAuthorizationAuthority:
-    """SSSF-owned authenticated capability issuer with durable one-use state."""
+def _destroy_authorization_fingerprint(authorization: DestroyAuthorization) -> str:
+    return hashlib.sha256(
+        _destroy_authorization_payload(authorization) + b"|" + authorization.authenticator.encode()
+    ).hexdigest()
 
-    def __init__(self, signing_key: bytes, *, consumed_ids: Iterable[str] = ()) -> None:
+
+class DestroyAuthorizationStateStore(Protocol):
+    def record_issuance(self, authorization_id: str, fingerprint: str) -> None:
+        ...
+
+    def verifies(self, authorization_id: str, fingerprint: str) -> bool:
+        ...
+
+    def consumed(self, authorization_id: str) -> bool:
+        ...
+
+    def compare_and_swap_consumed(self, authorization_id: str, fingerprint: str) -> bool:
+        ...
+
+
+class InMemoryDestroyAuthorizationStateStore:
+    """Deterministic test store for the durable atomic authorization state seam."""
+
+    def __init__(self, state: MutableMapping[str, MutableMapping[str, object]] | None = None) -> None:
+        self._state = state if state is not None else {}
+        for authorization_id, item in self._state.items():
+            _token(authorization_id, "persisted authorization_id")
+            _digest(item.get("fingerprint"), "persisted authorization fingerprint")
+            if not isinstance(item.get("consumed"), bool):
+                raise ValueError("persisted authorization consumption must be boolean")
+        self._lock = threading.Lock()
+
+    def record_issuance(self, authorization_id: str, fingerprint: str) -> None:
+        _token(authorization_id, "authorization_id")
+        _digest(fingerprint, "authorization fingerprint")
+        with self._lock:
+            existing = self._state.get(authorization_id)
+            if existing is not None and existing["fingerprint"] != fingerprint:
+                raise ValueError("authorization identity was reissued with different provenance")
+            self._state.setdefault(authorization_id, {"fingerprint": fingerprint, "consumed": False})
+
+    def verifies(self, authorization_id: str, fingerprint: str) -> bool:
+        with self._lock:
+            item = self._state.get(authorization_id)
+            return item is not None and hmac.compare_digest(str(item["fingerprint"]), fingerprint)
+
+    def consumed(self, authorization_id: str) -> bool:
+        with self._lock:
+            item = self._state.get(authorization_id)
+            return item is not None and item["consumed"] is True
+
+    def compare_and_swap_consumed(self, authorization_id: str, fingerprint: str) -> bool:
+        with self._lock:
+            item = self._state.get(authorization_id)
+            if (
+                item is None
+                or item["consumed"] is True
+                or not hmac.compare_digest(str(item["fingerprint"]), fingerprint)
+            ):
+                return False
+            item["consumed"] = True
+            return True
+
+    def snapshot(self) -> Mapping[str, Mapping[str, object]]:
+        with self._lock:
+            return {
+                authorization_id: {
+                    "fingerprint": item["fingerprint"],
+                    "consumed": item["consumed"],
+                }
+                for authorization_id, item in self._state.items()
+            }
+
+
+class DestroyAuthorizationIssuer:
+    """SSSF-only signing capability; never passed across the provider seam."""
+
+    def __init__(self, signing_key: bytes, state_store: DestroyAuthorizationStateStore) -> None:
         if not isinstance(signing_key, bytes) or len(signing_key) < 32:
             raise ValueError("destroy authorization signing key must contain at least 32 bytes")
         self.__signing_key = signing_key
-        self._consumed = set(_tokens(consumed_ids, "consumed authorization ids"))
+        self.__state_store = state_store
 
     def _mint(self, authorization: DestroyAuthorization) -> DestroyAuthorization:
         authenticator = hmac.new(
@@ -1117,45 +1192,34 @@ class DestroyAuthorizationAuthority:
             _destroy_authorization_payload(authorization),
             hashlib.sha256,
         ).hexdigest()
-        return replace(authorization, authenticator=authenticator)
+        minted = replace(authorization, authenticator=authenticator)
+        self.__state_store.record_issuance(
+            minted.authorization_id,
+            _destroy_authorization_fingerprint(minted),
+        )
+        return minted
+
+
+class DestroyAuthorizationVerifier:
+    """Provider-facing verification and atomic consumption capability."""
+
+    def __init__(self, state_store: DestroyAuthorizationStateStore) -> None:
+        self.__state_store = state_store
 
     def verifies(self, authorization: DestroyAuthorization) -> bool:
-        expected = hmac.new(
-            self.__signing_key,
-            _destroy_authorization_payload(authorization),
-            hashlib.sha256,
-        ).hexdigest()
-        return hmac.compare_digest(authorization.authenticator, expected)
+        return self.__state_store.verifies(
+            authorization.authorization_id,
+            _destroy_authorization_fingerprint(authorization),
+        )
 
     def consumed(self, authorization: DestroyAuthorization) -> bool:
-        return authorization.authorization_id in self._consumed
+        return self.__state_store.consumed(authorization.authorization_id)
 
     def consume(self, authorization: DestroyAuthorization) -> bool:
-        if not self.verifies(authorization) or self.consumed(authorization):
-            return False
-        self._consumed.add(authorization.authorization_id)
-        return True
-
-    def snapshot(self) -> Mapping[str, object]:
-        return {
-            "schema_version": "destroy-authorization-state/v1",
-            "signing_key_hex": self.__signing_key.hex(),
-            "consumed_ids": tuple(sorted(self._consumed)),
-        }
-
-    @classmethod
-    def from_snapshot(cls, snapshot: Mapping[str, object]) -> "DestroyAuthorizationAuthority":
-        if snapshot.get("schema_version") != "destroy-authorization-state/v1":
-            raise ValueError("unsupported destroy authorization state schema")
-        signing_key_hex = snapshot.get("signing_key_hex")
-        consumed_ids = snapshot.get("consumed_ids")
-        if not isinstance(signing_key_hex, str) or not isinstance(consumed_ids, (tuple, list)):
-            raise ValueError("destroy authorization state is malformed")
-        try:
-            signing_key = bytes.fromhex(signing_key_hex)
-        except ValueError as exc:
-            raise ValueError("destroy authorization signing key encoding is malformed") from exc
-        return cls(signing_key, consumed_ids=consumed_ids)
+        return self.__state_store.compare_and_swap_consumed(
+            authorization.authorization_id,
+            _destroy_authorization_fingerprint(authorization),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1468,7 +1532,7 @@ def issue_destroy_authorization(
     git: GitExportFacts,
     artifact_spec: ArtifactSpec,
     git_spec: GitExportSpec,
-    authorization_authority: DestroyAuthorizationAuthority,
+    authorization_issuer: DestroyAuthorizationIssuer,
     secret_retirement: SecretRetirementFacts | None = None,
     issued_at: str = "1970-01-01T00:00:00Z",
 ) -> DestroyAuthorization:
@@ -1487,8 +1551,8 @@ def issue_destroy_authorization(
         raise DestroyNotAuthorized("destroy authorization requires an applicable required artifact obligation")
     if not git_spec.applicable or not git_spec.required:
         raise DestroyNotAuthorized("destroy authorization requires an applicable required Git obligation")
-    if not isinstance(authorization_authority, DestroyAuthorizationAuthority):
-        raise DestroyNotAuthorized("destroy authorization requires the SSSF capability authority")
+    if not isinstance(authorization_issuer, DestroyAuthorizationIssuer):
+        raise DestroyNotAuthorized("destroy authorization requires the SSSF-only issuer")
     artifact_context = artifact_spec.manifest_context
     if (
         artifact_spec.operation.run_id != spec.run_id
@@ -1548,7 +1612,7 @@ def issue_destroy_authorization(
         issued_at=issued_at,
         authenticator="0" * 64,
     )
-    return authorization_authority._mint(authorization)
+    return authorization_issuer._mint(authorization)
 
 
 # ---------------------------------------------------------------------------
@@ -1666,7 +1730,7 @@ class FakeSandboxProvider:
         *,
         interrupt_before: LifecycleBoundary | None = None,
         interrupt_after: LifecycleBoundary | None = None,
-        authorization_verifier: DestroyAuthorizationAuthority | None = None,
+        authorization_verifier: DestroyAuthorizationVerifier | None = None,
     ) -> None:
         self.controls = frozenset(controls)
         self.interrupt_before = interrupt_before
@@ -2148,7 +2212,9 @@ __all__ = [
     "CopySpec",
     "CreateFacts",
     "DestroyAuthorization",
-    "DestroyAuthorizationAuthority",
+    "DestroyAuthorizationIssuer",
+    "DestroyAuthorizationStateStore",
+    "DestroyAuthorizationVerifier",
     "DestroyFacts",
     "DestroyNotAuthorized",
     "DeferredCapability",
@@ -2159,6 +2225,7 @@ __all__ = [
     "GitExportFacts",
     "GitExportSpec",
     "InMemoryLifecycleRecordStore",
+    "InMemoryDestroyAuthorizationStateStore",
     "InputCopySpec",
     "InspectFacts",
     "InterruptTiming",

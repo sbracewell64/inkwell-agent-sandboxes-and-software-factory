@@ -23,12 +23,14 @@ from adws.adw_modules.sandbox_provider import (  # noqa: E402
     CapabilityFact,
     CommandSpec,
     CopySpec,
-    DestroyAuthorizationAuthority,
+    DestroyAuthorizationIssuer,
+    DestroyAuthorizationVerifier,
     DestroyNotAuthorized,
     FakeControl,
     FakeSandboxProvider,
     GitExportSpec,
     InMemoryLifecycleRecordStore,
+    InMemoryDestroyAuthorizationStateStore,
     InterruptTiming,
     LifecycleBoundary,
     LifecycleOperationRecord,
@@ -63,8 +65,15 @@ def check(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
-def destroy_authority() -> DestroyAuthorizationAuthority:
-    return DestroyAuthorizationAuthority(b"deterministic-sbx1-destroy-key-0001")
+def destroy_capabilities(
+    state: dict[str, dict[str, object]] | None = None,
+) -> tuple[DestroyAuthorizationIssuer, DestroyAuthorizationVerifier, InMemoryDestroyAuthorizationStateStore]:
+    store = InMemoryDestroyAuthorizationStateStore(state)
+    return (
+        DestroyAuthorizationIssuer(b"deterministic-sbx1-destroy-key-0001", store),
+        DestroyAuthorizationVerifier(store),
+        store,
+    )
 
 
 def spec() -> SandboxSpec:
@@ -206,8 +215,8 @@ def create(provider: FakeSandboxProvider, run: SandboxSpec) -> SandboxIdentity:
 
 def success_control(errors: list[str]) -> None:
     run = spec()
-    authority = destroy_authority()
-    provider = FakeSandboxProvider(authorization_verifier=authority)
+    issuer, verifier, _ = destroy_capabilities()
+    provider = FakeSandboxProvider(authorization_verifier=verifier)
     identity = create(provider, run)
     copied = provider.copy_in(
         identity,
@@ -238,7 +247,7 @@ def success_control(errors: list[str]) -> None:
     check(deferred.disposition is CapabilityDisposition.DEFERRED and deferred.observation is Observation.COULD_NOT_OBSERVE, "success: Docker deferred capability was not typed", errors)
     check(processes.observation is Observation.OBSERVED_GOOD and processes.resources.quiescent is True, "success: all quiescence domains were not observed", errors)
     destroy_key = key(run, OperationKind.DESTROY, "destroy")
-    authorization = issue_destroy_authorization(run, identity, destroy_key, artifact=artifacts, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_authority=authority)
+    authorization = issue_destroy_authorization(run, identity, destroy_key, artifact=artifacts, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_issuer=issuer)
     destroyed = provider.destroy(identity, destroy_key, authorization)
     reconciled = provider.reconcile(identity, key(run, OperationKind.RECONCILE, "after-destroy"))
     check(destroyed.observation is Observation.OBSERVED_GOOD and destroyed.acknowledged, "success: destroy was not acknowledged", errors)
@@ -265,8 +274,8 @@ def ambiguity_and_identity_controls(errors: list[str]) -> None:
     wrong_result = FakeSandboxProvider().inspect(wrong, key(run, OperationKind.INSPECT, "wrong"))
     check(wrong_result.observation is Observation.COULD_NOT_OBSERVE and wrong_result.observed_state is LifecycleState.UNKNOWN, "wrong identity was converted into absence", errors)
 
-    collision_authority = destroy_authority()
-    collision = FakeSandboxProvider({FakeControl.RESOURCE_ID_COLLISION}, authorization_verifier=collision_authority)
+    collision_issuer, collision_verifier, _ = destroy_capabilities()
+    collision = FakeSandboxProvider({FakeControl.RESOURCE_ID_COLLISION}, authorization_verifier=collision_verifier)
     identity_a = create(collision, run)
     run_b = replace(run, run_id="sbx-fixture-run-b", operation_id="create-fixture-b", evidence_root="/evidence/sbx-fixture-run-b")
     identity_b = create(collision, run_b)
@@ -284,7 +293,7 @@ def ambiguity_and_identity_controls(errors: list[str]) -> None:
     git_a_spec = make_git(run)
     artifact_a = collision.collect_artifacts(identity_a, artifact_a_spec)
     git_a = collision.export_git(identity_a, git_a_spec)
-    auth_a = issue_destroy_authorization(run, identity_a, destroy_key_a, artifact=artifact_a, git=git_a, artifact_spec=artifact_a_spec, git_spec=git_a_spec, authorization_authority=collision_authority)
+    auth_a = issue_destroy_authorization(run, identity_a, destroy_key_a, artifact=artifact_a, git=git_a, artifact_spec=artifact_a_spec, git_spec=git_a_spec, authorization_issuer=collision_issuer)
     destroy_key_b = key(run_b, OperationKind.DESTROY, "cross-run")
     forged_auth = replace(auth_a, run_id=run_b.run_id, sandbox_spec_digest=cross_run.spec_digest, operation_id=destroy_key_b.operation_id, idempotency_key=destroy_key_b.idempotency_key)
     destroyed = collision.destroy(cross_run, destroy_key_b, forged_auth)
@@ -387,13 +396,13 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     denied = unauthorized.destroy(identity, key(run, OperationKind.DESTROY, "unauthorized"), None)
     check(denied.observation is Observation.OBSERVED_BAD and not denied.acknowledged, "unauthorized destroy was not refused", errors)
 
-    residual_authority = destroy_authority()
-    residual = FakeSandboxProvider({FakeControl.DESTROY_RESIDUAL}, authorization_verifier=residual_authority)
+    residual_issuer, residual_verifier, _ = destroy_capabilities()
+    residual = FakeSandboxProvider({FakeControl.DESTROY_RESIDUAL}, authorization_verifier=residual_verifier)
     identity = create(residual, run)
     artifact = residual.collect_artifacts(identity, make_artifact(run))
     git = residual.export_git(identity, make_git(run))
     destroy_key = key(run, OperationKind.DESTROY, "residual")
-    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_authority=residual_authority)
+    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_issuer=residual_issuer)
     destroyed = residual.destroy(identity, destroy_key, auth)
     reconciled = residual.reconcile(identity, key(run, OperationKind.RECONCILE, "residual"))
     check(destroyed.observation is Observation.OBSERVED_BAD and destroyed.acknowledged and destroyed.residual_resource_ids, "residual destroy: acknowledgement/residue was not positive", errors)
@@ -406,30 +415,32 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     check(inspected.observation is Observation.COULD_NOT_OBSERVE and inspected.observed_state is LifecycleState.UNKNOWN, "unreachable inspect: CNO became a state assertion", errors)
     check(reconciled.status.value == "could-not-observe" and reconciled.observation is Observation.COULD_NOT_OBSERVE, "unreachable reconcile: failure became absence", errors)
 
-    absent_authority = destroy_authority()
-    absent = FakeSandboxProvider({FakeControl.ALREADY_ABSENT}, authorization_verifier=absent_authority)
+    durable_state: dict[str, dict[str, object]] = {}
+    absent_issuer, absent_verifier, absent_store = destroy_capabilities(durable_state)
+    absent = FakeSandboxProvider({FakeControl.ALREADY_ABSENT}, authorization_verifier=absent_verifier)
     identity = create(absent, run)
     artifact = absent.collect_artifacts(identity, make_artifact(run))
     git = absent.export_git(identity, make_git(run))
-    auth = issue_destroy_authorization(run, identity, key(run, OperationKind.DESTROY, "absent"), artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_authority=absent_authority)
+    auth = issue_destroy_authorization(run, identity, key(run, OperationKind.DESTROY, "absent"), artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_issuer=absent_issuer)
     destroyed = absent.destroy(identity, key(run, OperationKind.DESTROY, "absent"), auth)
     check(destroyed.observation is Observation.OBSERVED_GOOD and destroyed.already_absent, "already absent: destroy was not idempotent", errors)
-    recovered_authority = DestroyAuthorizationAuthority.from_snapshot(absent_authority.snapshot())
+    _, recovered_verifier, _ = destroy_capabilities(durable_state)
     recovered_auth = replace(auth)
-    check(recovered_authority.verifies(recovered_auth), "restart recovery lost authenticated authorization provenance", errors)
-    check(recovered_authority.consumed(recovered_auth) and not recovered_authority.consume(recovered_auth), "restart recovery lost one-use authorization consumption", errors)
+    check(recovered_verifier.verifies(recovered_auth), "restart recovery lost authenticated authorization provenance", errors)
+    check(recovered_verifier.consumed(recovered_auth) and not recovered_verifier.consume(recovered_auth), "restart recovery lost one-use authorization consumption", errors)
+    check("signing_key" not in repr(absent_store.snapshot()), "durable authorization state serialized signing material", errors)
     reconciled = absent.reconcile(identity, key(run, OperationKind.RECONCILE, "absent"))
     check(reconciled.observation is Observation.OBSERVED_GOOD and reconciled.status.value == "absent", "already absent: exact identity did not reconcile authoritatively", errors)
 
-    guarded_authority = destroy_authority()
-    guarded_absent = FakeSandboxProvider({FakeControl.ALREADY_ABSENT}, authorization_verifier=guarded_authority)
+    guarded_issuer, guarded_verifier, _ = destroy_capabilities()
+    guarded_absent = FakeSandboxProvider({FakeControl.ALREADY_ABSENT}, authorization_verifier=guarded_verifier)
     guarded_identity = create(guarded_absent, run)
     guarded_artifact_spec = make_artifact(run)
     guarded_git_spec = make_git(run)
     guarded_artifact = guarded_absent.collect_artifacts(guarded_identity, guarded_artifact_spec)
     guarded_git = guarded_absent.export_git(guarded_identity, guarded_git_spec)
     guarded_key = key(run, OperationKind.DESTROY, "absent-identity-guard")
-    guarded_auth = issue_destroy_authorization(run, guarded_identity, guarded_key, artifact=guarded_artifact, git=guarded_git, artifact_spec=guarded_artifact_spec, git_spec=guarded_git_spec, authorization_authority=guarded_authority)
+    guarded_auth = issue_destroy_authorization(run, guarded_identity, guarded_key, artifact=guarded_artifact, git=guarded_git, artifact_spec=guarded_artifact_spec, git_spec=guarded_git_spec, authorization_issuer=guarded_issuer)
     wrong_identity = SandboxIdentity(guarded_identity.run_id, "f" * 64, guarded_identity.provider_resource_id)
     wrong = guarded_absent.destroy(wrong_identity, guarded_key, guarded_auth)
     wrong_reconcile = guarded_absent.reconcile(wrong_identity, key(run, OperationKind.RECONCILE, "wrong-absent"))
@@ -444,11 +455,11 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     unbound_retry = guarded_absent.destroy(unbound_identity, guarded_key, unbound_auth)
     check(unbound_first.observation is Observation.OBSERVED_BAD and unbound_retry.observation is Observation.OBSERVED_BAD, "already absent: fabricated resource authorization was not rejected", errors)
     serialized_auth = replace(guarded_auth)
-    check(guarded_authority.verifies(serialized_auth), "serialized issued authorization lost value-based provenance", errors)
+    check(guarded_verifier.verifies(serialized_auth), "serialized issued authorization lost value-based provenance", errors)
     fabricated_auth = replace(guarded_auth, authenticator="0" * 64)
     fabricated = guarded_absent.destroy(guarded_identity, guarded_key, fabricated_auth)
     check(fabricated.observation is Observation.OBSERVED_BAD and not fabricated.already_absent, "caller-constructed destroy authorization bypassed issuance provenance", errors)
-    check(not hasattr(guarded_absent, "authorization_authority") and not hasattr(guarded_authority, "_register"), "provider exposed caller registration for destroy authorization", errors)
+    check(not hasattr(guarded_verifier, "_mint") and not hasattr(guarded_verifier, "_DestroyAuthorizationIssuer__signing_key"), "provider verifier retained destroy minting authority", errors)
 
     duplicate = FakeSandboxProvider({FakeControl.DUPLICATE_RESOURCES})
     duplicate_identity = create(duplicate, run)
@@ -456,7 +467,7 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     check(reconciled.status.value == "duplicate" and len(reconciled.duplicate_resource_ids) == 2, "duplicate reconciliation: duplicate resources were not enumerated", errors)
 
     try:
-        issue_destroy_authorization(run, SandboxIdentity.requested(run), key(run, OperationKind.DESTROY, "no-resource"), artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_authority=absent_authority)
+        issue_destroy_authorization(run, SandboxIdentity.requested(run), key(run, OperationKind.DESTROY, "no-resource"), artifact=artifact, git=git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_issuer=absent_issuer)
     except DestroyNotAuthorized:
         pass
     else:
@@ -471,36 +482,36 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
             git=git,
             artifact_spec=replace(make_artifact(run), applicable=False, required=False),
             git_spec=make_git(run),
-            authorization_authority=absent_authority,
+            authorization_issuer=absent_issuer,
         )
     except DestroyNotAuthorized:
         pass
     else:
         errors.append("destroy authorization accepted an inapplicable artifact obligation")
 
-    interrupted_authority = destroy_authority()
-    interrupted = FakeSandboxProvider(interrupt_before=LifecycleBoundary.DESTROY, authorization_verifier=interrupted_authority)
+    interrupted_issuer, interrupted_verifier, _ = destroy_capabilities()
+    interrupted = FakeSandboxProvider(interrupt_before=LifecycleBoundary.DESTROY, authorization_verifier=interrupted_verifier)
     identity = create(interrupted, run)
     artifact_spec = make_artifact(run)
     git_spec = make_git(run)
     artifact = interrupted.collect_artifacts(identity, artifact_spec)
     git = interrupted.export_git(identity, git_spec)
     destroy_key = key(run, OperationKind.DESTROY, "retry-before-linearization")
-    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=artifact_spec, git_spec=git_spec, authorization_authority=interrupted_authority)
+    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=artifact_spec, git_spec=git_spec, authorization_issuer=interrupted_issuer)
     first = interrupted.destroy(identity, destroy_key, auth)
     interrupted.interrupt_before = None
     retry = interrupted.destroy(identity, destroy_key, auth)
     check(first.observation is Observation.COULD_NOT_OBSERVE and retry.acknowledged, "pre-linearization destroy interruption consumed retry authority", errors)
 
-    unresolved_authority = destroy_authority()
-    unresolved = FakeSandboxProvider(authorization_verifier=unresolved_authority)
+    unresolved_issuer, unresolved_verifier, _ = destroy_capabilities()
+    unresolved = FakeSandboxProvider(authorization_verifier=unresolved_verifier)
     identity = create(unresolved, run)
     artifact_spec = make_artifact(run)
     git_spec = make_git(run)
     artifact = unresolved.collect_artifacts(identity, artifact_spec)
     git = unresolved.export_git(identity, git_spec)
     destroy_key = key(run, OperationKind.DESTROY, "wrong-destroy-identity")
-    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=artifact_spec, git_spec=git_spec, authorization_authority=unresolved_authority)
+    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=artifact_spec, git_spec=git_spec, authorization_issuer=unresolved_issuer)
     wrong_identity = SandboxIdentity(identity.run_id, "f" * 64, identity.provider_resource_id)
     unknown = unresolved.destroy(wrong_identity, destroy_key, auth)
     check(unknown.observation is Observation.OBSERVED_BAD and unknown.observed_state is LifecycleState.UNKNOWN and not unknown.already_absent, "wrong destroy identity was not preserved as a contradiction without absence", errors)
@@ -574,13 +585,13 @@ def interruption_controls(errors: list[str]) -> None:
     after_create_fact = after_create.create(run, key(run, OperationKind.CREATE, "after-create"))
     check(after_create_fact.observation is Observation.COULD_NOT_OBSERVE and after_create_fact.provider_resource_id is not None, "interrupt after create: resource identity was not retained", errors)
 
-    after_authority = destroy_authority()
-    after_destroy = FakeSandboxProvider(interrupt_after=LifecycleBoundary.DESTROY, authorization_verifier=after_authority)
+    after_issuer, after_verifier, _ = destroy_capabilities()
+    after_destroy = FakeSandboxProvider(interrupt_after=LifecycleBoundary.DESTROY, authorization_verifier=after_verifier)
     after_identity = create(after_destroy, run)
     after_artifact = after_destroy.collect_artifacts(after_identity, make_artifact(run))
     after_git = after_destroy.export_git(after_identity, make_git(run))
     after_destroy_key = key(run, OperationKind.DESTROY, "after-destroy")
-    after_auth = issue_destroy_authorization(run, after_identity, after_destroy_key, artifact=after_artifact, git=after_git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_authority=after_authority)
+    after_auth = issue_destroy_authorization(run, after_identity, after_destroy_key, artifact=after_artifact, git=after_git, artifact_spec=make_artifact(run), git_spec=make_git(run), authorization_issuer=after_issuer)
     after_destroy_fact = after_destroy.destroy(after_identity, after_destroy_key, after_auth)
     after_reconcile = after_destroy.reconcile(after_identity, key(run, OperationKind.RECONCILE, "after-destroy-reconcile"))
     check(after_destroy_fact.observation is Observation.COULD_NOT_OBSERVE and after_destroy_fact.acknowledged, "interrupt after destroy: acknowledgement/CNO was not retained", errors)
@@ -637,8 +648,8 @@ def durable_record_controls(errors: list[str]) -> None:
 
 def destroy_binding_controls(errors: list[str]) -> None:
     run = replace(spec(), secret_refs=("secret/a", "secret/b"))
-    authority = destroy_authority()
-    provider = FakeSandboxProvider(authorization_verifier=authority)
+    issuer, verifier, _ = destroy_capabilities()
+    provider = FakeSandboxProvider(authorization_verifier=verifier)
     identity = create(provider, run)
     artifact_spec = make_artifact(run)
     git_spec = make_git(run)
@@ -660,7 +671,7 @@ def destroy_binding_controls(errors: list[str]) -> None:
         git=git,
         artifact_spec=artifact_spec,
         git_spec=git_spec,
-        authorization_authority=authority,
+        authorization_issuer=issuer,
         secret_retirement=retirement,
     )
     stale_spec = replace(run, profile_id="profile/other")
@@ -683,7 +694,7 @@ def destroy_binding_controls(errors: list[str]) -> None:
                 git=git,
                 artifact_spec=candidate_artifact_spec,
                 git_spec=candidate_git_spec,
-                authorization_authority=authority,
+                authorization_issuer=issuer,
                 secret_retirement=candidate_retirement,
             )
         except DestroyNotAuthorized:
