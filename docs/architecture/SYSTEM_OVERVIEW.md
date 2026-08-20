@@ -40,6 +40,7 @@ The sandbox contains the code and coding agents. Long-lived orchestration creden
 - `just sbx ...` — sandbox lifecycle and host operations
 - `just obs ...` — trace readback
 - `just local ...` — local orchestrator launch
+- `bin\\sssf-firstmate.cmd` — Windows transport front door into FirstMate at the canonical `E:\\SSSF` root
 
 ## Two work-entry paths
 

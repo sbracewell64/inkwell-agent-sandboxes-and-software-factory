@@ -56,3 +56,28 @@ bin\sssf-windows.cmd
 The bootstrap invokes the host doctor, which invokes the exact strict LF
 command above and does not print the session-ready message when that check is
 non-passing.
+
+## FirstMate double-click front door
+
+After the tracked launcher is installed in the canonical checkout, double-click
+this shortcut target or run it from any Command Prompt directory:
+
+```bat
+E:\SSSF\bin\sssf-firstmate.cmd
+```
+
+The front door always validates and enters `E:\SSSF` through WSL before handing
+off to FirstMate's existing `fm-launch.sh` primary path. It prints the project,
+canonical repository, root, handoff, HEAD, and branch identity without printing
+credentials or auth-home paths. FirstMate remains responsible for harness
+selection, project registration, supervision, admission, and work decisions.
+
+Use `--print-menu` to validate the root/configuration and render FirstMate's
+menu without creating a session. `--detach` is reserved for bounded host
+validation; it selects the installed Claude entry and returns after the
+FirstMate primary starts. Unknown arguments refuse visibly.
+
+The front door does not run `just local cc`, schedule work, mutate Docker/SBX
+state, or activate Wayfinder or DSH. If WSL, the canonical checkout, the
+canonical origin, the FirstMate launcher/admission/session-start scripts, or the
+registered `sssf` project is missing, it refuses with a repair instruction.
