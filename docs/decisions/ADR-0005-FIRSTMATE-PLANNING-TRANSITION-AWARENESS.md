@@ -1,6 +1,6 @@
 # ADR-0005 — FirstMate Planning-Transition Awareness
 
-- **Status:** Accepted design direction; implementation unsequenced and inactive
+- **Status:** Accepted design direction; implementation `ACTIVE` under FUT-003, not `PROVEN` or production-enabled
 - **Date:** 2026-08-18
 - **Planning item:** FUT-003
 - **FirstMate evaluation baseline:** `sbracewell64/firstmate@f4e69d6ce411750b55fc9f186f60ce0e8b0cd786`
@@ -157,19 +157,20 @@ Not selected. Its durability/cursor discipline is useful, but its blocking-sourc
 
 ## Sequencing
 
-This decision is **not sequenced for implementation**.
+FUT-003 is now `ACTIVE` through the bounded `FP-001` SSSF producer and `FM-FP-001` FirstMate consumer increments. That activation authorizes isolated implementation and qualification work only; it does not make either side `PROVEN`, merged, trusted, or production-enabled.
 
-Implementation should be considered only when the planning branch itself is ready to enter the accepted SSSF documentation surface and a bounded FirstMate increment is explicitly activated. Until then, manual inspection/transport remains acceptable and no FirstMate watcher behavior changes.
+The SSSF producer and FirstMate consumer remain subject to their exact acceptance boundaries. The producer remains unlanded under SSSF PRE_CERTIFICATION, the current consumer must match the actual producer wire contract and current FirstMate runtime, and live planning-feed enablement remains separately gated.
+
+Manual inspection and transport remain valid until both sides are accepted and live enablement is explicitly authorized.
 
 ## Non-goals
 
 This ADR does not:
 
-- create `PLANNING_EVENTS.jsonl` yet;
-- modify FirstMate;
-- register a FirstMate custom check;
-- create a FirstMate task or control-plane escalation;
-- sequence implementation on the SSSF roadmap;
+- itself merge or production-enable `PLANNING_EVENTS.jsonl`;
+- itself modify or live-enable FirstMate;
+- itself register a production FirstMate custom check;
+- itself create a FirstMate task or control-plane escalation;
 - allow FirstMate to promote planning state;
 - make `SEQUENCED` work executable;
 - bypass normal FirstMate admission for `ACTIVE` work.
