@@ -1116,10 +1116,16 @@ class DestroyAuthorizationStateStore(Protocol):
     def verifies(self, authorization_id: str, fingerprint: str) -> bool:
         ...
 
-    def consumed(self, authorization_id: str) -> bool:
+    def reserved(self, authorization_id: str) -> bool:
         ...
 
-    def compare_and_swap_consumed(self, authorization_id: str, fingerprint: str) -> bool:
+    def completed(self, authorization_id: str) -> bool:
+        ...
+
+    def compare_and_swap_reserved(self, authorization_id: str, fingerprint: str) -> bool:
+        ...
+
+    def compare_and_swap_completed(self, authorization_id: str, fingerprint: str) -> bool:
         ...
 
 
@@ -1131,8 +1137,8 @@ class InMemoryDestroyAuthorizationStateStore:
         for authorization_id, item in self._state.items():
             _token(authorization_id, "persisted authorization_id")
             _digest(item.get("fingerprint"), "persisted authorization fingerprint")
-            if not isinstance(item.get("consumed"), bool):
-                raise ValueError("persisted authorization consumption must be boolean")
+            if item.get("status") not in {"issued", "reserved", "completed"}:
+                raise ValueError("persisted authorization status must be issued, reserved, or completed")
         self._lock = threading.Lock()
 
     def record_issuance(self, authorization_id: str, fingerprint: str) -> None:
@@ -1142,28 +1148,45 @@ class InMemoryDestroyAuthorizationStateStore:
             existing = self._state.get(authorization_id)
             if existing is not None and existing["fingerprint"] != fingerprint:
                 raise ValueError("authorization identity was reissued with different provenance")
-            self._state.setdefault(authorization_id, {"fingerprint": fingerprint, "consumed": False})
+            self._state.setdefault(authorization_id, {"fingerprint": fingerprint, "status": "issued"})
 
     def verifies(self, authorization_id: str, fingerprint: str) -> bool:
         with self._lock:
             item = self._state.get(authorization_id)
             return item is not None and hmac.compare_digest(str(item["fingerprint"]), fingerprint)
 
-    def consumed(self, authorization_id: str) -> bool:
+    def reserved(self, authorization_id: str) -> bool:
         with self._lock:
             item = self._state.get(authorization_id)
-            return item is not None and item["consumed"] is True
+            return item is not None and item["status"] == "reserved"
 
-    def compare_and_swap_consumed(self, authorization_id: str, fingerprint: str) -> bool:
+    def completed(self, authorization_id: str) -> bool:
+        with self._lock:
+            item = self._state.get(authorization_id)
+            return item is not None and item["status"] == "completed"
+
+    def compare_and_swap_reserved(self, authorization_id: str, fingerprint: str) -> bool:
         with self._lock:
             item = self._state.get(authorization_id)
             if (
                 item is None
-                or item["consumed"] is True
+                or item["status"] == "completed"
                 or not hmac.compare_digest(str(item["fingerprint"]), fingerprint)
             ):
                 return False
-            item["consumed"] = True
+            item["status"] = "reserved"
+            return True
+
+    def compare_and_swap_completed(self, authorization_id: str, fingerprint: str) -> bool:
+        with self._lock:
+            item = self._state.get(authorization_id)
+            if (
+                item is None
+                or item["status"] != "reserved"
+                or not hmac.compare_digest(str(item["fingerprint"]), fingerprint)
+            ):
+                return False
+            item["status"] = "completed"
             return True
 
     def snapshot(self) -> Mapping[str, Mapping[str, object]]:
@@ -1171,7 +1194,7 @@ class InMemoryDestroyAuthorizationStateStore:
             return {
                 authorization_id: {
                     "fingerprint": item["fingerprint"],
-                    "consumed": item["consumed"],
+                    "status": item["status"],
                 }
                 for authorization_id, item in self._state.items()
             }
@@ -1201,7 +1224,7 @@ class DestroyAuthorizationIssuer:
 
 
 class DestroyAuthorizationVerifier:
-    """Provider-facing verification and atomic consumption capability."""
+    """Provider-facing verification, reservation, and completion capability."""
 
     def __init__(self, state_store: DestroyAuthorizationStateStore) -> None:
         self.__state_store = state_store
@@ -1212,11 +1235,20 @@ class DestroyAuthorizationVerifier:
             _destroy_authorization_fingerprint(authorization),
         )
 
-    def consumed(self, authorization: DestroyAuthorization) -> bool:
-        return self.__state_store.consumed(authorization.authorization_id)
+    def reserved(self, authorization: DestroyAuthorization) -> bool:
+        return self.__state_store.reserved(authorization.authorization_id)
 
-    def consume(self, authorization: DestroyAuthorization) -> bool:
-        return self.__state_store.compare_and_swap_consumed(
+    def completed(self, authorization: DestroyAuthorization) -> bool:
+        return self.__state_store.completed(authorization.authorization_id)
+
+    def reserve(self, authorization: DestroyAuthorization) -> bool:
+        return self.__state_store.compare_and_swap_reserved(
+            authorization.authorization_id,
+            _destroy_authorization_fingerprint(authorization),
+        )
+
+    def complete(self, authorization: DestroyAuthorization) -> bool:
+        return self.__state_store.compare_and_swap_completed(
             authorization.authorization_id,
             _destroy_authorization_fingerprint(authorization),
         )
@@ -1680,6 +1712,8 @@ class FakeControl(str, Enum):
     GIT_WRONG_ANCESTRY = "git-wrong-ancestry"
     STOP_PARTIAL = "stop-partial"
     DESTROY_RESIDUAL = "destroy-residual"
+    DESTROY_AFTER_RESERVATION_CNO = "destroy-after-reservation-cno"
+    DESTROY_BEFORE_COMPLETION_CNO = "destroy-before-completion-cno"
     INSPECT_UNREACHABLE = "inspect-unreachable"
     ALREADY_ABSENT = "already-absent"
     DUPLICATE_RESOURCES = "duplicate-resources"
@@ -1738,6 +1772,7 @@ class FakeSandboxProvider:
         self._resources: dict[SandboxIdentity, _FakeResource] = {}
         self._by_run: dict[str, SandboxIdentity] = {}
         self._create_calls: dict[str, int] = {}
+        self._destroy_interruptions: set[FakeControl] = set()
         self._authorization_verifier = authorization_verifier
         self.calls: list[tuple[OperationKind, str]] = []
         self.external_call_count = 0
@@ -2127,8 +2162,8 @@ class FakeSandboxProvider:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization is absent; provider did not destroy", resource_id=identity.provider_resource_id), authorization_id=None)
         if self._authorization_verifier is None or not self._authorization_verifier.verifies(authorization):
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization has no valid SSSF authenticator", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
-        if self._authorization_verifier.consumed(authorization):
-            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "one-use destroy authorization was already consumed", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if self._authorization_verifier.completed(authorization):
+            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "one-use destroy authorization was already completed", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if operation.kind is not OperationKind.DESTROY:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy call used a non-destroy operation identity", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if (
@@ -2144,16 +2179,26 @@ class FakeSandboxProvider:
         target, lookup_observation = self._resource_for(identity)
         if target is None:
             return DestroyFacts(**self._base(operation, lookup_observation, "destroy target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "destroy target identity could not be authoritatively resolved", state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
-        if FakeControl.ALREADY_ABSENT in self.controls:
-            if not self._authorization_verifier.consume(authorization):
-                return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization provenance changed before consumption", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if (target.destroyed and not target.residual) or FakeControl.ALREADY_ABSENT in self.controls:
+            if not self._authorization_verifier.reserve(authorization) or not self._authorization_verifier.complete(authorization):
+                return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "destroy completion could not be durably recorded", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
             target.destroyed = True
             target.state = LifecycleState.ABSENT
             target.resources_quiescent = True
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "resource already absent; destroy is idempotent", prior=LifecycleState.ABSENT, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=False, already_absent=True, authorization_id=authorization.authorization_id)
-        if not self._authorization_verifier.consume(authorization):
-            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization provenance changed before consumption", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if not self._authorization_verifier.reserve(authorization):
+            return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization could not be durably reserved", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        if FakeControl.DESTROY_AFTER_RESERVATION_CNO in self.controls and FakeControl.DESTROY_AFTER_RESERVATION_CNO not in self._destroy_interruptions:
+            self._destroy_interruptions.add(FakeControl.DESTROY_AFTER_RESERVATION_CNO)
+            return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "provider failed after destroy reservation but before side effect", prior=LifecycleState.PRESENT, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         target.destroyed = True
+        if FakeControl.DESTROY_BEFORE_COMPLETION_CNO in self.controls and FakeControl.DESTROY_BEFORE_COMPLETION_CNO not in self._destroy_interruptions:
+            self._destroy_interruptions.add(FakeControl.DESTROY_BEFORE_COMPLETION_CNO)
+            target.state = LifecycleState.ABSENT
+            target.resources_quiescent = True
+            return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "provider failed after destroy side effect but before durable completion", prior=LifecycleState.DESTROYING, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), acknowledged=True, authorization_id=authorization.authorization_id)
+        if not self._authorization_verifier.complete(authorization):
+            return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "destroy occurred but completion could not be durably recorded", prior=LifecycleState.DESTROYING, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), acknowledged=True, authorization_id=authorization.authorization_id)
         if FakeControl.DESTROY_RESIDUAL in self.controls:
             target.residual = True
             target.resources_quiescent = False

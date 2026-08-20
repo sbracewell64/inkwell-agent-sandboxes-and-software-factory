@@ -173,10 +173,13 @@ Destroy requires an opaque SSSF-issued `DestroyAuthorization`. The SSSF-only
 `DestroyAuthorizationIssuer` owns signing material and records the authenticated
 value in `DestroyAuthorizationStateStore`; signing material is never serialized.
 The provider receives only `DestroyAuthorizationVerifier`, which can verify and
-atomically compare-and-swap an issued capability to consumed but cannot mint or
-record one. Production binds that state seam to the durable SSSF owner; the
+atomically compare-and-swap an issued capability through `reserved` and
+`completed` states but cannot mint or record one. A reservation remains
+identity-bound and retryable after authoritative reconciliation when failure
+precedes the side effect; completion is recorded only after destruction or
+authoritative absence. Production binds that state seam to the durable SSSF owner; the
 in-memory implementation is only the deterministic fake. Fabricated capabilities
-are rejected, while issued provenance and consumed status remain valid across
+are rejected, while issued provenance and completion status remain valid across
 serialization and supervisor restart. Residual or ambiguous state is preserved
 for later reconciliation.
 
