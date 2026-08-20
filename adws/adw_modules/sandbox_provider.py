@@ -1017,6 +1017,7 @@ def validate_git_export(
         and facts.operation == spec.operation
         and (provider_resource_id is None or facts.provider_resource_id == provider_resource_id)
         and facts.source == spec.source
+        and facts.export_ref == spec.export_ref
         and facts.base_commit == spec.expected_base_commit
         and facts.base_tree == spec.expected_base_tree
         and facts.promotion_authority is PromotionAuthority.NONE
@@ -1179,6 +1180,8 @@ class InMemoryLifecycleRecordStore:
         expected_version: int,
         record: LifecycleOperationRecord,
     ) -> int:
+        if record.operation.run_id != run_id or record.operation.operation_id != operation_id:
+            raise ValueError("CAS record identity differs from the selected lifecycle stream")
         current = self.latest(run_id, operation_id)
         if current is None or current.version != expected_version:
             raise RuntimeError("lifecycle record compare-and-swap lost its owner")
@@ -1218,6 +1221,26 @@ class OutcomeCheck:
             raise ValueError("outcome check observation must be closed or None")
         if not self.reason:
             object.__setattr__(self, "reason", "no reason supplied")
+
+
+@dataclass(frozen=True, slots=True)
+class SecretRetirementFacts:
+    sandbox_identity: SandboxIdentity
+    operation: OperationKey
+    secret_refs: tuple[str, ...]
+    observation: Observation
+    reason: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.sandbox_identity, SandboxIdentity):
+            raise ValueError("secret retirement sandbox identity is required")
+        if self.operation.kind is not OperationKind.DESTROY:
+            raise ValueError("secret retirement must bind the destroy operation")
+        object.__setattr__(self, "secret_refs", tuple(self.secret_refs))
+        _sorted_tokens(self.secret_refs, "retired secret_refs")
+        if not isinstance(self.observation, Observation):
+            raise ValueError("secret retirement observation must be closed")
+        _nonempty(self.reason, "secret retirement reason")
 
 
 @dataclass(frozen=True, slots=True)
@@ -1370,13 +1393,17 @@ def issue_destroy_authorization(
     git: GitExportFacts,
     artifact_spec: ArtifactSpec,
     git_spec: GitExportSpec,
-    secret_retirement: OutcomeCheck | None = None,
+    secret_retirement: SecretRetirementFacts | None = None,
     issued_at: str = "1970-01-01T00:00:00Z",
 ) -> DestroyAuthorization:
     """Mint destruction authority only after SSSF-owned export obligations pass."""
     if operation.kind is not OperationKind.DESTROY:
         raise DestroyNotAuthorized("destroy authorization requires a DESTROY operation")
-    if operation.run_id != spec.run_id or identity.run_id != spec.run_id:
+    if (
+        operation.run_id != spec.run_id
+        or identity.run_id != spec.run_id
+        or identity.spec_digest != spec.identity_digest
+    ):
         raise DestroyNotAuthorized("destroy authorization identity is stale")
     if identity.provider_resource_id is None:
         raise DestroyNotAuthorized("destroy authorization needs a provider resource identity")
@@ -1384,6 +1411,16 @@ def issue_destroy_authorization(
         raise DestroyNotAuthorized("destroy authorization requires an applicable required artifact obligation")
     if not git_spec.applicable or not git_spec.required:
         raise DestroyNotAuthorized("destroy authorization requires an applicable required Git obligation")
+    artifact_context = artifact_spec.manifest_context
+    if (
+        artifact_spec.operation.run_id != spec.run_id
+        or artifact_context.run_id != spec.run_id
+        or artifact_context.canonical_url != spec.source_repo
+        or artifact_context.base_sha != spec.source_commit
+    ):
+        raise DestroyNotAuthorized("artifact obligation does not belong to the sandbox specification")
+    if git_spec.operation.run_id != spec.run_id or git_spec.source != spec.source_identity:
+        raise DestroyNotAuthorized("Git obligation does not belong to the sandbox specification")
     artifact_check = validate_artifact_export(
         artifact_spec, artifact, provider_resource_id=identity.provider_resource_id
     )
@@ -1394,7 +1431,20 @@ def issue_destroy_authorization(
     if spec.secret_refs:
         if secret_retirement is None:
             raise DestroyNotAuthorized("secret retirement observation is required before destroy")
-        checks.append(secret_retirement)
+        retirement_identity_ok = (
+            secret_retirement.sandbox_identity == identity
+            and secret_retirement.operation == operation
+            and secret_retirement.secret_refs == tuple(sorted(spec.secret_refs))
+        )
+        checks.append(
+            OutcomeCheck(
+                "secret-retirement",
+                secret_retirement.observation,
+                identity_verified=retirement_identity_ok,
+                complete=retirement_identity_ok,
+                reason=secret_retirement.reason,
+            )
+        )
     folded = fold_aggregate(evidence=checks)
     if folded.status is not Observation.OBSERVED_GOOD:
         raise DestroyNotAuthorized(f"destroy obligations are not PASS: {folded.reason}")
@@ -2040,6 +2090,7 @@ __all__ = [
     "SandboxProvider",
     "SandboxSpec",
     "SandboxStateFacts",
+    "SecretRetirementFacts",
     "SourceCopySpec",
     "SourceIdentity",
     "StdinPolicy",

@@ -40,6 +40,7 @@ from adws.adw_modules.sandbox_provider import (  # noqa: E402
     ResourceBounds,
     SandboxIdentity,
     SandboxSpec,
+    SecretRetirementFacts,
     SourceIdentity,
     StdinPolicy,
     WorkspaceMode,
@@ -597,6 +598,74 @@ def durable_record_controls(errors: list[str]) -> None:
     )
     store.append(other_record)
     check(other_record.version == 0 and store.latest(run.run_id, other_operation.operation_id) == other_record, "durable record version leaked across operation streams", errors)
+    cross_stream_record = replace(
+        other_record,
+        record_id="record-3",
+        version=1,
+    )
+    try:
+        store.compare_and_swap(run.run_id, operation.operation_id, 0, cross_stream_record)
+    except ValueError:
+        pass
+    else:
+        errors.append("durable record CAS accepted a record from another lifecycle stream")
+
+
+def destroy_binding_controls(errors: list[str]) -> None:
+    run = replace(spec(), secret_refs=("secret/a", "secret/b"))
+    provider = FakeSandboxProvider()
+    identity = create(provider, run)
+    artifact_spec = make_artifact(run)
+    git_spec = make_git(run)
+    artifact = provider.collect_artifacts(identity, artifact_spec)
+    git = provider.export_git(identity, git_spec)
+    destroy_operation = key(run, OperationKind.DESTROY, "bound-destroy")
+    retirement = SecretRetirementFacts(
+        sandbox_identity=identity,
+        operation=destroy_operation,
+        secret_refs=("secret/a", "secret/b"),
+        observation=Observation.OBSERVED_GOOD,
+        reason="all requested secret capabilities retired",
+    )
+    issue_destroy_authorization(
+        run,
+        identity,
+        destroy_operation,
+        artifact=artifact,
+        git=git,
+        artifact_spec=artifact_spec,
+        git_spec=git_spec,
+        secret_retirement=retirement,
+    )
+    stale_spec = replace(run, profile_id="profile/other")
+    wrong_cases = (
+        (stale_spec, identity, artifact_spec, git_spec, retirement, "stale sandbox spec digest"),
+        (run, identity, replace(artifact_spec, manifest_context=replace(artifact_spec.manifest_context, canonical_url="https://example.invalid/other.git")), git_spec, retirement, "foreign artifact source"),
+        (run, identity, artifact_spec, replace(git_spec, source=SourceIdentity("https://example.invalid/other.git", run.source_commit, run.source_tree)), retirement, "foreign Git source"),
+        (run, identity, artifact_spec, git_spec, replace(retirement, secret_refs=("secret/a",)), "partial secret retirement"),
+    )
+    for candidate_spec, candidate_identity, candidate_artifact_spec, candidate_git_spec, candidate_retirement, label in wrong_cases:
+        try:
+            issue_destroy_authorization(
+                candidate_spec,
+                candidate_identity,
+                destroy_operation,
+                artifact=artifact,
+                git=git,
+                artifact_spec=candidate_artifact_spec,
+                git_spec=candidate_git_spec,
+                secret_retirement=candidate_retirement,
+            )
+        except DestroyNotAuthorized:
+            pass
+        else:
+            errors.append(f"destroy authorization accepted {label}")
+    wrong_ref = replace(git, export_ref="refs/exports/other")
+    check(
+        not validate_git_export(git_spec, wrong_ref, provider_resource_id=identity.provider_resource_id).identity_verified,
+        "Git export validation accepted a different export reference",
+        errors,
+    )
 
 
 def run_controls() -> list[str]:
@@ -613,6 +682,7 @@ def run_controls() -> list[str]:
         ambiguity_and_identity_controls(errors)
         cleanup_and_authority_controls(errors)
         interruption_controls(errors)
+        destroy_binding_controls(errors)
     exec_controls(errors)
     artifact_and_git_controls(errors)
     aggregate_controls(errors)
