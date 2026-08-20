@@ -47,6 +47,7 @@ from adws.adw_modules.sandbox_provider import (  # noqa: E402
     validate_artifact_export,
     validate_git_export,
 )
+from tools.evidence_manifest import ValidationContext as EvidenceManifestContext  # noqa: E402
 
 
 def check(condition: bool, message: str, errors: list[str]) -> None:
@@ -112,6 +113,7 @@ def command(run: SandboxSpec, suffix: str = "exec") -> CommandSpec:
 
 
 def make_artifact(run: SandboxSpec) -> ArtifactSpec:
+    fixture_root = ROOT / "tests" / "fixtures" / "sandbox_provider"
     return ArtifactSpec(
         operation=key(run, OperationKind.COLLECT_ARTIFACTS, "artifact"),
         artifact_id="artifact-fixture",
@@ -123,7 +125,20 @@ def make_artifact(run: SandboxSpec) -> ArtifactSpec:
         max_file_bytes=512,
         producer_id="fake-provider",
         purpose="sbx-fixture",
-        manifest_ref="manifest/evidence-v1",
+        manifest_path=fixture_root / "manifest.json",
+        artifact_root=fixture_root,
+        manifest_context=EvidenceManifestContext(
+            canonical_url=run.source_repo,
+            base_sha=run.source_commit,
+            candidate_sha="2" * 40,
+            branch="fm/sssf-sbx-1",
+            worktree_role="runtime",
+            run_id=run.run_id,
+            adw_id=None,
+            purpose="sbx-fixture",
+            required_phases=("artifact-export",),
+            required_dimensions=("sandbox-artifacts",),
+        ),
     )
 
 
@@ -251,7 +266,7 @@ def artifact_and_git_controls(errors: list[str]) -> None:
         if label == "missing":
             check(result.missing_paths == ("evidence/result.json",) and not result.complete, "artifact missing: no positive missing inventory", errors)
         elif label == "tampered":
-            check(result.tampered_paths == ("evidence/result.json",) and result.inventory[0].sha256 != result.inventory[0].expected_sha256, "artifact tamper: digest mismatch was not manufactured", errors)
+            check(result.tampered_paths == ("evidence/result.json",) and result.inventory[0].sha256 == "0" * 64, "artifact tamper: digest mismatch was not manufactured", errors)
         else:
             check(result.overflowed and not result.complete, "artifact overflow: no positive bound fact", errors)
 
@@ -268,14 +283,16 @@ def artifact_and_git_controls(errors: list[str]) -> None:
     misleading_artifacts = (
         replace(valid_artifact, tampered_paths=(item.path,)),
         replace(valid_artifact, inventory=(replace(item, sha256="0" * 64),)),
-        replace(valid_artifact, inventory_sha256="0" * 64),
         replace(valid_artifact, total_bytes=valid_artifact.total_bytes + 1),
     )
     check(
         all(validate_artifact_export(artifact_spec, fact, provider_resource_id=identity.provider_resource_id).observation is Observation.OBSERVED_BAD for fact in misleading_artifacts),
-        "artifact validator trusted observed-good tamper, item/inventory digest, or byte-total contradictions",
+        "artifact validator trusted observed-good tamper, canonical digest, or byte-total contradictions",
         errors,
     )
+    unavailable_manifest = replace(artifact_spec, manifest_path=artifact_spec.manifest_path.with_name("missing.json"))
+    manifest_check = validate_artifact_export(unavailable_manifest, valid_artifact, provider_resource_id=identity.provider_resource_id)
+    check(manifest_check.observation is Observation.COULD_NOT_OBSERVE, "unavailable canonical evidence manifest was narrowed to success", errors)
     git_spec = make_git(run)
     valid_git = provider.export_git(identity, git_spec)
     oversized_git = replace(valid_git, bundle_bytes=git_spec.max_bundle_bytes + 1)
@@ -363,6 +380,18 @@ def cleanup_and_authority_controls(errors: list[str]) -> None:
     interrupted.interrupt_before = None
     retry = interrupted.destroy(identity, destroy_key, auth)
     check(first.observation is Observation.COULD_NOT_OBSERVE and retry.acknowledged, "pre-linearization destroy interruption consumed retry authority", errors)
+
+    unresolved = FakeSandboxProvider()
+    identity = create(unresolved, run)
+    artifact_spec = make_artifact(run)
+    git_spec = make_git(run)
+    artifact = unresolved.collect_artifacts(identity, artifact_spec)
+    git = unresolved.export_git(identity, git_spec)
+    destroy_key = key(run, OperationKind.DESTROY, "wrong-destroy-identity")
+    auth = issue_destroy_authorization(run, identity, destroy_key, artifact=artifact, git=git, artifact_spec=artifact_spec, git_spec=git_spec)
+    wrong_identity = SandboxIdentity(identity.run_id, "f" * 64, identity.provider_resource_id)
+    unknown = unresolved.destroy(wrong_identity, destroy_key, auth)
+    check(unknown.observation is Observation.COULD_NOT_OBSERVE and unknown.observed_state is LifecycleState.UNKNOWN and not unknown.already_absent, "unresolved destroy identity was converted to absence", errors)
 
 
 def aggregate_controls(errors: list[str]) -> None:

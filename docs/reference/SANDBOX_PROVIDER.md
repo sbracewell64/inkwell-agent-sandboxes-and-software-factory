@@ -127,7 +127,9 @@ contains exact paths, required/applicable status, producer/purpose/manifest
 identity, and positive file/count/byte bounds. `ArtifactExportFacts` returns a
 path-sorted, duplicate-free inventory with byte lengths, SHA-256 digests,
 producer/run/operation/attempt identities, completeness, overflow, missing and
-tamper facts, and a pointer to the existing evidence-manifest owner.
+tamper facts. `ArtifactSpec` binds the manifest path, artifact root, and
+`tools/evidence_manifest.py` validation context; its observed result and
+validated inventory are required before the export obligation can pass.
 
 The provider does not create a second evidence serializer or validator. Runtime
 SSSF integration must use the sole `tools/evidence_manifest.py` serializer and

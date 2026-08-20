@@ -16,11 +16,16 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 import hashlib
 import json
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 import re
 from typing import Iterable, Mapping, Protocol, Sequence
 
 from .subprocess_supervisor import Observation, SupervisorRequest
+from tools.evidence_manifest import (
+    Observation as EvidenceManifestObservation,
+    ValidationContext as EvidenceManifestContext,
+    validate_manifest as validate_evidence_manifest,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -447,7 +452,9 @@ class ArtifactSpec:
     max_file_bytes: int
     producer_id: str
     purpose: str
-    manifest_ref: str
+    manifest_path: Path
+    artifact_root: Path
+    manifest_context: EvidenceManifestContext
 
     def __post_init__(self) -> None:
         if self.operation.kind is not OperationKind.COLLECT_ARTIFACTS:
@@ -467,7 +474,10 @@ class ArtifactSpec:
             raise ValueError("artifact max_files is below the exact path inventory")
         _token(self.producer_id, "producer_id")
         _token(self.purpose, "purpose")
-        _token(self.manifest_ref, "manifest_ref")
+        if not isinstance(self.manifest_path, Path) or not isinstance(self.artifact_root, Path):
+            raise ValueError("artifact manifest and root must be paths")
+        if not isinstance(self.manifest_context, EvidenceManifestContext):
+            raise ValueError("artifact manifest context must use the canonical evidence owner")
 
 
 @dataclass(frozen=True, slots=True)
@@ -480,7 +490,6 @@ class ArtifactInventoryItem:
     run_id: str
     operation_id: str
     attempt_id: str
-    expected_sha256: str | None = None
 
     def __post_init__(self) -> None:
         _relative_path(self.path, "artifact inventory path")
@@ -490,8 +499,6 @@ class ArtifactInventoryItem:
         _digest(self.sha256, "artifact sha256")
         for name in ("producer_id", "run_id", "operation_id", "attempt_id"):
             _token(getattr(self, name), name)
-        if self.expected_sha256 is not None:
-            _digest(self.expected_sha256, "artifact expected_sha256")
 
 
 @dataclass(frozen=True, slots=True)
@@ -740,12 +747,10 @@ class ArtifactExportFacts(FactBase):
     applicable: bool = True
     complete: bool = False
     inventory: tuple[ArtifactInventoryItem, ...] = ()
-    inventory_sha256: str = hashlib.sha256(b"").hexdigest()
     total_bytes: int = 0
     missing_paths: tuple[str, ...] = ()
     tampered_paths: tuple[str, ...] = ()
     overflowed: bool = False
-    manifest_ref: str = ""
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -759,7 +764,6 @@ class ArtifactExportFacts(FactBase):
             raise ValueError("artifact inventory must be path-sorted")
         if len({item.path for item in self.inventory}) != len(self.inventory):
             raise ValueError("artifact inventory paths must be unique")
-        _digest(self.inventory_sha256, "inventory_sha256")
         if not isinstance(self.total_bytes, int) or isinstance(self.total_bytes, bool) or self.total_bytes < 0:
             raise ValueError("artifact total_bytes must be nonnegative")
         _tokens(self.missing_paths, "missing_paths")
@@ -768,7 +772,6 @@ class ArtifactExportFacts(FactBase):
         _tokens(self.tampered_paths, "tampered_paths")
         for path in self.tampered_paths:
             _relative_path(path, "tampered artifact path")
-        _token(self.manifest_ref, "manifest_ref")
 
 
 @dataclass(frozen=True, slots=True)
@@ -930,30 +933,30 @@ def validate_artifact_export(
         and facts.operation == spec.operation
         and (provider_resource_id is None or facts.provider_resource_id == provider_resource_id)
     )
-    computed_inventory_digest = hashlib.sha256(
-        json.dumps(
-            [asdict(item) for item in facts.inventory],
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-    ).hexdigest()
-    digest_mismatches = tuple(
-        item.path
-        for item in facts.inventory
-        if item.expected_sha256 is not None and item.sha256 != item.expected_sha256
-    )
-    expected_digests_present = all(item.expected_sha256 is not None for item in facts.inventory)
     total_bytes_match = facts.total_bytes == sum(item.byte_length for item in facts.inventory)
-    inventory_digest_match = facts.inventory_sha256 == computed_inventory_digest
-    tampered = bool(facts.tampered_paths or digest_mismatches)
+    manifest_validation = validate_evidence_manifest(
+        spec.manifest_path,
+        spec.artifact_root,
+        spec.manifest_context,
+    )
+    manifest_items = {item.path: item for item in manifest_validation.validated_inventory}
+    manifest_inventory_match = len(manifest_items) == len(facts.inventory) and all(
+        item.path in manifest_items
+        and item.artifact_type == manifest_items[item.path].artifact_type
+        and item.byte_length == manifest_items[item.path].byte_length
+        and item.sha256 == manifest_items[item.path].sha256
+        and item.producer_id == manifest_items[item.path].producer
+        and item.run_id == manifest_items[item.path].run_id
+        for item in facts.inventory
+    )
+    tampered = bool(facts.tampered_paths)
     complete = (
         facts.complete
         and not facts.missing_paths
         and not facts.overflowed
         and not tampered
-        and expected_digests_present
         and total_bytes_match
-        and inventory_digest_match
+        and manifest_inventory_match
     )
     paths = tuple(item.path for item in facts.inventory)
     exact_paths = paths == spec.paths
@@ -971,13 +974,17 @@ def validate_artifact_export(
     )
     if facts.observation is Observation.OBSERVED_BAD:
         return OutcomeCheck("artifact-export", Observation.OBSERVED_BAD, reason=facts.reason)
+    if manifest_validation.observation is EvidenceManifestObservation.OBSERVED_BAD:
+        return OutcomeCheck("artifact-export", Observation.OBSERVED_BAD, reason="; ".join(manifest_validation.issues))
     if facts.observation is Observation.COULD_NOT_OBSERVE:
         return OutcomeCheck("artifact-export", Observation.COULD_NOT_OBSERVE, reason=facts.reason)
-    if tampered or not total_bytes_match or not inventory_digest_match:
+    if manifest_validation.observation is EvidenceManifestObservation.CNO:
+        return OutcomeCheck("artifact-export", Observation.COULD_NOT_OBSERVE, reason="; ".join(manifest_validation.issues))
+    if tampered or not total_bytes_match or not manifest_inventory_match:
         return OutcomeCheck(
             "artifact-export",
             Observation.OBSERVED_BAD,
-            reason="artifact tamper, item digest, inventory digest, or byte total contradiction",
+            reason="artifact facts contradict the canonical validated manifest or byte total",
         )
     return OutcomeCheck(
         "artifact-export",
@@ -1764,13 +1771,13 @@ class FakeSandboxProvider:
     def collect_artifacts(self, identity: SandboxIdentity, artifact: ArtifactSpec) -> ArtifactExportFacts:
         self._record(artifact.operation)
         if self._interrupted(LifecycleBoundary.ARTIFACT_EXPORT, InterruptTiming.BEFORE):
-            return ArtifactExportFacts(**self._base(artifact.operation, Observation.COULD_NOT_OBSERVE, "interrupted before artifact collection", resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, manifest_ref=artifact.manifest_ref)
+            return ArtifactExportFacts(**self._base(artifact.operation, Observation.COULD_NOT_OBSERVE, "interrupted before artifact collection", resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id)
         target = self._resource_for(identity)
         if target is None:
-            return ArtifactExportFacts(**self._base(artifact.operation, Observation.COULD_NOT_OBSERVE, "artifact collection target identity could not be observed", resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, manifest_ref=artifact.manifest_ref)
+            return ArtifactExportFacts(**self._base(artifact.operation, Observation.COULD_NOT_OBSERVE, "artifact collection target identity could not be observed", resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id)
         if not artifact.applicable:
-            return ArtifactExportFacts(**self._base(artifact.operation, Observation.OBSERVED_GOOD, "artifact obligation is explicitly not applicable", prior=target.state, state=target.state, resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, applicable=False, complete=True, manifest_ref=artifact.manifest_ref)
-        item = ArtifactInventoryItem("evidence/result.json", "json", 24, hashlib.sha256(b'{"result":"good"}\n').hexdigest(), artifact.producer_id, identity.run_id, artifact.operation.operation_id, artifact.operation.attempt_id, hashlib.sha256(b'{"result":"good"}\n').hexdigest())
+            return ArtifactExportFacts(**self._base(artifact.operation, Observation.OBSERVED_GOOD, "artifact obligation is explicitly not applicable", prior=target.state, state=target.state, resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, applicable=False, complete=True)
+        item = ArtifactInventoryItem("evidence/result.json", "json", 18, hashlib.sha256(b'{"result":"good"}\n').hexdigest(), artifact.producer_id, identity.run_id, artifact.operation.operation_id, artifact.operation.attempt_id)
         inventory = (item,)
         missing: tuple[str, ...] = ()
         tampered: tuple[str, ...] = ()
@@ -1783,17 +1790,16 @@ class FakeSandboxProvider:
             missing = artifact.paths or ("evidence/result.json",)
             complete, observation, reason = False, Observation.COULD_NOT_OBSERVE, "required artifact was missing"
         elif FakeControl.ARTIFACT_TAMPERED in self.controls:
-            item = ArtifactInventoryItem(item.path, item.artifact_type, item.byte_length, "0" * 64, item.producer_id, item.run_id, item.operation_id, item.attempt_id, item.expected_sha256)
+            item = ArtifactInventoryItem(item.path, item.artifact_type, item.byte_length, "0" * 64, item.producer_id, item.run_id, item.operation_id, item.attempt_id)
             inventory = (item,)
             tampered = (item.path,)
             observation, reason = Observation.OBSERVED_BAD, "artifact digest mismatch/tamper observed"
         elif FakeControl.ARTIFACT_OVERFLOW in self.controls:
             complete, observation, reason, overflowed = False, Observation.COULD_NOT_OBSERVE, "artifact byte/file bound overflowed", True
-        inventory_digest = hashlib.sha256(json.dumps([asdict(entry) for entry in inventory], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        fact = ArtifactExportFacts(**self._base(artifact.operation, observation, reason, prior=target.state, state=LifecycleState.EXPORTING, resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, applicable=True, complete=complete, inventory=inventory, inventory_sha256=inventory_digest, total_bytes=sum(entry.byte_length for entry in inventory), missing_paths=missing, tampered_paths=tampered, overflowed=overflowed, manifest_ref=artifact.manifest_ref)
+        fact = ArtifactExportFacts(**self._base(artifact.operation, observation, reason, prior=target.state, state=LifecycleState.EXPORTING, resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, applicable=True, complete=complete, inventory=inventory, total_bytes=sum(entry.byte_length for entry in inventory), missing_paths=missing, tampered_paths=tampered, overflowed=overflowed)
         target.artifacts_exported = observation is Observation.OBSERVED_GOOD
         if self._interrupted(LifecycleBoundary.ARTIFACT_EXPORT, InterruptTiming.AFTER):
-            return ArtifactExportFacts(**self._base(artifact.operation, Observation.COULD_NOT_OBSERVE, "interrupted after artifact collection", prior=target.state, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, inventory=fact.inventory, inventory_sha256=fact.inventory_sha256, total_bytes=fact.total_bytes, complete=fact.complete, missing_paths=fact.missing_paths, tampered_paths=fact.tampered_paths, overflowed=fact.overflowed, manifest_ref=artifact.manifest_ref)
+            return ArtifactExportFacts(**self._base(artifact.operation, Observation.COULD_NOT_OBSERVE, "interrupted after artifact collection", prior=target.state, state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, inventory=fact.inventory, total_bytes=fact.total_bytes, complete=fact.complete, missing_paths=fact.missing_paths, tampered_paths=fact.tampered_paths, overflowed=fact.overflowed)
         return fact
 
     def export_git(self, identity: SandboxIdentity, git: GitExportSpec) -> GitExportFacts:
@@ -1887,10 +1893,13 @@ class FakeSandboxProvider:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization has a stale or wrong identity", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if self._interrupted(LifecycleBoundary.DESTROY, InterruptTiming.BEFORE):
             return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before destroy linearization", prior=LifecycleState.PRESENT, state=LifecycleState.DESTROYING, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
-        self._used_authorizations.add(authorization.authorization_id)
         target = self._resource_for(identity)
-        if target is None or FakeControl.ALREADY_ABSENT in self.controls:
+        if FakeControl.ALREADY_ABSENT in self.controls:
+            self._used_authorizations.add(authorization.authorization_id)
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_GOOD, "resource already absent; destroy is idempotent", prior=LifecycleState.ABSENT, state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), acknowledged=False, already_absent=True, authorization_id=authorization.authorization_id)
+        if target is None:
+            return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "destroy target identity could not be authoritatively resolved", state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+        self._used_authorizations.add(authorization.authorization_id)
         target.destroyed = True
         if FakeControl.DESTROY_RESIDUAL in self.controls:
             target.residual = True
