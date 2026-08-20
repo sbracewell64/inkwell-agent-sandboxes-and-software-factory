@@ -80,10 +80,11 @@ def contract_errors(root: Path) -> list[str]:
         "python-version: '3.12.8'",
         "check-latest: false",
         "token: ''",
+        "python -m pip install pytest==8.3.5 iniconfig==2.0.0 packaging==24.2 pluggy==1.5.0 colorama==0.4.6",
         "bun-version: '1.3.14'",
         "no-cache: true",
         "just-version: '1.58.0'",
-        "github-token: ''",
+        "github-token: ${{ github.token }}",
         "python tools/ci_gate.py run --evidence ci-evidence-${{ runner.os }}.json",
     )
     for fragment in required_fragments:
