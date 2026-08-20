@@ -87,8 +87,9 @@ adws/adw_*.py         12 workflows. Each opens with a `Phases:` docstring that i
                       in one line. Thin on purpose: logic lives in adw_modules/.
 adws/adw_modules/     agents.py (roster + validation), agent_pi.py / agent_cc.py (harness
                       adapters), pi_json_adapter.py (strict Pi JSON/print contract),
-                      subprocess_supervisor.py (bounded native process owner), data_types.py
-                      (typed envelopes), gates.py, quality.py (deterministic checks incl. the
+                      subprocess_supervisor.py (bounded native process owner),
+                      sandbox_provider.py (SBX-1 provider-neutral environment contract/fake),
+                      data_types.py (typed envelopes), gates.py, quality.py (deterministic checks incl. the
                       test suite), tracer.py (the trace db), session.py, runner.py,
                       permissions.py, git_helper.py.
 adws/adw_sssf_config/ sssf.config.yaml (cheap roster) and sssf.frontier.config.yaml.

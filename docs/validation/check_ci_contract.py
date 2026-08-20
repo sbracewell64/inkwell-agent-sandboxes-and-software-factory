@@ -44,6 +44,9 @@ EXPECTED_CHECKS = {
     "production-extension-path-validator": (
         "{python}", "docs/validation/check_production_extension_path.py"
     ),
+    "sandbox-provider-contract-validator": (
+        "{python}", "docs/validation/check_sandbox_provider.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
 

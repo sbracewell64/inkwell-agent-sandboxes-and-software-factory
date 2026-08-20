@@ -27,8 +27,10 @@ Never hand-edit session evidence.
 - `docs/validation/check_evidence_manifest.py` — positive and watched-red controls
 - `docs/validation/fixtures/evidence_manifest/` — canonical offline fixtures
 
-## Sandbox orchestration
+## Sandbox contract and orchestration
 
+- `adws/adw_modules/sandbox_provider.py` — SBX-1 typed provider contract, SSSF lifecycle seam, and deterministic fake
+- `docs/reference/SANDBOX_PROVIDER.md` — sole public provider contract/owner-boundary reference
 - `just/sandbox/`
 - `sandbox_mount/host/`
 - `sandbox_mount/guest/`
