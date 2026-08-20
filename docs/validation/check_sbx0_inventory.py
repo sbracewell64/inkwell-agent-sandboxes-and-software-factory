@@ -559,8 +559,8 @@ def _watched_red_controls(document: dict[str, Any]) -> list[str]:
     """Return control names that failed to go red; mutations stay in memory."""
     controls: list[tuple[str, Any, str]] = []
     stale = copy.deepcopy(document)
-    stale["authority_boundary"]["starting_sssf_main_sha"] = EXPECTED_REPORT_CODE_SHA
-    controls.append(("stale-source-generation", stale, "starting SSSF generation is stale"))
+    stale["source_snapshot"]["generation_id"] = "sbx-0-report/v0"
+    controls.append(("stale-source-generation", stale, "source_snapshot generation_id mismatch"))
     digest = copy.deepcopy(document)
     digest["source_snapshot"]["content_sha256"] = "0" * 64
     controls.append(("content-digest-mismatch", digest, "source_snapshot content_sha256 mismatch"))
