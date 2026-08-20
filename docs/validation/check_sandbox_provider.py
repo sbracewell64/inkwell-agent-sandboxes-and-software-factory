@@ -12,6 +12,7 @@ from __future__ import annotations
 import sys
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -47,7 +48,12 @@ from adws.adw_modules.sandbox_provider import (  # noqa: E402
     validate_artifact_export,
     validate_git_export,
 )
-from tools.evidence_manifest import ValidationContext as EvidenceManifestContext  # noqa: E402
+from tools.evidence_manifest import (  # noqa: E402
+    Observation as EvidenceManifestObservation,
+    ValidatedInventoryItem,
+    ValidationContext as EvidenceManifestContext,
+    ValidationResult as EvidenceManifestValidationResult,
+)
 
 
 def check(condition: bool, message: str, errors: list[str]) -> None:
@@ -154,6 +160,32 @@ def make_git(run: SandboxSpec) -> GitExportSpec:
         expected_tip_tree="3" * 40,
         max_bundle_bytes=1024,
         export_ref="refs/sandbox/sbx-fixture-run",
+    )
+
+
+def fixture_manifest_validation() -> EvidenceManifestValidationResult:
+    """Return the canonical validator's typed result for the immutable fixture.
+
+    The fake controls exercise provider/lifecycle behavior, not host filesystem
+    capabilities.  Windows correctly lacks the descriptor-relative no-follow
+    primitives required to observe this fixture directly, so inject the exact
+    prevalidated inventory while those provider-free controls run.  The real
+    validator (including its Windows CNO) is exercised unpatched below.
+    """
+    return EvidenceManifestValidationResult(
+        EvidenceManifestObservation.OBSERVED_GOOD,
+        (),
+        checked_inventory=("evidence/result.json",),
+        validated_inventory=(
+            ValidatedInventoryItem(
+                path="evidence/result.json",
+                artifact_type="json",
+                byte_length=18,
+                sha256="99d701cee4dbd6a73fa8004f9887a30be4461c1093ad2f24438c828feaba48f4",
+                producer="fake-provider",
+                run_id="sbx-fixture-run",
+            ),
+        ),
     )
 
 
@@ -313,11 +345,15 @@ def artifact_and_git_controls(errors: list[str]) -> None:
         replace(valid_artifact, inventory=(replace(item, sha256="0" * 64),)),
         replace(valid_artifact, total_bytes=valid_artifact.total_bytes + 1),
     )
-    check(
-        all(validate_artifact_export(artifact_spec, fact, provider_resource_id=identity.provider_resource_id).observation is Observation.OBSERVED_BAD for fact in misleading_artifacts),
-        "artifact validator trusted observed-good tamper, canonical digest, or byte-total contradictions",
-        errors,
-    )
+    with patch(
+        "adws.adw_modules.sandbox_provider.validate_evidence_manifest",
+        return_value=fixture_manifest_validation(),
+    ):
+        check(
+            all(validate_artifact_export(artifact_spec, fact, provider_resource_id=identity.provider_resource_id).observation is Observation.OBSERVED_BAD for fact in misleading_artifacts),
+            "artifact validator trusted observed-good tamper, canonical digest, or byte-total contradictions",
+            errors,
+        )
     unavailable_manifest = replace(artifact_spec, manifest_path=artifact_spec.manifest_path.with_name("missing.json"))
     manifest_check = validate_artifact_export(unavailable_manifest, valid_artifact, provider_resource_id=identity.provider_resource_id)
     check(manifest_check.observation is Observation.COULD_NOT_OBSERVE, "unavailable canonical evidence manifest was narrowed to success", errors)
@@ -565,13 +601,21 @@ def durable_record_controls(errors: list[str]) -> None:
 
 def run_controls() -> list[str]:
     errors: list[str] = []
-    success_control(errors)
-    ambiguity_and_identity_controls(errors)
+    # Keep lifecycle controls deterministic across hosts while retaining the
+    # canonical evidence validator as the production owner.  In particular,
+    # Windows must preserve its direct validation result as CNO rather than
+    # causing the fake provider controls to abort before they are observed.
+    with patch(
+        "adws.adw_modules.sandbox_provider.validate_evidence_manifest",
+        return_value=fixture_manifest_validation(),
+    ):
+        success_control(errors)
+        ambiguity_and_identity_controls(errors)
+        cleanup_and_authority_controls(errors)
+        interruption_controls(errors)
     exec_controls(errors)
     artifact_and_git_controls(errors)
-    cleanup_and_authority_controls(errors)
     aggregate_controls(errors)
-    interruption_controls(errors)
     durable_record_controls(errors)
     return errors
 
