@@ -1,0 +1,2243 @@
+{
+  "authority_boundary": {
+    "dsh_observation": "could-not-observe",
+    "independent_semantic_review_observation": "could-not-observe",
+    "landing_authorization_observation": "could-not-observe",
+    "real_provider_custody_observation": "could-not-observe",
+    "ruling_id": "SOL-FM-SSSF-SBX1-POSTMERGE-20260820-1203",
+    "sbx0_exit_observation": "could-not-observe",
+    "sbx1_acceptance_observation": "could-not-observe",
+    "sbx1_activation_observation": "could-not-observe",
+    "sbx2_unlock_observation": "could-not-observe",
+    "source_report_copy_committed": false,
+    "source_report_is_authority": false,
+    "source_report_role": "Mutable fleet-local evidence input; this durable inventory is the inspectable handoff record.",
+    "starting_sssf_main_sha": "b902cdcecd65c8ba03031875297d31e990f12c11",
+    "wayfinder_observation": "could-not-observe",
+    "windows_host_observation": "could-not-observe"
+  },
+  "classification_vocabulary": [
+    "provider-neutral-semantic",
+    "exe.dev/provider-mechanism",
+    "limitation",
+    "obsolete-artifact",
+    "external-dependency",
+    "could-not-observe"
+  ],
+  "coverage": {
+    "required_deferred_item_ids": [
+      "sbx0.deferred.ambiguity.01",
+      "sbx0.deferred.ambiguity.02",
+      "sbx0.deferred.ambiguity.03",
+      "sbx0.deferred.ambiguity.04",
+      "sbx0.deferred.ambiguity.05",
+      "sbx0.deferred.ambiguity.06",
+      "sbx0.deferred.ambiguity.07",
+      "sbx0.deferred.ambiguity.08",
+      "sbx0.deferred.ambiguity.09",
+      "sbx0.deferred.ambiguity.10",
+      "sbx0.deferred.ambiguity.11",
+      "sbx0.deferred.ambiguity.12",
+      "sbx0.deferred.ambiguity.13",
+      "sbx0.deferred.ambiguity.14",
+      "sbx0.deferred.ambiguity.15",
+      "sbx0.deferred.ambiguity.16",
+      "sbx0.deferred.qualification.01",
+      "sbx0.deferred.qualification.02",
+      "sbx0.deferred.qualification.03",
+      "sbx0.deferred.qualification.04",
+      "sbx0.deferred.qualification.05",
+      "sbx0.deferred.qualification.06",
+      "sbx0.deferred.qualification.07",
+      "sbx0.deferred.qualification.08",
+      "sbx0.deferred.qualification.09",
+      "sbx0.deferred.qualification.10",
+      "sbx0.deferred.qualification.11",
+      "sbx0.deferred.qualification.12",
+      "sbx0.deferred.qualification.13",
+      "sbx0.deferred.qualification.14",
+      "sbx0.deferred.qualification.15",
+      "sbx0.deferred.qualification.16",
+      "sbx0.deferred.qualification.17"
+    ],
+    "required_fact_ids": [
+      "sbx0.fact.001",
+      "sbx0.fact.002",
+      "sbx0.fact.003",
+      "sbx0.fact.004",
+      "sbx0.fact.005",
+      "sbx0.fact.006",
+      "sbx0.fact.007",
+      "sbx0.fact.008",
+      "sbx0.fact.009",
+      "sbx0.fact.010",
+      "sbx0.fact.011",
+      "sbx0.fact.012",
+      "sbx0.fact.013",
+      "sbx0.fact.014",
+      "sbx0.fact.015",
+      "sbx0.fact.016",
+      "sbx0.fact.017",
+      "sbx0.fact.018",
+      "sbx0.fact.019",
+      "sbx0.fact.020",
+      "sbx0.fact.021",
+      "sbx0.fact.022",
+      "sbx0.fact.023",
+      "sbx0.fact.024",
+      "sbx0.fact.025",
+      "sbx0.fact.026",
+      "sbx0.fact.027",
+      "sbx0.fact.028",
+      "sbx0.fact.029",
+      "sbx0.fact.030",
+      "sbx0.fact.031",
+      "sbx0.fact.032",
+      "sbx0.fact.033",
+      "sbx0.fact.034",
+      "sbx0.fact.035",
+      "sbx0.fact.036",
+      "sbx0.fact.037",
+      "sbx0.fact.038",
+      "sbx0.fact.039",
+      "sbx0.fact.040",
+      "sbx0.fact.041",
+      "sbx0.fact.042",
+      "sbx0.fact.043",
+      "sbx0.fact.044",
+      "sbx0.fact.045",
+      "sbx0.fact.046",
+      "sbx0.fact.047",
+      "sbx0.fact.048",
+      "sbx0.fact.049",
+      "sbx0.fact.050",
+      "sbx0.fact.051",
+      "sbx0.fact.052",
+      "sbx0.fact.053",
+      "sbx0.fact.054",
+      "sbx0.fact.055",
+      "sbx0.fact.056",
+      "sbx0.fact.057"
+    ],
+    "required_obligation_ids": [
+      "sbx1.obligation.001",
+      "sbx1.obligation.002",
+      "sbx1.obligation.003",
+      "sbx1.obligation.004",
+      "sbx1.obligation.005",
+      "sbx1.obligation.006",
+      "sbx1.obligation.007",
+      "sbx1.obligation.008",
+      "sbx1.obligation.009",
+      "sbx0.obligation.010",
+      "sbx0.obligation.011",
+      "sbx0.obligation.012",
+      "sbx0.obligation.013",
+      "sbx0.obligation.014",
+      "sbx0.obligation.015",
+      "sbx1.obligation.fake.create-ambiguity",
+      "sbx1.obligation.fake.identity-mismatch",
+      "sbx1.obligation.fake.exec-bounds",
+      "sbx1.obligation.fake.provider-client-cleanup",
+      "sbx1.obligation.fake.workload-leak",
+      "sbx1.obligation.fake.artifact-missing",
+      "sbx1.obligation.fake.artifact-tamper",
+      "sbx1.obligation.fake.artifact-overflow",
+      "sbx1.obligation.fake.git-ancestry",
+      "sbx1.obligation.fake.partial-stop",
+      "sbx1.obligation.fake.destroy-authorization",
+      "sbx1.obligation.fake.destroy-residual",
+      "sbx1.obligation.fake.inspect-unreachable",
+      "sbx1.obligation.fake.already-absent",
+      "sbx1.obligation.fake.duplicate-reconcile",
+      "sbx1.obligation.fake.boundary-interruption",
+      "sbx1.obligation.fake.secret-retirement",
+      "sbx1.obligation.fake.aggregate-precedence"
+    ],
+    "required_recommendation_ids": [
+      "sbx0.recommendation.01",
+      "sbx0.recommendation.02",
+      "sbx0.recommendation.03",
+      "sbx0.recommendation.04",
+      "sbx0.recommendation.05",
+      "sbx0.recommendation.06",
+      "sbx0.recommendation.07",
+      "sbx0.recommendation.08"
+    ],
+    "required_source_observation_ids": [
+      "sbx0.observation.001",
+      "sbx0.observation.002",
+      "sbx0.observation.003",
+      "sbx0.observation.004",
+      "sbx0.observation.005",
+      "sbx0.observation.006",
+      "sbx0.observation.007"
+    ]
+  },
+  "current_reconciliation": {
+    "planning_contract_observation": "observed-good",
+    "planning_contract_sha": "54ef67c3849b24b1eaa6e10d2ed0e49a09464a70",
+    "sbx1_contract_observation": "observed-good",
+    "sbx1_contract_path": "adws/adw_modules/sandbox_provider.py",
+    "sbx1_contract_scope": "Provider-neutral contract and deterministic fake only; no activation, acceptance, or real-provider claim.",
+    "sssf_main_observation": "observed-good",
+    "sssf_main_sha": "b902cdcecd65c8ba03031875297d31e990f12c11"
+  },
+  "deferred_items": [
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.01",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 163,
+      "statement": "Does `CommandSpec` run via Docker CLI, Engine API, or an in-container helper? The accepted supervisor can own the host client process, but not automatically every in-container descendant. Result types must separate transport process, workload process, and environment quiescence identities.",
+      "title": "Exec custody topology"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.02",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 164,
+      "statement": "The plan requires a Source Broker, but copy-in versus provider-visible broker clone and the required full-Git transfer format are undecided. This changes `copy_in`, workspace identity, and export trust boundaries.",
+      "title": "Source staging boundary"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.03",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 165,
+      "statement": "Image build versus runtime setup, read-only source plus writable overlay versus full writable clone, and named-volume/tmpfs use are unresolved. These change filesystem policy and residual checks.",
+      "title": "Workspace/image mode"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.04",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 166,
+      "statement": "Docker name/label uniqueness is likely, but the authoritative operation token, adoption rules after an ambiguous create response, and duplicate-resource resolution are not defined.",
+      "title": "Create linearization/idempotency"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.05",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 167,
+      "statement": "Requested/creating/running/ready/stopped/exited/destroying/absent/unknown and partial setup/export states need a closed model. Current `closed_at` is insufficient.",
+      "title": "State vocabulary"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.06",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 168,
+      "statement": "Grace periods, whether stop preserves evidence, and which states permit one-use destroy authorization need exact transition rules.",
+      "title": "Stop versus cancel versus destroy"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.07",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 169,
+      "statement": "Which checks are provider-generic (container state/exec availability) versus profile-specific (source/toolchain/app/trace) and who emits each observation need separation.",
+      "title": "Readiness contract"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.08",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 170,
+      "statement": "Docker network mode, DNS/egress allowlisting, port publication, owner/public access semantics, and how denial is positively observed are undecided.",
+      "title": "Network policy enforcement"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.09",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 171,
+      "statement": "Environment, file, tmpfs, stdin, or external broker; redaction; rotation/retirement; and what absence can be proved after teardown need an explicit design. Never copy the current `.env`+`models.json` duplication by default.",
+      "title": "Secret transport"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.10",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 172,
+      "statement": "CPU, memory, PIDs, disk, output, network, and concurrency units/defaults and whether an unavailable metric is refusal or runtime CNO remain unspecified.",
+      "title": "Resource bounds"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.11",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 173,
+      "statement": "Live copy versus stopped/quiescent snapshot, maximum files/bytes, required path set, symlink/hardlink behavior, and atomicity with concurrent writes can change the export interface.",
+      "title": "Artifact snapshot semantics"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.12",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 174,
+      "statement": "Whether zero commits is valid depends on an SSSF-owned expected-mutation obligation. Dirty uncommitted work, multiple refs, submodules/LFS, and exact exported tree evidence are unresolved.",
+      "title": "Git harvest semantics"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.13",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 175,
+      "statement": "Exact Docker labels/namespaces and authoritative absence scope (container only versus volumes/networks/build cache) await SBX-2 feasibility evidence.",
+      "title": "Reconciliation authority"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.14",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 176,
+      "statement": "The accepted process owner refuses native Windows. The supported Docker path must establish whether Linux/WSL custody is the production seam or whether a Windows Job Object successor is mandatory.",
+      "title": "Windows/WSL execution side"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.15",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 177,
+      "statement": "HD-08 is not integrated. The operation that freezes/validates exported evidence and the point at which it becomes acceptance input remain open.",
+      "title": "Manifest/runtime join"
+    },
+    {
+      "disposition": "deferred-contract-decision",
+      "item_id": "sbx0.deferred.ambiguity.16",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "source_line": 178,
+      "statement": "FAIL-over-CNO is supported for deterministic contradictions, but cancellation of peers, cleanup CNO, and independent partial successes need a closed aggregate/result schema rather than one scalar alone.",
+      "title": "Aggregate precedence across concurrent results"
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "No typed canonical `CommandSpec` despite accepted supervisor substrate",
+      "item_id": "sbx0.deferred.qualification.01",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "qualification_classification": "MATERIALLY BLOCKS SBX-3 truthful qualification; SBX-1 is the intended fix",
+      "rationale": "Current lifecycle command is untyped shell (`execute.just:91-101`); planning requires typed command/process owner before Docker (`ROADMAP@54ef67c:125-127`).",
+      "source_line": 186
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "B4-002 final exact-head review/acceptance remains CNO in ledger/proof matrix",
+      "item_id": "sbx0.deferred.qualification.02",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "MATERIALLY BLOCKS claiming reuse of an “accepted” process owner unless governance accepts the main bytes or a successor",
+      "rationale": "`INCREMENT_LEDGER.md:27`; `PROOF_MATRIX.md:109`. Deterministic local fixtures are good, but documentation says final-head acceptance CNO. SBX-1 must not silently call candidate semantics accepted without resolving this authority mismatch.",
+      "source_line": 187
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "Strict Pi adapter not wired to production due extension transport",
+      "item_id": "sbx0.deferred.qualification.03",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "qualification_classification": "DOES NOT BLOCK deterministic Docker lifecycle SBX-1..7; blocks later claim of qualified strict AgentBackend execution",
+      "rationale": "Docker SBX-3 explicitly needs no live coding agent (`ROADMAP@54ef67c:190`). Keep AgentBackend separate.",
+      "source_line": 188
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "Native Windows process owner CNO / no Job Objects",
+      "item_id": "sbx0.deferred.qualification.04",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "CONDITIONALLY BLOCKS supported Windows qualification",
+      "rationale": "Does not block a proven Linux/WSL custody path; does block any claim of native Windows process containment. `PROOF_MATRIX.md:105-108`. SBX-2 must bind the real execution side.",
+      "source_line": 189
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "No provider-level process/quiescence owner or residual-state contract",
+      "item_id": "sbx0.deferred.qualification.05",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "qualification_classification": "MATERIALLY BLOCKS SBX-3/5/8",
+      "rationale": "Current lifecycle has none; roadmap requires quiescence and residual check (`ROADMAP@54ef67c:190,198`). SBX-1/fake and SBX-2 mechanism binding must establish it.",
+      "source_line": 190
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "Current teardown collapses control-plane CNO to absent and has no post-destroy residual check",
+      "item_id": "sbx0.deferred.qualification.06",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "MATERIALLY BLOCKS",
+      "rationale": "`teardown.just:59-70,159-195`. Must not be ported.",
+      "source_line": 191
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "Artifact collection is suppressed/unbounded/unmanifested; harvest applicability is ambiguous",
+      "item_id": "sbx0.deferred.qualification.07",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "MATERIALLY BLOCKS evidence-bearing Docker qualification",
+      "rationale": "`teardown.just:102-139`; `harvest.just:44-81`. Deterministic fixture-only feasibility can proceed, but no acceptance claim should depend on it.",
+      "source_line": 192
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "HD-08 runtime acceptance integration (HD-09) not proven",
+      "item_id": "sbx0.deferred.qualification.08",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "MATERIALLY BLOCKS final evidence-bearing commission if no bounded substitute is explicitly owned; does not block SBX-1 contract design/fake",
+      "rationale": "`PROOF_MATRIX.md:119`; evidence reference `:3-6`. Roadmap says no known defect may make Docker evidence untrustworthy. Reuse owner, do not create a second manifest.",
+      "source_line": 193
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "Source tree SHA and Source Broker not implemented",
+      "item_id": "sbx0.deferred.qualification.09",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "qualification_classification": "MATERIALLY BLOCKS SBX-3/4 real source-custody claim; does not block SBX-1 design",
+      "rationale": "Current B2-002 proves repo+commit only; planning requires repo+commit+tree and broker (`detailed plan@54ef67c:231-250`).",
+      "source_line": 194
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "Setup C/D/E false-PASS anomaly",
+      "item_id": "sbx0.deferred.qualification.10",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "DOES NOT BLOCK Docker provider qualification if removed from provider readiness; blocks any claim that this gate proves model readiness",
+      "rationale": "Baseline limitation `BASELINE.md:113-114`. Docker conformance should use deterministic profile checks, not model calls.",
+      "source_line": 195
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "Mutable/unpinned guest provisioning",
+      "item_id": "sbx0.deferred.qualification.11",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "MATERIALLY BLOCKS reproducible SBX-3 setup/template identity if reused; does not block SBX-2 feasibility",
+      "rationale": "`provision.sh:33-69,103-123`. SBX-2 can measure feasibility; SBX-3 must pin accepted identities.",
+      "source_line": 196
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "B3 fresh Windows clone→doctor→mount→teardown remains not proven",
+      "item_id": "sbx0.deferred.qualification.12",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "DOES NOT BLOCK contract/fake or Linux feasibility; MATERIALLY BLOCKS SBX-8 supported Windows/WSL commission",
+      "rationale": "`PROOF_MATRIX.md:88`; roadmap SBX-8 requires supported Windows/WSL.",
+      "source_line": 197
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "B4-001 closure successor/default-branch checks CNO",
+      "item_id": "sbx0.deferred.qualification.13",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "DOES NOT BY ITSELF BLOCK provider semantics or deterministic Docker fixtures; may block landing under active review policy",
+      "rationale": "`PROOF_MATRIX.md:93-94`. This is governance/exact-head evidence, not a provider capability, but active increment acceptance must still satisfy current landing rules.",
+      "source_line": 198
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "Visual marker unresolved, paid roster unproven, free model volatility, external sqlite3 absent",
+      "item_id": "sbx0.deferred.qualification.14",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "DOES NOT BLOCK",
+      "rationale": "Application presentation/model operations are orthogonal; SQLite-free observability is already proven. `PROOF_MATRIX.md:18,27,64-75`.",
+      "source_line": 199
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "exe.dev availability/subscription",
+      "item_id": "sbx0.deferred.qualification.15",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "DOES NOT BLOCK; classify unavailable live comparison as `EXTERNAL_DEPENDENCY`",
+      "rationale": "Authoritative roadmap `@54ef67c:39-43,178-184`; no parity gate.",
+      "source_line": 200
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "No aggregate sandbox lifecycle outcome owner",
+      "item_id": "sbx0.deferred.qualification.16",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "qualification_classification": "MATERIALLY BLOCKS contract conformance/acceptance",
+      "rationale": "Current inconsistent shell projections cannot support truthful PASS/FAIL/CNO. SBX-1 must provide the state/fold owner and fake branches.",
+      "source_line": 201
+    },
+    {
+      "disposition": "qualification-boundary-only",
+      "item": "No Docker installed/feasibility evidence in this scout",
+      "item_id": "sbx0.deferred.qualification.17",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "qualification_classification": "DOES NOT BLOCK SBX-1; intentionally belongs to SBX-2",
+      "rationale": "This scout was prohibited from mutating Docker and from creating the provider contract. Planning assigns direct Docker mechanism binding to SBX-2 (`ROADMAP@54ef67c:178-184`).",
+      "source_line": 202
+    }
+  ],
+  "facts": [
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`just/sandbox/lifecycle/create.just:8-13,50-65`; exclusive record creation in `sandbox_mount/host/run_record.py:94-110` refuses clobber. Retained failed runs were recoverable (`docs/baseline/PROOF_MATRIX.md:10-13`).",
+      "fact_id": "sbx0.fact.001",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 42,
+      "source_observation": "observed-good",
+      "statement": "`run_id` is the durable lifecycle identity and must exist before an external resource can be orphaned. Create must be correlation/idempotency-keyed; a retry must not silently create a second resource."
+    },
+    {
+      "classification": "exe.dev/provider-mechanism",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`create.just:50-61,84-128`; accepted response shape for `new --json` is explicitly unverified at `:87-109`.",
+      "fact_id": "sbx0.fact.002",
+      "handoff_disposition": "historical-provider-mechanism-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "PROVIDER_SPECIFIC_MECHANISM",
+      "source_line": 43,
+      "source_observation": "observed-good",
+      "statement": "Current resource identity equals DNS-safe exe.dev VM name and derives an `*.exe.xyz` URL. This establishes the observed mapping only, not a provider-neutral naming rule."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`run_record.py:1-20,40-63,129-149,182-186`. SBX-1 needs a lifecycle state owner richer than this file, but must retain these properties.",
+      "fact_id": "sbx0.fact.003",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 44,
+      "source_observation": "observed-good",
+      "statement": "Durable host state must survive separate phase processes, reject unknown schema fields, preserve immutable identity, and update crash-atomically."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "Closed fields `run_record.py:40-58`; read-modify-replace `:141-148,182-186`; close meaning `:152-161`.",
+      "fact_id": "sbx0.fact.004",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "LIMITATION",
+      "source_line": 45,
+      "source_observation": "observed-bad",
+      "statement": "Record updates are atomic replacement but not compare-and-swap/locked; concurrent writers can lose updates. The schema has no provider ID, lifecycle phase/operation attempt, source tree SHA, policy IDs, cleanup observation, or destroy authorization. `closed_at` is documented as meaning key revoked, not full residual cleanup."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`fill.just:14-63,146-170`; independent setup gate checks origin, HEAD, and clean tree at `setup.just:31-51,104-146`. Deterministic validator observed-good at this base.",
+      "fact_id": "sbx0.fact.005",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "source-custody",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 46,
+      "source_observation": "observed-good",
+      "statement": "Source authority must bind canonical public repository and exact committed revision; default current-source execution refuses a dirty host tree; guest actual HEAD must equal requested SHA before provenance is recorded."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "Current plan `SANDBOX_DSH_IMPLEMENTATION_PLAN.md@54ef67c:231-250,394-396`. Current lifecycle proves repo+commit only; tree identity is therefore a required new semantic, not an observed current mechanism.",
+      "fact_id": "sbx0.fact.006",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "source-custody",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 47,
+      "source_observation": "could-not-observe",
+      "statement": "SBX-1 must strengthen identity to **repo URL + full commit SHA + full tree SHA**, and use an SSSF Source Broker to create disposable credential-free full Git clones without exposing the canonical checkout."
+    },
+    {
+      "classification": "exe.dev/provider-mechanism",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`fill.just:20-29,72-144`. Docker may use broker clone/copy; `app/`, SSH, and public GitHub cloning are not contract requirements.",
+      "fact_id": "sbx0.fact.007",
+      "handoff_disposition": "historical-provider-mechanism-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "PROVIDER_SPECIFIC_MECHANISM",
+      "source_line": 48,
+      "source_observation": "observed-good",
+      "statement": "Source is staged by public HTTPS clone/fetch/check-out over SSH into exe.dev’s `app/`, with run branch `sbx/<run_id>`."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Branch creation and base preservation `fill.just:104-127,146-170`; credential-free ranged bundle rationale and destination namespace `just/sandbox/manage/harvest.just:5-27,35-41`.",
+      "fact_id": "sbx0.fact.008",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "source-custody",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 49,
+      "source_observation": "observed-good",
+      "statement": "Candidate mutations must remain on a run-scoped disposable Git lineage based on the exact input and be exportable without guest push authority."
+    },
+    {
+      "classification": "exe.dev/provider-mechanism",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`create.just:193-198`; `just/sandbox/run/mod.just:47-93`. This is AgentBackend/session behavior and must not enter `SandboxProvider`.",
+      "fact_id": "sbx0.fact.009",
+      "handoff_disposition": "historical-provider-mechanism-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "A. Ownership, identity, and source custody",
+      "source_classification": "PROVIDER_SPECIFIC_MECHANISM",
+      "source_line": 50,
+      "source_observation": "observed-good",
+      "statement": "Claude session UUID and `.agent-started` sentinel belong to the exe.dev/Claude steering lane, not sandbox identity."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`create.just:8-14,63-83,129-171`; architecture sequence `docs/architecture/SANDBOX_LIFECYCLE.md:5-19`. Planning ownership `ROADMAP.md@54ef67c:157-174`.",
+      "fact_id": "sbx0.fact.010",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "security-boundary",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "B. Create, setup, readiness, and environment profile",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 56,
+      "source_observation": "observed-good",
+      "statement": "SSSF—not provider—owns ordered lifecycle transitions. Create currently demonstrates `durable record → resource → bounded runtime secret`; failures preserve inspectable state rather than auto-destroy evidence."
+    },
+    {
+      "classification": "exe.dev/provider-mechanism",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`create.just:84-128,173-190`. Provider-neutral property is only typed create result plus bounded reachability/readiness observations.",
+      "fact_id": "sbx0.fact.011",
+      "handoff_disposition": "historical-provider-mechanism-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "B. Create, setup, readiness, and environment profile",
+      "source_classification": "PROVIDER_SPECIFIC_MECHANISM",
+      "source_line": 57,
+      "source_observation": "observed-good",
+      "statement": "Resource creation/list/readiness uses `ssh exe.dev new/ls`, DNS hostnames, and SSH polling for 60 seconds."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Sentinel removal/poll `setup.just:76-99`; source gate `:104-146`; provisioning claims idempotence in `sandbox_mount/guest/provision.sh:1-12`.",
+      "fact_id": "sbx0.fact.012",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "B. Create, setup, readiness, and environment profile",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 58,
+      "source_observation": "observed-good",
+      "statement": "Setup must be rerunnable where declared, invalidate stale readiness before starting, expose a bounded completion observation, and independently gate source/workspace integrity after setup."
+    },
+    {
+      "classification": "exe.dev/provider-mechanism",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`provision.sh:29-222`; `observe.just:31-38`. SBX-1 should bind an immutable template/profile identity and typed readiness checks, not these commands.",
+      "fact_id": "sbx0.fact.013",
+      "handoff_disposition": "historical-provider-mechanism-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "B. Create, setup, readiness, and environment profile",
+      "source_classification": "PROVIDER_SPECIFIC_MECHANISM",
+      "source_line": 59,
+      "source_observation": "observed-good",
+      "statement": "`/tmp/PROVISION_READY`, Bun/just installers, Pi model registry, visualizer build, uv warmup, Claude onboarding, and ports 4501/4600 are the current exeuntu/SSSF profile implementation."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`provision.sh:33-69,103-123`; future `SandboxSpec` requirements at detailed plan `@54ef67c:394-396`. This materially prevents reproducible Docker qualification if copied unchanged.",
+      "fact_id": "sbx0.fact.014",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "B. Create, setup, readiness, and environment profile",
+      "source_classification": "LIMITATION",
+      "source_line": 60,
+      "source_observation": "observed-bad",
+      "statement": "Setup downloads mutable/unpinned tools and dependencies (`curl | bash`, `bun install`, `bunx vite build`). It does not bind image/toolchain/lock/effective template identity or resource bounds."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`docs/baseline/BASELINE.md:111-120`; `docs/increments/B2-002_SANDBOX_SOURCE_CONTRACT.md:156-162`; gate implementation `setup.just:175-299`.",
+      "fact_id": "sbx0.fact.015",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "B. Create, setup, readiness, and environment profile",
+      "source_classification": "LIMITATION",
+      "source_line": 61,
+      "source_observation": "observed-bad",
+      "statement": "Current setup’s C/D/E model/credit gate is known to print insufficient-credit failures while reporting PASS. It is not truthful readiness evidence and model availability is not a sandbox-provider capability."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Three-valued owner `docs/decisions/ADR-0003-THREE_VALUED_GATE_OUTCOMES.md:12-29`; zero-check and raised-observation tests `tests/test_gate_outcomes.py:25-40,104-133`.",
+      "fact_id": "sbx0.fact.016",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "gate-outcome",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "B. Create, setup, readiness, and environment profile",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 62,
+      "source_observation": "observed-good",
+      "statement": "Readiness is an explicit set of required observations, each three-valued; provider merely reports environment facts while SSSF decides whether setup/readiness is accepted. No sentinel/existence-only or shell-zero shortcut is sufficient."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Planning detailed contract `SANDBOX_DSH_IMPLEMENTATION_PLAN.md@54ef67c:214-229`; existing `SupervisorRequest` has argv/cwd/environment/allowlist/timeout/stream bounds at `subprocess_supervisor.py:136-151`. **No canonical `CommandSpec` type exists yet**; SBX-1 must define it as a projection onto this owner, not a second executor.",
+      "fact_id": "sbx0.fact.017",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "process-supervisor",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "C. Typed command execution, streams, timeout, cancellation, and retry",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 68,
+      "source_observation": "could-not-observe",
+      "statement": "Every acceptance-relevant command must bind argv (no shell prose), absolute cwd, exact environment references/allowlist, timeout, stdin mode, stdout/stderr bounds/policy, expected exits, and execution/attempt identity."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`execute.just:47-101`; `just/sandbox/run/mod.just:12-33`. This path is historical input, not SBX-1’s exec contract.",
+      "fact_id": "sbx0.fact.018",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "C. Typed command execution, streams, timeout, cancellation, and retry",
+      "source_classification": "LIMITATION",
+      "source_line": 69,
+      "source_observation": "observed-bad",
+      "statement": "Current lifecycle execute is an interpolated remote shell command, detached with `nohup`; it records only a PID, truncates `run.log`, has no typed expected exit, timeout/cancel, stream bound/digest, or terminal observation. Generic `run cmd` deliberately accepts arbitrary shell text."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`subprocess_supervisor.py:1-7,27-94,136-151,688-717`; deterministic supervisor validator observed-good with zero provider calls.",
+      "fact_id": "sbx0.fact.019",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "process-supervisor",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "C. Typed command execution, streams, timeout, cancellation, and retry",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 70,
+      "source_observation": "observed-good",
+      "statement": "The existing SSSF subprocess supervisor owns shell-free launch, closed stdin, fixed environment, monotonic wall timeout/cancellation, bounded stdout/stderr, process identity, digests, cleanup, and three-valued terminal reason."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Supervisor classifications `subprocess_supervisor.py:571-590`; Pi strict parsing `pi_json_adapter.py:722-765`; fixtures `check_executor_supervisor.py:275-278,356-405`.",
+      "fact_id": "sbx0.fact.020",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "process-supervisor",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "C. Typed command execution, streams, timeout, cancellation, and retry",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 71,
+      "source_observation": "observed-good",
+      "statement": "Output overflow, timeout, cancellation, inability to verify cleanup, and launch unobservability must not become success. Structured child/provider errors override shell-zero success at the adapter seam."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`subprocess_supervisor.py:97-133,705-717,739-750`; Pi accounting `pi_json_adapter.py:712-745`; fixtures `check_executor_supervisor.py:345-353,410-501`. A provider must never retry resource creation or commands autonomously without an observed operation identity/result.",
+      "fact_id": "sbx0.fact.021",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "process-supervisor",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "C. Typed command execution, streams, timeout, cancellation, and retry",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 72,
+      "source_observation": "observed-good",
+      "statement": "Retry ownership stays in SSSF: one shared native-attempt budget, claims are not refunded, pre-launch cancellation does not spend if seen before claim, and provider/native retries are either disabled or observed and charged."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`docs/decisions/ADR-0003-OWNED-SUBPROCESS-SUPERVISION.md:49-60`; `docs/increments/B4-002_EXECUTOR_SUPERVISOR.md:64-97`.",
+      "fact_id": "sbx0.fact.022",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "process-supervisor",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "C. Typed command execution, streams, timeout, cancellation, and retry",
+      "source_classification": "LIMITATION",
+      "source_line": 73,
+      "source_observation": "observed-bad",
+      "statement": "The strict Pi adapter is substrate only and not wired into shipped ADWs because shipped extension transport conflicts with its no-extension policy. This affects AgentBackend integration, not the SandboxProvider interface, but the provider cannot claim an end-to-end agent execution proof through this substrate yet."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`subprocess_supervisor.py:688-704`; `docs/baseline/PROOF_MATRIX.md:105-109`. For Docker-on-WSL, SBX-2 must prove which side launches the Docker CLI and which owner can honestly contain that process.",
+      "fact_id": "sbx0.fact.023",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "process-supervisor",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "C. Typed command execution, streams, timeout, cancellation, and retry",
+      "source_classification": "LIMITATION",
+      "source_line": 74,
+      "source_observation": "observed-bad",
+      "statement": "Native Windows process execution refuses CNO until a Job Object assign/kill/verify path exists. Linux subreaper custody is the only proven runtime."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`subprocess_supervisor.py:46-63,284-304,363-456`; escaped/immediate/late-fork controls `check_executor_supervisor.py:364-388`.",
+      "fact_id": "sbx0.fact.024",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "process-supervisor",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "D. Process tree, quiescence, and cancellation topology",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 80,
+      "source_observation": "observed-good",
+      "statement": "Process completion is not quiescence. The accepted process owner tracks identity (PID/start token/group), rescans descendants, TERM→KILL escalates, reaps, and requires verified group/descendant absence."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Roadmap `@54ef67c:174,190,198`; detailed plan `@54ef67c:453-461,551`. This avoids the false equation “Docker CLI exited = container workload quiescent.”",
+      "fact_id": "sbx0.fact.025",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "D. Process tree, quiescence, and cancellation topology",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 81,
+      "source_observation": "could-not-observe",
+      "statement": "Sandbox quiescence is a second, provider-level observation: inspect/wait until no workload processes/resources remain, independently of the host CLI process owner. Provider process facts feed SSSF; provider does not decide acceptance."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`execute.just:91-101`; `observe.just:70-135`; `teardown.just:102-176`.",
+      "fact_id": "sbx0.fact.026",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "D. Process tree, quiescence, and cancellation topology",
+      "source_classification": "LIMITATION",
+      "source_line": 82,
+      "source_observation": "observed-bad",
+      "statement": "Current lifecycle does not inspect the ADW’s process tree, wait for it, cancel it, or prove app/visualizer descendants absent. Observe records ports but not app/visualizer process identities. Teardown jumps from export to VM destruction."
+    },
+    {
+      "classification": "could-not-observe",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "Teardown invokes `ssh exe.dev rm` and prints destroyed without a post-destroy VM/resource check (`teardown.just:159-176`). No live call was authorized/needed.",
+      "fact_id": "sbx0.fact.027",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "D. Process tree, quiescence, and cancellation topology",
+      "source_classification": "COULD_NOT_OBSERVE",
+      "source_line": 83,
+      "source_observation": "could-not-observe",
+      "statement": "Whether exe.dev VM destruction synchronously kills every guest descendant and whether `rm` completion means provider residual absence could not be established from retained evidence."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Detailed plan `@54ef67c:453-461`; supervisor cancellation semantics `subprocess_supervisor.py:705-717,739-750,754-799`.",
+      "fact_id": "sbx0.fact.028",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "process-supervisor",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "D. Process tree, quiescence, and cancellation topology",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 84,
+      "source_observation": "could-not-observe",
+      "statement": "Cancellation is an SSSF-owned transition that interrupts every lifecycle boundary, retains spent-attempt accounting, preserves evidence where possible, and leaves cleanup uncertainty as CNO/non-clean."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "Roadmap `@54ef67c:202`; detailed plan `@54ef67c:357-366,466-468`. Current trace owner is `adws/adw_data/sssf.db` (`docs/architecture/OBSERVABILITY.md:3-24`).",
+      "fact_id": "sbx0.fact.029",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "observability-trace",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "E. Observability, ports, network, filesystem, and credentials",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 90,
+      "source_observation": "could-not-observe",
+      "statement": "Join run/provider/source/ADW/attempt/process/evidence/harvest identities through existing owners; observation is read-only and distinct from lifecycle mutation; no second Docker trace database."
+    },
+    {
+      "classification": "exe.dev/provider-mechanism",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`observe.just:31-68,70-131,138-176`. Provider-neutral semantics are named endpoints/access policy plus bind/readiness observations, not exe.dev share commands or these ports.",
+      "fact_id": "sbx0.fact.030",
+      "handoff_disposition": "historical-provider-mechanism-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "E. Observability, ports, network, filesystem, and credentials",
+      "source_classification": "PROVIDER_SPECIFIC_MECHANISM",
+      "source_line": 91,
+      "source_observation": "observed-good",
+      "statement": "exe.dev retargets a primary HTTPS proxy, makes app port 4501 anonymous, and leaves alternate port 4600 owner-gated; readiness uses `ss` and HTTP status."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`observe.just:159-167`. Docker qualification needs explicit network/access-policy fixtures and negative controls.",
+      "fact_id": "sbx0.fact.031",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "security-boundary",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "E. Observability, ports, network, filesystem, and credentials",
+      "source_classification": "LIMITATION",
+      "source_line": 92,
+      "source_observation": "observed-bad",
+      "statement": "Current HTTP acceptance treats almost any non-000/non-5xx response on observability as “reachable and gated”; it does not prove the intended auth policy."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`docs/architecture/SECURITY_AND_CREDENTIALS.md:3-22,50-58`; roadmap SBX-4 `@54ef67c:192-195`; detailed plan `@54ef67c:435-449`.",
+      "fact_id": "sbx0.fact.032",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "security-boundary",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "E. Observability, ports, network, filesystem, and credentials",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 93,
+      "source_observation": "observed-good",
+      "statement": "Canonical host checkout, host control-plane credentials/auth homes, and uncontrolled provider control sockets must be absent from worker scope. Filesystem mounts/writes and network/effect policy must be explicit and identity-bound."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Current host provisioning key boundary and separate 0600 runtime-key file `create.just:42-47,129-171`; stdin injection and permission check `fill.just:173-196`; security doc `:3-22`.",
+      "fact_id": "sbx0.fact.033",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "source-custody",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "E. Observability, ports, network, filesystem, and credentials",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 94,
+      "source_observation": "observed-good",
+      "statement": "Runtime secrets are references/policy inputs, not values in `SandboxSpec`, argv, logs, evidence, or durable run JSON. They are scoped, bounded, injected only where authorized, retired before/with teardown, and their absence is observed."
+    },
+    {
+      "classification": "exe.dev/provider-mechanism",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`create.just:129-171`; `fill.just:173-196`; `provision.sh:73-101`; `reap.just:1-11`.",
+      "fact_id": "sbx0.fact.034",
+      "handoff_disposition": "historical-provider-mechanism-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "E. Observability, ports, network, filesystem, and credentials",
+      "source_classification": "PROVIDER_SPECIFIC_MECHANISM",
+      "source_line": 95,
+      "source_observation": "observed-good",
+      "statement": "OpenRouter key mint/list/delete, `sbx-` naming, dollar limit, hash, `.env`, and duplication into Pi `models.json` implement the current inference credential lifecycle. They are not general SandboxProvider requirements."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`fill.just:188-196`; `provision.sh:82-100`; teardown `:142-176`. Docker must prove secret mount/injection retirement and artifact redaction independently of container deletion.",
+      "fact_id": "sbx0.fact.035",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "source-custody",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "E. Observability, ports, network, filesystem, and credentials",
+      "source_classification": "LIMITATION",
+      "source_line": 96,
+      "source_observation": "observed-bad",
+      "statement": "Runtime secret is duplicated into `.env` and `~/.pi/agent/models.json`; no pre-destroy file-level secret removal/absence check exists. Safety currently depends on VM destruction plus remote key revocation."
+    },
+    {
+      "classification": "external-dependency",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`create.just:39-47,84-85,135-138`; `provision.sh:33-69`; `setup.just:189-282`; baseline limits `BASELINE.md:111-120`. Live exe.dev availability is explicitly non-blocking in planning.",
+      "fact_id": "sbx0.fact.036",
+      "handoff_disposition": "external-dependency",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "planning-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "E. Observability, ports, network, filesystem, and credentials",
+      "source_classification": "EXTERNAL_DEPENDENCY",
+      "source_line": 97,
+      "source_observation": "could-not-observe",
+      "statement": "exe.dev account/control plane, OpenRouter provisioning/list APIs, public GitHub clone, tool CDNs, model APIs, and current free-model availability are external and can be unavailable/CNO without changing provider semantics."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Load-bearing order `teardown.just:8-21,73-176`; harvest failure stop `:123-139`; roadmap `@54ef67c:198`.",
+      "fact_id": "sbx0.fact.037",
+      "handoff_disposition": "provider-neutral-handoff",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 103,
+      "source_observation": "observed-good",
+      "statement": "All reads needed for spend/accounting, bounded artifacts/evidence, and Git export occur before irreversible destroy. A required export failure holds destruction."
+    },
+    {
+      "classification": "exe.dev/provider-mechanism",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`teardown.just:102-120`; `harvest.just:35-105`. The Git bundle design usefully proves ancestry and avoids guest credentials, but SBX-1 should specify the result property, not SCP/tmp paths.",
+      "fact_id": "sbx0.fact.038",
+      "handoff_disposition": "historical-provider-mechanism-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "PROVIDER_SPECIFIC_MECHANISM",
+      "source_line": 104,
+      "source_observation": "observed-good",
+      "statement": "Current artifact copy is SSH tar of fixed paths and Git export is SCP of a ranged `git bundle`, fetched into `refs/sandbox/<run_id>`."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Bundle prerequisite/verification `harvest.just:14-19,61-101`; evidence-manifest identity/inventory rules `docs/reference/EVIDENCE_MANIFEST.md:17-37`.",
+      "fact_id": "sbx0.fact.039",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "evidence-manifest",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 105,
+      "source_observation": "could-not-observe",
+      "statement": "Git export must bind base, tip, tree/commit graph and run identity, verify before import, and grant no push/promotion authority. Artifact export must return typed inventory, bounds, digests, producer/identity, and completion observation."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`teardown.just:102-120`. This materially blocks truthful evidence qualification if reused.",
+      "fact_id": "sbx0.fact.040",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "LIMITATION",
+      "source_line": 106,
+      "source_observation": "observed-bad",
+      "statement": "Artifact collection suppresses SSH/tar failure (`|| true`), is unbounded, has no manifest/digest/completeness contract, and can report “none found.” Required versus optional artifacts are not declared."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`harvest.just:44-51,74-81`; `teardown.just:34-41,123-139`. SBX-1 needs applicability and required/optional export obligations owned by SSSF.",
+      "fact_id": "sbx0.fact.041",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "LIMITATION",
+      "source_line": 107,
+      "source_observation": "observed-bad",
+      "statement": "Harvest returns success for no VM, no base, no repo, or no commits. Those may be valid “not applicable” states, but without an external expected-output obligation they are indistinguishable from missing required output. `--no-harvest` bypass is untyped operator discretion."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`docs/reference/EVIDENCE_MANIFEST.md:5-14,45-67`.",
+      "fact_id": "sbx0.fact.042",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "evidence-manifest",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 108,
+      "source_observation": "could-not-observe",
+      "statement": "Reuse the sole evidence-manifest serializer/validator; do not infer acceptance from a broad artifact directory. Missing/empty/unreadable/unstable evidence is CNO; contradiction is FAIL; hashes alone are not authenticity."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`docs/reference/EVIDENCE_MANIFEST.md:3-6`; `docs/baseline/PROOF_MATRIX.md:119`.",
+      "fact_id": "sbx0.fact.043",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "evidence-manifest",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "LIMITATION",
+      "source_line": 109,
+      "source_observation": "observed-bad",
+      "statement": "HD-08 manifest is offline core only and is not integrated with sandbox export/runtime acceptance."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Planned surface `SANDBOX_DSH_IMPLEMENTATION_PLAN.md@54ef67c:197-212,392-396`; teardown ordering demonstrates irreversibility `teardown.just:8-18`.",
+      "fact_id": "sbx0.fact.044",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 110,
+      "source_observation": "could-not-observe",
+      "statement": "Destroy is materially irreversible and requires SSSF authorization after export obligations. `stop` is reversible/best-effort lifecycle control and must be distinct from `destroy(authorization)`. Both return observed actual state, not provider-owned recovery decisions."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`teardown.just:59-70,102-120,159-176`. This is a concrete CNO-collapsing defect and must not survive in SBX-1.",
+      "fact_id": "sbx0.fact.045",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "LIMITATION",
+      "source_line": 111,
+      "source_observation": "observed-bad",
+      "statement": "Current teardown’s control-plane list failure is replaced with `{\"vms\":[]}`, so unavailable inspection becomes “gone or never created.” It may skip artifact/harvest and destruction, close the record, and lacks a post-destroy VM absence gate."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`teardown.just:167-195`.",
+      "fact_id": "sbx0.fact.046",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "security-boundary",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "LIMITATION",
+      "source_line": 112,
+      "source_observation": "observed-bad",
+      "statement": "Current final gate proves only OpenRouter key absence, not VM/provider resource absence, filesystem/volume/network residue, or process quiescence. The record is closed before this key gate."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Planned contract `@54ef67c:197-212,453-461`; current reap’s three-way join demonstrates the need (`reap.just:47-83`) but is key-specific.",
+      "fact_id": "sbx0.fact.047",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 113,
+      "source_observation": "could-not-observe",
+      "statement": "`reconcile()` must enumerate actual provider resources by durable identity, distinguish present/absent/unobservable, detect duplicates/residue, and let SSSF choose the next legal transition. Clean terminal state requires authoritative post-destroy absence."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "`reap.just:40-45,53-83`.",
+      "fact_id": "sbx0.fact.048",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "LIMITATION",
+      "source_line": 114,
+      "source_observation": "observed-bad",
+      "statement": "Reap’s external key API pagination is explicitly unverified, and its VM-list failure also becomes an empty VM set, potentially classifying live-run keys as orphaned."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "`run_record.py:101-110`; `provision.sh:1-12`; `harvest.just:25-27,98-101`; `teardown.just:18-19,142-165`; supervisor accounting `:119-129`.",
+      "fact_id": "sbx0.fact.049",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "sandbox-contract",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "F. Artifacts, evidence, Git harvest, teardown, and reconciliation",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 115,
+      "source_observation": "could-not-observe",
+      "statement": "Idempotency is per operation and state-aware: create refuses identity collision; setup may rerun only under declared profile semantics; export may replace only the same identity; revoke/destroy accept already-absent; retries never erase spent work or duplicate resources."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Process enum `subprocess_supervisor.py:27-43`; gate ADR `ADR-0003-THREE_VALUED_GATE_OUTCOMES.md:12-29`; manifest rule `EVIDENCE_MANIFEST.md:55-63`.",
+      "fact_id": "sbx0.fact.050",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "evidence-manifest",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "G. Aggregate three-valued lifecycle outcome",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 121,
+      "source_observation": "could-not-observe",
+      "statement": "Every operation and required observation returns `observed-good`, `observed-bad`, or `could-not-observe` plus closed reason/evidence. Missing/empty/unreadable/unreachable is CNO, never absence-as-success."
+    },
+    {
+      "classification": "provider-neutral-semantic",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Gate test gives explicit failed check precedence over concurrent CNO (`tests/test_gate_outcomes.py:35-47`); CI owner refuses zero/incomplete and folds CNO before good (`tools/ci_gate.py:90-100`); manifest gives observed-bad precedence over absence (`EVIDENCE_MANIFEST.md:55-63`).",
+      "fact_id": "sbx0.fact.051",
+      "handoff_disposition": "could-not-observe",
+      "obligation_ids": [
+        "sbx1.obligation.001",
+        "sbx1.obligation.003",
+        "sbx1.obligation.008"
+      ],
+      "owner_id": "evidence-manifest",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "G. Aggregate three-valued lifecycle outcome",
+      "source_classification": "REQUIRED_PROVIDER_NEUTRAL_SEMANTIC",
+      "source_line": 122,
+      "source_observation": "could-not-observe",
+      "statement": "SBX-1 aggregate fold should be nonempty and deterministic: (1) any applicable observed contradiction/FAIL makes aggregate FAIL; else (2) any required CNO, missing result, wrong identity, incomplete collection, or unverified cleanup makes aggregate CNO; else (3) all applicable required observations good makes PASS. Cleanup/quiescence is independently required, so successful work plus cleanup CNO is aggregate CNO/non-clean."
+    },
+    {
+      "classification": "limitation",
+      "current_contract_observation": "observed-good",
+      "current_contract_reason": "Current b902 main contract/fake binds this semantic; contract evidence is not activation or acceptance.",
+      "evidence": "Examples: setup textual gate `setup.just:287-302`; artifact suppression `teardown.just:102-120`; close `run_record.py:152-161`. SBX-1 must make the state owner and fold explicit.",
+      "fact_id": "sbx0.fact.052",
+      "handoff_disposition": "limitation-to-carry",
+      "obligation_ids": [
+        "sbx0.obligation.013",
+        "sbx0.obligation.015"
+      ],
+      "owner_id": "legacy-exedev-lifecycle",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "G. Aggregate three-valued lifecycle outcome",
+      "source_classification": "LIMITATION",
+      "source_line": 123,
+      "source_observation": "observed-bad",
+      "statement": "No current sandbox lifecycle aggregate owner exists. Shell exits, suppressed errors, textual PASS, missing artifacts-as-success, and run-record `closed_at` are inconsistent projections."
+    },
+    {
+      "classification": "obsolete-artifact",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "Superseded by executable B2-002 FILL deriving canonical `origin`; the same doc’s later section records the transition. Code and retained B2-002 evidence outrank the stale opening narrative.",
+      "fact_id": "sbx0.fact.053",
+      "handoff_disposition": "historical-obsolete-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "source-of-truth-policy",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "Obsolete and historical artifacts",
+      "source_classification": "OBSOLETE_ARTIFACT",
+      "source_line": 129,
+      "source_observation": "observed-bad",
+      "statement": "Baseline narrative saying FILL cloned Disler’s hard-coded upstream (`docs/architecture/REPOSITORY_OWNERSHIP.md:3-27`)."
+    },
+    {
+      "classification": "obsolete-artifact",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "B3-004 replaced sqlite3 CLI dependence (`PROOF_MATRIX.md:64-75`), and the B0 freeze record says the sandbox was harvested/destroyed (`BASELINE.md:128-138`). Preserve as historical provenance only.",
+      "fact_id": "sbx0.fact.054",
+      "handoff_disposition": "historical-obsolete-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "source-of-truth-policy",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "Obsolete and historical artifacts",
+      "source_classification": "OBSOLETE_ARTIFACT",
+      "source_line": 130,
+      "source_observation": "observed-bad",
+      "statement": "B0 Windows sqlite3 limitation and “proof sandbox must be harvested/torn down” statements in the frozen baseline."
+    },
+    {
+      "classification": "obsolete-artifact",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "Authoritative planning commit `54ef67c` explicitly removes live exe.dev parity as a Docker prerequisite and makes Docker the only intended production provider (`ROADMAP.md@54ef67c:178-190`).",
+      "fact_id": "sbx0.fact.055",
+      "handoff_disposition": "historical-obsolete-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "source-of-truth-policy",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "Obsolete and historical artifacts",
+      "source_classification": "OBSOLETE_ARTIFACT",
+      "source_line": 131,
+      "source_observation": "observed-bad",
+      "statement": "Old roadmap B5 acceptance requiring exe.dev reference-adapter conformance (`docs/development/ROADMAP.md` at `bee9296a:55-72`)."
+    },
+    {
+      "classification": "obsolete-artifact",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "These are retiring-provider/guest-image mechanisms (`provision.sh:170-203`; `observe.just:42-48,125-176`), not portable semantics.",
+      "fact_id": "sbx0.fact.056",
+      "handoff_disposition": "historical-obsolete-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "source-of-truth-policy",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "Obsolete and historical artifacts",
+      "source_classification": "OBSOLETE_ARTIFACT",
+      "source_line": 132,
+      "source_observation": "observed-bad",
+      "statement": "exe.dev Claude key-free gateway, onboarding mutation, public-proxy behavior, `exeuntu` assumptions, wildcard host-key notes."
+    },
+    {
+      "classification": "obsolete-artifact",
+      "current_contract_observation": "could-not-observe",
+      "current_contract_reason": "Current code does not positively observe this historical, external, deferred, or unresolved property; retain CNO.",
+      "evidence": "It is useful historical state, but SBX-1 needs distinct requested repo/commit/tree, initial workspace identity, current/export tip/tree, and operation identities.",
+      "fact_id": "sbx0.fact.057",
+      "handoff_disposition": "historical-obsolete-only",
+      "obligation_ids": [
+        "sbx0.obligation.011"
+      ],
+      "owner_id": "source-of-truth-policy",
+      "provider_qualification_observation": "could-not-observe",
+      "provider_qualification_reason": "No Docker/provider/exe.dev/browser/Windows-host/live environment observation was performed; publication cannot promote this fact.",
+      "section": "Obsolete and historical artifacts",
+      "source_classification": "OBSOLETE_ARTIFACT",
+      "source_line": 133,
+      "source_observation": "observed-bad",
+      "statement": "`commit_sha` as both requested source baseline and current commit identity in legacy run record."
+    }
+  ],
+  "inventory_content_sha256": "e1c3d693b6e81b84405fb5402fc7ca071a49679c1fb8dc0b01b82069c381c974",
+  "inventory_id": "sssf-sbx-0-provider-semantics",
+  "inventory_revision": 1,
+  "non_goals": [
+    "SBX-0 exit or independent semantic review",
+    "SBX-1 activation or acceptance",
+    "Docker/provider implementation or custody",
+    "Windows host observation or native process qualification",
+    "landing authorization or merge",
+    "SBX-2, Wayfinder, and DSH work"
+  ],
+  "obligations": [
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.001",
+      "owner_id": "sandbox-contract",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "sandbox-spec-identity",
+      "statement": "SandboxSpec binds run/operation, exact repository+commit+tree, profile/template/toolchain/workspace/policy/resource/secret-reference/evidence identities."
+    },
+    {
+      "binding_observation": "could-not-observe",
+      "obligation_id": "sbx1.obligation.002",
+      "owner_id": "sandbox-contract",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "durable-lifecycle-owner",
+      "statement": "SSSF owns append/CAS lifecycle records with requested/provider/source/attempt/state/time/reason/evidence/destroy identities; provider is not the owner."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.003",
+      "owner_id": "sandbox-contract",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "operation-surface",
+      "statement": "Provider operations are bounded and operation-keyed for create/inspect/typed exec/copy/export/process/quiescence/stop/destroy/reconcile, with no autonomous retry."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.004",
+      "owner_id": "sandbox-contract",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "command-spec-supervisor-projection",
+      "statement": "CommandSpec is typed argv/cwd/environment/stdin/monotonic-timeout/bounded-stream/expected-result authority projected to the existing supervisor."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.005",
+      "owner_id": "sandbox-contract",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "two-quiescence-domains",
+      "statement": "Clean terminal state requires independently observed host/provider-client custody and sandbox workload/resource quiescence."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.006",
+      "owner_id": "evidence-manifest",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "bounded-export-obligations",
+      "statement": "SSSF declares artifact applicability before launch; bounded identity/digest/path-safe exports use the sole manifest owner; Git base/tip/tree/ancestry and no-promotion authority are verified."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.007",
+      "owner_id": "sandbox-contract",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "irreversible-destroy-order",
+      "statement": "Artifact/Git/evidence obligations and secret retirement precede one-use destroy authorization; clean state still requires authoritative post-destroy reconcile."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.008",
+      "owner_id": "sandbox-contract",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "aggregate-outcome-fold",
+      "statement": "Observed-bad wins, then required CNO/incomplete/wrong identity/unverified cleanup, and PASS only for complete applicable good observations with components retained."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.009",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-provider-suite",
+      "statement": "Fake covers success, ambiguity/duplicate/identity, exec bounds/leaks, artifact/Git faults, stop/destroy/reconcile, absence, interruption, and precedence."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx0.obligation.010",
+      "owner_id": "sbx0-handoff-record",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "source-generation-binding",
+      "statement": "Handoff binds exact mutable report generation, report SHA-256/size/lines, examined code/planning SHAs, and current starting SHA without copying the mutable report into authority."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx0.obligation.011",
+      "owner_id": "sbx0-handoff-record",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "classification-preservation",
+      "statement": "Every source classification remains explicit: provider-neutral semantic, exe.dev/provider mechanism, limitation, obsolete artifact, external dependency, and CNO."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx0.obligation.012",
+      "owner_id": "sbx0-handoff-record",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "owner-per-fact",
+      "statement": "Every fact and obligation has exactly one owner_id resolving to one owner record, and every fact owner governs its classification; inventory is not runtime authority."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx0.obligation.013",
+      "owner_id": "gate-outcome",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "cno-preservation",
+      "statement": "CNO is real; absent, empty, unreadable, unavailable, interrupted, ambiguous, or unverified evidence cannot become absence or PASS."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx0.obligation.014",
+      "owner_id": "planning-contract",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "planning-reconciliation",
+      "statement": "Inventory reconciles scout generation to current main b902... and planning 54ef..., separating source/current-contract/live-provider observations."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx0.obligation.015",
+      "owner_id": "sbx0-handoff-record",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "promotion-boundary",
+      "statement": "Publication does not assert SBX-0 exit, SBX-1 activation/acceptance, provider custody, Windows observation, review, landing, or SBX-2 unlock."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.create-ambiguity",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-create-ambiguity",
+      "statement": "Create ambiguity is CNO and same-key retry reconciles one resource without duplication."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.identity-mismatch",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-identity-mismatch",
+      "statement": "Stale/wrong/cross-run/colliding identity is rejected, never absence."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.exec-bounds",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-exec-bounds",
+      "statement": "Exec timeout/cancel/overflow remains CNO with positive bounds."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.provider-client-cleanup",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-provider-client-cleanup",
+      "statement": "Provider-client cleanup unobservability remains CNO."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.workload-leak",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-workload-leak",
+      "statement": "Workload leak is observed-bad with identity."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.artifact-missing",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-artifact-missing",
+      "statement": "Missing required artifact is CNO, not empty success."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.artifact-tamper",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-artifact-tamper",
+      "statement": "Artifact digest contradiction is observed-bad."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.artifact-overflow",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-artifact-overflow",
+      "statement": "Artifact overflow is CNO."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.git-ancestry",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-git-ancestry",
+      "statement": "Wrong Git ancestry is observed-bad and no promotion authority."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.partial-stop",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-partial-stop",
+      "statement": "Partial stop retains residual workload observed-bad."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.destroy-authorization",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-destroy-authorization",
+      "statement": "Destroy without exact one-use authorization is observed-bad."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.destroy-residual",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-destroy-residual",
+      "statement": "Acknowledged destroy with residuals is observed-bad and retryable."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.inspect-unreachable",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-inspect-unreachable",
+      "statement": "Unreachable inspect/reconcile is CNO, never absent."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.already-absent",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-already-absent",
+      "statement": "Already-absent is idempotent only after exact authoritative identity-bound absence."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.duplicate-reconcile",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-duplicate-reconcile",
+      "statement": "Duplicate resources are enumerated observed-bad."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.boundary-interruption",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-boundary-interruption",
+      "statement": "Interruption before/after every boundary retains identity and CNO/retry state."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.secret-retirement",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-secret-retirement",
+      "statement": "Secret-retirement CNO prevents clean destroy and aggregate PASS."
+    },
+    {
+      "binding_observation": "observed-good",
+      "obligation_id": "sbx1.obligation.fake.aggregate-precedence",
+      "owner_id": "verification-controls",
+      "qualification_observation": "could-not-observe",
+      "qualification_reason": "Contract/fake binding only; no SBX-1 activation/acceptance or real-provider claim.",
+      "slug": "fake-aggregate-precedence",
+      "statement": "FAIL wins over CNO; required CNO wins over good; zero observations are CNO."
+    }
+  ],
+  "observation_vocabulary": [
+    "observed-good",
+    "observed-bad",
+    "could-not-observe"
+  ],
+  "owners": [
+    {
+      "fact_classifications": [],
+      "kind": "documentation-and-verification-record",
+      "owner_id": "sbx0-handoff-record",
+      "path": "docs/reference/SBX-0_SEMANTICS_INVENTORY.json",
+      "scope": "Exact source identity, coverage, owner binding, and handoff boundary only; never runtime or acceptance authority."
+    },
+    {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
+      "kind": "executable-contract-and-lifecycle-owner",
+      "owner_id": "sandbox-contract",
+      "path": "adws/adw_modules/sandbox_provider.py",
+      "scope": "SandboxSpec/CommandSpec, provider facts, lifecycle record seam, destroy authorization, aggregate fold, and fake."
+    },
+    {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
+      "kind": "executable-process-custody-owner",
+      "owner_id": "process-supervisor",
+      "path": "adws/adw_modules/subprocess_supervisor.py",
+      "scope": "Host/provider-client process custody, bounds, retry accounting, cleanup, and typed observations."
+    },
+    {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
+      "kind": "executable-evidence-serializer-and-validator",
+      "owner_id": "evidence-manifest",
+      "path": "tools/evidence_manifest.py",
+      "scope": "Sole offline evidence-manifest schema, serializer, artifact validator, and typed result."
+    },
+    {
+      "fact_classifications": [
+        "provider-neutral-semantic"
+      ],
+      "kind": "executable-three-valued-gate-owner",
+      "owner_id": "gate-outcome",
+      "path": "adws/adw_modules/data_types.py",
+      "scope": "PASS/FAIL/CNO gate model and non-vacuous evidence rules."
+    },
+    {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
+      "kind": "executable-source-provenance-owner",
+      "owner_id": "source-custody",
+      "path": "just/sandbox/lifecycle/fill.just",
+      "scope": "Current source repository/commit custody; Source Broker remains unresolved."
+    },
+    {
+      "fact_classifications": [
+        "exe.dev/provider-mechanism",
+        "limitation",
+        "could-not-observe"
+      ],
+      "kind": "historical-provider-mechanism-owner",
+      "owner_id": "legacy-exedev-lifecycle",
+      "path": "just/sandbox/lifecycle",
+      "scope": "Historical exe.dev mechanisms only; never provider-neutral authority."
+    },
+    {
+      "fact_classifications": [
+        "provider-neutral-semantic"
+      ],
+      "kind": "executable-observability-owner",
+      "owner_id": "observability-trace",
+      "path": "adws/adw_modules/tracer.py",
+      "scope": "Existing SSSF trace identity/read surfaces; no second database."
+    },
+    {
+      "fact_classifications": [
+        "provider-neutral-semantic",
+        "limitation"
+      ],
+      "kind": "security-and-credential-policy-owner",
+      "owner_id": "security-boundary",
+      "path": "docs/architecture/SECURITY_AND_CREDENTIALS.md",
+      "scope": "Credential, filesystem, network, effect, and secret-reference boundaries."
+    },
+    {
+      "fact_classifications": [],
+      "kind": "existing-agent-execution-owner",
+      "owner_id": "agent-backend",
+      "path": "adws/adw_modules/agents.py",
+      "scope": "AgentBackend/session behavior separate from SandboxProvider lifecycle."
+    },
+    {
+      "fact_classifications": [
+        "obsolete-artifact"
+      ],
+      "kind": "documentation-authority-policy-owner",
+      "owner_id": "source-of-truth-policy",
+      "path": "docs/reference/SOURCE_OF_TRUTH.md",
+      "scope": "Precedence and obsolete-artifact treatment; not runtime facts."
+    },
+    {
+      "fact_classifications": [
+        "external-dependency"
+      ],
+      "kind": "planning-and-roadmap-owner",
+      "owner_id": "planning-contract",
+      "path": "docs/development/ROADMAP.md",
+      "scope": "Planning contract and explicit deferral boundaries; not runtime facts."
+    },
+    {
+      "fact_classifications": [],
+      "kind": "deterministic-verification-owner",
+      "owner_id": "verification-controls",
+      "path": "docs/validation/check_sbx0_inventory.py",
+      "scope": "Schema, identity, coverage, ownership, and watched-red controls."
+    }
+  ],
+  "publication_status": "published-handoff-only-cno-for-promotions",
+  "recommendations": [
+    {
+      "disposition": "recommendation-not-promotion",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "recommendation_id": "sbx0.recommendation.01",
+      "source_line": 206,
+      "statement": "Activate SBX-1 as a contract-and-fake increment only, using the minimum surface above."
+    },
+    {
+      "disposition": "recommendation-not-promotion",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "recommendation_id": "sbx0.recommendation.02",
+      "source_line": 207,
+      "statement": "Resolve the B4-002 acceptance-status mismatch before naming its bytes the accepted owner; otherwise name an exact accepted successor while preserving the same semantics."
+    },
+    {
+      "disposition": "recommendation-not-promotion",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "recommendation_id": "sbx0.recommendation.03",
+      "source_line": 208,
+      "statement": "Make `CommandSpec` a typed projection consumed by the existing supervisor. Do not let `DockerSbxProvider.exec` invoke arbitrary shell text or own retry/process cleanup policy."
+    },
+    {
+      "disposition": "recommendation-not-promotion",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "recommendation_id": "sbx0.recommendation.04",
+      "source_line": 209,
+      "statement": "Model create/destroy/reconcile around operation IDs and three-valued observations. Never translate provider-inspection failure into absent."
+    },
+    {
+      "disposition": "recommendation-not-promotion",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "recommendation_id": "sbx0.recommendation.05",
+      "source_line": 210,
+      "statement": "Separate client-process cleanup from in-sandbox workload/environment quiescence and require both."
+    },
+    {
+      "disposition": "recommendation-not-promotion",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "recommendation_id": "sbx0.recommendation.06",
+      "source_line": 211,
+      "statement": "Reuse the evidence-manifest owner and add runtime/export integration; do not bless tar-directory existence or duplicate its serializer."
+    },
+    {
+      "disposition": "recommendation-not-promotion",
+      "observation": "could-not-observe",
+      "owner_id": "sandbox-contract",
+      "recommendation_id": "sbx0.recommendation.07",
+      "source_line": 212,
+      "statement": "Keep source brokerage, profile readiness, artifact obligations, network/effect policy, and aggregate acceptance in SSSF. Provider results are facts, never `accepted=true`."
+    },
+    {
+      "disposition": "recommendation-not-promotion",
+      "observation": "could-not-observe",
+      "owner_id": "planning-contract",
+      "recommendation_id": "sbx0.recommendation.08",
+      "source_line": 213,
+      "statement": "Proceed to SBX-2 without live exe.dev. Record its unavailability, if encountered, as `EXTERNAL_DEPENDENCY` and qualify Docker directly."
+    }
+  ],
+  "schema_version": "sssf.sbx-0-handoff.v1",
+  "source_context": {
+    "constitutional_boundary": "AgentBackend != SandboxProvider. SSSF owns lifecycle sequencing, retry/recovery decisions, budgets, aggregate result folding, acceptance, promotion, and irreversible-operation authorization; the existing subprocess supervisor remains the single process owner.",
+    "evidence_precedence": "Executable code/tests, immutable Git objects/captured evidence, current config, then docs; no live exe.dev call was made.",
+    "executive_conclusion": "SBX-1 has enough durable evidence to define a small environment-mechanics contract, but not to copy the current shell lifecycle wholesale. The contract must preserve exact source/workspace custody, durable resource identity, typed bounded command execution through the existing SSSF process owner, explicit readiness observations, bounded artifact and Git export before irreversible destruction, provider-state reconciliation, process/environment quiescence, credential/network/filesystem policy, and non-vacuous three-valued outcomes.",
+    "mode": "scout/report only; no Docker, SSSF, Wayfinder, DSH, provider, browser, or live exe.dev mutation was performed.",
+    "repository": "sbracewell64/inkwell-agent-sandboxes-and-software-factory"
+  },
+  "source_observations": [
+    {
+      "command": "git rev-parse HEAD",
+      "observation": "observed-good",
+      "observation_id": "sbx0.observation.001",
+      "owner_id": "source-custody",
+      "source_line": 24,
+      "statement": "exact base bee9296a4c94b1dc3da6991acd1755a91fa681eb; worktree was detached and initially clean."
+    },
+    {
+      "command": "git rev-parse origin/planning/future-sssf",
+      "observation": "observed-good",
+      "observation_id": "sbx0.observation.002",
+      "owner_id": "planning-contract",
+      "source_line": 25,
+      "statement": "54ef67c3849b24b1eaa6e10d2ed0e49a09464a70."
+    },
+    {
+      "command": "python3 docs/validation/check_sandbox_source_contract.py",
+      "observation": "observed-good",
+      "observation_id": "sbx0.observation.003",
+      "owner_id": "source-custody",
+      "source_line": 26,
+      "statement": "Printed B2-002 sandbox source contract: PASS, canonical origin, exact current HEAD, and present run-record/FILL/SETUP contract; assessed manually because no declared verifier was available."
+    },
+    {
+      "command": "python3 docs/validation/check_executor_supervisor.py",
+      "observation": "observed-good",
+      "observation_id": "sbx0.observation.004",
+      "owner_id": "process-supervisor",
+      "source_line": 27,
+      "statement": "Printed executor-supervisor: PASS, listed watched-red controls, and provider-calls: 0; assessed manually because no declared verifier was available."
+    },
+    {
+      "command": "PYTHONPATH=adws pytest -q tests/test_gate_outcomes.py",
+      "observation": "could-not-observe",
+      "observation_id": "sbx0.observation.005",
+      "owner_id": "gate-outcome",
+      "source_line": 28,
+      "statement": "Collection lacked pydantic in the disposable host environment; this was not treated as a subject failure or pass."
+    },
+    {
+      "command": "python3 tools/ci_gate.py run --evidence ...",
+      "observation": "observed-bad",
+      "observation_id": "sbx0.observation.006",
+      "owner_id": "gate-outcome",
+      "source_line": 29,
+      "statement": "Aggregate was non-PASS: 6 observed-good, 1 observed-bad (a validator surfaced missing just as an exception), and 1 CNO (just unavailable); host/tooling evidence only, not a Docker or lifecycle verdict."
+    },
+    {
+      "command": "GitHub search and gh-axi issue view 6",
+      "observation": "could-not-observe",
+      "observation_id": "sbx0.observation.007",
+      "owner_id": "verification-controls",
+      "source_line": 30,
+      "statement": "Public fm-sol-control/v1/SBX-0 issue search was empty without a declared verifier; the unrelated repository issue 6 was not used as SBX authority."
+    }
+  ],
+  "source_snapshot": {
+    "byte_length": 42031,
+    "canonical_code_sha_examined": "bee9296a4c94b1dc3da6991acd1755a91fa681eb",
+    "content_observation": "observed-good",
+    "content_observation_reason": "The snapshot was read completely before publication and its exact digest is bound; future absence of the mutable path is not PASS.",
+    "content_sha256": "2d16bee3db4c46062b460dfbd6752339e85228a3b6f2c5002313a4f06dc663b3",
+    "generation_id": "sbx-0-report/v1@code-bee9296a4c94b1dc3da6991acd1755a91fa681eb@planning-54ef67c3849b24b1eaa6e10d2ed0e49a09464a70",
+    "line_count": 221,
+    "logical_path": "data/sssf-sbx-0/report.md",
+    "path_kind": "mutable-fleet-local-evidence-input",
+    "planning_ref_examined": "origin/planning/future-sssf",
+    "planning_sha_examined": "54ef67c3849b24b1eaa6e10d2ed0e49a09464a70"
+  },
+  "source_verifier_gap": {
+    "observation": "could-not-observe",
+    "owner_id": "verification-controls",
+    "statement": "The focused source commands had no declared fm-verify.sh verifier; stdout and deterministic fixture behavior were assessed under the three-valued rule rather than by exit status."
+  }
+}

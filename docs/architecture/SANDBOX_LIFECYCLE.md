@@ -77,11 +77,19 @@ Never replace this with implicit shell-session state.
 
 See `operations/INSTALL_WINDOWS.md`.
 
-## SBX-1 provider-neutral projection
+## SBX-0/SBX-1 provider-neutral projection
+
+The exact SBX-0 source-bound handoff is published once in
+[`reference/SBX-0_SEMANTICS_INVENTORY.json`](../reference/SBX-0_SEMANTICS_INVENTORY.json)
+and its publication record/validator. It binds the report generation and
+content digest, preserves classifications and CNO, and assigns one
+classification-compatible authority per fact; it does not become a lifecycle
+or acceptance store.
 
 The provider-neutral contract, ownership boundary, lifecycle vocabulary, bounded
 exports, reconciliation rules, and deterministic fake are owned once by
 [`reference/SANDBOX_PROVIDER.md`](../reference/SANDBOX_PROVIDER.md) and
 `adws/adw_modules/sandbox_provider.py`. This lifecycle document remains the
 historical exe.dev ordering reference; it does not define a second provider
-interface. SBX-1 does not bind Docker mechanics or live provider behavior.
+interface. SBX-1 activation/acceptance, Docker mechanics, and live provider
+behavior remain outside this publication.

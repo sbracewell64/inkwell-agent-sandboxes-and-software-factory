@@ -37,6 +37,11 @@
       "timeout_seconds": 60
     },
     {
+      "id": "sbx0-semantics-inventory-validator",
+      "command": ["{python}", "docs/validation/check_sbx0_inventory.py"],
+      "timeout_seconds": 60
+    },
+    {
       "id": "sandbox-provider-contract-validator",
       "command": ["{python}", "docs/validation/check_sandbox_provider.py"],
       "timeout_seconds": 120

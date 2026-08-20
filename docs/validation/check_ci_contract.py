@@ -44,6 +44,9 @@ EXPECTED_CHECKS = {
     "production-extension-path-validator": (
         "{python}", "docs/validation/check_production_extension_path.py"
     ),
+    "sbx0-semantics-inventory-validator": (
+        "{python}", "docs/validation/check_sbx0_inventory.py"
+    ),
     "sandbox-provider-contract-validator": (
         "{python}", "docs/validation/check_sandbox_provider.py"
     ),
