@@ -158,7 +158,7 @@ The launcher may land before Docker. It must not imply that Docker, Wayfinder or
 
 ### SBX-0 — Reference semantics inventory
 
-**Planning state: `ACTIVE`. Named increment `sssf-sbx-0` is `WORKING` from exact base/head `bee9296a4c94b1dc3da6991acd1755a91fa681eb`; this stage is semantics inventory only and authorizes no Docker mutation.**
+**Planning state: `ACTIVE`, not exited or `PROVEN`. Named increment `sssf-sbx-0` crossed activation from exact base/head `bee9296a4c94b1dc3da6991acd1755a91fa681eb`. Its durable semantics-handoff implementation is now landed on canonical SSSF history through PR #21 / merge `aa0dcc5e66a41284cdb2f28ca4c235bec7c623d6`; that landed handoff does not by itself establish the SBX-0 lifecycle exit, SBX-1 activation, or SBX-2 readiness.**
 
 Inventory current sandbox lifecycle semantics from canonical code, docs, tests and retained evidence. Classify each fact as:
 
@@ -171,7 +171,7 @@ Live exe.dev access is optional evidence only.
 
 ### SBX-1 — SandboxProvider + lifecycle-state contract
 
-**Execution state: named increment `sssf-sbx-1` exists but is `QUEUED_BLOCKED_BY_SBX_0`; no SBX-1 implementation checkpoint is credited before the SBX-0 handoff.**
+**Planning state: `SEQUENCED`, not `ACTIVE`. The SBX-0 durable handoff is landed and therefore is no longer an unresolved blocker. Provider-neutral SandboxProvider contract/fake implementation bytes are also landed through PR #18 / merge `b902cdcecd65c8ba03031875297d31e990f12c11`, with implementation-status reconciliation through PR #22 / merge `991d3a64f1b96a8b9637f97060d692af3518228f`. Those landed bytes do not establish SBX-1 activation, acceptance, certification, real-provider proof, Windows-host qualification, or SBX-2 unlock.**
 
 Define the minimum typed provider interface, state owner, CNO/failure semantics, irreversibility rules, reconciliation contract and fake-provider conformance suite.
 
