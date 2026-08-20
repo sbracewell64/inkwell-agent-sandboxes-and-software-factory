@@ -66,7 +66,7 @@ Run:
 
 ```text
 python3 docs/validation/check_sandbox_provider.py
-PYTHONPATH=adws pytest -q tests/test_sandbox_provider.py
+PYTHONPATH=.:adws pytest -q tests/test_sandbox_provider.py
 ```
 
 The validator positively manufactures complete success; ambiguous create and

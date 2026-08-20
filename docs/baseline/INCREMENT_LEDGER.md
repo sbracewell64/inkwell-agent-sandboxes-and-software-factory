@@ -30,7 +30,7 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | HD-03 | PASS | Nonvacuous three-valued gate outcomes | 15 focused controls prove PASS/FAIL/CNO, fail-closed migration, trace provenance, and non-green CNO rendering |
 | HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
 | LAUNCH-1 | CORRECTED CANDIDATE — CNO | Tracked Windows `E:\\SSSF` front door into the existing FirstMate primary/supervision path | `tests/test_windows_front_door.py`; named disposable Herdr-lab launch; public shortcut target recorded; post-merge launch from the installed canonical checkout remains CNO until observed |
-| SBX-1 | CANDIDATE — provider-free | Provider-neutral SandboxProvider contract, SSSF lifecycle record seam, destroy authorization gate, aggregate fold, and deterministic fake; no Docker/provider implementation | implementation candidate `47178a95557be92f13fa2c5b2013556ee9ba4107`; `python3 docs/validation/check_sandbox_provider.py`; `PYTHONPATH=adws pytest -q tests/test_sandbox_provider.py`; pipeline qualification remains pending |
+| SBX-1 | CANDIDATE — provider-free | Provider-neutral SandboxProvider contract, SSSF lifecycle record seam, destroy authorization gate, aggregate fold, and deterministic fake; no Docker/provider implementation | reviewed implementation head `3b35ac02c2a99c36b8228a9da0b8ac2880fc6eb1`; `python3 docs/validation/check_sandbox_provider.py`; `PYTHONPATH=.:adws pytest -q tests/test_sandbox_provider.py`; pipeline qualification remains pending |
 
 ## Future increments
 
