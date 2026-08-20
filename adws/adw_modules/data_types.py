@@ -276,6 +276,9 @@ class GateCNOReason(str, Enum):
     INVALID_GATE_RETURN = "INVALID_GATE_RETURN"
     LEGACY_BOOLEAN_ONLY = "LEGACY_BOOLEAN_ONLY"
     MALFORMED_TYPED_OUTCOME = "MALFORMED_TYPED_OUTCOME"
+    # A gate whose candidate universe was not fully readable. Zero findings over
+    # an incomplete universe is not a negative fact, so it can never be PASS.
+    INCOMPLETE_OBSERVED_UNIVERSE = "INCOMPLETE_OBSERVED_UNIVERSE"
 
 
 class GateCNOSource(str, Enum):
@@ -287,6 +290,7 @@ class GateCNOSource(str, Enum):
     GATE_ADAPTER = "GATE_ADAPTER"
     SCHEMA_MIGRATION = "SCHEMA_MIGRATION"
     TRACE_READER = "TRACE_READER"
+    MUTATION_FACT = "MUTATION_FACT"
 
 
 class GateOutcome(BaseModel):
@@ -337,6 +341,23 @@ class GateCheck(BaseModel):
     note: str = ""
 
 
+class ObservationScope(BaseModel):
+    """The universe a gate's verdict covers, and the classes it does not.
+
+    Carried beside the checks rather than inside them on purpose: a boundary
+    statement is not evidence, and must never be able to turn a report with no
+    real observations into a PASS. It exists so a green cannot be read as
+    "nothing else happened" — zero findings is only cleanliness within a stated
+    universe, and `unobservable` is what says that universe had holes in it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    observed: list[str] = Field(default_factory=list)
+    out_of_scope: list[str] = Field(default_factory=list)
+    unobservable: list[str] = Field(default_factory=list)
+
+
 class GateReport(BaseModel):
     """Checks plus an explicit evidence requirement; outcome is derived once.
 
@@ -351,6 +372,7 @@ class GateReport(BaseModel):
     cno_reason: Optional[GateCNOReason] = None
     cno_source: Optional[GateCNOSource] = None
     cno_detail: str = ""
+    scope: Optional[ObservationScope] = None
 
     @model_validator(mode="after")
     def _complete_explicit_cno(self) -> "GateReport":

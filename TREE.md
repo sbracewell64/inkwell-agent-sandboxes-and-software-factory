@@ -88,9 +88,10 @@ adws/adw_*.py         12 workflows. Each opens with a `Phases:` docstring that i
 adws/adw_modules/     agents.py (roster + validation), agent_pi.py / agent_cc.py (harness
                       adapters), pi_json_adapter.py (strict Pi JSON/print contract),
                       subprocess_supervisor.py (bounded native process owner), data_types.py
-                      (typed envelopes), gates.py, quality.py (deterministic checks incl. the
-                      test suite), tracer.py (the trace db), session.py, runner.py,
-                      permissions.py, git_helper.py.
+                      (typed envelopes), gates.py, mutation_fact.py (what the tree actually
+                      did, and the both-ways claim comparison), quality.py (deterministic
+                      checks incl. the test suite), tracer.py (the trace db), session.py,
+                      runner.py, permissions.py, git_helper.py.
 adws/adw_sssf_config/ sssf.config.yaml (cheap roster) and sssf.frontier.config.yaml.
                       Every model is `openrouter/<id>`; the first slash splits provider
                       from model id.

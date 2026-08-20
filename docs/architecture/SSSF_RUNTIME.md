@@ -17,8 +17,10 @@ Low-level behavior belongs in `adws/adw_modules/`.
 - `subprocess_supervisor.py` — bounded provider-neutral native process ownership
 - `data_types.py` — typed envelopes and the canonical gate outcome contract
 - `gates.py` — claim verification with explicit evidence requirements
+- `mutation_fact.py` — the one code-computed record of what the working tree
+  actually did, and the bidirectional comparison against an envelope's claims
 - `quality.py` — deterministic quality commands
-- `permissions.py` — post-agent write-boundary enforcement
+- `permissions.py` — post-agent write-boundary enforcement, over the same fact
 - `tracer.py` — SQLite trace
 - `session.py` — ADW session lifecycle
 - `runner.py` — phase execution
@@ -50,11 +52,45 @@ return is CNO. Only explicit `PASS` advances an agent phase. The console and UI
 render CNO amber, never green, and the trace stores outcome, reason, source,
 checks, and the nonempty requirement.
 
-Existing genuine controls keep their bounded meaning: nonempty artifact gates
-prove the declared artifact observations they actually recorded, and permission
-enforcement remains a separate post-agent boundary. Neither is presented as
-proof that an envelope listed every real repository mutation; Git/content claim
-reconciliation belongs to a later increment.
+Nonempty artifact gates keep their bounded meaning: they prove the declared
+artifact observations they actually recorded, and nothing more.
+
+## Mutation fact and claim reconciliation
+
+`mutation_fact.py` computes ONE observation per gate attempt: per-path git blob
+identity in HEAD and on disk, for every path the tree differs on plus every
+untracked, non-ignored file. Content identity, never line counts — a line replaced
+by another of the same shape moves the identity and left the old fingerprint
+unchanged. Mutation kinds (`added`, `modified`, `deleted`) derive from that
+identity, and a rename is a deletion and an addition carrying equal bytes, linked
+as peers, with both paths still required.
+
+`diff_matches_claims` reads that observation and compares it with
+`envelope.changed_files` in both directions: a claimed path that did not move is a
+FAIL, and a path that moved without being claimed is a FAIL. Claims normalize to
+repo-relative POSIX form first, so a spelling difference is not a fabrication and
+a path outside the repository root is refused rather than silently accepted.
+
+`permissions.enforce` is handed the same observation object. Two snapshots of one
+tree read at two moments are two sources of truth; there is one.
+
+### The boundary, which every verdict states
+
+The fact set observes tracked content identity against HEAD and untracked,
+non-ignored files. It does NOT observe gitignored files, writes outside the
+repository root, network effects, or process effects. `ObservationScope` carries
+that universe on the report, the console prints it beside the verdict, and the
+trace stores it in `gate_results.scope_json`.
+
+Agreement therefore means agreement WITHIN that fact set and must never be read as
+"nothing else happened". A candidate the observation could not read makes the
+outcome COULD_NOT_OBSERVE (`INCOMPLETE_OBSERVED_UNIVERSE` / `MUTATION_FACT`), never
+a clean negative; an observed discrepancy remains FAIL and is never masked by the
+hole. Outside a git repository there is no fact, so the gate is CNO rather than a
+pass.
+
+What a contribution is measured against — repository, worktree, branch, base,
+head, and the ambient `git add -A` — is not defined here and belongs to HD-05.
 
 Legacy `gate_results.passed` is retained only as a compatibility projection
 (`1` PASS, `0` FAIL, `NULL` CNO). Schema migration preserves an old explicit

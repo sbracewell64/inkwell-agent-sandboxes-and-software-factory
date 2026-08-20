@@ -15,7 +15,7 @@ from typing import Optional
 
 import yaml
 
-from . import agent_pi, permissions, prompts
+from . import agent_pi, mutation_fact, permissions, prompts
 from .data_types import (
     AgentCall,
     AgentConfig,
@@ -159,6 +159,12 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     # judged defects and unavailable evidence return to the SAME session while
     # retaining FAIL versus COULD_NOT_OBSERVE in the trace.
     for gate_attempt in range(1, max(1, phase.params.retries + 1) + 1):
+        # ONE mutation fact per attempt, computed after this attempt's last send.
+        # The claim gate reconciles against it and the permission check below
+        # enforces against the same object, so the two cannot end up arguing
+        # about what moved.
+        run.mutation = mutation_fact.MutationObservation.between(
+            tree_before, permissions.snapshot(run))
         problems = []
         for gate_name, report in _evaluate_gates(call, envelope, run):
             outcome = report.outcome
@@ -196,7 +202,9 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     # accepted: an agent does not get to report success on a phase in which it
     # wrote somewhere it was not allowed to.
     try:
-        touched = permissions.enforce(run, phase, agent, tree_before)
+        touched = permissions.enforce(
+            run, phase, agent, tree_before,
+            after=run.mutation.after if run.mutation else None)
     except permissions.PermissionBreach as breach:
         run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,
                                      type="error", name="permission_breach",

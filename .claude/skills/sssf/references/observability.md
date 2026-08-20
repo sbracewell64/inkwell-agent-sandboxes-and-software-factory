@@ -40,7 +40,14 @@ Two caveats worth knowing. Pi adds an *estimate* for any messages trailing the l
 
 **Gates record evidence and a three-valued outcome.** `GateOutcome` in `data_types.py` is the owner of `PASS | FAIL | COULD_NOT_OBSERVE`; it cannot coerce to Boolean. A gate declares `nonempty_required` and returns one `{item, ok, note}` check per observation. A failed check is FAIL. All required observations must be present and positive to PASS. Zero required checks or unavailable evidence is CNO with a closed `cno_reason` and `cno_source`.
 
-Outcome, CNO provenance, requirement, checks, and violations land in `gate_results` and the matching `gate_pass`/`gate_fail`/`gate_could_not_observe` event. Thus PASS can answer *what did you verify* — `{"item": "…/plan.md", "ok": true, "note": "exists, 454B"}` — while CNO remains distinct from a judged defect.
+Outcome, CNO provenance, requirement, checks, violations, and any observation
+scope land in `gate_results`; the matching
+`gate_pass`/`gate_fail`/`gate_could_not_observe` event carries the result and
+checks. Thus PASS can answer *what did you verify* — `{"item": "…/plan.md",
+"ok": true, "note": "exists, 454B"}` — while CNO remains distinct from a
+judged defect. `scope_json` states the universe covered by gates such as mutation
+reconciliation, including what was observed, out of scope, or unobservable; it
+is not itself a passing check.
 
 `passed` is compatibility projection only: `1` for PASS, `0` for FAIL, and SQL NULL for CNO. Migration preserves legacy negatives as FAIL and downgrades legacy Boolean green to CNO (`LEGACY_BOOLEAN_ONLY` / `SCHEMA_MIGRATION`); old positives may have been vacuous. A reader opening a schema without typed outcome columns projects CNO (`TRACE_READER`) and never falls back to `passed`. Missing/malformed/unknown typed data and missing checks for a required PASS render CNO.
 
@@ -112,6 +119,7 @@ gate_results (
   nonempty_required INTEGER,        -- whether zero checks is CNO
   violations_json TEXT,             -- derived: the failed checks, as "item: note"
   checks_json   TEXT,               -- [{item, ok, note}] — everything the gate looked at
+  scope_json    TEXT,               -- {observed, out_of_scope, unobservable}, when bounded
   created_at    TEXT
 );
 

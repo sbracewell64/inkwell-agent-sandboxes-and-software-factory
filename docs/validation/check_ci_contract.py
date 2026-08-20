@@ -44,6 +44,9 @@ EXPECTED_CHECKS = {
     "production-extension-path-validator": (
         "{python}", "docs/validation/check_production_extension_path.py"
     ),
+    "mutation-fact-reconciliation-validator": (
+        "{python}", "docs/validation/check_mutation_fact.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
 

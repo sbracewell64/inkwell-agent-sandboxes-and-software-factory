@@ -15,7 +15,15 @@ import json
 import subprocess
 from pathlib import Path
 
-from .data_types import EnvelopeBase, GateReport
+from . import mutation_fact
+from .data_types import (
+    EnvelopeBase,
+    GateCheck,
+    GateCNOReason,
+    GateCNOSource,
+    GateReport,
+    ObservationScope,
+)
 
 TAIL_CHARS = 1000        # command output kept as evidence on a failure
 
@@ -59,14 +67,82 @@ def json_parses(envelope: EnvelopeBase, run) -> GateReport:
     return report
 
 
+def _short(oid: str | None) -> str:
+    return oid[:7] if oid else "absent"
+
+
+def _scope(reconciliation) -> ObservationScope:
+    """Say what this verdict covers before it says what it found."""
+    return ObservationScope(
+        observed=list(reconciliation.observed_classes),
+        out_of_scope=list(reconciliation.out_of_scope_classes),
+        unobservable=[f"{item}: {why}" for item, why in reconciliation.unobservable])
+
+
 def diff_matches_claims(envelope: EnvelopeBase, run) -> GateReport:
-    """Every file claimed changed must exist on disk."""
-    report = GateReport(nonempty_required=True)
-    for f in getattr(envelope, "changed_files", []):
-        p = Path(f)
-        report.check(f, p.exists(),
-                     f"exists, {_size(p)}" if p.exists() else "claimed changed file does not exist")
-    return report
+    """Reconcile the claimed change set against the mutation fact, BOTH ways.
+
+    The old gate looped the declared list and proved only that each named path
+    EXISTS, so an empty `changed_files`, an omitted path, and a claim on a file
+    nobody touched all went green. Existence is not mutation. This compares
+    normalized path plus CONTENT IDENTITY in both directions, because each one
+    catches a different lie: a claimed path that did not move is a fabricated
+    claim, and a path that moved without being claimed is a concealed one.
+
+    The fact is read, never taken — `mutation_fact.observation_of` returns the
+    one observation the permission check also consumes, so the two cannot
+    disagree about what moved.
+
+    The verdict is bounded, and says so. Agreement here means agreement WITHIN
+    the Git and permission fact set; ignored files, out-of-repository writes,
+    network effects and process effects are outside it and the report names
+    them. A candidate that could not be read makes the result COULD_NOT_OBSERVE
+    rather than a negative fact, because a negative claim is only as good as its
+    universe.
+    """
+    observation = mutation_fact.observation_of(run)
+    if observation is None:
+        return GateReport(
+            nonempty_required=True,
+            cno_reason=GateCNOReason.INCOMPLETE_OBSERVED_UNIVERSE,
+            cno_source=GateCNOSource.MUTATION_FACT,
+            cno_detail="no mutation fact was recorded for this phase, so the "
+                       "claimed change set could not be reconciled against anything",
+            scope=ObservationScope(observed=[],
+                                   out_of_scope=list(mutation_fact.OUT_OF_SCOPE_CLASSES),
+                                   unobservable=["<mutation fact>: not recorded"]))
+
+    result = mutation_fact.reconcile(observation, getattr(envelope, "changed_files", []))
+    checks = [
+        GateCheck(item=m.path, ok=True,
+                  note=f"claimed and observed {m.kind}, content "
+                       f"{_short(m.before_oid)} -> {_short(m.after_oid)}"
+                       + (f", rename peer {m.rename_peer}" if m.rename_peer else ""))
+        for m in result.agreed
+    ]
+    checks += [
+        GateCheck(item=m.path, ok=False,
+                  note=f"observed {m.kind} ({_short(m.before_oid)} -> "
+                       f"{_short(m.after_oid)}) but the envelope did not claim it"
+                       + (f"; it is the rename peer of the claimed {m.rename_peer}"
+                          if m.rename_peer else ""))
+        for m in result.unclaimed
+    ]
+    checks += [
+        GateCheck(item=match.claim, ok=False,
+                  note=match.problem or "claimed changed, but the mutation fact "
+                                        "records no change to it")
+        for match in result.unmatched
+    ]
+    return GateReport(
+        nonempty_required=True, checks=checks, scope=_scope(result),
+        # Zero discrepancies over a universe with a hole in it is not a negative
+        # fact. FAIL still wins over this — an observed defect is never masked.
+        cno_reason=None if result.complete else GateCNOReason.INCOMPLETE_OBSERVED_UNIVERSE,
+        cno_source=None if result.complete else GateCNOSource.MUTATION_FACT,
+        cno_detail="" if result.complete else
+        "the mutation fact could not read " + "; ".join(
+            f"{item} ({why})" for item, why in result.unobservable))
 
 
 def verdict_consistent(envelope: EnvelopeBase, run) -> GateReport:

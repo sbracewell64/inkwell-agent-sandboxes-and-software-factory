@@ -81,11 +81,20 @@ def test_nonempty_exact_positive_artifact_is_pass(tmp_path: Path, monkeypatch: p
     reports = [
         gates.artifacts_exist(envelope, None),
         gates.files_non_empty(envelope, None),
-        gates.diff_matches_claims(envelope, None),
     ]
 
     assert all(report.checks for report in reports)
-    assert [report.outcome.status for report in reports] == [GateStatus.PASS] * 3
+    assert [report.outcome.status for report in reports] == [GateStatus.PASS] * 2
+
+    # HD-04 moved diff_matches_claims off path existence and onto the mutation
+    # fact. An existing file is no longer evidence that anything CHANGED, so
+    # with no fact recorded the honest answer is could-not-observe — the same
+    # fixture that used to earn a vacuous green. Its positive control now needs
+    # a real repository and lives in tests/test_mutation_fact.py.
+    claims = gates.diff_matches_claims(envelope, None)
+    assert claims.outcome.status == GateStatus.COULD_NOT_OBSERVE
+    assert claims.outcome.reason == GateCNOReason.INCOMPLETE_OBSERVED_UNIVERSE
+    assert claims.outcome.source == GateCNOSource.MUTATION_FACT
 
 
 @pytest.mark.parametrize(

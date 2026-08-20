@@ -126,11 +126,32 @@ class Console:
         if outcome.status == GateStatus.COULD_NOT_OBSERVE and outcome.detail:
             self._emit(f"    [dim yellow]{escape(_clip(outcome.detail))}[/dim yellow]",
                        level="warn")
+        self._gate_scope(report)
         for check in report.checks:
             style = "dim" if check.ok else "dim red"
             detail = f" — {_clip(check.note)}" if check.note else ""
             self._emit(f"    [{style}]{'·' if check.ok else '✗'} {escape(_clip(check.item))}"
                        f"{escape(detail)}[/{style}]", level="info" if check.ok else "error")
+
+    def _gate_scope(self, report) -> None:
+        """Print the universe a verdict covers, next to the verdict itself.
+
+        A green that does not say what it did NOT look at reads as "nothing else
+        happened". It never means that: zero findings is cleanliness only within
+        a stated universe, so the boundary is printed with the result rather
+        than left in a document nobody has open.
+        """
+        scope = getattr(report, "scope", None)
+        if scope is None:
+            return
+        if scope.observed:
+            self._emit(f"    [dim]observed: {escape(_clip('; '.join(scope.observed)))}[/dim]")
+        if scope.out_of_scope:
+            self._emit(f"    [dim]NOT observed, so not covered by this verdict: "
+                       f"{escape(_clip('; '.join(scope.out_of_scope)))}[/dim]")
+        for item in scope.unobservable:
+            self._emit(f"    [dim yellow]could not observe {escape(_clip(item))}[/dim yellow]",
+                       level="warn")
 
     def envelope_summary(self, envelope: EnvelopeBase) -> None:
         ok = envelope.status == "success"
