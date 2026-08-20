@@ -57,6 +57,22 @@ Validate installed, template, and disposable generated ADW contracts without a p
 uv run docs/validation/check_adw_synchronization.py
 ```
 
+Validate mapped-surface parity between installable template bytes and live bytes,
+including the watched-red calibration that runs on every invocation, with the
+standard library only:
+
+```text
+python docs/validation/check_mapped_surface_parity.py
+python docs/validation/check_mapped_surface_parity.py --state parity-state.json
+```
+
+Check what a fresh disposable stamp actually produces — that the reconciled
+substrate arrives and intentional scaffold/user-owned divergence survives:
+
+```text
+python docs/validation/check_stamped_substrate.py
+```
+
 ## Sandbox
 
 ```text

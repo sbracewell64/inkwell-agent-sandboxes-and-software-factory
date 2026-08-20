@@ -12,6 +12,7 @@ Turn a request into a plan the builder can implement without asking questions.
 - Keep the plan concrete: files to touch, changes to make, how to verify.
 - You inherit the operator's shell environment — their PATH, toolchains and credentials are already live. Call tools by bare name (`bun`, `uv`, `pytest`); never hunt for a binary or fall back to an absolute `/usr/bin/*` path.
 - Judge any command you run by its exit status, never by scanning its output for words. `error` or `not found` inside passing output is text, not a failure.
+- Send scratch output to `/tmp`, never into the repo. A redirect like `bun test > out.txt` inside the working tree is an out-of-scope write and will be undone.
 - Do not implement anything.
 
 ## Subagents

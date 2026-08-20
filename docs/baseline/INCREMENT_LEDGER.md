@@ -31,6 +31,15 @@ This ledger is append-only in intent. Do not rewrite history to make later resul
 | HD-08 | PASS | Offline nonempty run-bound evidence manifest core; no runtime acceptance integration | canonical positive fixture and watched-red identity/empty/diagnostic/tamper/duplicate/path/schema controls |
 | LAUNCH-1 | CORRECTED CANDIDATE — CNO | Tracked Windows `E:\\SSSF` front door into the existing FirstMate primary/supervision path | `tests/test_windows_front_door.py`; named disposable Herdr-lab launch; public shortcut target recorded; post-merge launch from the installed canonical checkout remains CNO until observed |
 
+## Identity calibration
+
+The mapped-surface candidate in pull request 8 is intentionally absent from the
+row set because authoritative history does not assign it an increment ID. Its
+former `HD-04` claim collided with the mutations increment reserved by landed
+HD-03 history. The collision, the complete identity check, and the reason no
+replacement ID was invented are retained in
+[`../evidence/PR8_INCREMENT_IDENTITY_COLLISION.md`](../evidence/PR8_INCREMENT_IDENTITY_COLLISION.md).
+
 ## Future increments
 
 Use IDs `B1-001`, `B1-002`, etc. after the B0 freeze. Every row should point to an ADR, proof record, test/trace, or immutable Git object when applicable.

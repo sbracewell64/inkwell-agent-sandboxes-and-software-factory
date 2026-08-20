@@ -52,9 +52,12 @@ checks, and the nonempty requirement.
 
 Existing genuine controls keep their bounded meaning: nonempty artifact gates
 prove the declared artifact observations they actually recorded, and permission
-enforcement remains a separate post-agent boundary. Neither is presented as
-proof that an envelope listed every real repository mutation; Git/content claim
-reconciliation belongs to a later increment.
+enforcement remains a separate post-agent boundary. Before an agent runs, that
+boundary preserves up to 1 MiB of each already-dirty file. It restores those
+bytes when necessary and permits at most three fully recovered out-of-scope
+writes to continue; an unrecovered or larger breach fails the phase. Neither
+control is presented as proof that an envelope listed every real repository
+mutation; Git/content claim reconciliation belongs to a later increment.
 
 Legacy `gate_results.passed` is retained only as a compatibility projection
 (`1` PASS, `0` FAIL, `NULL` CNO). Schema migration preserves an old explicit
@@ -89,3 +92,31 @@ Every ADW must end through the run finish path with an explicit accepted conditi
 ## Static synchronization
 
 `docs/validation/check_adw_synchronization.py` is the authority for the installed, skill-template, and disposable generated ADW contract. It checks a nonempty surface inventory, statically resolves imported module attributes, requires concrete typed agent calls and exactly one `run.finish()` as the final top-level return from `main()` after a bounded fallthrough prefix, reconciles PEP 723 dependencies with imports, and matches prompt Report fields to output models. Its generated import smoke does not execute `main()` or call a provider.
+
+That internal-contract validator checks each surface independently and does not
+compare installed and template CONTENT; it is preserved unchanged and its verdict
+is not broadened by the parity work below. See the claim-boundary section of
+`docs/increments/HD-02_ADW_SYNCHRONIZATION.md`.
+
+## Mapped-surface parity
+
+The surfaces are a mapping, not a mirror: `install.py` stamps template paths to
+different live paths, so a relative-path or subtree comparison is not a parity
+model. `docs/validation/mapped_surface_contract.json` transcribes that mapping
+from install.py's `stamp()` calls and assigns every governed path one relation —
+`EXACT_MIRROR`, `CONTRACT_ONLY`, `TEMPLATE_SCAFFOLD`, `USER_OWNED`, `LIVE_ONLY` —
+with owner, rationale and evidence wherever divergence is intentional.
+
+`docs/validation/check_mapped_surface_parity.py` enforces it: mapped content
+identity for `EXACT_MIRROR`, named-property enforcement for relations that permit
+body divergence, coupled groups that must stamp together, and CNO for a vacuous,
+unreviewable, stale, or unclaimed declaration. Undeclared divergence is never
+silently accepted. It emits `matched / intentional-divergence / drift /
+unresolved` as structured state bound to the sha256 of the verifier and contract
+bytes, and re-runs its watched-red calibration on every invocation, so it cannot
+report PASS without having just demonstrated it still fails.
+
+`docs/validation/check_stamped_substrate.py` closes the remaining gap by running
+the real installer into a disposable directory: it asserts the reconciled
+substrate arrives and that intentional scaffold/user-owned divergence survives.
+Decision record: `docs/decisions/ADR-0004-MAPPED-SURFACE-PARITY.md`.

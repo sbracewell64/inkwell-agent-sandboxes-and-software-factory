@@ -27,6 +27,14 @@ Never hand-edit session evidence.
 - `docs/validation/check_evidence_manifest.py` — positive and watched-red controls
 - `docs/validation/fixtures/evidence_manifest/` — canonical offline fixtures
 
+## Mapped-surface parity (template ↔ live)
+
+- `docs/validation/mapped_surface_contract.json` — authoritative typed relations and the non-isomorphic stamp mapping, transcribed from `install.py`
+- `docs/validation/check_mapped_surface_parity.py` — mapped content parity, structured state, watched-red calibration on every run
+- `docs/validation/check_stamped_substrate.py` — what a fresh disposable stamp really produces
+- `docs/decisions/ADR-0004-MAPPED-SURFACE-PARITY.md` — decision record
+- `.claude/skills/sssf/scripts/install.py` — the `stamp()` calls are the mapping's source of truth
+
 ## Sandbox orchestration
 
 - `just/sandbox/`

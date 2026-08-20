@@ -37,6 +37,16 @@
       "timeout_seconds": 60
     },
     {
+      "id": "mapped-surface-parity-validator",
+      "command": ["{python}", "docs/validation/check_mapped_surface_parity.py"],
+      "timeout_seconds": 60
+    },
+    {
+      "id": "stamped-substrate-validator",
+      "command": ["{python}", "docs/validation/check_stamped_substrate.py"],
+      "timeout_seconds": 60
+    },
+    {
       "id": "inkwell-unit-tests",
       "command": ["just", "inkwell", "test"],
       "timeout_seconds": 180

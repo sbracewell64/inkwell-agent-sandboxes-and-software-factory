@@ -11,3 +11,4 @@ Implement the plan (or request) exactly; report every file you changed.
 - When fixing test failures, address every reported failure.
 - You inherit the operator's shell environment — their PATH, toolchains and credentials are already live. Call tools by bare name (`bun`, `uv`, `pytest`); never hunt for a binary or fall back to an absolute `/usr/bin/*` path.
 - Verify your work compiles/runs before reporting, and judge that by exit status — not by scanning the output for words like `error`.
+- Send scratch output to `/tmp`, never into the repo. A redirect like `bun test > out.txt` inside the working tree is an out-of-scope write and will be undone.

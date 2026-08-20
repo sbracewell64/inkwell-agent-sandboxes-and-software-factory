@@ -91,9 +91,9 @@ adws/adw_modules/     agents.py (roster + validation), agent_pi.py / agent_cc.py
                       (typed envelopes), gates.py, quality.py (deterministic checks incl. the
                       test suite), tracer.py (the trace db), session.py, runner.py,
                       permissions.py, git_helper.py.
-adws/adw_sssf_config/ sssf.config.yaml (cheap roster) and sssf.frontier.config.yaml.
-                      Every model is `openrouter/<id>`; the first slash splits provider
-                      from model id.
+adws/adw_sssf_config/ five rosters: cheap default, frontier, DeepSeek, open-weights, and
+                      top-speed. Every model is `openrouter/<id>`; the first slash splits
+                      provider from model id.
 adws/adw_data/        runtime: sessions/, prompt_engineering/, harness_engineering/, and
                       sssf.db. NEVER edit sessions/ — it is the run record.
 ```
@@ -122,6 +122,15 @@ docs/validation/check_executor_supervisor.py
 docs/validation/check_production_extension_path.py
                           shipped harness_engineering rosters drive the real agent_pi launch
                           path; extensions must be forwarded as -e, never rejected.
+docs/validation/mapped_surface_contract.json
+                          authoritative template<->live relations and the non-isomorphic
+                          stamp mapping transcribed from install.py.
+docs/validation/check_mapped_surface_parity.py
+                          mapped content parity, structured matched/intentional/drift state,
+                          watched-red calibration re-run on every invocation.
+docs/validation/check_stamped_substrate.py
+                          fresh disposable stamp: reconciled substrate arrives, intentional
+                          scaffold and user-owned divergence survives.
 ```
 
 ## `tools/` — repository-owned utilities
@@ -148,6 +157,8 @@ commands/prime.md     `/prime` — boots a net-new agent on this whole system.
 
 ```
 docs/reference/EVIDENCE_MANIFEST.md  authoritative manifest v1 contract and HD-09 boundary.
+docs/evidence/PR8_INCREMENT_IDENTITY_COLLISION.md  calibration record for the withdrawn,
+                      unsupported PR 8 HD-04 claim and the complete affected claim map.
 docs/validation/check_evidence_manifest.py  deterministic positive and watched-red controls.
 docs/validation/fixtures/evidence_manifest/ canonical offline manifest fixtures.
 specs/sandbox-mount-system.html   THE PLAN, and the working checklist. Live checkboxes record

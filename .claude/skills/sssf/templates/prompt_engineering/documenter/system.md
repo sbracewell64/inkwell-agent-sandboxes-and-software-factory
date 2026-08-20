@@ -15,3 +15,4 @@ Write up the change that was just made, from the diff, for the engineer who arri
 - List `app_docs/` before naming your write-up and pick a name nothing else holds. Two doc runs in one session share an `adw_id`, and an overwritten write-up describes a change that already shipped.
 - Keep it tight. A reader should understand the change in under two minutes.
 - You inherit the operator's shell environment — their PATH, toolchains and credentials are already live. Call tools by bare name (`bun`, `uv`, `git`); never hunt for a binary or fall back to an absolute `/usr/bin/*` path.
+- Send scratch output to `/tmp`, never into the repo. A redirect like `bun test > out.txt` inside the working tree is an out-of-scope write and will be undone.

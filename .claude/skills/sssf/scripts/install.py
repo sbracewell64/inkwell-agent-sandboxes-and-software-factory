@@ -8,9 +8,19 @@ Usage:
     uv run <skill>/scripts/install.py [--force]
 
 Stamps: adws/ (modules + starter ADWs), adws/adw_data/prompt_engineering/
-(4 starter agents), adws/adw_sssf_config/sssf.config.yaml, .env.sample,
+(5 starter agents), adws/adw_data/harness_engineering/,
+adws/adw_sssf_config/sssf.config.yaml, .env.sample, justfile,
 .gitignore entries.
 Existing files are skipped unless --force.
+
+The stamp() calls in main() are the AUTHORITATIVE mapping between template and
+live paths, and that mapping is deliberately NOT isomorphic: templates/
+prompt_engineering lands at adws/adw_data/prompt_engineering, templates/
+sssf.config.yaml at adws/adw_sssf_config/sssf.config.yaml, templates/env.sample
+at .env.sample. A relative-path or subtree comparison of the two surfaces is
+therefore meaningless. docs/validation/mapped_surface_contract.json transcribes
+this mapping and assigns each governed path a typed relation; if these calls
+change, that contract is stale and must change with them.
 """
 
 import argparse
