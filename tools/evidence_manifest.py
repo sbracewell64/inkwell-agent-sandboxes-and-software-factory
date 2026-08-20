@@ -154,10 +154,21 @@ class ValidationContext:
 
 
 @dataclass(frozen=True)
+class ValidatedInventoryItem:
+    path: str
+    artifact_type: str
+    byte_length: int
+    sha256: str
+    producer: str
+    run_id: str
+
+
+@dataclass(frozen=True)
 class ValidationResult:
     observation: Observation
     issues: tuple[str, ...]
     checked_inventory: tuple[str, ...] = ()
+    validated_inventory: tuple[ValidatedInventoryItem, ...] = ()
 
     @property
     def is_qualifying(self) -> bool:
@@ -772,6 +783,7 @@ def validate_manifest(
     bad: list[str] = []
     cno: list[str] = []
     checked: list[str] = []
+    validated: list[ValidatedInventoryItem] = []
 
     try:
         raw_manifest = manifest_path.read_bytes()
@@ -868,6 +880,16 @@ def validate_manifest(
                     adw_id=item["adw_id"],
                 )
                 checked.append(path)
+                validated.append(
+                    ValidatedInventoryItem(
+                        path=path,
+                        artifact_type=item["artifact_type"],
+                        byte_length=item["byte_length"],
+                        sha256=item["sha256"],
+                        producer=item["producer"],
+                        run_id=item["run_id"],
+                    )
+                )
                 if qualifying_identity_ok:
                     qualifying_phases.add(item["phase"])
                     qualifying_dimensions.update(claimed)
@@ -887,10 +909,10 @@ def validate_manifest(
         cno.append("checked inventory is empty")
 
     if bad:
-        return ValidationResult(Observation.OBSERVED_BAD, tuple(bad + cno), tuple(checked))
+        return ValidationResult(Observation.OBSERVED_BAD, tuple(bad + cno), tuple(checked), tuple(validated))
     if cno:
-        return ValidationResult(Observation.CNO, tuple(cno), tuple(checked))
-    return ValidationResult(Observation.OBSERVED_GOOD, (), tuple(checked))
+        return ValidationResult(Observation.CNO, tuple(cno), tuple(checked), tuple(validated))
+    return ValidationResult(Observation.OBSERVED_GOOD, (), tuple(checked), tuple(validated))
 
 
 def _parser() -> argparse.ArgumentParser:

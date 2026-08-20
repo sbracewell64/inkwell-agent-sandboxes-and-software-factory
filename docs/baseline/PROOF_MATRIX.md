@@ -122,6 +122,8 @@
 | LAUNCH-1 named-lab FirstMate handoff | guarded non-default `fm-lab-*` session created labeled `firstmate`; pane agent was Claude and returned idle; default-session tripwire held through teardown | PASS — GUARDED HOST OBSERVED |
 | LAUNCH-1 authorized shortcut | `C:\\Users\\Public\\Desktop\\SSSF FirstMate.lnk` targets tracked `E:\\SSSF\\bin\\sssf-firstmate.cmd`, no arguments, working directory `E:\\SSSF` | PASS — HOST INSPECTED |
 | LAUNCH-1 canonical post-merge installation launch | new tracked file is not present in the pre-merge canonical checkout used for the host observation | CNO — HONEST LIMIT |
+| SBX-1 SandboxProvider contract/fake | provider-free deterministic positive success plus typed watched-red controls for ambiguity, identity, bounded exec, separate host/workload/resource quiescence domains, artifact/Git obligations, stop/destroy/reconcile, interruptions, and aggregate precedence; `provider-calls: 0` | PASS — LOCAL CONTRACT/FAKE; REAL PROVIDER CNO |
+| SBX-1 Docker mechanism binding | typed capability is `deferred-to-sbx-2`; no Docker or provider side effect belongs to this increment | CNO UNTIL SBX-2 |
 
 ## Rule
 

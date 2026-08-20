@@ -2,7 +2,7 @@
 
 ## Scope
 
-HD-08 defines the offline, run-bound evidence-manifest core. It does **not** integrate manifests into ADW completion, sandbox lifecycle, export, or runtime acceptance. A valid v1 manifest is an observed-good statement about the bounded files checked by this validator; it does not authorize acceptance. HD-09 owns that later transition.
+HD-08 defines the offline, run-bound evidence-manifest core. SBX-1 reuses its validation result and validated inventory as an export obligation before destruction, but a valid v1 manifest remains only an observed-good statement about the bounded files checked by this validator; it does not authorize ADW completion, promotion, or runtime acceptance. HD-09 owns that later transition.
 
 The sole executable owner is `tools/evidence_manifest.py`. It owns:
 

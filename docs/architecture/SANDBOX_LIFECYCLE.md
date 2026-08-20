@@ -76,3 +76,12 @@ Never replace this with implicit shell-session state.
 ## Local Windows compatibility notes
 
 See `operations/INSTALL_WINDOWS.md`.
+
+## SBX-1 provider-neutral projection
+
+The provider-neutral contract, ownership boundary, lifecycle vocabulary, bounded
+exports, reconciliation rules, and deterministic fake are owned once by
+[`reference/SANDBOX_PROVIDER.md`](../reference/SANDBOX_PROVIDER.md) and
+`adws/adw_modules/sandbox_provider.py`. This lifecycle document remains the
+historical exe.dev ordering reference; it does not define a second provider
+interface. SBX-1 does not bind Docker mechanics or live provider behavior.
