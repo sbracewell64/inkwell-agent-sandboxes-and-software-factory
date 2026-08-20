@@ -1,0 +1,36 @@
+HD-08 intermediate-component time-of-check-to-time-of-use negative control
+
+This supplemental evidence binds the watched-red calibration to the exact
+defective program derived from the current evidence-manifest validator.
+
+program identity
+  base_tool_path: tools/evidence_manifest.py
+  base_tool_sha256: c5b89d5f95ccf220b07ffac9fd93796d0c973e6b6daca44ff54e80ce5bcb2e00
+  defective_program_sha256: 14c23cb74932e1aeb9f2cbeec09510984bf8b11b404d64745713f84dd4a61887
+
+defective arm
+  expected_exit: nonzero (1)
+  observed_exit: 1
+  observed_output:
+defective_program_sha256: 14c23cb74932e1aeb9f2cbeec09510984bf8b11b404d64745713f84dd4a61887
+intermediate-component-tocttou: outside-root bytes were accepted
+intermediate-component-tocttou: escaped artifact entered checked inventory
+intermediate-component-tocttou: outside-root bytes were read
+findings: 3
+
+production arm
+  expected_exit: 0
+  observed_exit: 0
+  observed_output:
+production: tools/evidence_manifest.py
+findings: 0
+
+classification
+  defective variant: observed-bad, watched red for the intended reason
+  shipped implementation: refusal held; outside-root bytes were neither read
+    nor admitted to checked inventory
+
+scope
+  This proves the control detects an intermediate component swap when both
+  intermediate protections are removed, while the shipped implementation
+  refuses the same swap. It does not claim runtime acceptance integration.
