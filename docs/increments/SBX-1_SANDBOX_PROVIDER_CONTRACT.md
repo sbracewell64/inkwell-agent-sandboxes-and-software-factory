@@ -1,16 +1,19 @@
 # SBX-1 — SandboxProvider contract and deterministic fake
 
-**Status:** implementation candidate; provider-free deterministic proof
+**Status:** implementation candidate; provider-free deterministic proof; activation/acceptance CNO
 **Starts from:** `bee9296a4c94b1dc3da6991acd1755a91fa681eb`
 **Planning ref:** `origin/planning/future-sssf` at `54ef67c3849b24b1eaa6e10d2ed0e49a09464a70`
-**SBX-0 input:** `/home/shane/kun-agent-workspace/data/sssf-sbx-0/report.md`
+**SBX-0 handoff:** [`../reference/SBX-0_SEMANTICS_INVENTORY.json`](../reference/SBX-0_SEMANTICS_INVENTORY.json), source content SHA `2d16bee3db4c46062b460dfbd6752339e85228a3b6f2c5002313a4f06dc663b`
+**Mutable source input:** `data/sssf-sbx-0/report.md` (evidence only; not durable authority)
 
 ## Intent and non-goals
 
-Define the smallest provider-neutral `SandboxProvider` contract authorized by
+Define the smallest provider-neutral `SandboxProvider` contract handed off by
 Browser Sol control issue 6 and the continuing SSSF commission. The increment
 proves the semantics with a deterministic in-process fake and watched-red
-controls; it does not implement Docker or call any live provider.
+controls; it does not implement Docker or call any live provider. The SBX-0
+publication is an inspectable handoff input only and does not activate or accept
+this increment.
 
 Explicit non-goals are Docker mechanism binding (SBX-2), exe.dev parity,
 Wayfinder/DSH, model execution, network/credential transport, live source

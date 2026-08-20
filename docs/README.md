@@ -30,6 +30,7 @@ Read in this order:
 7. [`reference/GLOSSARY.md`](reference/GLOSSARY.md) — canonical terms.
 8. [`reference/EVIDENCE_MANIFEST.md`](reference/EVIDENCE_MANIFEST.md) — offline run-bound evidence manifest v1 (not runtime acceptance).
 9. [`reference/SANDBOX_PROVIDER.md`](reference/SANDBOX_PROVIDER.md) — SBX-1 provider-neutral sandbox contract and owner boundary.
+10. [`reference/SBX-0_SEMANTICS_INVENTORY.json`](reference/SBX-0_SEMANTICS_INVENTORY.json) — exact SBX-0 source-bound handoff inventory and owner-per-fact coverage.
 
 ## Documentation authority
 

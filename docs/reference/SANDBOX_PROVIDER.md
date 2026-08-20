@@ -4,11 +4,13 @@
 **Implementation owner:** `adws/adw_modules/sandbox_provider.py`
 **Increment:** `SBX-1` from canonical base `bee9296a4c94b1dc3da6991acd1755a91fa681eb`
 **Planning authority:** `origin/planning/future-sssf` at `54ef67c3849b24b1eaa6e10d2ed0e49a09464a70`
+**SBX-0 handoff:** [`SBX-0_SEMANTICS_INVENTORY.json`](SBX-0_SEMANTICS_INVENTORY.json), source digest `2d16bee3db4c46062b460dfbd6752339e85228a3b6f2c5002313a4f06dc663b`
 
 This is the provider-neutral environment-mechanics seam. It is not a Docker
 adapter and it does not claim a live provider capability. The deterministic
 validator is `docs/validation/check_sandbox_provider.py`; its fake has zero
-external provider calls.
+external provider calls. The SBX-0 inventory is a source-bound handoff only;
+SBX-1 activation and acceptance remain `could-not-observe`.
 
 ## Ownership boundary
 

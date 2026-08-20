@@ -120,6 +120,9 @@ docs/validation/check_ci_contract.py
 docs/validation/check_executor_supervisor.py
                           provider-free process/Pi adapter fixtures, including watched-red
                           stdin inheritance and explicit Windows cleanup refusal.
+docs/validation/check_sbx0_inventory.py
+                          exact SBX-0 source-generation/content-digest handoff validator,
+                          owner-per-fact coverage, and watched-red CNO controls.
 docs/validation/check_production_extension_path.py
                           shipped harness_engineering rosters drive the real agent_pi launch
                           path; extensions must be forwarded as -e, never rejected.
@@ -149,6 +152,9 @@ commands/prime.md     `/prime` — boots a net-new agent on this whole system.
 
 ```
 docs/reference/EVIDENCE_MANIFEST.md  authoritative manifest v1 contract and HD-09 boundary.
+docs/reference/SBX-0_SEMANTICS_INVENTORY.json  exact SBX-0 source-bound handoff inventory;
+                      mutable report input is not repository authority.
+docs/increments/SBX-0_SEMANTICS_INVENTORY.md  publication scope and non-promotion boundary.
 docs/validation/check_evidence_manifest.py  deterministic positive and watched-red controls.
 docs/validation/fixtures/evidence_manifest/ canonical offline manifest fixtures.
 specs/sandbox-mount-system.html   THE PLAN, and the working checklist. Live checkboxes record
