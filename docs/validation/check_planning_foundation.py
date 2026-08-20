@@ -249,10 +249,11 @@ def _validate_single_transition(
     project: dict[str, Any],
     index: int,
     errors: list[str],
-) -> str:
+    deferred_return: str | None,
+) -> tuple[str, str | None]:
     if not isinstance(transition, dict):
         errors.append(f"{record.get('item_id')} transition {index} is not an object")
-        return previous
+        return previous, deferred_return
     source = transition.get("from")
     target = transition.get("to")
     if source not in STATES or target not in STATES:
@@ -260,7 +261,7 @@ def _validate_single_transition(
             f"illegal/unknown/skipped transition for {record.get('item_id')}: "
             f"{source!r} -> {target!r}"
         )
-        return target if target in STATES else previous
+        return (target if target in STATES else previous), deferred_return
     if source != previous:
         errors.append(
             f"illegal/unknown/skipped transition for {record.get('item_id')}: "
@@ -282,21 +283,51 @@ def _validate_single_transition(
     source_commit = transition.get("source_commit")
     if source_commit is not None and not _safe_sha(source_commit):
         errors.append(f"{record.get('item_id')} transition {index} has an invalid source commit identity")
-    if source == "DEFERRED":
+    if target == "DEFERRED":
         return_to = transition.get("return_to")
-        if target not in RESUMABLE_STATES or return_to != target:
+        if source not in RESUMABLE_STATES or return_to != source:
+            errors.append(
+                f"{record.get('item_id')} deferred entry does not retain its return state"
+            )
+        else:
+            deferred_return = return_to
+    if source == "DEFERRED":
+        if target not in RESUMABLE_STATES or deferred_return != target:
             errors.append(
                 f"{record.get('item_id')} deferred re-entry does not return to its recorded state"
             )
+        deferred_return = None
     if target == "ACTIVE":
         _validate_active_binding(record, errors)
     if target == "PROVEN":
-        proof_refs = record.get("proof_evidence_refs")
-        if not isinstance(proof_refs, list) or not proof_refs or any(
-            not _path_exists(project, reference) for reference in proof_refs
+        _validate_proven_proof(record, project, errors)
+    return target, deferred_return
+
+
+def _validate_proven_proof(
+    record: dict[str, Any], project: dict[str, Any], errors: list[str]
+) -> None:
+    proof = record.get("proven_proof")
+    item_id = record.get("item_id")
+    if not isinstance(proof, dict):
+        errors.append(f"{item_id} PROVEN transition lacks the complete proof contract")
+        return
+    if proof.get("accepted_implementation") is not True:
+        errors.append(f"{item_id} PROVEN transition lacks accepted implementation")
+    for field in (
+        "acceptance_evidence_refs",
+        "implementation_evidence_refs",
+        "proof_evidence_refs",
+        "documentation_evidence_refs",
+    ):
+        references = proof.get(field)
+        if not isinstance(references, list) or not references or any(
+            not _path_exists(project, reference) for reference in references
         ):
-            errors.append(f"{record.get('item_id')} PROVEN transition lacks retained proof evidence")
-    return target
+            errors.append(f"{item_id} PROVEN transition lacks retained {field}")
+    for field in ("source_commit", "source_tree"):
+        if not _safe_sha(proof.get(field)):
+            errors.append(f"{item_id} PROVEN transition lacks immutable {field}")
 
 
 def _validate_active_binding(record: dict[str, Any], errors: list[str]) -> None:
@@ -305,6 +336,24 @@ def _validate_active_binding(record: dict[str, Any], errors: list[str]) -> None:
     if not isinstance(increments, list) or not increments:
         errors.append(f"unbound or partial ACTIVE identity for {record.get('item_id')}: increments")
         return
+    planned = record.get("planned_increments")
+    planned_ids = (
+        [item.get("increment_id") for item in planned]
+        if isinstance(planned, list) and all(isinstance(item, dict) for item in planned)
+        else []
+    )
+    bound_ids = [item.get("increment_id") for item in increments if isinstance(item, dict)]
+    if (
+        not planned_ids
+        or len(planned_ids) != len(set(planned_ids))
+        or len(bound_ids) != len(increments)
+        or len(bound_ids) != len(set(bound_ids))
+        or set(bound_ids) != set(planned_ids)
+    ):
+        errors.append(
+            f"unbound or partial ACTIVE identity for {record.get('item_id')}: "
+            "bindings must exactly cover unique planned increments"
+        )
     required = (
         "increment_id",
         "branch",
@@ -421,26 +470,34 @@ def _validate_state(
             errors.append(f"{item_id} has no complete durable transition history")
             continue
         previous = initial
+        deferred_return: str | None = None
         for index, transition in enumerate(transitions):
-            previous = _validate_single_transition(
+            previous, deferred_return = _validate_single_transition(
                 transition,
                 previous=previous,
                 record=record,
                 project=project,
                 index=index,
                 errors=errors,
+                deferred_return=deferred_return,
             )
         if previous != current:
             errors.append(f"{item_id} durable transition history does not end at current state {current}")
         binding = record.get("active_binding")
-        if current != "ACTIVE" and binding is not None:
-            errors.append(f"{item_id} has an ACTIVE binding while its canonical state is {current}")
-        if current == "ACTIVE":
+        entered_active = any(
+            isinstance(transition, dict) and transition.get("to") == "ACTIVE"
+            for transition in transitions
+        )
+        if binding is not None and not entered_active:
+            errors.append(f"{item_id} has an ACTIVE binding without an ACTIVE transition")
+        if current == "ACTIVE" or entered_active:
             _validate_active_binding(record, errors)
         if current in TERMINAL_STATES and record.get("reentry_rule") not in ("terminal", None):
             errors.append(f"{item_id} terminal state has a re-entry rule")
-        if current == "DEFERRED" and not record.get("return_state"):
-            errors.append(f"{item_id} deferred state has no return state")
+        if current == "DEFERRED" and record.get("return_state") != deferred_return:
+            errors.append(f"{item_id} deferred state does not retain its recorded return state")
+        if current != "DEFERRED" and record.get("return_state") is not None:
+            errors.append(f"{item_id} has a deferred return state while its canonical state is {current}")
     for record in records:
         if isinstance(record, dict):
             for reference in record.get("authoritative_refs", []):
@@ -722,6 +779,14 @@ def _positive_active_fixture(project: dict[str, Any]) -> list[str]:
                 "source_commit": "a" * 40,
                 "source_tree": "b" * 40,
                 "authoritative_refs": ["docs/development/FUTURE_CANDIDATES.md"],
+            },
+            {
+                "increment_id": "FM-FP-001",
+                "branch": "fm/fm-fp-001",
+                "pr_url": "https://github.com/example/sssf/pull/102",
+                "source_commit": "c" * 40,
+                "source_tree": "d" * 40,
+                "authoritative_refs": ["docs/development/FUTURE_CANDIDATES.md"],
             }
         ]
     }
@@ -734,6 +799,73 @@ def _positive_active_fixture(project: dict[str, Any]) -> list[str]:
     )
     errors = validate_state_document(state, project)
     return [f"positive valid ACTIVE fixture failed: {error}" for error in errors]
+
+
+def _active_state_fixture(project: dict[str, Any]) -> dict[str, Any]:
+    state = copy.deepcopy(project["state"])
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record["state"] = "ACTIVE"
+    record["active_binding"] = {
+        "increments": [
+            {
+                "increment_id": increment_id,
+                "branch": f"fm/{increment_id.lower()}",
+                "pr_url": f"https://github.com/example/sssf/pull/{index}",
+                "source_commit": format(index, "040x"),
+                "source_tree": format(index + 10, "040x"),
+                "authoritative_refs": ["docs/development/FUTURE_CANDIDATES.md"],
+            }
+            for index, increment_id in enumerate(("FP-001", "FM-FP-001"), 1)
+        ]
+    }
+    record["transition_history"].append(
+        {
+            "from": "SEQUENCED",
+            "to": "ACTIVE",
+            "evidence_refs": ["docs/development/FUTURE_CANDIDATES.md"],
+        }
+    )
+    return state
+
+
+def _positive_proven_fixture(project: dict[str, Any]) -> list[str]:
+    state = _active_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    evidence = ["docs/development/FUTURE_CANDIDATES.md"]
+    record["state"] = "PROVEN"
+    record["transition_history"].append(
+        {"from": "ACTIVE", "to": "PROVEN", "evidence_refs": evidence}
+    )
+    record["proven_proof"] = {
+        "accepted_implementation": True,
+        "acceptance_evidence_refs": evidence,
+        "implementation_evidence_refs": evidence,
+        "proof_evidence_refs": evidence,
+        "documentation_evidence_refs": evidence,
+        "source_commit": "e" * 40,
+        "source_tree": "f" * 40,
+    }
+    errors = validate_state_document(state, project)
+    return [f"positive valid PROVEN fixture failed: {error}" for error in errors]
+
+
+def _positive_deferred_fixture(project: dict[str, Any]) -> list[str]:
+    state = copy.deepcopy(project["state"])
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    evidence = ["docs/development/FUTURE_CANDIDATES.md"]
+    record["state"] = "DEFERRED"
+    record["return_state"] = "SEQUENCED"
+    record["transition_history"].append(
+        {"from": "SEQUENCED", "to": "DEFERRED", "return_to": "SEQUENCED", "evidence_refs": evidence}
+    )
+    errors = validate_state_document(state, project)
+    record["state"] = "SEQUENCED"
+    record.pop("return_state")
+    record["transition_history"].append(
+        {"from": "DEFERRED", "to": "SEQUENCED", "evidence_refs": evidence}
+    )
+    errors.extend(validate_state_document(state, project))
+    return [f"positive valid DEFERRED fixture failed: {error}" for error in errors]
 
 
 def _expect_red(
@@ -792,6 +924,43 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
     partial_record["active_binding"] = {"increments": [{"increment_id": "FP-001", "branch": "fm/fp-001"}]}
     _expect_red("partial-active-identity", partial_active, "unbound or partial ACTIVE identity", failures)
 
+    for name, mutate in (
+        ("omitted-active-increment", lambda increments: increments.pop()),
+        (
+            "extra-active-increment",
+            lambda increments: increments.append({**increments[0], "increment_id": "EXTRA-001"}),
+        ),
+        ("duplicate-active-increment", lambda increments: increments.__setitem__(1, copy.deepcopy(increments[0]))),
+    ):
+        active_state = _active_state_fixture(project)
+        active_record = next(item for item in active_state["records"] if item["item_id"] == "FUT-003")
+        mutate(active_record["active_binding"]["increments"])
+        if not any("exactly cover unique planned increments" in error for error in validate_state_document(active_state, project)):
+            failures.append(name)
+
+    incomplete_proof = _active_state_fixture(project)
+    proof_record = next(item for item in incomplete_proof["records"] if item["item_id"] == "FUT-003")
+    proof_record["state"] = "PROVEN"
+    proof_record["transition_history"].append(
+        {"from": "ACTIVE", "to": "PROVEN", "evidence_refs": ["docs/development/FUTURE_CANDIDATES.md"]}
+    )
+    proof_record["proven_proof"] = {"proof_evidence_refs": ["docs/development/FUTURE_CANDIDATES.md"]}
+    if not any("PROVEN transition lacks" in error for error in validate_state_document(incomplete_proof, project)):
+        failures.append("incomplete-proven-proof-contract")
+
+    invented_return = copy.deepcopy(project["state"])
+    deferred_record = next(item for item in invented_return["records"] if item["item_id"] == "FUT-003")
+    evidence = ["docs/development/FUTURE_CANDIDATES.md"]
+    deferred_record["state"] = "DECIDED"
+    deferred_record["transition_history"].extend(
+        [
+            {"from": "SEQUENCED", "to": "DEFERRED", "return_to": "SEQUENCED", "evidence_refs": evidence},
+            {"from": "DEFERRED", "to": "DECIDED", "return_to": "DECIDED", "evidence_refs": evidence},
+        ]
+    )
+    if not any("deferred re-entry" in error for error in validate_state_document(invented_return, project)):
+        failures.append("invented-deferred-return-state")
+
     unsafe_router = copy.deepcopy(project)
     unsafe_router["surfaces"]["readme"] = unsafe_router["surfaces"]["readme"].replace(
         "`ACTIVE` is engineering authorization only. `ACTIVE` is intake eligibility",
@@ -824,6 +993,8 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
     _expect_red("broken-planning-cross-reference", broken_link, "broken planning cross-reference", failures)
 
     failures.extend(_positive_active_fixture(project))
+    failures.extend(_positive_proven_fixture(project))
+    failures.extend(_positive_deferred_fixture(project))
     return failures
 
 
@@ -868,6 +1039,8 @@ def main() -> int:
         "watched-red: stale-contradictory-adr-status, illegal-transition, "
         "unknown-transition, skipped-transition, missing-durable-sequenced-record, "
         "unbound-active-identity, partial-active-identity, "
+        "omitted-active-increment, extra-active-increment, duplicate-active-increment, "
+        "incomplete-proven-proof-contract, invented-deferred-return-state, "
         "active-not-proven-runtime-or-landing-authority, duplicate-adr-identity, "
         "stale-roadmap-sbx-regression, competing-lifecycle-owner, "
         "broken-planning-cross-reference"
@@ -882,6 +1055,8 @@ def main() -> int:
         return 1
     print("positive case: canonical lifecycle, durable SEQUENCED records, and current SBX holds")
     print("positive ACTIVE fixture: exact increment/branch/PR/source identities validate in memory")
+    print("positive PROVEN fixture: accepted proof contract validates in memory")
+    print("positive DEFERRED fixture: retained return state validates in memory")
     print("watched-red: all controls observed-bad under in-memory defects")
     print("side effects: none")
     return 0

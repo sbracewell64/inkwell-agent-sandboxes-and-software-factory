@@ -32,6 +32,53 @@ def test_valid_active_binding_is_checked_without_promoting_current_state() -> No
     assert current["FUT-003"] == "SEQUENCED"
 
 
+def test_active_binding_exactly_covers_planned_increments() -> None:
+    project = _VALIDATOR.load_project()
+    state = _VALIDATOR._active_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record["active_binding"]["increments"].pop()
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    assert any("exactly cover unique planned increments" in error for error in errors)
+
+
+def test_proven_requires_complete_accepted_proof_contract() -> None:
+    project = _VALIDATOR.load_project()
+
+    assert _VALIDATOR._positive_proven_fixture(project) == []
+    state = _VALIDATOR._active_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record["state"] = "PROVEN"
+    record["transition_history"].append(
+        {"from": "ACTIVE", "to": "PROVEN", "evidence_refs": ["docs/development/FUTURE_CANDIDATES.md"]}
+    )
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    assert any("complete proof contract" in error for error in errors)
+
+
+def test_deferred_exit_matches_return_state_recorded_on_entry() -> None:
+    project = _VALIDATOR.load_project()
+
+    assert _VALIDATOR._positive_deferred_fixture(project) == []
+    state = copy.deepcopy(project["state"])
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    evidence = ["docs/development/FUTURE_CANDIDATES.md"]
+    record["state"] = "DECIDED"
+    record["transition_history"].extend(
+        [
+            {"from": "SEQUENCED", "to": "DEFERRED", "return_to": "SEQUENCED", "evidence_refs": evidence},
+            {"from": "DEFERRED", "to": "DECIDED", "return_to": "DECIDED", "evidence_refs": evidence},
+        ]
+    )
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    assert any("deferred re-entry" in error for error in errors)
+
+
 def test_unknown_and_skipped_transitions_are_rejected() -> None:
     project = _VALIDATOR.load_project()
     unknown = copy.deepcopy(project)
