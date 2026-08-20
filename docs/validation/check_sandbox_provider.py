@@ -12,6 +12,7 @@ from __future__ import annotations
 import sys
 from dataclasses import replace
 from pathlib import Path
+from typing import Mapping
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,9 +61,109 @@ from tools.evidence_manifest import (  # noqa: E402
 )
 
 
+STATUS_PATHS = (
+    Path("docs/baseline/BASELINE.md"),
+    Path("docs/baseline/INCREMENT_LEDGER.md"),
+    Path("docs/baseline/PROOF_MATRIX.md"),
+    Path("docs/development/ROADMAP.md"),
+    Path("docs/increments/SBX-1_SANDBOX_PROVIDER_CONTRACT.md"),
+    Path("docs/reference/SANDBOX_PROVIDER.md"),
+    Path("docs/architecture/SANDBOX_LIFECYCLE.md"),
+)
+SBX0_SOURCE_DIGEST = "2d16bee3db4c46062b460dfbd6752339e85228a3b6f2c5002313a4f06dc663b3"
+LANDED_HEAD = "d38b9b4c4718389104ad5ffbd1ad05e70cb82db9"
+LANDED_MAIN = "b902cdcecd65c8ba03031875297d31e990f12c11"
+
+
 def check(condition: bool, message: str, errors: list[str]) -> None:
     if not condition:
         errors.append(message)
+
+
+def load_status_surfaces(root: Path = ROOT) -> dict[Path, str]:
+    surfaces: dict[Path, str] = {}
+    for path in STATUS_PATHS:
+        try:
+            surfaces[path] = (root / path).read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            # Absence/unreadability is returned to the caller as a named CNO
+            # error; it can never disappear into an empty-success path.
+            surfaces[path] = ""
+    return surfaces
+
+
+def status_surface_errors(surfaces: Mapping[Path, str]) -> list[str]:
+    """Require one non-promoting SBX-1 lifecycle truth on every status surface."""
+    errors: list[str] = []
+    required = (
+        "landed implementation",
+        "sbx-1 is not activated",
+        "not accepted",
+        "not certified",
+        "not real-provider-proven",
+        "does not unlock sbx-2",
+    )
+    forbidden = (
+        "sbx-1 is activated",
+        "sbx-1 is accepted",
+        "sbx-1 is certified",
+        "sbx-1 is real-provider-proven",
+        "sbx-1 unlocks sbx-2",
+        "sbx-1 is sufficient to unlock sbx-2",
+    )
+    for path in STATUS_PATHS:
+        text = surfaces.get(path)
+        if not text:
+            errors.append(f"status surface could-not-observe: {path}")
+            continue
+        normalized = " ".join(text.lower().split())
+        for fragment in required:
+            if fragment not in normalized:
+                errors.append(f"status surface {path} is missing lifecycle boundary: {fragment}")
+        for fragment in forbidden:
+            if fragment in normalized:
+                errors.append(f"status surface {path} makes false lifecycle claim: {fragment}")
+
+    increment = " ".join(
+        surfaces.get(Path("docs/increments/SBX-1_SANDBOX_PROVIDER_CONTRACT.md"), "").lower().split()
+    )
+    for fragment in (
+        "assignment-distinct semantic review applicable to the pr #18 landing | could-not-observe",
+        "applicable rulingenvelope for the pr #18 landing | could-not-observe",
+        "one-use landingauthorization for the pr #18 landing | could-not-observe",
+        "post-merge exact-main proof for the pr #18 landing | could-not-observe",
+        "supported windows-host/provider execution | could-not-observe",
+        "real provider or docker custody | could-not-observe",
+        "activation, acceptance, certification, or sbx-2 unlock | could-not-observe",
+    ):
+        if fragment not in increment:
+            errors.append(f"historical evidence was promoted, dropped, or left untyped: {fragment}")
+    if LANDED_HEAD not in increment or LANDED_MAIN not in increment:
+        errors.append("landed PR #18 head/main lineage is absent from the increment record")
+    for path in (
+        Path("docs/increments/SBX-1_SANDBOX_PROVIDER_CONTRACT.md"),
+        Path("docs/reference/SANDBOX_PROVIDER.md"),
+    ):
+        if SBX0_SOURCE_DIGEST not in surfaces.get(path, ""):
+            errors.append(f"canonical SBX-0 source digest drifted on {path}")
+    return errors
+
+
+def lifecycle_status_controls(errors: list[str]) -> None:
+    surfaces = load_status_surfaces()
+    errors.extend(status_surface_errors(surfaces))
+
+    increment_path = Path("docs/increments/SBX-1_SANDBOX_PROVIDER_CONTRACT.md")
+    mutation_source = "SBX-1 is a **landed implementation**. SBX-1 is not activated, not accepted,\nnot certified, and not real-provider-proven; it does not unlock SBX-2."
+    false_claim = "SBX-1 is accepted and real-provider-proven. SBX-1 unlocks SBX-2."
+    mutated = dict(surfaces)
+    mutated[increment_path] = mutated.get(increment_path, "").replace(
+        mutation_source, false_claim, 1
+    )
+    if mutated[increment_path] == surfaces.get(increment_path, ""):
+        errors.append("false acceptance/promotion watched-red mutation could-not-observe its target")
+    elif not status_surface_errors(mutated):
+        errors.append("false acceptance/promotion claim did not make lifecycle status control red")
 
 
 def destroy_capabilities(
@@ -770,6 +871,7 @@ def run_controls() -> list[str]:
     artifact_and_git_controls(errors)
     aggregate_controls(errors)
     durable_record_controls(errors)
+    lifecycle_status_controls(errors)
     return errors
 
 
@@ -781,11 +883,15 @@ def main() -> int:
             print(f"- {error}")
         return 1
     print("SBX-1 SandboxProvider contract/fake controls: PASS")
+    print("status: landed implementation; activation/acceptance/certification/provider proof remain CNO")
     print("provider-calls: 0 (in-process fake; no Docker/exe.dev/network/provider side effect)")
-    print("positive success: typed source/exec/artifact/Git/quiescence/destroy/reconcile facts")
+    print("positive fake: immutable repo+commit+tree identity and typed existing-supervisor projection")
+    print("positive fake: operation-keyed three-valued facts and separate client/workload/resource quiescence")
+    print("positive fake: bounded manifest/Git export, no promotion, authenticated one-use destroy/reconcile, FAIL>CNO>PASS")
     print("watched-red: ambiguity, identity, timeout/cancel/overflow, cleanup CNO, workload leak")
     print("watched-red: artifact missing/tamper/overflow, Git ancestry, stop, authorization, residue")
     print("watched-red: unreachable inspection, duplicates, idempotent absence, interruptions, aggregate precedence")
+    print("watched-red: false SBX-1 acceptance/provider-proof/SBX-2 promotion claim")
     return 0
 
 

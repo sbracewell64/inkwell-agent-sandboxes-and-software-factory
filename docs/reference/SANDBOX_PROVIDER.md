@@ -3,14 +3,16 @@
 **Contract:** `sandbox-provider/v1`
 **Implementation owner:** `adws/adw_modules/sandbox_provider.py`
 **Increment:** `SBX-1` from canonical base `bee9296a4c94b1dc3da6991acd1755a91fa681eb`
+**Landed implementation:** PR #18 head `d38b9b4c4718389104ad5ffbd1ad05e70cb82db9` landed as tree-identical `b902cdcecd65c8ba03031875297d31e990f12c11`
 **Planning authority:** `origin/planning/future-sssf` at `54ef67c3849b24b1eaa6e10d2ed0e49a09464a70`
-**SBX-0 handoff:** [`SBX-0_SEMANTICS_INVENTORY.json`](SBX-0_SEMANTICS_INVENTORY.json), source digest `2d16bee3db4c46062b460dfbd6752339e85228a3b6f2c5002313a4f06dc663b`
+**SBX-0 handoff:** [`SBX-0_SEMANTICS_INVENTORY.json`](SBX-0_SEMANTICS_INVENTORY.json), source digest `2d16bee3db4c46062b460dfbd6752339e85228a3b6f2c5002313a4f06dc663b3`
 
 This is the provider-neutral environment-mechanics seam. It is not a Docker
 adapter and it does not claim a live provider capability. The deterministic
 validator is `docs/validation/check_sandbox_provider.py`; its fake has zero
-external provider calls. The SBX-0 inventory is a source-bound handoff only;
-SBX-1 activation and acceptance remain `could-not-observe`.
+external provider calls. The SBX-0 inventory is a source-bound handoff only.
+SBX-1 is a **landed implementation**. SBX-1 is not activated, not accepted,
+not certified, and not real-provider-proven; it does not unlock SBX-2.
 
 ## Ownership boundary
 

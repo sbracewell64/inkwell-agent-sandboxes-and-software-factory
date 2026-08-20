@@ -24,6 +24,8 @@ _validator = importlib.util.module_from_spec(_validator_spec)
 _validator_spec.loader.exec_module(_validator)
 run_controls = _validator.run_controls
 spec = _validator.spec
+load_status_surfaces = _validator.load_status_surfaces
+status_surface_errors = _validator.status_surface_errors
 
 
 def test_all_sbx1_watched_red_controls_are_nonvacuous() -> None:
@@ -59,6 +61,21 @@ def test_spec_and_command_are_immutable_typed_projections() -> None:
     assert command.supervisor_projection["argv"] == ("/usr/bin/true",)
     projected = command.to_supervisor_request({"LANG": "C"})
     assert tuple(projected.argv) == ("/usr/bin/true",)
+
+
+def test_landed_status_rejects_false_acceptance_and_sbx2_promotion() -> None:
+    surfaces = load_status_surfaces()
+    assert status_surface_errors(surfaces) == []
+    increment = Path("docs/increments/SBX-1_SANDBOX_PROVIDER_CONTRACT.md")
+    surfaces[increment] = surfaces[increment].replace(
+        "SBX-1 is a **landed implementation**. SBX-1 is not activated, not accepted,\n"
+        "not certified, and not real-provider-proven; it does not unlock SBX-2.",
+        "SBX-1 is accepted and real-provider-proven. SBX-1 unlocks SBX-2.",
+        1,
+    )
+    observed = status_surface_errors(surfaces)
+    assert observed
+    assert any("false lifecycle claim" in error for error in observed)
 
 
 def test_fake_is_in_process_and_aggregate_keeps_cleanup_cno() -> None:

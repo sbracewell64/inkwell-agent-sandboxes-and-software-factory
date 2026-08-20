@@ -4,6 +4,15 @@
 **Date proven:** 2026-08-13
 **Purpose:** Establish a reproducible reference point before architectural augmentation.
 
+## Post-baseline lifecycle status
+
+The B0 proof remains frozen; later `main` changes do not retroactively enlarge it.
+SBX-1 is a **landed implementation** of the provider-neutral contract and
+deterministic fake controls. SBX-1 is not activated, not accepted, not
+certified, and not real-provider-proven; it does not unlock SBX-2. Real
+provider/Docker custody, supported Windows-host execution, and the missing
+historical landing-governance evidence remain CNO or unmet.
+
 ## Source baseline
 
 - Repository: `disler/inkwell-agent-sandboxes-and-software-factory`

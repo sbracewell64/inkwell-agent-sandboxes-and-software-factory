@@ -2,6 +2,17 @@
 
 The order below deliberately separates concerns.
 
+## Current SBX lifecycle status
+
+- SBX-0's sole durable provider-neutral handoff landed at `aa0dcc5e`; it does
+  not establish SBX-0 exit or any promotion.
+- SBX-1 is a **landed implementation** of the provider-neutral contract and
+  deterministic fake controls. SBX-1 is not activated, not accepted, not
+  certified, and not real-provider-proven; it does not unlock SBX-2.
+- SBX-2 is held. Docker mechanism selection, real-provider custody, and
+  Windows/WSL feasibility require their own authorization and evidence; none
+  is inferred from SBX-1's provider-free CI.
+
 ## B1 — Baseline archive + documentation discovery
 
 Goal:
@@ -65,32 +76,25 @@ Acceptance:
 - deterministic test+commit fixture,
 - documented last-verified date/model IDs.
 
-## B5 — Sandbox provider contract
+## B5 / SBX-1 — Sandbox provider contract
 
-Goal:
+The provider-neutral contract and deterministic fake implementation have landed.
+That landed scope defines create/source, typed execution, readiness facts,
+bounded artifact/Git extraction, state inspection, stop, authorized destroy,
+reconciliation, and three-valued folding. Historical exe.dev parity is not an
+acceptance prerequisite and was not observed by this increment.
 
-Extract the semantic contract currently supplied by exe.dev before replacing it.
+This status is implementation-only. Activation, acceptance, certification,
+real-provider proof, supported Windows-host proof, and SBX-2 promotion remain
+CNO or unmet.
 
-Define provider-neutral operations:
+## B6 / SBX-2+ — Free/local sandbox implementation (held)
 
-- create
-- fill/source
-- execute
-- readiness
-- port exposure
-- artifact/Git extraction
-- state inspection
-- destroy
+A selected local/free provider may be implemented only after a separately
+bounded SBX-2 mechanism/feasibility increment is authorized. SBX-1 is not that
+authorization or unlock.
 
-Acceptance:
-
-contract tests run against the exe.dev reference adapter.
-
-## B6 — Free/local sandbox implementation
-
-Implement the selected local/free provider only after B5.
-
-Acceptance must preserve:
+Eventual acceptance must preserve:
 
 - host isolation,
 - disposable/reproducible state,
