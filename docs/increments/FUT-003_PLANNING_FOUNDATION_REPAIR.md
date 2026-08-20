@@ -17,10 +17,10 @@ authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9
 
 ## Intent
 
-Repair the planning/lifecycle foundation carried by stale SSSF PR #16 without
-rewriting that immutable predecessor or treating its head as current. The new
-successor is based on supplied current main, not on the predecessor's stale
-base. Reconcile
+Create the canonical successor to open PR #24 without rewriting PR #23 or PR
+#24 or treating either predecessor head as current. The successor is based on
+the supplied contribution target and carries PR #24's eight commits unchanged
+before the bounded authority correction. Reconcile
 ADR-0005, define one closed transition contract, preserve durable sequencing,
 keep FUT-001/DSH sequenced and inactive, reconcile FUT-003 to the
 authoritative ACTIVE-but-not-PROVEN generation, allocate unique ADR-0007 for
@@ -116,13 +116,16 @@ outside this candidate.
 
 ## Successor containment correction
 
-This branch carries the five commits of immutable predecessor PR #23 in their
+This branch carries the eight commits of immutable predecessor PR #24 in their
 original order on exact contribution target
 `991d3a64f1b96a8b9637f97060d692af3518228f`, whose tree is
-`7b88546cd1f63e8304325ee35be37893268ae0e0`. It does not modify, merge, or
-transfer evidence from predecessor head
+`7b88546cd1f63e8304325ee35be37893268ae0e0`, and then adds only the bounded
+correction. It does not modify or merge PR #24 head
+`05d3addf8c9120e0824400041fa7235410a7ec4b` / tree
+`ec52ce459fd9e2f3c722ca66e377b88ee1c13a05`, or PR #23 head
 `4d4c42377dfaa99ea4bf818322cf422bc8cb06f7` / tree
-`22b312002f7bde05b98ea95b04a45d70b2ba6157`.
+`22b312002f7bde05b98ea95b04a45d70b2ba6157`; their measured and review
+records remain predecessor evidence, not evidence for this successor.
 
 The bounded correction addresses only the assignment-distinct repository-
 containment findings, the closure-owner non-vacuity contract, Windows symlink
