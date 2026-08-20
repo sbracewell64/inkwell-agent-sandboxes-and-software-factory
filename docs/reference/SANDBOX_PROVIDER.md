@@ -47,8 +47,10 @@ external provider calls.
 - an absolute evidence root.
 
 `SandboxIdentity` separates the requested spec digest from the provider's
-resource identity. A stale, wrong, or unavailable provider identity is not
-silently changed into `ABSENT`.
+resource identity. Resource lookup and replay bind the complete run, spec, and
+provider-local resource identity, so a local identifier collision across runs
+cannot satisfy or mutate either subject. A stale, wrong, or unavailable
+provider identity is not silently changed into `ABSENT`.
 
 ## Typed command projection
 

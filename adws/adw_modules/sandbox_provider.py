@@ -896,11 +896,14 @@ class ReconciliationFacts(FactBase):
     resource_ids: tuple[str, ...] = ()
     duplicate_resource_ids: tuple[str, ...] = ()
     residual_resource_ids: tuple[str, ...] = ()
+    identity_observation: Observation = Observation.COULD_NOT_OBSERVE
 
     def __post_init__(self) -> None:
         super().__post_init__()
         if not isinstance(self.status, ReconciliationStatus):
             raise ValueError("reconciliation status must be closed")
+        if not isinstance(self.identity_observation, Observation):
+            raise ValueError("reconciliation identity observation must be closed")
         _tokens(self.resource_ids, "resource_ids")
         _tokens(self.duplicate_resource_ids, "duplicate_resource_ids")
         _tokens(self.residual_resource_ids, "residual_resource_ids")
@@ -1479,6 +1482,7 @@ class FakeControl(str, Enum):
     INSPECT_UNREACHABLE = "inspect-unreachable"
     ALREADY_ABSENT = "already-absent"
     DUPLICATE_RESOURCES = "duplicate-resources"
+    RESOURCE_ID_COLLISION = "resource-id-collision"
 
 
 class LifecycleBoundary(str, Enum):
@@ -1529,8 +1533,8 @@ class FakeSandboxProvider:
         self.controls = frozenset(controls)
         self.interrupt_before = interrupt_before
         self.interrupt_after = interrupt_after
-        self._resources: dict[str, _FakeResource] = {}
-        self._by_run: dict[str, str] = {}
+        self._resources: dict[SandboxIdentity, _FakeResource] = {}
+        self._by_run: dict[str, SandboxIdentity] = {}
         self._create_calls: dict[str, int] = {}
         self._used_authorizations: set[str] = set()
         self.calls: list[tuple[OperationKind, str]] = []
@@ -1580,15 +1584,17 @@ class FakeSandboxProvider:
             "evidence_refs": evidence,
         }
 
-    def _resource_for(self, identity: SandboxIdentity) -> _FakeResource | None:
+    def _resource_for(self, identity: SandboxIdentity) -> tuple[_FakeResource | None, Observation]:
         if identity.provider_resource_id is None:
-            return None
-        resource = self._resources.get(identity.provider_resource_id)
-        if resource is None:
-            return None
-        if resource.identity.spec_digest != identity.spec_digest:
-            return None
-        return resource
+            return None, Observation.COULD_NOT_OBSERVE
+        resource = self._resources.get(identity)
+        if resource is not None:
+            return resource, Observation.OBSERVED_GOOD
+        collision = any(
+            stored.provider_resource_id == identity.provider_resource_id
+            for stored in self._resources
+        )
+        return None, Observation.OBSERVED_BAD if collision else Observation.COULD_NOT_OBSERVE
 
     def _wrong_identity(self, identity: SandboxIdentity, operation: OperationKey, *, state: LifecycleState = LifecycleState.UNKNOWN) -> InspectFacts:
         return InspectFacts(
@@ -1607,8 +1613,10 @@ class FakeSandboxProvider:
             return self._wrong_identity(identity, operation)
         if FakeControl.STALE_IDENTITY in self.controls or FakeControl.WRONG_IDENTITY in self.controls:
             return self._wrong_identity(identity, operation)
-        resource = self._resource_for(identity)
+        resource, lookup_observation = self._resource_for(identity)
         if resource is None:
+            if lookup_observation is Observation.OBSERVED_BAD:
+                return self._wrong_identity(identity, operation)
             return InspectFacts(
                 **self._base(operation, Observation.COULD_NOT_OBSERVE, "provider resource identity could not be resolved", resource_id=identity.provider_resource_id),
                 identity_observation=Observation.COULD_NOT_OBSERVE,
@@ -1630,9 +1638,10 @@ class FakeSandboxProvider:
                 **self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before create linearization", state=LifecycleState.CREATING),
                 spec_digest=spec.identity_digest,
             )
-        existing_id = self._by_run.get(spec.run_id)
-        if existing_id is not None:
-            existing = self._resources[existing_id]
+        existing_identity = self._by_run.get(spec.run_id)
+        if existing_identity is not None:
+            existing = self._resources[existing_identity]
+            existing_id = existing_identity.provider_resource_id
             if existing.spec.identity_digest != spec.identity_digest:
                 return CreateFacts(
                     **self._base(operation, Observation.OBSERVED_BAD, "same run requested a wrong SandboxSpec identity", state=existing.state, resource_id=existing_id),
@@ -1651,16 +1660,15 @@ class FakeSandboxProvider:
                 spec_digest=spec.identity_digest,
                 resource_identity_observation=Observation.OBSERVED_GOOD,
             )
-        resource_id = f"fake-sandbox-{spec.run_id}"
+        resource_id = "fake-sandbox-collision" if FakeControl.RESOURCE_ID_COLLISION in self.controls else f"fake-sandbox-{spec.run_id}"
         identity = SandboxIdentity(spec.run_id, spec.identity_digest, resource_id)
         resource = _FakeResource(identity, spec)
-        self._resources[resource_id] = resource
-        self._by_run[spec.run_id] = resource_id
+        self._resources[identity] = resource
+        self._by_run[spec.run_id] = identity
         if FakeControl.DUPLICATE_RESOURCES in self.controls:
             duplicate_id = f"{resource_id}-duplicate"
-            self._resources[duplicate_id] = _FakeResource(
-                SandboxIdentity(spec.run_id, spec.identity_digest, duplicate_id), spec
-            )
+            duplicate_identity = SandboxIdentity(spec.run_id, spec.identity_digest, duplicate_id)
+            self._resources[duplicate_identity] = _FakeResource(duplicate_identity, spec)
         if FakeControl.CREATE_RESPONSE_AMBIGUITY in self.controls:
             fact = CreateFacts(
                 **self._base(operation, Observation.COULD_NOT_OBSERVE, "create response was ambiguous after resource linearization", state=LifecycleState.PRESENT, resource_id=None),
@@ -1684,6 +1692,8 @@ class FakeSandboxProvider:
 
     def inspect(self, identity: SandboxIdentity, operation: OperationKey) -> InspectFacts:
         self._record(operation)
+        if operation.kind is not OperationKind.INSPECT or operation.run_id != identity.run_id:
+            return self._wrong_identity(identity, operation)
         if self._interrupted(LifecycleBoundary.PROCESS_INSPECTION, InterruptTiming.BEFORE):
             return InspectFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before inspection", resource_id=identity.provider_resource_id))
         if FakeControl.INSPECT_UNREACHABLE in self.controls:
@@ -1700,11 +1710,13 @@ class FakeSandboxProvider:
 
     def copy_in(self, identity: SandboxIdentity, copy: CopySpec) -> CopyFacts:
         self._record(copy.operation)
+        if copy.operation.run_id != identity.run_id:
+            return CopyFacts(**self._base(copy.operation, Observation.OBSERVED_BAD, "source copy operation identity is wrong", resource_id=identity.provider_resource_id), source_observation=Observation.OBSERVED_BAD, guest_path=copy.guest_path)
         if self._interrupted(LifecycleBoundary.SOURCE_COPY, InterruptTiming.BEFORE):
             return CopyFacts(**self._base(copy.operation, Observation.COULD_NOT_OBSERVE, "interrupted before explicit source/input copy", resource_id=identity.provider_resource_id), source_observation=Observation.COULD_NOT_OBSERVE, guest_path=copy.guest_path)
-        target = self._resource_for(identity)
+        target, lookup_observation = self._resource_for(identity)
         if target is None:
-            return CopyFacts(**self._base(copy.operation, Observation.COULD_NOT_OBSERVE, "source copy target could not be observed", resource_id=identity.provider_resource_id), source_observation=Observation.COULD_NOT_OBSERVE, guest_path=copy.guest_path)
+            return CopyFacts(**self._base(copy.operation, lookup_observation, "source copy target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "source copy target could not be observed", resource_id=identity.provider_resource_id), source_observation=lookup_observation, guest_path=copy.guest_path)
         if FakeControl.STALE_IDENTITY in self.controls or FakeControl.WRONG_IDENTITY in self.controls:
             return CopyFacts(**self._base(copy.operation, Observation.OBSERVED_BAD, "source copy identity mismatch", resource_id=identity.provider_resource_id), source_observation=Observation.OBSERVED_BAD, guest_path=copy.guest_path)
         target.source_staged = True
@@ -1717,9 +1729,9 @@ class FakeSandboxProvider:
 
     def exec(self, identity: SandboxIdentity, command: CommandSpec, operation: OperationKey) -> ExecFacts:
         self._record(operation)
-        target = self._resource_for(identity)
+        target, lookup_observation = self._resource_for(identity)
         if target is None:
-            return self._exec_failure(operation, identity, "typed exec target identity could not be observed", Observation.COULD_NOT_OBSERVE)
+            return self._exec_failure(operation, identity, "typed exec target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "typed exec target identity could not be observed", lookup_observation)
         if operation.kind is not OperationKind.EXEC or operation.run_id != identity.run_id:
             return self._exec_failure(operation, identity, "typed exec operation identity is wrong", Observation.OBSERVED_BAD)
         if self._interrupted(LifecycleBoundary.SETUP if command.execution_id == "setup" else LifecycleBoundary.EXEC, InterruptTiming.BEFORE):
@@ -1784,11 +1796,13 @@ class FakeSandboxProvider:
 
     def collect_artifacts(self, identity: SandboxIdentity, artifact: ArtifactSpec) -> ArtifactExportFacts:
         self._record(artifact.operation)
+        if artifact.operation.run_id != identity.run_id:
+            return ArtifactExportFacts(**self._base(artifact.operation, Observation.OBSERVED_BAD, "artifact collection operation identity is wrong", resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id)
         if self._interrupted(LifecycleBoundary.ARTIFACT_EXPORT, InterruptTiming.BEFORE):
             return ArtifactExportFacts(**self._base(artifact.operation, Observation.COULD_NOT_OBSERVE, "interrupted before artifact collection", resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id)
-        target = self._resource_for(identity)
+        target, lookup_observation = self._resource_for(identity)
         if target is None:
-            return ArtifactExportFacts(**self._base(artifact.operation, Observation.COULD_NOT_OBSERVE, "artifact collection target identity could not be observed", resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id)
+            return ArtifactExportFacts(**self._base(artifact.operation, lookup_observation, "artifact collection target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "artifact collection target identity could not be observed", resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id)
         if not artifact.applicable:
             return ArtifactExportFacts(**self._base(artifact.operation, Observation.OBSERVED_GOOD, "artifact obligation is explicitly not applicable", prior=target.state, state=target.state, resource_id=identity.provider_resource_id), artifact_id=artifact.artifact_id, applicable=False, complete=True)
         item = ArtifactInventoryItem("evidence/result.json", "json", 18, hashlib.sha256(b'{"result":"good"}\n').hexdigest(), artifact.producer_id, identity.run_id, artifact.operation.operation_id, artifact.operation.attempt_id)
@@ -1818,11 +1832,13 @@ class FakeSandboxProvider:
 
     def export_git(self, identity: SandboxIdentity, git: GitExportSpec) -> GitExportFacts:
         self._record(git.operation)
+        if git.operation.run_id != identity.run_id:
+            return GitExportFacts(**self._base(git.operation, Observation.OBSERVED_BAD, "Git export operation identity is wrong", resource_id=identity.provider_resource_id), export_ref=git.export_ref)
         if self._interrupted(LifecycleBoundary.GIT_EXPORT, InterruptTiming.BEFORE):
             return GitExportFacts(**self._base(git.operation, Observation.COULD_NOT_OBSERVE, "interrupted before Git export", resource_id=identity.provider_resource_id), export_ref=git.export_ref)
-        target = self._resource_for(identity)
+        target, lookup_observation = self._resource_for(identity)
         if target is None:
-            return GitExportFacts(**self._base(git.operation, Observation.COULD_NOT_OBSERVE, "Git export target identity could not be observed", resource_id=identity.provider_resource_id), export_ref=git.export_ref)
+            return GitExportFacts(**self._base(git.operation, lookup_observation, "Git export target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "Git export target identity could not be observed", resource_id=identity.provider_resource_id), export_ref=git.export_ref)
         tip_commit = git.expected_tip_commit or "2" * 40
         tip_tree = git.expected_tip_tree or "3" * 40
         observation = Observation.OBSERVED_GOOD
@@ -1841,13 +1857,19 @@ class FakeSandboxProvider:
         return fact
 
     def _process_facts(self, identity: SandboxIdentity, operation: OperationKey) -> ProcessFacts:
+        if operation.run_id != identity.run_id or operation.kind not in {OperationKind.INSPECT_PROCESSES, OperationKind.WAIT_QUIESCENT}:
+            reason = "process inspection operation identity is wrong"
+            host = QuiescenceFact(QuiescenceDomain.HOST_PROVIDER_CLIENT, Observation.OBSERVED_BAD, False, reason)
+            return ProcessFacts(**self._base(operation, Observation.OBSERVED_BAD, reason, resource_id=identity.provider_resource_id), host_client=host, workload=QuiescenceFact(QuiescenceDomain.SANDBOX_WORKLOAD, Observation.OBSERVED_BAD, False, reason), resources=QuiescenceFact(QuiescenceDomain.SANDBOX_RESOURCES, Observation.OBSERVED_BAD, False, reason))
         if self._interrupted(LifecycleBoundary.PROCESS_INSPECTION, InterruptTiming.BEFORE):
             cno = QuiescenceFact(QuiescenceDomain.HOST_PROVIDER_CLIENT, Observation.COULD_NOT_OBSERVE, None, "interrupted before process inspection")
             return ProcessFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before process inspection", resource_id=identity.provider_resource_id), host_client=cno, workload=QuiescenceFact(QuiescenceDomain.SANDBOX_WORKLOAD, Observation.COULD_NOT_OBSERVE, None, cno.reason), resources=QuiescenceFact(QuiescenceDomain.SANDBOX_RESOURCES, Observation.COULD_NOT_OBSERVE, None, cno.reason))
-        target = self._resource_for(identity)
+        target, lookup_observation = self._resource_for(identity)
         if target is None:
-            cno = QuiescenceFact(QuiescenceDomain.HOST_PROVIDER_CLIENT, Observation.COULD_NOT_OBSERVE, None, "process target identity could not be observed")
-            return ProcessFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "process inspection target identity could not be observed", resource_id=identity.provider_resource_id), host_client=cno, workload=QuiescenceFact(QuiescenceDomain.SANDBOX_WORKLOAD, Observation.COULD_NOT_OBSERVE, None, cno.reason), resources=QuiescenceFact(QuiescenceDomain.SANDBOX_RESOURCES, Observation.COULD_NOT_OBSERVE, None, cno.reason))
+            reason = "process target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "process target identity could not be observed"
+            quiescent = None if lookup_observation is Observation.COULD_NOT_OBSERVE else False
+            host = QuiescenceFact(QuiescenceDomain.HOST_PROVIDER_CLIENT, lookup_observation, quiescent, reason)
+            return ProcessFacts(**self._base(operation, lookup_observation, reason, resource_id=identity.provider_resource_id), host_client=host, workload=QuiescenceFact(QuiescenceDomain.SANDBOX_WORKLOAD, lookup_observation, quiescent, reason), resources=QuiescenceFact(QuiescenceDomain.SANDBOX_RESOURCES, lookup_observation, quiescent, reason))
         client = QuiescenceFact(QuiescenceDomain.HOST_PROVIDER_CLIENT, Observation.OBSERVED_GOOD, True, "host/provider-client process custody is quiescent")
         workload = QuiescenceFact(QuiescenceDomain.SANDBOX_WORKLOAD, Observation.OBSERVED_GOOD, True, "sandbox workload is quiescent")
         resources = QuiescenceFact(QuiescenceDomain.SANDBOX_RESOURCES, Observation.OBSERVED_GOOD, True, "sandbox resources are quiescent")
@@ -1879,11 +1901,13 @@ class FakeSandboxProvider:
 
     def stop(self, identity: SandboxIdentity, operation: OperationKey) -> StopFacts:
         self._record(operation)
+        if operation.kind is not OperationKind.STOP or operation.run_id != identity.run_id:
+            return StopFacts(**self._base(operation, Observation.OBSERVED_BAD, "stop operation identity is wrong", resource_id=identity.provider_resource_id))
         if self._interrupted(LifecycleBoundary.STOP, InterruptTiming.BEFORE):
             return StopFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before stop", resource_id=identity.provider_resource_id))
-        target = self._resource_for(identity)
+        target, lookup_observation = self._resource_for(identity)
         if target is None:
-            return StopFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "stop target could not be observed", resource_id=identity.provider_resource_id))
+            return StopFacts(**self._base(operation, lookup_observation, "stop target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "stop target could not be observed", resource_id=identity.provider_resource_id))
         if FakeControl.STOP_PARTIAL in self.controls:
             target.state = LifecycleState.STOPPED
             target.workload_quiescent = False
@@ -1913,9 +1937,9 @@ class FakeSandboxProvider:
             return DestroyFacts(**self._base(operation, Observation.OBSERVED_BAD, "destroy authorization has a stale or wrong identity", resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if self._interrupted(LifecycleBoundary.DESTROY, InterruptTiming.BEFORE):
             return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted before destroy linearization", prior=LifecycleState.PRESENT, state=LifecycleState.DESTROYING, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
-        target = self._resource_for(identity)
+        target, lookup_observation = self._resource_for(identity)
         if target is None:
-            return DestroyFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "destroy target identity could not be authoritatively resolved", state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
+            return DestroyFacts(**self._base(operation, lookup_observation, "destroy target identity mismatched" if lookup_observation is Observation.OBSERVED_BAD else "destroy target identity could not be authoritatively resolved", state=LifecycleState.UNKNOWN, resource_id=identity.provider_resource_id), authorization_id=authorization.authorization_id)
         if FakeControl.ALREADY_ABSENT in self.controls:
             self._used_authorizations.add(authorization.authorization_id)
             target.destroyed = True
@@ -1937,22 +1961,27 @@ class FakeSandboxProvider:
 
     def reconcile(self, identity: SandboxIdentity, operation: OperationKey) -> ReconciliationFacts:
         self._record(operation)
+        if operation.kind is not OperationKind.RECONCILE or operation.run_id != identity.run_id:
+            return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "reconciliation operation identity is wrong", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE, identity_observation=Observation.OBSERVED_BAD)
         if self._interrupted(LifecycleBoundary.POST_DESTROY_RECONCILIATION, InterruptTiming.BEFORE) or FakeControl.INSPECT_UNREACHABLE in self.controls:
             return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "authoritative reconciliation could not reach the provider", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
         if self._interrupted(LifecycleBoundary.POST_DESTROY_RECONCILIATION, InterruptTiming.AFTER):
             return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "interrupted after reconciliation observation", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
         if FakeControl.DUPLICATE_RESOURCES in self.controls:
-            ids = tuple(sorted(self._resources))
+            ids = tuple(
+                sorted(
+                    resource.identity.provider_resource_id
+                    for resource in self._resources.values()
+                    if resource.identity.run_id == identity.run_id
+                    and resource.identity.spec_digest == identity.spec_digest
+                    and resource.identity.provider_resource_id is not None
+                )
+            )
             return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_BAD, "duplicate resources share one requested identity", state=LifecycleState.DUPLICATE, resource_id=identity.provider_resource_id), status=ReconciliationStatus.DUPLICATE, resource_ids=ids, duplicate_resource_ids=ids)
-        target = self._resource_for(identity)
+        target, lookup_observation = self._resource_for(identity)
         if target is None:
-            known_resource_id = self._by_run.get(identity.run_id)
-            known = self._resources.get(known_resource_id) if known_resource_id is not None else None
-            if known is None or known.identity.spec_digest != identity.spec_digest:
-                return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "reconciliation identity could not be resolved against authoritative enumeration", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
-            if not known.destroyed or known.residual:
-                return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, "reconciliation identity differs from the authoritative resource identity", resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE)
-            return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "authoritative enumeration positively established absence", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), status=ReconciliationStatus.ABSENT)
+            reason = "cross-identity resource collision observed during reconciliation" if lookup_observation is Observation.OBSERVED_BAD else "reconciliation identity could not be resolved against authoritative enumeration"
+            return ReconciliationFacts(**self._base(operation, Observation.COULD_NOT_OBSERVE, reason, resource_id=identity.provider_resource_id), status=ReconciliationStatus.COULD_NOT_OBSERVE, identity_observation=lookup_observation)
         if FakeControl.ALREADY_ABSENT in self.controls and target.destroyed and not target.residual:
             return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "authoritative exact-identity absence observed", state=LifecycleState.ABSENT, resource_id=identity.provider_resource_id), status=ReconciliationStatus.ABSENT)
         if target.destroyed and not target.residual:
