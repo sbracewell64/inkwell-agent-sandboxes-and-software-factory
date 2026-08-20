@@ -59,6 +59,34 @@ def test_proven_requires_complete_accepted_proof_contract() -> None:
     assert any("complete proof contract" in error for error in errors)
 
 
+def test_proven_evidence_must_be_retained_inside_repository() -> None:
+    project = _VALIDATOR.load_project()
+    state = _VALIDATOR._proven_state_fixture(project)
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record["proven_proof"]["proof_evidence_refs"] = [
+        "https://example.invalid/proof.json"
+    ]
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    assert any("lacks retained proof_evidence_refs" in error for error in errors)
+
+
+def test_active_branch_and_pr_identities_are_canonical() -> None:
+    assert _VALIDATOR._valid_branch("fm/fp-001")
+    assert _VALIDATOR._valid_pr_url("https://github.com/example/sssf/pull/101")
+    for branch in (" bad ", "bad branch", "-bad", "bad..branch", "bad@{branch"):
+        assert not _VALIDATOR._valid_branch(branch)
+    for pr_url in (
+        "not-a-pr",
+        "http://github.com/example/sssf/pull/1",
+        "https://github.com/example/sssf/pull/0",
+        "https://github.com/example/sssf/pull/1?x=1",
+        "https://github.com/example/sssf/pull/1#x",
+    ):
+        assert not _VALIDATOR._valid_pr_url(pr_url)
+
+
 def test_proven_proof_is_rejected_outside_durable_proven_state() -> None:
     project = _VALIDATOR.load_project()
     state = _VALIDATOR._active_state_fixture(project)
