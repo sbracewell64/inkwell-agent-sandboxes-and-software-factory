@@ -1,5 +1,13 @@
 # LAUNCH-1 — Windows FirstMate Front Door
 
+## Historical provenance
+
+This record describes the original LAUNCH-1 candidate from PR #17. Its
+implementation and resulting `main` commit `312001ddbbead5cc957bc8db19f4b0b2c1d9d34c`
+are preserved as adverse provenance; LAUNCH-1-R1 repairs its public identity
+sink from exact current `main` `b902cdcecd65c8ba03031875297d31e990f12c11` under
+ruling `SOL-FM-SSSF-LAUNCH1-POSTMERGE-20260820-1052`.
+
 ## Intent
 
 Implement the smallest tracked Windows double-click front door for the
@@ -55,8 +63,10 @@ shortcut target.
 - the tracked source contract is transport-only and contains no direct factory,
   Docker, Wayfinder, or DSH activation;
 - an unknown argument returns a visible usage refusal with exit status `2`;
-- executable attached/detached checkout fixtures proving live HEAD and honest
-  branch identity, including a watched-red stale-identity variant; and
+- executable attached/detached checkout fixtures proving the same transport
+  handoff without exposing checkout state; the public identity sink contains
+  exactly project, repository, root, and handoff, with watched-red `head=` and
+  `branch=` variants; and
 - executable missing Bash, Git, and grep fixtures proving prerequisite-specific
   refusals before misleading repository or registration diagnostics, including
   watched-red preflight-omission variants.
