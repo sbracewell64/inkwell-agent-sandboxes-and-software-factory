@@ -134,6 +134,10 @@ exact identities in the durable record:
 - exact source tree SHA; and
 - authoritative repository-document references.
 
+The branch must be a syntactically valid Git branch name. The PR identity must
+be a canonical `https://github.com/<owner>/<repository>/pull/<positive-number>`
+URL without whitespace, a query, or a fragment.
+
 The record must also remain subject to ordinary admission, exact-source
 validation, review, acceptance, and existing repository gates. If any required
 identity does not yet exist, the canonical state is `SEQUENCED` and the
@@ -155,7 +159,9 @@ retain nonempty, existing `acceptance_evidence_refs`,
 40-character `source_commit` and `source_tree` identities. A `proven_proof`
 claim is valid only after a legal transition reaches `PROVEN`; it remains
 required historical proof if the legal `PROVEN -> SUPERSEDED` edge follows.
-An item that never reached `PROVEN` may not carry the claim.
+Every retained evidence reference must be a repository-relative artifact that
+exists strictly beneath the repository root; no external evidence scheme is
+accepted. An item that never reached `PROVEN` may not carry the claim.
 
 ## Durable records and ownership
 

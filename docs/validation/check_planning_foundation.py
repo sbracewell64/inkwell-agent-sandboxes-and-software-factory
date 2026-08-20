@@ -94,6 +94,12 @@ PLANNING_SURFACE_KEYS = (
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+BRANCH_FORBIDDEN = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]")
+GITHUB_PR_URL = re.compile(
+    r"https://github\.com/"
+    r"(?P<owner>[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/"
+    r"(?P<repository>[A-Za-z0-9._-]{1,100})/pull/[1-9][0-9]*"
+)
 
 
 class _DuplicateKey(ValueError):
@@ -127,6 +133,38 @@ def _normal(text: str) -> str:
 
 def _safe_sha(value: Any) -> bool:
     return isinstance(value, str) and bool(FULL_SHA.fullmatch(value))
+
+
+def _valid_branch(value: Any) -> bool:
+    if not isinstance(value, str) or not value or value != value.strip():
+        return False
+    if (
+        value.startswith(("-", "/"))
+        or value.endswith(("/", "."))
+        or "//" in value
+        or ".." in value
+        or "@{" in value
+        or value == "@"
+        or BRANCH_FORBIDDEN.search(value)
+    ):
+        return False
+    return all(
+        component
+        and not component.startswith(".")
+        and not component.endswith(".lock")
+        for component in value.split("/")
+    )
+
+
+def _valid_pr_url(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    match = GITHUB_PR_URL.fullmatch(value)
+    return bool(
+        match
+        and "--" not in match.group("owner")
+        and match.group("repository") not in {".", ".."}
+    )
 
 
 def load_project(root: Path = ROOT) -> dict[str, Any]:
@@ -347,7 +385,7 @@ def _validate_proven_proof(
     ):
         references = proof.get(field)
         if not isinstance(references, list) or not references or any(
-            not _path_exists(project, reference) for reference in references
+            not _repository_path_exists(project, reference) for reference in references
         ):
             errors.append(f"{item_id} PROVEN transition lacks retained {field}")
     for field in ("source_commit", "source_tree"):
@@ -397,6 +435,10 @@ def _validate_active_binding(
             value = increment.get(field)
             if field in {"source_commit", "source_tree"}:
                 valid = _safe_sha(value)
+            elif field == "branch":
+                valid = _valid_branch(value)
+            elif field == "pr_url":
+                valid = _valid_pr_url(value)
             elif field == "authoritative_refs":
                 valid = isinstance(value, list) and bool(value) and all(isinstance(item, str) and item for item in value)
             else:
@@ -998,6 +1040,42 @@ def _watched_red_controls(project: dict[str, Any]) -> list[str]:
     if not any("PROVEN transition lacks" in error for error in validate_state_document(incomplete_proof, project)):
         failures.append("incomplete-proven-proof-contract")
 
+    for name, reference in (
+        ("remote-proven-evidence", "https://example.invalid/proof.json"),
+        ("absolute-proven-evidence", "/etc/hosts"),
+        ("parent-proven-evidence", "../proof.json"),
+    ):
+        escaped_proof = _proven_state_fixture(project)
+        escaped_proof_record = next(
+            item for item in escaped_proof["records"] if item["item_id"] == "FUT-003"
+        )
+        escaped_proof_record["proven_proof"]["proof_evidence_refs"] = [reference]
+        if not any(
+            "lacks retained proof_evidence_refs" in error
+            for error in validate_state_document(escaped_proof, project)
+        ):
+            failures.append(name)
+
+    for name, field, value in (
+        ("whitespace-active-branch", "branch", " bad branch "),
+        ("malformed-active-branch", "branch", "bad..branch"),
+        ("non-pr-active-identity", "pr_url", "not-a-pr"),
+        ("insecure-active-pr", "pr_url", "http://github.com/example/sssf/pull/1"),
+        ("queried-active-pr", "pr_url", "https://github.com/example/sssf/pull/1?x=1"),
+        ("fragmented-active-pr", "pr_url", "https://github.com/example/sssf/pull/1#x"),
+        ("nonpositive-active-pr", "pr_url", "https://github.com/example/sssf/pull/0"),
+    ):
+        malformed_active = _active_state_fixture(project)
+        malformed_record = next(
+            item for item in malformed_active["records"] if item["item_id"] == "FUT-003"
+        )
+        malformed_record["active_binding"]["increments"][0][field] = value
+        if not any(
+            f"increment 0 field {field}" in error
+            for error in validate_state_document(malformed_active, project)
+        ):
+            failures.append(name)
+
     active_with_proof = _active_state_fixture(project)
     active_proof_record = next(
         item for item in active_with_proof["records"] if item["item_id"] == "FUT-003"
@@ -1146,6 +1224,9 @@ def main() -> int:
         "unbound-active-identity, partial-active-identity, "
         "omitted-active-increment, extra-active-increment, duplicate-active-increment, "
         "incomplete-proven-proof-contract, invented-deferred-return-state, "
+        "remote-proven-evidence, absolute-proven-evidence, parent-proven-evidence, "
+        "whitespace-active-branch, malformed-active-branch, non-pr-active-identity, "
+        "insecure-active-pr, queried-active-pr, fragmented-active-pr, nonpositive-active-pr, "
         "proven-proof-outside-proven-state, broken-active-authoritative-reference, "
         "remote-active-authoritative-reference, absolute-active-authoritative-reference, "
         "parent-active-authoritative-reference, "
