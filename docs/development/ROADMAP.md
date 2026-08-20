@@ -132,7 +132,7 @@ Required before Docker mutation work:
 
 ## LAUNCH-1 — Operator-facing SSSF launch surface
 
-**Planning state: `SEQUENCED`; not yet `ACTIVE` unless a named increment is opened.**
+**Planning state: `ACTIVE`. Named increment `sssf-launch-1` is `WORKING` from exact base/head `bee9296a4c94b1dc3da6991acd1755a91fa681eb` on local branch `fm/sssf-launch-1`; no implementation checkpoint is credited until normal increment evidence is produced.**
 
 Goal: give the Captain one obvious launch action for SSSF without creating a new orchestrator.
 
@@ -158,6 +158,8 @@ The launcher may land before Docker. It must not imply that Docker, Wayfinder or
 
 ### SBX-0 — Reference semantics inventory
 
+**Planning state: `ACTIVE`. Named increment `sssf-sbx-0` is `WORKING` from exact base/head `bee9296a4c94b1dc3da6991acd1755a91fa681eb`; this stage is semantics inventory only and authorizes no Docker mutation.**
+
 Inventory current sandbox lifecycle semantics from canonical code, docs, tests and retained evidence. Classify each fact as:
 
 - required provider-neutral semantic;
@@ -168,6 +170,8 @@ Inventory current sandbox lifecycle semantics from canonical code, docs, tests a
 Live exe.dev access is optional evidence only.
 
 ### SBX-1 — SandboxProvider + lifecycle-state contract
+
+**Execution state: named increment `sssf-sbx-1` exists but is `QUEUED_BLOCKED_BY_SBX_0`; no SBX-1 implementation checkpoint is credited before the SBX-0 handoff.**
 
 Define the minimum typed provider interface, state owner, CNO/failure semantics, irreversibility rules, reconciliation contract and fake-provider conformance suite.
 
