@@ -63,13 +63,15 @@ shortcut target.
 - the tracked source contract is transport-only and contains no direct factory,
   Docker, Wayfinder, or DSH activation;
 - an unknown argument returns a visible usage refusal with exit status `2`;
-- executable attached/detached checkout fixtures proving the same transport
-  handoff without exposing checkout state; the public identity sink contains
-  exactly project, repository, root, and handoff, with watched-red `head=` and
-  `branch=` variants; and
+- executable attached/detached checkout fixtures proving live HEAD and honest
+  branch identity, including a watched-red stale-identity variant; and
 - executable missing Bash, Git, and grep fixtures proving prerequisite-specific
   refusals before misleading repository or registration diagnostics, including
   watched-red preflight-omission variants.
+
+This historical proof contract is superseded, not rewritten. The corrected
+public identity contract is owned by
+`docs/increments/LAUNCH-1-POSTMERGE-IDENTITY-CORRECTION.md`.
 
 A direct host launch was also observed through the tracked front door in the
 named disposable Herdr lab only:
