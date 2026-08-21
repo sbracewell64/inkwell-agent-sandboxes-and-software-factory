@@ -222,7 +222,16 @@ def _project_authoritative_planning_blobs(
         if not block:
             return None, f"authority roadmap omits lifecycle identity at {commit}: {identity}"
         state_match = re.search(r"(?i)planning state:\s*`([^`]+)`", block)
-        state = state_match.group(1).upper() if state_match else "ROADMAP_SUBSTEP"
+        if state_match:
+            state = state_match.group(1).upper()
+        elif identity == "SBX-2" and re.search(
+            r"do(?:es)? not(?: by itself)? establish.*SBX-2 unlock",
+            _identity_heading_block(roadmap, "SBX-1"),
+            re.IGNORECASE | re.DOTALL,
+        ):
+            state = "HELD"
+        else:
+            state = "ROADMAP_SUBSTEP"
         lifecycle_items.append(
             {
                 "identity": identity,

@@ -53,7 +53,7 @@
       {"identity": "LAUNCH-1", "state": "ACTIVE", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "SBX-0", "state": "ACTIVE", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "SBX-1", "state": "SEQUENCED", "source_path": "docs/development/ROADMAP.md"},
-      {"identity": "SBX-2", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-2", "state": "HELD", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "SBX-3", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "SBX-4", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "SBX-5", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
