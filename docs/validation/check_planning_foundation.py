@@ -594,12 +594,13 @@ def _validate_planning_authority_binding(
     record: dict[str, Any], project: dict[str, Any], errors: list[str]
 ) -> None:
     binding = record.get("planning_authority_binding")
+    expected_increment_ids = ["FP-001", "FM-FP-001"]
     expected = {
         "ref": AUTHORITATIVE_PLANNING_REF,
         "source_commit": AUTHORITATIVE_PLANNING_COMMIT,
         "source_tree": AUTHORITATIVE_PLANNING_TREE,
         "generation": AUTHORITATIVE_PLANNING_GENERATION,
-        "increment_ids": ["FP-001", "FM-FP-001"],
+        "increment_ids": expected_increment_ids,
     }
     if not isinstance(binding, dict):
         errors.append(f"{record.get('item_id')} ACTIVE state lacks authoritative planning binding")
@@ -609,6 +610,18 @@ def _validate_planning_authority_binding(
             errors.append(
                 f"{record.get('item_id')} ACTIVE planning binding has stale {field}"
             )
+    planned = record.get("planned_increments")
+    expected_planned = [
+        {"increment_id": increment_id, "status": "active-not-proven"}
+        for increment_id in expected_increment_ids
+    ]
+    if planned != expected_planned or binding.get("increment_ids") != [
+        item["increment_id"] for item in planned if isinstance(item, dict)
+    ]:
+        errors.append(
+            f"{record.get('item_id')} ACTIVE planning binding must exactly match "
+            "unique active-not-proven planned increments"
+        )
     refs = binding.get("authoritative_refs")
     if not isinstance(refs, list) or not refs or any(
         not _repository_path_exists(project, reference) for reference in refs

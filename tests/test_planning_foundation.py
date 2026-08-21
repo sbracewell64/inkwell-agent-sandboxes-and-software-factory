@@ -159,6 +159,27 @@ def test_active_binding_exactly_covers_planned_increments() -> None:
     assert any("exactly cover unique planned increments" in error for error in errors)
 
 
+def test_planning_authority_binding_exactly_matches_active_planned_increments() -> None:
+    project = _VALIDATOR.load_project()
+
+    for mutate in (
+        lambda planned: planned.pop(),
+        lambda planned: planned.append(copy.deepcopy(planned[0])),
+        lambda planned: planned[0].update(increment_id="FP-002"),
+        lambda planned: planned[0].update(status="proven"),
+    ):
+        state = copy.deepcopy(project["state"])
+        record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+        mutate(record["planned_increments"])
+
+        errors = _VALIDATOR.validate_state_document(state, project)
+
+        assert any(
+            "exactly match unique active-not-proven planned increments" in error
+            for error in errors
+        )
+
+
 def test_proven_requires_complete_accepted_proof_contract() -> None:
     project = _VALIDATOR.load_project()
 
