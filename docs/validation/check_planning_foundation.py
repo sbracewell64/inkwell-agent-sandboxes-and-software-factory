@@ -112,6 +112,8 @@ CLOSURE_REQUIRED_TESTS = (
     "tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe",
     "tests/test_planning_foundation.py::test_closure_gate_includes_unrelated_notimplementederror_regression",
     "tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation",
+    "tests/test_planning_foundation.py::test_authority_projection_preserves_sbx2_state_and_rejects_missing_identity",
+    "tests/test_planning_foundation.py::test_authority_projection_derives_bound1_predecessor_markers",
     "tests/test_planning_foundation.py::test_windows_symlink_privilege_cno_is_machine_readable_non_pass",
     "tests/test_planning_foundation.py::test_unrelated_notimplementederror_is_not_automatic_cno",
 )
