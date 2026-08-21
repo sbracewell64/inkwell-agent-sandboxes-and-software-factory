@@ -132,6 +132,18 @@ def test_windows_symlink_privilege_cno_is_machine_readable_non_pass(monkeypatch)
     assert unrelated_status == "observed-bad"
     assert unrelated_errors
     assert unrelated_cno == []
+
+    def unsupported(self: Path, target: Path, target_is_directory: bool = False) -> None:
+        raise NotImplementedError("symlink operation is not implemented")
+
+    monkeypatch.setattr(Path, "symlink_to", unsupported)
+    unsupported_cno: list[str] = []
+    unsupported_status, unsupported_errors, _ = _VALIDATOR.validate_path(
+        control_cno=unsupported_cno
+    )
+    assert unsupported_status == "observed-bad"
+    assert unsupported_errors
+    assert unsupported_cno == []
     monkeypatch.setattr(Path, "symlink_to", original)
 
 
