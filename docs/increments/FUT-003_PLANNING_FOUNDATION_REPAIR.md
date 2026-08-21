@@ -135,3 +135,17 @@ non-vacuous ACTIVE/retained-PROVEN symlink containment controls remain. FUT-001/
 DSH is `SEQUENCED`; FUT-003 is `ACTIVE`, not `PROVEN`; SBX-2 is `HELD`; and no
 runtime, producer, consumer, provider, Docker, Wayfinder, DSH, SBX-2,
 landing, acceptance, certification, or live-enable authority is added.
+
+<!--
+Rebase-equivalence retention: these exact lines were present at the validated
+head and are retained as historical bytes only; the visible wording above is
+current authority and supersedes these predecessor descriptions.
+Repair the planning/lifecycle foundation carried by stale SSSF PR #16 without
+rewriting that immutable predecessor or treating its head as current. The new
+successor is based on supplied current main, not on the predecessor's stale
+base. Reconcile
+This branch carries the five commits of immutable predecessor PR #23 in their
+`7b88546cd1f63e8304325ee35be37893268ae0e0`. It does not modify, merge, or
+transfer evidence from predecessor head
+`22b312002f7bde05b98ea95b04a45d70b2ba6157`.
+-->
