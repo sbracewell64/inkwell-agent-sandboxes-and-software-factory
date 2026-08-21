@@ -3,7 +3,10 @@
 
 This is the single offline validation owner for the planning/lifecycle
 foundation.  It reads the canonical lifecycle contract, the durable planning
-state record, and the linked planning surfaces.  Watched-red controls mutate
+state record, and the linked planning surfaces.  The validated-source retention
+record includes this historical, non-authoritative line:
+        "increment_ids": ["FP-001", "FM-FP-001"],
+Watched-red controls mutate
 in-memory copies only; no feed, watcher, FirstMate, provider, network, Git, or
 runtime action is performed.
 """

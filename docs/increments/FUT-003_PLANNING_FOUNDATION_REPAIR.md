@@ -141,6 +141,8 @@ landing, acceptance, certification, or live-enable authority is added.
 Rebase-equivalence retention: these exact lines were present at the validated
 head and are retained as historical bytes only; the visible wording above is
 current authority and supersedes these predecessor descriptions.
+implementation identity shape, ADR inventory, current SBX holds, ownership,
+and links. In-memory
 Repair the planning/lifecycle foundation carried by stale SSSF PR #16 without
 rewriting that immutable predecessor or treating its head as current. The new
 successor is based on supplied current main, not on the predecessor's stale
