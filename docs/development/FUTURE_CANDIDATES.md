@@ -118,15 +118,10 @@ contract.
 
 ### Required future admission inputs
 
-Before any later ACTIVE transition, each named increment must carry these
-exact identities in the durable record:
-
-- increment ID;
-- exact branch name;
-- exact PR URL/identity;
-- exact source commit SHA;
-- exact source tree SHA; and
-- bounded authoritative document references.
+The exact implementation-binding requirements for later admission are owned by
+[`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md). The current
+planning-authority binding is not an accepted implementation binding and does
+not bypass those requirements.
 
 The authoritative `ACTIVE` planning state does not create a task or permit
 execution, landing, acceptance, certification, live enablement, or proof. No
