@@ -65,7 +65,8 @@ so a GitHub success can only follow nonempty deterministic execution.
 ## Workflow controls
 
 `.github/workflows/ci.yml` has one two-OS matrix job. Every matrix expansion
-runs the same six enumerated checks. The contract validator requires:
+runs the same checks enumerated by `ci/checks.json`. The contract validator
+requires:
 
 - exact `pull_request` and `push` triggers targeting `main`;
 - no path filter and no `pull_request_target`;
