@@ -142,9 +142,7 @@ class _DuplicateKey(ValueError):
 
 def _is_windows_symlink_capability_error(error: BaseException) -> bool:
     """Return true only for the ruled Windows missing-link privilege case."""
-    if isinstance(error, OSError) and getattr(error, "winerror", None) == 1314:
-        return True
-    return isinstance(error, NotImplementedError) and sys.platform == "win32"
+    return isinstance(error, OSError) and getattr(error, "winerror", None) == 1314
 
 
 def _fold_property_outcome(failures: list[str], cno: list[str]) -> str:
