@@ -42,7 +42,7 @@ durable current state and transition evidence is
 candidate register, roadmap, ADRs, and manifest point to that owner rather than
 restating a competing lifecycle.
 
-authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b; tree: e29628eb5754a032dce989166f287b82d5c877dc; generation: planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc
 
 `ACTIVE` is engineering authorization only. `ACTIVE` is intake eligibility
 only. `ACTIVE` is never task creation. `ACTIVE` is never execution authority.
@@ -55,10 +55,14 @@ runtime authority; an ADR, manifest, roadmap row, or validation result is not
 runtime, landing, acceptance, certification, or live-enable authority.
 
 The authoritative planning generation records FUT-001/DSH as `SEQUENCED`,
-FUT-003 as `ACTIVE` but not `PROVEN`, and SBX-2 as `HELD`. The exact source
-identity/generation is bound in `PLANNING_STATE.json`; this planning state is
-never task creation, execution, landing, acceptance, certification, live
-enablement, or runtime authority.
+FUT-003 as `ACTIVE` but not `PROVEN`, and SBX-2 as `HELD`. The machine-readable
+projection also retains FUT-004..013, the named LAUNCH/SBX/Wayfinder/DSH
+identities, and BOUND-1 as `SEQUENCED`; BOUND-1 must complete and qualify before
+SBX-2 can leave `HELD`. The exact source identity/generation is observed from
+`refs/remotes/origin/planning/future-sssf` and bound in `PLANNING_STATE.json`.
+This planning state is never task creation, execution, landing, acceptance,
+certification, live enablement, or runtime authority, and it cannot answer
+SBX-2 readiness.
 
 ## Documentation authority
 

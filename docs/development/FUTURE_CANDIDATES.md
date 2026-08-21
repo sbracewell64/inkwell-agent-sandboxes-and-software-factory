@@ -8,7 +8,7 @@ record is [`PLANNING_STATE.json`](PLANNING_STATE.json).
 The register does not create tasks or runtime authority. `ACTIVE` is an
 engineering authorization/intake state, not `PROVEN` or runtime authority.
 
-authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b; tree: e29628eb5754a032dce989166f287b82d5c877dc; generation: planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc
 
 ## Register
 
@@ -17,6 +17,26 @@ authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9
 | FUT-001 | Bounded autonomous DSH execution cells | SEQUENCED | [`ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md`](../decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md); long-range roadmap | SSSF owns outer authority; DSH may exercise bounded inner autonomy. This item is not active. |
 | FUT-002 | Awesome DSH Plugin catalog as future research/reuse source | PRESERVE | none | Catalog inclusion is not trust or production eligibility. |
 | FUT-003 | FirstMate planning-transition awareness | ACTIVE | [`ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md`](../decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md); `FP-001` + `FM-FP-001` | Authoritative planning authorization is ACTIVE, not PROVEN; production landing/enablement remains separately held. |
+| FUT-004 | LLM-as-a-Verifier as post-DSH research source | PRESERVE | `FUT-004_LLM_AS_VERIFIER_REFERENCE.md` | State-only projection; detail remains outside this bounded planning repair. |
+| FUT-005 | Verifier-guided DSH progress and refinement | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | State-only projection; no implementation or production evaluation authority. |
+| FUT-006 | Best-of-N DSH candidate selection | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | State-only projection; no implementation or production evaluation authority. |
+| FUT-007 | Typed criteria decomposition for inner semantic evaluation | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | State-only projection; no implementation or production evaluation authority. |
+| FUT-008 | Hierarchical probabilistic-verifier evidence and cost telemetry | CANDIDATE | `VERIFIER_DSH_RESEARCH.md`; unsequenced | State-only projection; verifier output remains advisory. |
+| FUT-009 | SSSF architecture-unit contract and generated governance views | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | State-only projection; no governance runtime is authorized. |
+| FUT-010 | Compact SSSF architectural laws | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | State-only projection; no competing constitution or runtime is authorized. |
+| FUT-011 | Instruction-artifact governance | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | State-only projection; no instruction router or runtime is authorized. |
+| FUT-012 | Deterministic derived documentation | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | State-only projection; no generated governance runtime is authorized. |
+| FUT-013 | Agent engineering skill repositories as research sources | PRESERVE | `AGENT_ENGINEERING_SKILLS_RESEARCH.md` | State-only projection; no competing skill router is authorized. |
+
+## Projection boundary
+
+This register is a current-authority state projection, not a complete research
+corpus. Its machine-readable scope is in `PLANNING_STATE.json`: all FUT-001
+through FUT-013 states are included, while detailed research prose for the
+preserved/candidate items is explicitly out of scope. The projection cannot
+answer SBX-2 readiness, activation, implementation, landing, acceptance,
+certification, or live enablement. BOUND-1 is separately projected as
+`SEQUENCED` and must complete and qualify before SBX-2 can leave `HELD`.
 
 ## FUT-001 — Bounded autonomous DSH execution cells
 

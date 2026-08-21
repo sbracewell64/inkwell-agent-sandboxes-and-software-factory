@@ -3,7 +3,7 @@
 **Status:** documentation and offline-validator candidate; not a FUT-003 runtime
 implementation and not a `PROVEN` or live-enable claim
 
-authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b; tree: e29628eb5754a032dce989166f287b82d5c877dc; generation: planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc
 
 - **Starts from:** `991d3a64f1b96a8b9637f97060d692af3518228f`
 - **Starting tree:** `7b88546cd1f63e8304325ee35be37893268ae0e0`
@@ -13,7 +13,7 @@ authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9
 - **Lifecycle owner:** [`PLANNING_LIFECYCLE.md`](../development/PLANNING_LIFECYCLE.md)
 - **State record:** [`PLANNING_STATE.json`](../development/PLANNING_STATE.json)
 - **Validation owner:** [`check_planning_foundation.py`](../validation/check_planning_foundation.py)
-- **Authoritative planning source:** `planning/future-sssf` at commit `5f83760a6d71bb798b9f652f21267fad4b743f16`, tree `6e33db5ae5f7d43bf3a7f8c351d888c599d1997d`, generation `planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d`
+- **Authoritative planning source:** `planning/future-sssf` at observed commit `d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b`, tree `e29628eb5754a032dce989166f287b82d5c877dc`, generation `planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc`
 
 ## Intent
 
@@ -54,8 +54,9 @@ or treated as a pass after the correction.
   evidence record; commit subjects are not state.
 - Candidate, roadmap, ADR, manifest, and increment surfaces point to the
   lifecycle owner rather than restating a competing graph.
-- `check_planning_foundation.py` is offline, deterministic, side-effect-free,
-  and owns the watched-red controls for this foundation.
+- `check_planning_foundation.py` is deterministic and side-effect-free; it
+  observes a pre-fetched current-authority Git ref read-only and owns the
+  watched-red controls for this foundation.
 - `ACTIVE` is engineering authorization/intake eligibility only. The
   authoritative planning binding records FUT-003 as ACTIVE, not PROVEN, without
   granting task, execution, landing, acceptance, certification, or live-enable
@@ -72,6 +73,23 @@ behavior.
 Current SBX lifecycle status and all existing holds remain authoritative: SBX-1
 is a landed implementation but not activated, accepted, certified, or
 real-provider-proven, and it does not unlock held SBX-2.
+
+## Current-authority projection scope
+
+`PLANNING_STATE.json` contains the machine-readable
+`sssf.planning-authority-projection.v1` projection observed from the fetched
+`refs/remotes/origin/planning/future-sssf` ref. It projects all current FUT-001
+through FUT-013 states, the named LAUNCH/SBX/Wayfinder/DSH roadmap identities,
+and BOUND-1 as `SEQUENCED`. BOUND-1 is a mandatory predecessor: it must
+complete and qualify before SBX-2 can leave `HELD`.
+
+The projection is deliberately bounded. It answers only future-item state,
+named lifecycle state, and the BOUND-1 predecessor order. It cannot answer
+SBX-2 readiness or activation, implementation, landing, acceptance,
+certification, or live enablement; every such query is CNO/non-PASS. The
+validator observes the current authority ref/tree and rejects candidate-authored
+stale-generation self-consistency, omitted FUT items, omitted or demoted
+LAUNCH/SBX/Wayfinder/DSH identities, and omitted BOUND-1.
 
 ## Deterministic acceptance
 
