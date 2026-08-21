@@ -166,6 +166,97 @@ def test_current_planning_generation_is_observed_not_candidate_constant() -> Non
     assert any("stale, missing, or mismatched" in error for error in errors)
 
 
+def _authority_blob_fixture() -> dict[str, str]:
+    lifecycle = (
+        ("LAUNCH-1", "ACTIVE"),
+        ("SBX-0", "ACTIVE"),
+        ("SBX-1", "SEQUENCED"),
+        ("SBX-2", "HELD"),
+        ("SBX-3", None),
+        ("SBX-4", None),
+        ("SBX-5", None),
+        ("SBX-6", None),
+        ("SBX-7", None),
+        ("SBX-8", None),
+        ("WAYFINDER-1", "SEQUENCED"),
+        ("DSH-0A", None),
+        ("DSH-0B", None),
+        ("DSH-1", None),
+    )
+    roadmap = "\n".join(
+        f"## {identity}\n" + (f"Planning state: `{state}`\n" if state else "roadmap substep\n")
+        for identity, state in lifecycle
+    ) + "\n## BOUND-1\ncomplete and qualify before `SBX-2` can leave `HELD`\n"
+    return {
+        "docs/development/FUTURE_CANDIDATES.md": "| FUT-001 | item | SEQUENCED |",
+        "docs/development/ROADMAP.md": roadmap,
+        "docs/development/INCREMENT_PROTOCOL.md": "\n".join(
+            (
+                "boundedness_delta:",
+                "New or changed growth surfaces must use the boundedness registry/owner mechanism",
+                "For an added or changed dynamic bound, prove the effective limit",
+            )
+        ),
+        "docs/development/BOUNDEDNESS_LAW.md": "\n".join(
+            ("Every list, queue, log, retry chain", "EXPLICIT_BOUND", "SAFE_UNBOUNDED")
+        ),
+        "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md": (
+            "Planning state:** `SEQUENCED`\ncomplete and qualify before `SBX-2` activation"
+        ),
+    }
+
+
+def test_authority_projection_preserves_sbx2_state_and_rejects_missing_identity() -> None:
+    blobs = _authority_blob_fixture()
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs("a" * 40, "b" * 40, blobs)
+    assert error is None
+    assert observation is not None
+    sbx2 = next(item for item in observation["lifecycle_identities"] if item["identity"] == "SBX-2")
+    assert sbx2["state"] == "HELD"
+
+    promoted = copy.deepcopy(blobs)
+    promoted["docs/development/ROADMAP.md"] = promoted["docs/development/ROADMAP.md"].replace(
+        "## SBX-2\nPlanning state: `HELD`", "## SBX-2\nPlanning state: `ACTIVE`"
+    )
+    promoted_observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, promoted
+    )
+    assert error is None
+    assert promoted_observation is not None
+    promoted_sbx2 = next(
+        item for item in promoted_observation["lifecycle_identities"] if item["identity"] == "SBX-2"
+    )
+    assert promoted_sbx2["state"] == "ACTIVE"
+
+    omitted = copy.deepcopy(blobs)
+    omitted["docs/development/ROADMAP.md"] = omitted["docs/development/ROADMAP.md"].replace(
+        "## SBX-8\nroadmap substep\n", ""
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, omitted
+    )
+    assert observation is None
+    assert error is not None and "omits lifecycle identity" in error
+
+
+def test_authority_projection_derives_bound1_predecessor_markers() -> None:
+    blobs = _authority_blob_fixture()
+    blobs["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"] = (
+        "Planning state:** `ACTIVE`\npredecessor text removed"
+    )
+
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs("a" * 40, "b" * 40, blobs)
+
+    assert error is None
+    assert observation is not None
+    assert observation["bound1_markers"] == {
+        "state": "ACTIVE",
+        "before": None,
+        "required_phrase": None,
+        "leave_held_phrase": "complete and qualify before `SBX-2` can leave `HELD`",
+    }
+
+
 def test_bound1_omission_is_nonpass() -> None:
     project = _VALIDATOR.load_project()
     projection = project["state"]["projection_scope"]
