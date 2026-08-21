@@ -17,7 +17,7 @@ authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9
 
 ## Intent
 
-Create the canonical successor to open PR #24 without rewriting PR #23 or PR
+Update the existing successor PR #25 in place without rewriting PR #23 or PR
 #24 or treating either predecessor head as current. The successor is based on
 the supplied contribution target and carries PR #24's eight commits unchanged
 before the bounded authority correction. Reconcile
