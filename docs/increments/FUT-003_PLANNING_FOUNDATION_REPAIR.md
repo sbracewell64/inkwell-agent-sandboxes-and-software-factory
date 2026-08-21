@@ -88,8 +88,9 @@ python3 -m pytest -q tests/test_planning_foundation.py::test_windows_symlink_pri
 The validator positively checks the canonical lifecycle, all legal edges,
 terminal/re-entry rules, the exact authoritative planning source/generation,
 FUT-001/FUT-003/SBX-2 current states, durable transition records, exact ACTIVE
-implementation identity shape, ADR inventory, current SBX holds, ownership,
-and links. In-memory
+implementation identity shape, the exact unique `active-not-proven` planned
+increment set and its matching planning-authority binding, ADR inventory,
+current SBX holds, ownership, and links. In-memory
 watched-red defects cover stale ADR status, illegal/unknown/skipped edges,
 missing sequencing, unbound/partial ACTIVE identity, ACTIVE authority escape,
 duplicate ADR identity, roadmap regression, competing lifecycle owners, and
