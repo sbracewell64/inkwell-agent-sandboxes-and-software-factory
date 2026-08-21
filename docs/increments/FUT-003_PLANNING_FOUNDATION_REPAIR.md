@@ -109,7 +109,9 @@ canonical machine-readable `{"outcome":"CNO","status":"UNVERIFIED"}` with
 nonzero exit 2 rather than treating an unexercised control as observed-good.
 The closure owner derives selection and completion from pytest collection/report
 events and keeps FAIL > CNO > PASS property precedence, including an unrelated
-filesystem `OSError` failure and a simultaneous contradiction plus CNO control.
+`NotImplementedError`, an unrelated observable filesystem `OSError`, and a
+simultaneous contradiction plus CNO control. Only direct WinError 1314 evidence
+establishes Windows privilege/environment CNO.
 
 The authoritative `ACTIVE` planning state is not `PROVEN`; no passing local
 control grants task creation, execution, landing, acceptance, certification,
