@@ -188,6 +188,12 @@ def _observe_authoritative_planning_source(root: Path) -> tuple[dict[str, Any] |
         if blob is None:
             return None, f"authority source path unavailable at {commit}: {relative}"
         blobs[relative] = blob
+    return _project_authoritative_planning_blobs(commit, tree, blobs)
+
+
+def _project_authoritative_planning_blobs(
+    commit: str, tree: str, blobs: dict[str, str]
+) -> tuple[dict[str, Any] | None, str | None]:
     future_items = _extract_register_items(blobs[AUTHORITATIVE_PLANNING_PATHS[0]])
     if not future_items:
         return None, f"authority future-item register is empty at {commit}"
@@ -211,10 +217,10 @@ def _observe_authoritative_planning_source(root: Path) -> tuple[dict[str, Any] |
     lifecycle_items: list[dict[str, str]] = []
     for identity in lifecycle_ids:
         block = _identity_heading_block(roadmap, identity)
+        if not block:
+            return None, f"authority roadmap omits lifecycle identity at {commit}: {identity}"
         state_match = re.search(r"(?i)planning state:\s*`([^`]+)`", block)
         state = state_match.group(1).upper() if state_match else "ROADMAP_SUBSTEP"
-        if identity == "SBX-2":
-            state = EXPECTED_SANDBOX_STATES[identity]
         lifecycle_items.append(
             {
                 "identity": identity,
@@ -238,10 +244,13 @@ def _observe_authoritative_planning_source(root: Path) -> tuple[dict[str, Any] |
         return None, f"authority boundedness law lacks governing marker at {commit}"
     bound1 = blobs["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"]
     bound1_state = re.search(r"(?i)planning state:\**\s*`([^`]+)`", bound1)
+    if not bound1_state:
+        return None, f"authority BOUND-1 state is unavailable at {commit}"
+    bound1_state_value = bound1_state.group(1).upper()
     lifecycle_items.append(
         {
             "identity": "BOUND-1",
-            "state": bound1_state.group(1).upper() if bound1_state else "UNKNOWN",
+            "state": bound1_state_value,
             "source_path": "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md",
         }
     )
@@ -256,9 +265,22 @@ def _observe_authoritative_planning_source(root: Path) -> tuple[dict[str, Any] |
         "protocol_markers": list(protocol_markers),
         "law_markers": list(law_markers),
         "bound1_markers": {
-            "state": "SEQUENCED",
-            "before": "SBX-2",
-            "required_phrase": "complete and qualify before `SBX-2` activation",
+            "state": bound1_state_value,
+            "before": (
+                "SBX-2"
+                if "complete and qualify before `SBX-2` activation" in bound1
+                else None
+            ),
+            "required_phrase": (
+                "complete and qualify before `SBX-2` activation"
+                if "complete and qualify before `SBX-2` activation" in bound1
+                else None
+            ),
+            "leave_held_phrase": (
+                "complete and qualify before `SBX-2` can leave `HELD`"
+                if "complete and qualify before `SBX-2` can leave `HELD`" in roadmap
+                else None
+            ),
         },
     }, None
 
@@ -738,6 +760,7 @@ def _validate_projection(
         "state": "SEQUENCED",
         "before": "SBX-2",
         "required_phrase": "complete and qualify before `SBX-2` activation",
+        "leave_held_phrase": "complete and qualify before `SBX-2` can leave `HELD`",
     }:
         errors.append("current authority BOUND-1 observation is incomplete")
     protocol = project["surfaces"].get("increment_protocol", "")
