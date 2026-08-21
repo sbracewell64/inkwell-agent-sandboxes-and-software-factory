@@ -147,6 +147,23 @@ def test_windows_symlink_privilege_cno_is_machine_readable_non_pass(monkeypatch)
     monkeypatch.setattr(Path, "symlink_to", original)
 
 
+def test_unrelated_notimplementederror_is_not_automatic_cno(monkeypatch) -> None:
+    project = _VALIDATOR.load_project()
+
+    def unsupported(self: Path, target: Path, target_is_directory: bool = False) -> None:
+        raise NotImplementedError("symlink operation is not implemented")
+
+    monkeypatch.setattr(Path, "symlink_to", unsupported)
+    control_cno: list[str] = []
+    status, errors, red_failures = _VALIDATOR.validate_path(control_cno=control_cno)
+
+    assert status == "observed-bad"
+    assert errors
+    assert red_failures
+    assert control_cno == []
+    assert _VALIDATOR._fold_property_outcome(["unrelated setup failure"], control_cno) == "observed-bad"
+
+
 def test_valid_active_binding_is_checked_without_promoting_current_state() -> None:
     project = _VALIDATOR.load_project()
 
