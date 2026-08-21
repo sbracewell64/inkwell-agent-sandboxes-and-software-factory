@@ -242,6 +242,26 @@ When DSH implementation begins, the proposed evaluation order is:
 7. DSH-6+: use verification/outcome-loop implementations as reference/evaluation profiles, never outer acceptance truth;
 8. DSH-8: evaluate `dsh-self-evolving` against the existing governed self-evolution contract and fresh-frontier promotion rules.
 
+## Required pre-DSH catalog revisit
+
+This 2026-08-20 screening is a **snapshot**, not the final DSH plugin selection. The catalog and DSH itself are both moving quickly, while SSSF's own Docker custody, ExecutionCell contract, evidence model, capability policy, and qualification machinery will be materially more concrete by the time DSH commissioning approaches.
+
+Therefore, before the first real DSH implementation increment is activated—not merely before production landing—Browser Sol must perform a fresh review of `awesome-dsh-plugin/awesome-dsh-plugin` and relevant candidate repositories.
+
+The revisit must:
+
+1. inspect the then-current catalog head and compare it with the preserved 2026-08-20 snapshot;
+2. identify new plugins, replacements, abandoned candidates, material redesigns, and newly available official DSH seams;
+3. reassess the shortlist against the **then-current SSSF architecture**, especially Docker/SandboxProvider custody, WorkPackage/ExecutionCell identity, capability/effect admission, budgets, evidence and quiescence contracts;
+4. re-check the Skills and Workflow & Automation categories rather than assuming today's candidates remain best-in-class;
+5. re-check adjacent Security & Permissions, Development & Runtime, Tools & Capabilities, Git & Code Review, Sessions & Messages, Memory, and Models & Providers areas when they touch an active DSH stage;
+6. preserve new findings before implementation and route them through the normal planning lifecycle; discovery alone never activates work;
+7. re-pin every selected candidate to exact source/build/dependency identity and re-run the full qualification stack—an old review or an older qualified release does not qualify a newer plugin generation.
+
+This revisit should occur **after the pre-DSH Docker baseline/freeze and existing Wayfinder commissioning are sufficiently concrete to evaluate real integration boundaries, but before DSH-0A/0B implementation choices are treated as settled**. It is an architecture checkpoint, not a calendar reminder and not a second backlog.
+
+If the catalog has materially evolved, today's shortlist may be revised, replaced, split, or rejected. The preservation objective is to retain useful evidence and avoid rediscovery, not to create attachment to specific community implementations.
+
 Governing invariant:
 
 > Community plugins may supply implementations inside a bounded DSH phase. They never inherit SSSF workflow, source, authority, security, evidence, acceptance, or promotion ownership merely by being useful or installable.
