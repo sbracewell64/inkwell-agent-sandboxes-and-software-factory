@@ -762,7 +762,7 @@ def _validate_projection(
         "state": "SEQUENCED",
         "before": "SBX-2",
         "required_phrase": "complete and qualify before `SBX-2` activation",
-        "leave_held_phrase": "complete and qualify before `SBX-2` can leave `HELD`",
+        "leave_held_phrase": None,
     }:
         errors.append("current authority BOUND-1 observation is incomplete")
     protocol = project["surfaces"].get("increment_protocol", "")
