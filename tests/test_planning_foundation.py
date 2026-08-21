@@ -144,6 +144,8 @@ def test_current_planning_generation_is_observed_not_candidate_constant() -> Non
     observation = project["authority_observation"]
     assert observation["source_commit"] == "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b"
     assert observation["source_tree"] == "e29628eb5754a032dce989166f287b82d5c877dc"
+    sbx2 = next(item for item in observation["lifecycle_identities"] if item["identity"] == "SBX-2")
+    assert sbx2["state"] == "HELD"
 
     stale = copy.deepcopy(project)
     stale_commit = "5f83760a6d71bb798b9f652f21267fad4b743f16"
@@ -237,6 +239,24 @@ def test_authority_projection_preserves_sbx2_state_and_rejects_missing_identity(
     )
     assert observation is None
     assert error is not None and "omits lifecycle identity" in error
+
+
+def test_authority_projection_derives_held_sbx2_from_unlock_boundary() -> None:
+    blobs = _authority_blob_fixture()
+    blobs["docs/development/ROADMAP.md"] = blobs["docs/development/ROADMAP.md"].replace(
+        "## SBX-1\nPlanning state: `SEQUENCED`\n## SBX-2\nPlanning state: `HELD`",
+        "## SBX-1\nPlanning state: `SEQUENCED`; landed bytes do not establish "
+        "SBX-2 unlock.\n## SBX-2\nroadmap substep",
+    )
+
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, blobs
+    )
+
+    assert error is None
+    assert observation is not None
+    sbx2 = next(item for item in observation["lifecycle_identities"] if item["identity"] == "SBX-2")
+    assert sbx2["state"] == "HELD"
 
 
 def test_authority_projection_derives_bound1_predecessor_markers() -> None:
