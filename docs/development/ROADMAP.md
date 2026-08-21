@@ -2,7 +2,7 @@
 
 The order below deliberately separates concerns.
 
-authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b; tree: e29628eb5754a032dce989166f287b82d5c877dc; generation: planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc
 
 ## Authoritative Docker-first commissioning order
 
@@ -127,6 +127,18 @@ Eventual acceptance must preserve:
 - Git harvest,
 - explicit destruction,
 - crash recovery.
+
+## BOUND-1 — Boundedness audit and continuous enforcement
+
+**Planning state: `SEQUENCED`, not `ACTIVE`, not `PROVEN`.**
+
+`BOUND-1` is a mandatory cross-cutting predecessor: it must complete and
+qualify before `SBX-2` activation and before `SBX-2` can leave `HELD`. Its
+current increment record is
+[`BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md`](../increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md).
+It does not authorize Docker, SBX-2 activation, runtime execution, landing,
+acceptance, certification, or live enablement. This roadmap projection cannot
+answer SBX-2 readiness; it only records the required predecessor order.
 
 ## B7 — Observability and unattended execution
 

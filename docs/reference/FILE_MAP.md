@@ -80,11 +80,14 @@ Never hand-edit session evidence.
 
 ## Planning foundation
 
-authoritative planning source: planning/future-sssf; commit: 5f83760a6d71bb798b9f652f21267fad4b743f16; tree: 6e33db5ae5f7d43bf3a7f8c351d888c599d1997d; generation: planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d
+authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b; tree: e29628eb5754a032dce989166f287b82d5c877dc; generation: planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc
 
 - `docs/development/PLANNING_LIFECYCLE.md` — sole closed transition-contract owner
-- `docs/development/PLANNING_STATE.json` — durable current state and transition evidence
-- `docs/development/FUTURE_CANDIDATES.md` — future item register
+- `docs/development/PLANNING_STATE.json` — durable current state, projection scope, and transition evidence
+- `docs/development/INCREMENT_PROTOCOL.md` — boundedness-delta increment contract
+- `docs/development/BOUNDEDNESS_LAW.md` — current boundedness law
+- `docs/development/FUTURE_CANDIDATES.md` — complete current-authority future-item state projection
+- `docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md` — mandatory SEQUENCED pre-SBX-2 boundedness predecessor
 - `docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md` — FUT-003 decision boundary
 - `docs/decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md` — FUT-001 DSH decision boundary
 - `docs/validation/check_planning_foundation.py` — sole offline planning validator

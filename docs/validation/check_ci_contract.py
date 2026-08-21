@@ -77,6 +77,7 @@ def contract_errors(root: Path) -> list[str]:
         "os: [ubuntu-24.04, windows-2022]",
         "ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}",
         "persist-credentials: false",
+        "git fetch --no-tags --depth=1 origin refs/heads/planning/future-sssf:refs/remotes/origin/planning/future-sssf",
         "python-version: '3.12.8'",
         "check-latest: false",
         "token: ''",
@@ -84,7 +85,7 @@ def contract_errors(root: Path) -> list[str]:
         "bun-version: '1.3.14'",
         "no-cache: true",
         "just-version: '1.58.0'",
-        "github-token: ${{ github.token }}",
+        "github-token: ''",
         "python tools/ci_gate.py run --evidence ci-evidence-${{ runner.os }}.json",
     )
     for fragment in required_fragments:

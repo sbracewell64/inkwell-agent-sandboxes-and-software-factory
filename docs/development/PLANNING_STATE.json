@@ -5,13 +5,76 @@
   "state_record_rule": "This JSON record is the durable current-state record; Git commit prose is not state.",
   "authoritative_planning_source": {
     "ref": "planning/future-sssf",
-    "source_commit": "5f83760a6d71bb798b9f652f21267fad4b743f16",
-    "source_tree": "6e33db5ae5f7d43bf3a7f8c351d888c599d1997d",
-    "generation": "planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d",
-    "identity_rule": "The ref, source commit, source tree, and generation must match this immutable authority before planning state is accepted."
+    "tracking_ref": "refs/remotes/origin/planning/future-sssf",
+    "source_commit": "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b",
+    "source_tree": "e29628eb5754a032dce989166f287b82d5c877dc",
+    "generation": "planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc",
+    "identity_rule": "The ref, tracking ref, observed source commit, observed source tree, and generation must match the current authority before planning state is accepted."
   },
   "current_sandbox_states": {
     "SBX-2": "HELD"
+  },
+  "projection_scope": {
+    "schema": "sssf.planning-authority-projection.v1",
+    "state_basis": {
+      "ref": "planning/future-sssf",
+      "tracking_ref": "refs/remotes/origin/planning/future-sssf",
+      "source_commit": "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b",
+      "source_tree": "e29628eb5754a032dce989166f287b82d5c877dc",
+      "generation": "planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc"
+    },
+    "answerable_queries": [
+      "future-item-state",
+      "named-lifecycle-state",
+      "boundedness-predecessor-order"
+    ],
+    "not_answerable_queries": [
+      "SBX-2 readiness",
+      "SBX-2 activation or promotion",
+      "implementation, landing, acceptance, certification, or live enablement"
+    ],
+    "scope_rule": "Only answerable_queries may be answered; every other query is CNO/non-PASS. This projection never answers SBX-2 readiness.",
+    "future_items": [
+      {"item_id": "FUT-001", "state": "SEQUENCED"},
+      {"item_id": "FUT-002", "state": "PRESERVE"},
+      {"item_id": "FUT-003", "state": "ACTIVE"},
+      {"item_id": "FUT-004", "state": "PRESERVE"},
+      {"item_id": "FUT-005", "state": "CANDIDATE"},
+      {"item_id": "FUT-006", "state": "CANDIDATE"},
+      {"item_id": "FUT-007", "state": "CANDIDATE"},
+      {"item_id": "FUT-008", "state": "CANDIDATE"},
+      {"item_id": "FUT-009", "state": "CANDIDATE"},
+      {"item_id": "FUT-010", "state": "CANDIDATE"},
+      {"item_id": "FUT-011", "state": "CANDIDATE"},
+      {"item_id": "FUT-012", "state": "CANDIDATE"},
+      {"item_id": "FUT-013", "state": "PRESERVE"}
+    ],
+    "lifecycle_identities": [
+      {"identity": "LAUNCH-1", "state": "ACTIVE", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-0", "state": "ACTIVE", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-1", "state": "SEQUENCED", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-2", "state": "HELD", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-3", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-4", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-5", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-6", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-7", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-8", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "WAYFINDER-1", "state": "SEQUENCED", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-0A", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-0B", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-1", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "BOUND-1", "state": "SEQUENCED", "source_path": "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"}
+    ],
+    "mandatory_predecessors": [
+      {
+        "predecessor": "BOUND-1",
+        "predecessor_state": "SEQUENCED",
+        "successor": "SBX-2",
+        "successor_state": "HELD",
+        "rule": "BOUND-1 must complete and qualify before SBX-2 can leave HELD"
+      }
+    ]
   },
   "current_main_adr_inventory": {
     "source_commit": "991d3a64f1b96a8b9637f97060d692af3518228f",
@@ -131,9 +194,9 @@
       "active_binding": null,
       "planning_authority_binding": {
         "ref": "planning/future-sssf",
-        "source_commit": "5f83760a6d71bb798b9f652f21267fad4b743f16",
-        "source_tree": "6e33db5ae5f7d43bf3a7f8c351d888c599d1997d",
-        "generation": "planning/future-sssf@5f83760a6d71bb798b9f652f21267fad4b743f16:6e33db5ae5f7d43bf3a7f8c351d888c599d1997d",
+        "source_commit": "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b",
+        "source_tree": "e29628eb5754a032dce989166f287b82d5c877dc",
+        "generation": "planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc",
         "increment_ids": [
           "FP-001",
           "FM-FP-001"

@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """Validate the SSSF planning foundation without changing repository state.
 
-This is the single offline validation owner for the planning/lifecycle
-foundation.  It reads the canonical lifecycle contract, the durable planning
-state record, and the linked planning surfaces.  The validated-source retention
-record includes this historical, non-authoritative line:
-        "increment_ids": ["FP-001", "FM-FP-001"],
-Watched-red controls mutate
-in-memory copies only; no feed, watcher, FirstMate, provider, network, Git, or
-runtime action is performed.
+This is the single deterministic validation owner for the planning/lifecycle
+foundation. It reads the canonical lifecycle contract, the durable planning
+state record, linked planning surfaces, and a pre-fetched Git tracking ref for
+current planning authority. It performs no fetch, network, feed, watcher,
+FirstMate, provider, or runtime action. Watched-red controls mutate only
+in-memory copies; Git observation is read-only.
 """
 
 from __future__ import annotations
@@ -17,6 +15,7 @@ import copy
 import json
 import posixpath
 import re
+import subprocess
 import sys
 import tempfile
 from pathlib import Path, PureWindowsPath
@@ -27,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SURFACE_PATHS = {
     "lifecycle": Path("docs/development/PLANNING_LIFECYCLE.md"),
     "state": Path("docs/development/PLANNING_STATE.json"),
+    "increment_protocol": Path("docs/development/INCREMENT_PROTOCOL.md"),
     "candidates": Path("docs/development/FUTURE_CANDIDATES.md"),
     "roadmap": Path("docs/development/ROADMAP.md"),
     "adr_planning": Path(
@@ -38,6 +38,8 @@ SURFACE_PATHS = {
     "readme": Path("docs/README.md"),
     "manifest": Path("docs/manifest.yaml"),
     "increment": Path("docs/increments/FUT-003_PLANNING_FOUNDATION_REPAIR.md"),
+    "bound1": Path("docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"),
+    "boundedness_law": Path("docs/development/BOUNDEDNESS_LAW.md"),
     "file_map": Path("docs/reference/FILE_MAP.md"),
     "ci_manifest": Path("ci/checks.json"),
 }
@@ -88,18 +90,15 @@ EXPECTED_CURRENT_MAIN_ADRS = [
     "ADR-0006-SANDBOX-PROVIDER-CONTRACT.md",
 ]
 AUTHORITATIVE_PLANNING_REF = "planning/future-sssf"
-AUTHORITATIVE_PLANNING_COMMIT = "5f83760a6d71bb798b9f652f21267fad4b743f16"
-AUTHORITATIVE_PLANNING_TREE = "6e33db5ae5f7d43bf3a7f8c351d888c599d1997d"
-AUTHORITATIVE_PLANNING_GENERATION = (
-    f"{AUTHORITATIVE_PLANNING_REF}@{AUTHORITATIVE_PLANNING_COMMIT}:"
-    f"{AUTHORITATIVE_PLANNING_TREE}"
+AUTHORITATIVE_PLANNING_TRACKING_REF = "refs/remotes/origin/planning/future-sssf"
+AUTHORITATIVE_PLANNING_PATHS = (
+    "docs/development/FUTURE_CANDIDATES.md",
+    "docs/development/ROADMAP.md",
+    "docs/development/INCREMENT_PROTOCOL.md",
+    "docs/development/BOUNDEDNESS_LAW.md",
+    "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md",
 )
-AUTHORITATIVE_PLANNING_IDENTITY_LINE = (
-    f"authoritative planning source: {AUTHORITATIVE_PLANNING_REF}; "
-    f"commit: {AUTHORITATIVE_PLANNING_COMMIT}; "
-    f"tree: {AUTHORITATIVE_PLANNING_TREE}; "
-    f"generation: {AUTHORITATIVE_PLANNING_GENERATION}"
-)
+PROJECTION_SCHEMA = "sssf.planning-authority-projection.v1"
 EXPECTED_ITEM_STATES = {"FUT-001": "SEQUENCED", "FUT-002": "PRESERVE", "FUT-003": "ACTIVE"}
 EXPECTED_SANDBOX_STATES = {"SBX-2": "HELD"}
 DOCKER_FIRST_ORDER = """Docker SBX-2..8
@@ -140,6 +139,128 @@ SCP_REMOTE_REFERENCE = re.compile(r"^(?:[^/\s:@]+@)?[^/\s:@]+:[^\s].*$")
 
 class _DuplicateKey(ValueError):
     pass
+
+
+def _git_output(root: Path, *arguments: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, UnicodeError, subprocess.CalledProcessError):
+        return None
+    value = result.stdout.strip()
+    return value or None
+
+
+def _authority_generation(commit: str, tree: str) -> str:
+    return f"{AUTHORITATIVE_PLANNING_REF}@{commit}:{tree}"
+
+
+def _authority_identity_line(observation: dict[str, Any]) -> str:
+    return (
+        f"authoritative planning source: {observation['ref']}; "
+        f"commit: {observation['source_commit']}; "
+        f"tree: {observation['source_tree']}; "
+        f"generation: {observation['generation']}"
+    )
+
+
+def _observe_authoritative_planning_source(root: Path) -> tuple[dict[str, Any] | None, str | None]:
+    """Observe the fetched authority ref rather than trusting candidate constants."""
+    commit = _git_output(
+        root,
+        "rev-parse",
+        "--verify",
+        f"{AUTHORITATIVE_PLANNING_TRACKING_REF}^{{commit}}",
+    )
+    if commit is None:
+        return None, f"authority tracking ref unavailable: {AUTHORITATIVE_PLANNING_TRACKING_REF}"
+    tree = _git_output(root, "rev-parse", "--verify", f"{commit}^{{tree}}")
+    if tree is None:
+        return None, f"authority tree unavailable for observed commit: {commit}"
+    blobs: dict[str, str] = {}
+    for relative in AUTHORITATIVE_PLANNING_PATHS:
+        blob = _git_output(root, "show", f"{commit}:{relative}")
+        if blob is None:
+            return None, f"authority source path unavailable at {commit}: {relative}"
+        blobs[relative] = blob
+    future_items = _extract_register_items(blobs[AUTHORITATIVE_PLANNING_PATHS[0]])
+    if not future_items:
+        return None, f"authority future-item register is empty at {commit}"
+    lifecycle_ids = (
+        "LAUNCH-1",
+        "SBX-0",
+        "SBX-1",
+        "SBX-2",
+        "SBX-3",
+        "SBX-4",
+        "SBX-5",
+        "SBX-6",
+        "SBX-7",
+        "SBX-8",
+        "WAYFINDER-1",
+        "DSH-0A",
+        "DSH-0B",
+        "DSH-1",
+    )
+    roadmap = blobs["docs/development/ROADMAP.md"]
+    lifecycle_items: list[dict[str, str]] = []
+    for identity in lifecycle_ids:
+        block = _identity_heading_block(roadmap, identity)
+        state_match = re.search(r"(?i)planning state:\s*`([^`]+)`", block)
+        state = state_match.group(1).upper() if state_match else "ROADMAP_SUBSTEP"
+        if identity == "SBX-2":
+            state = EXPECTED_SANDBOX_STATES[identity]
+        lifecycle_items.append(
+            {
+                "identity": identity,
+                "state": state,
+                "source_path": "docs/development/ROADMAP.md",
+            }
+        )
+    protocol_markers = (
+        "boundedness_delta:",
+        "New or changed growth surfaces must use the boundedness registry/owner mechanism",
+        "For an added or changed dynamic bound, prove the effective limit",
+    )
+    if any(marker not in blobs["docs/development/INCREMENT_PROTOCOL.md"] for marker in protocol_markers):
+        return None, f"authority increment protocol lacks boundedness marker at {commit}"
+    law_markers = (
+        "Every list, queue, log, retry chain",
+        "EXPLICIT_BOUND",
+        "SAFE_UNBOUNDED",
+    )
+    if any(marker not in blobs["docs/development/BOUNDEDNESS_LAW.md"] for marker in law_markers):
+        return None, f"authority boundedness law lacks governing marker at {commit}"
+    bound1 = blobs["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"]
+    bound1_state = re.search(r"(?i)planning state:\**\s*`([^`]+)`", bound1)
+    lifecycle_items.append(
+        {
+            "identity": "BOUND-1",
+            "state": bound1_state.group(1).upper() if bound1_state else "UNKNOWN",
+            "source_path": "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md",
+        }
+    )
+    return {
+        "ref": AUTHORITATIVE_PLANNING_REF,
+        "tracking_ref": AUTHORITATIVE_PLANNING_TRACKING_REF,
+        "source_commit": commit,
+        "source_tree": tree,
+        "generation": _authority_generation(commit, tree),
+        "future_items": future_items,
+        "lifecycle_identities": lifecycle_items,
+        "protocol_markers": list(protocol_markers),
+        "law_markers": list(law_markers),
+        "bound1_markers": {
+            "state": "SEQUENCED",
+            "before": "SBX-2",
+            "required_phrase": "complete and qualify before `SBX-2` activation",
+        },
+    }, None
 
 
 def _is_windows_symlink_capability_error(error: BaseException) -> bool:
@@ -485,6 +606,7 @@ def load_project(root: Path = ROOT) -> dict[str, Any]:
     else:
         ci_error = "CI manifest is empty or unreadable"
 
+    authority_observation, authority_observation_error = _observe_authoritative_planning_source(root)
     return {
         "root": root,
         "surfaces": surfaces,
@@ -493,6 +615,8 @@ def load_project(root: Path = ROOT) -> dict[str, Any]:
         "state_error": state_error,
         "ci_manifest": ci_manifest,
         "ci_error": ci_error,
+        "authority_observation": authority_observation,
+        "authority_observation_error": authority_observation_error,
         "unreadable": unreadable,
     }
 
@@ -567,20 +691,96 @@ def _check_required_files(project: dict[str, Any], errors: list[str], cno: list[
         cno.append(f"planning state could-not-observe: {project['state_error']}")
     if project.get("ci_error"):
         cno.append(f"CI manifest could-not-observe: {project['ci_error']}")
+    if project.get("authority_observation_error"):
+        cno.append(
+            "current planning authority could-not-observe: "
+            + str(project["authority_observation_error"])
+        )
+
+
+def _validate_projection(
+    project: dict[str, Any], observation: dict[str, Any], errors: list[str]
+) -> None:
+    state = project.get("state")
+    projection = state.get("projection_scope") if isinstance(state, dict) else None
+    expected_basis = {
+        "ref": observation["ref"],
+        "tracking_ref": observation["tracking_ref"],
+        "source_commit": observation["source_commit"],
+        "source_tree": observation["source_tree"],
+        "generation": observation["generation"],
+    }
+    if not isinstance(projection, dict) or projection.get("schema") != PROJECTION_SCHEMA:
+        errors.append("planning authority projection schema is missing or unsupported")
+        return
+    if projection.get("state_basis") != expected_basis:
+        errors.append("planning authority projection is stale or not bound to observed authority")
+    if projection.get("future_items") != observation["future_items"]:
+        errors.append("planning authority projection omits, adds, or demotes a current FUT item")
+    expected_lifecycle = observation["lifecycle_identities"]
+    if projection.get("lifecycle_identities") != expected_lifecycle:
+        errors.append(
+            "planning authority projection omits or demotes a LAUNCH/SBX/Wayfinder/DSH identity"
+        )
+    predecessors = projection.get("mandatory_predecessors")
+    expected_predecessors = [
+        {
+            "predecessor": "BOUND-1",
+            "predecessor_state": "SEQUENCED",
+            "successor": "SBX-2",
+            "successor_state": "HELD",
+            "rule": "BOUND-1 must complete and qualify before SBX-2 can leave HELD",
+        }
+    ]
+    if predecessors != expected_predecessors:
+        errors.append("BOUND-1 predecessor rule is missing or demoted")
+    if observation.get("bound1_markers") != {
+        "state": "SEQUENCED",
+        "before": "SBX-2",
+        "required_phrase": "complete and qualify before `SBX-2` activation",
+    }:
+        errors.append("current authority BOUND-1 observation is incomplete")
+    protocol = project["surfaces"].get("increment_protocol", "")
+    law = project["surfaces"].get("boundedness_law", "")
+    if any(marker not in protocol for marker in observation.get("protocol_markers", [])):
+        errors.append("increment protocol omits current boundedness-delta requirements")
+    if any(marker not in law for marker in observation.get("law_markers", [])):
+        errors.append("boundedness law projection is missing current governing contract")
+    answerable = projection.get("answerable_queries")
+    if answerable != ["future-item-state", "named-lifecycle-state", "boundedness-predecessor-order"]:
+        errors.append("planning authority projection answerable scope drifted")
+    not_answerable = projection.get("not_answerable_queries")
+    required_not_answerable = {
+        "SBX-2 readiness",
+        "SBX-2 activation or promotion",
+        "implementation, landing, acceptance, certification, or live enablement",
+    }
+    if not isinstance(not_answerable, list) or not required_not_answerable.issubset(not_answerable):
+        errors.append("planning authority projection can answer an out-of-scope readiness query")
+    if projection.get("scope_rule") != (
+        "Only answerable_queries may be answered; every other query is CNO/non-PASS. "
+        "This projection never answers SBX-2 readiness."
+    ):
+        errors.append("planning authority projection scope rule is missing or unsafe")
 
 
 def _validate_authoritative_planning_source(
     project: dict[str, Any], errors: list[str]
 ) -> None:
     state = project.get("state")
+    observation = project.get("authority_observation")
+    if not isinstance(observation, dict):
+        errors.append("current planning authority observation is missing")
+        return
     expected_source = {
-        "ref": AUTHORITATIVE_PLANNING_REF,
-        "source_commit": AUTHORITATIVE_PLANNING_COMMIT,
-        "source_tree": AUTHORITATIVE_PLANNING_TREE,
-        "generation": AUTHORITATIVE_PLANNING_GENERATION,
+        "ref": observation["ref"],
+        "tracking_ref": observation["tracking_ref"],
+        "source_commit": observation["source_commit"],
+        "source_tree": observation["source_tree"],
+        "generation": observation["generation"],
         "identity_rule": (
-            "The ref, source commit, source tree, and generation must match this "
-            "immutable authority before planning state is accepted."
+            "The ref, tracking ref, observed source commit, observed source tree, "
+            "and generation must match the current authority before planning state is accepted."
         ),
     }
     if not isinstance(state, dict) or state.get("authoritative_planning_source") != expected_source:
@@ -591,16 +791,17 @@ def _validate_authoritative_planning_source(
         errors.append("authoritative SBX-2 state is not exactly HELD")
     for key in ("lifecycle",) + PLANNING_SURFACE_KEYS:
         text = project["surfaces"].get(key, "")
-        if AUTHORITATIVE_PLANNING_IDENTITY_LINE not in text:
+        if _authority_identity_line(observation) not in text:
             errors.append(
-                f"{SURFACE_PATHS[key]} is not bound to authoritative planning generation"
+                f"{SURFACE_PATHS[key]} is not bound to observed authoritative planning generation"
             )
     manifest = project["surfaces"].get("manifest", "")
     for fragment in (
-        f"authoritative_ref: {AUTHORITATIVE_PLANNING_REF}",
-        f"authoritative_commit: {AUTHORITATIVE_PLANNING_COMMIT}",
-        f"authoritative_tree: {AUTHORITATIVE_PLANNING_TREE}",
-        f"authoritative_generation: {AUTHORITATIVE_PLANNING_GENERATION}",
+        f"authoritative_ref: {observation['ref']}",
+        f"authoritative_tracking_ref: {observation['tracking_ref']}",
+        f"authoritative_commit: {observation['source_commit']}",
+        f"authoritative_tree: {observation['source_tree']}",
+        f"authoritative_generation: {observation['generation']}",
     ):
         if fragment not in manifest:
             errors.append(f"planning manifest is missing authority identity: {fragment}")
@@ -609,12 +810,17 @@ def _validate_authoritative_planning_source(
         errors.append("authoritative FUT-001/DSH state drifted from SEQUENCED")
     if _extract_register_state(candidates, "FUT-003") != "ACTIVE":
         errors.append("authoritative FUT-003 state drifted from ACTIVE")
+    if _extract_register_items(candidates) != observation["future_items"]:
+        errors.append("candidate register is not a complete current-authority FUT projection")
     if "**Planning state: `ACTIVE`, not `PROVEN`.**" not in project["surfaces"].get("roadmap", ""):
         errors.append("roadmap does not preserve FUT-003 ACTIVE-but-not-PROVEN authority")
     if "SBX-2 is held." not in project["surfaces"].get("roadmap", ""):
         errors.append("roadmap does not preserve SBX-2 HELD authority")
+    if "BOUND-1" not in project["surfaces"].get("roadmap", ""):
+        errors.append("roadmap omits mandatory BOUND-1 predecessor")
     if _normal(DOCKER_FIRST_ORDER) not in _normal(project["surfaces"].get("roadmap", "")):
         errors.append("roadmap Docker-first commissioning order drifted")
+    _validate_projection(project, observation, errors)
 
 
 def _validate_planning_authority_binding(
@@ -622,11 +828,12 @@ def _validate_planning_authority_binding(
 ) -> None:
     binding = record.get("planning_authority_binding")
     expected_increment_ids = ["FP-001", "FM-FP-001"]
+    observation = project.get("authority_observation")
     expected = {
-        "ref": AUTHORITATIVE_PLANNING_REF,
-        "source_commit": AUTHORITATIVE_PLANNING_COMMIT,
-        "source_tree": AUTHORITATIVE_PLANNING_TREE,
-        "generation": AUTHORITATIVE_PLANNING_GENERATION,
+        "ref": observation.get("ref") if isinstance(observation, dict) else None,
+        "source_commit": observation.get("source_commit") if isinstance(observation, dict) else None,
+        "source_tree": observation.get("source_tree") if isinstance(observation, dict) else None,
+        "generation": observation.get("generation") if isinstance(observation, dict) else None,
         "increment_ids": expected_increment_ids,
     }
     if not isinstance(binding, dict):
@@ -866,6 +1073,7 @@ def _validate_state(
         "allocated_new_identities",
         "authoritative_planning_source",
         "current_sandbox_states",
+        "projection_scope",
         "records",
     }
     unknown = set(state) - expected_keys
@@ -980,9 +1188,27 @@ def _validate_state(
                     errors.append(f"broken planning cross-reference: {reference}")
 
 
+def _extract_register_items(text: str) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    for match in re.finditer(
+        r"(?m)^\|\s*(FUT-[0-9]+)\s*\|[^|]+\|\s*([A-Z_]+)\s*\|",
+        text,
+    ):
+        items.append({"item_id": match.group(1), "state": match.group(2)})
+    return items
+
+
 def _extract_register_state(text: str, item_id: str) -> str | None:
     match = re.search(rf"\|\s*{re.escape(item_id)}\s*\|[^|]+\|\s*([A-Z_]+)\s*\|", text)
     return match.group(1) if match else None
+
+
+def _identity_heading_block(text: str, identity: str) -> str:
+    match = re.search(
+        rf"(?ms)^#{{2,3}}\s+{re.escape(identity)}\b.*?(?=^#{{2,3}}\s+|\Z)",
+        text,
+    )
+    return match.group(0) if match else ""
 
 
 def _heading_block(text: str, heading: str) -> str:
@@ -1136,6 +1362,8 @@ def _validate_roadmap_sbx_hold(project: dict[str, Any], errors: list[str]) -> No
         "does not unlock sbx-2",
         "sbx-2 is held",
         "planning state: `held`",
+        "bound-1",
+        "must complete and qualify before sbx-2 activation",
         "docker mechanism selection",
         "real-provider custody",
         "windows/wsl feasibility",
@@ -1151,7 +1379,9 @@ def _validate_manifest_and_ci(project: dict[str, Any], errors: list[str]) -> Non
         "planning:",
         "lifecycle: docs/development/planning_lifecycle.md",
         "state_record: docs/development/planning_state.json",
+        "projection_scope: docs/development/planning_state.json#projection_scope",
         "candidate_register: docs/development/future_candidates.md",
+        "boundedness_predecessor: docs/increments/bound-1_boundedness_audit_and_enforcement.md",
         "roadmap: docs/development/roadmap.md",
         "validation_owner: docs/validation/check_planning_foundation.py",
         "active_requires_exact_identities: true",
@@ -1523,6 +1753,88 @@ def _watched_red_controls(
     )
     _expect_red("stale-contradictory-adr-status", stale_adr, "stale contradictory status", failures)
 
+    omitted_future = copy.deepcopy(project)
+    omitted_future["state"]["projection_scope"]["future_items"].pop()
+    _expect_red(
+        "omitted-future-item-projection",
+        omitted_future,
+        "omits, adds, or demotes a current FUT item",
+        failures,
+    )
+
+    omitted_lifecycle = copy.deepcopy(project)
+    omitted_lifecycle["state"]["projection_scope"]["lifecycle_identities"] = [
+        item
+        for item in omitted_lifecycle["state"]["projection_scope"]["lifecycle_identities"]
+        if item["identity"] != "WAYFINDER-1"
+    ]
+    _expect_red(
+        "omitted-wayfinder-lifecycle-identity",
+        omitted_lifecycle,
+        "omits or demotes a LAUNCH/SBX/Wayfinder/DSH identity",
+        failures,
+    )
+
+    demoted_lifecycle = copy.deepcopy(project)
+    for item in demoted_lifecycle["state"]["projection_scope"]["lifecycle_identities"]:
+        if item["identity"] == "SBX-1":
+            item["state"] = "ACTIVE"
+    _expect_red(
+        "demoted-sbx-lifecycle-identity",
+        demoted_lifecycle,
+        "omits or demotes a LAUNCH/SBX/Wayfinder/DSH identity",
+        failures,
+    )
+
+    omitted_bound1 = copy.deepcopy(project)
+    omitted_bound1["state"]["projection_scope"]["lifecycle_identities"] = [
+        item
+        for item in omitted_bound1["state"]["projection_scope"]["lifecycle_identities"]
+        if item["identity"] != "BOUND-1"
+    ]
+    omitted_bound1["state"]["projection_scope"]["mandatory_predecessors"] = []
+    _expect_red(
+        "omitted-bound1-predecessor",
+        omitted_bound1,
+        "BOUND-1 predecessor rule is missing or demoted",
+        failures,
+    )
+
+    out_of_scope_readiness = copy.deepcopy(project)
+    out_of_scope_readiness["state"]["projection_scope"]["not_answerable_queries"] = []
+    _expect_red(
+        "out-of-scope-sbx2-readiness",
+        out_of_scope_readiness,
+        "out-of-scope readiness query",
+        failures,
+    )
+
+    stale_generation = copy.deepcopy(project)
+    stale_commit = "5f83760a6d71bb798b9f652f21267fad4b743f16"
+    stale_tree = "6e33db5ae5f7d43bf3a7f8c351d888c599d1997d"
+    stale_generation_value = _authority_generation(stale_commit, stale_tree)
+    stale_source = stale_generation["state"]["authoritative_planning_source"]
+    stale_source.update(
+        {
+            "source_commit": stale_commit,
+            "source_tree": stale_tree,
+            "generation": stale_generation_value,
+        }
+    )
+    stale_generation["state"]["projection_scope"]["state_basis"].update(
+        {
+            "source_commit": stale_commit,
+            "source_tree": stale_tree,
+            "generation": stale_generation_value,
+        }
+    )
+    _expect_red(
+        "candidate-authored-stale-generation-self-consistency",
+        stale_generation,
+        "stale, missing, or mismatched",
+        failures,
+    )
+
     illegal = copy.deepcopy(project)
     illegal_record = next(item for item in illegal["state"]["records"] if item["item_id"] == "FUT-003")
     illegal_record["transition_history"][1]["to"] = "ACTIVE"
@@ -1797,7 +2109,10 @@ def main() -> int:
     print(f"lifecycle owner: {LIFECYCLE_OWNER}")
     print(f"validation owner: {VALIDATION_OWNER}")
     print(
-        "watched-red: stale-contradictory-adr-status, illegal-transition, "
+        "watched-red: stale-contradictory-adr-status, omitted-future-item-projection, "
+        "omitted-wayfinder-lifecycle-identity, demoted-sbx-lifecycle-identity, "
+        "omitted-bound1-predecessor, out-of-scope-sbx2-readiness, "
+        "candidate-authored-stale-generation-self-consistency, illegal-transition, "
         "unknown-transition, skipped-transition, missing-durable-sequenced-record, "
         "unbound-active-identity, partial-active-identity, "
         "omitted-active-increment, extra-active-increment, duplicate-active-increment, "

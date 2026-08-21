@@ -139,6 +139,64 @@ def test_older_consistent_snapshot_cannot_replace_authoritative_generation() -> 
     assert any("authoritative planning source identity/generation" in error for error in errors)
 
 
+def test_current_planning_generation_is_observed_not_candidate_constant() -> None:
+    project = _VALIDATOR.load_project()
+    observation = project["authority_observation"]
+    assert observation["source_commit"] == "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b"
+    assert observation["source_tree"] == "e29628eb5754a032dce989166f287b82d5c877dc"
+
+    stale = copy.deepcopy(project)
+    stale_commit = "5f83760a6d71bb798b9f652f21267fad4b743f16"
+    stale_tree = "6e33db5ae5f7d43bf3a7f8c351d888c599d1997d"
+    stale_generation = f"planning/future-sssf@{stale_commit}:{stale_tree}"
+    stale["state"]["authoritative_planning_source"].update(
+        source_commit=stale_commit,
+        source_tree=stale_tree,
+        generation=stale_generation,
+    )
+    stale["state"]["projection_scope"]["state_basis"].update(
+        source_commit=stale_commit,
+        source_tree=stale_tree,
+        generation=stale_generation,
+    )
+
+    status, errors = _VALIDATOR.validate_project(stale, run_controls=False)
+
+    assert status == "observed-bad"
+    assert any("stale, missing, or mismatched" in error for error in errors)
+
+
+def test_bound1_omission_is_nonpass() -> None:
+    project = _VALIDATOR.load_project()
+    projection = project["state"]["projection_scope"]
+    projection["lifecycle_identities"] = [
+        item for item in projection["lifecycle_identities"] if item["identity"] != "BOUND-1"
+    ]
+    projection["mandatory_predecessors"] = []
+
+    status, errors = _VALIDATOR.validate_project(project, run_controls=False)
+
+    assert status == "observed-bad"
+    assert any("BOUND-1 predecessor rule" in error for error in errors)
+
+
+def test_projection_scope_prevents_out_of_scope_sbx2_readiness() -> None:
+    project = _VALIDATOR.load_project()
+    project["state"]["projection_scope"]["not_answerable_queries"] = []
+
+    status, errors = _VALIDATOR.validate_project(project, run_controls=False)
+
+    assert status == "observed-bad"
+    assert any("out-of-scope readiness" in error for error in errors)
+
+
+def test_ci_workflow_remains_credential_free() -> None:
+    workflow = (_VALIDATOR.ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "github-token: ''" in workflow
+    assert "github-token: ${{ github.token }}" not in workflow
+    assert "refs/heads/planning/future-sssf:refs/remotes/origin/planning/future-sssf" in workflow
+
+
 def test_windows_symlink_privilege_cno_is_machine_readable_non_pass(monkeypatch) -> None:
     project = _VALIDATOR.load_project()
     original = Path.symlink_to
@@ -237,7 +295,7 @@ def test_valid_active_binding_is_checked_without_promoting_current_state() -> No
     }
     assert current["FUT-003"] == "ACTIVE"
     assert current["FUT-001"] == "SEQUENCED"
-    assert project["state"]["authoritative_planning_source"]["generation"] == _VALIDATOR.AUTHORITATIVE_PLANNING_GENERATION
+    assert project["state"]["authoritative_planning_source"]["generation"] == project["authority_observation"]["generation"]
 
 
 def test_active_binding_exactly_covers_planned_increments() -> None:
