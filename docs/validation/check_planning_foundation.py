@@ -615,9 +615,11 @@ def _validate_planning_authority_binding(
         {"increment_id": increment_id, "status": "active-not-proven"}
         for increment_id in expected_increment_ids
     ]
-    if planned != expected_planned or binding.get("increment_ids") != [
-        item["increment_id"] for item in planned if isinstance(item, dict)
-    ]:
+    planned_matches = isinstance(planned, list) and planned == expected_planned
+    binding_matches_planned = planned_matches and binding.get("increment_ids") == [
+        item["increment_id"] for item in planned
+    ]
+    if not binding_matches_planned:
         errors.append(
             f"{record.get('item_id')} ACTIVE planning binding must exactly match "
             "unique active-not-proven planned increments"

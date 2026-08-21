@@ -179,6 +179,29 @@ def test_planning_authority_binding_exactly_matches_active_planned_increments() 
             for error in errors
         )
 
+    for malformed in (None, {}, "FP-001"):
+        state = copy.deepcopy(project["state"])
+        record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+        record["planned_increments"] = malformed
+
+        errors = _VALIDATOR.validate_state_document(state, project)
+
+        assert any(
+            "exactly match unique active-not-proven planned increments" in error
+            for error in errors
+        )
+
+    state = copy.deepcopy(project["state"])
+    record = next(item for item in state["records"] if item["item_id"] == "FUT-003")
+    record.pop("planned_increments")
+
+    errors = _VALIDATOR.validate_state_document(state, project)
+
+    assert any(
+        "exactly match unique active-not-proven planned increments" in error
+        for error in errors
+    )
+
 
 def test_proven_requires_complete_accepted_proof_contract() -> None:
     project = _VALIDATOR.load_project()
