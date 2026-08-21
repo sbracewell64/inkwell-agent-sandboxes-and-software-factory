@@ -57,11 +57,11 @@ future valid ACTIVE record would never be task creation, execution authority,
 landing authority, a PRE_CERTIFICATION exit, acceptance, certification, live
 enablement, or `PROVEN`.
 
-A future ACTIVE record must bind every named increment to an exact branch,
-exact PR URL/identity, exact source commit SHA, exact source tree SHA, and
-bounded authoritative references. If any identity is missing, the durable
-current state is `SEQUENCED` and activation is deferred. No unbound or partial
-ACTIVE record is valid.
+The exact binding requirements and the distinction between planning-authority
+binding and a later implementation binding are owned by
+[`PLANNING_LIFECYCLE.md`](../development/PLANNING_LIFECYCLE.md). The current
+planning-authority binding does not substitute for accepted implementation
+identities or grant any implementation authority.
 
 ### 4. Browser Sol retains planning authority
 
