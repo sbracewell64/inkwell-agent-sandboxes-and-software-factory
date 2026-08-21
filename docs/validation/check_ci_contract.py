@@ -77,7 +77,7 @@ def contract_errors(root: Path) -> list[str]:
         "os: [ubuntu-24.04, windows-2022]",
         "ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}",
         "persist-credentials: false",
-        "git fetch --no-tags --depth=1 origin refs/heads/planning/future-sssf:refs/remotes/origin/planning/future-sssf",
+        "git fetch --no-tags --depth=1 origin d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:refs/remotes/origin/planning/future-sssf",
         "python-version: '3.12.8'",
         "check-latest: false",
         "token: ''",

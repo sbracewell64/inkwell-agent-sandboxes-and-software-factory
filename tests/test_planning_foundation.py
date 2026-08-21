@@ -285,7 +285,10 @@ def test_ci_workflow_remains_credential_free() -> None:
     workflow = (_VALIDATOR.ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "github-token: ''" in workflow
     assert "github-token: ${{ github.token }}" not in workflow
-    assert "refs/heads/planning/future-sssf:refs/remotes/origin/planning/future-sssf" in workflow
+    assert (
+        "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:"
+        "refs/remotes/origin/planning/future-sssf"
+    ) in workflow
 
 
 def test_windows_symlink_privilege_cno_is_machine_readable_non_pass(monkeypatch) -> None:
