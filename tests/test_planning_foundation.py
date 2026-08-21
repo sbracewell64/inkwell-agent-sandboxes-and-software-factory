@@ -84,6 +84,41 @@ def test_closure_gate_requires_nonempty_exact_test_universe() -> None:
     assert status == "observed-good", errors
 
 
+def test_closure_gate_includes_unrelated_notimplementederror_regression() -> None:
+    required = _VALIDATOR.CLOSURE_REQUIRED_TESTS
+    unrelated_nodeid = (
+        "tests/test_planning_foundation.py::"
+        "test_unrelated_notimplementederror_is_not_automatic_cno"
+    )
+    reports = tuple((nodeid, "passed") for nodeid in required)
+
+    status, errors = _VALIDATOR.evaluate_test_closure(
+        required,
+        reports,
+        required_nodeids=required,
+    )
+    assert status == "observed-good", errors
+
+    omitted = tuple(nodeid for nodeid in required if nodeid != unrelated_nodeid)
+    omitted_status, _ = _VALIDATOR.evaluate_test_closure(
+        omitted,
+        tuple((nodeid, "passed") for nodeid in omitted),
+        required_nodeids=required,
+    )
+    assert omitted_status != "observed-good"
+
+    renamed = tuple(
+        nodeid if nodeid != unrelated_nodeid else nodeid + "_renamed"
+        for nodeid in required
+    )
+    renamed_status, _ = _VALIDATOR.evaluate_test_closure(
+        renamed,
+        tuple((nodeid, "passed") for nodeid in renamed),
+        required_nodeids=required,
+    )
+    assert renamed_status != "observed-good"
+
+
 def test_older_consistent_snapshot_cannot_replace_authoritative_generation() -> None:
     project = _VALIDATOR.load_project()
     stale = copy.deepcopy(project)
