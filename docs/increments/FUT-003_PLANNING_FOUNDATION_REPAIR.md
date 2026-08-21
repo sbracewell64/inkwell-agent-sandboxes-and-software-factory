@@ -83,6 +83,7 @@ PYTHONPATH=.:adws pytest -q tests/test_planning_foundation.py
 python3 -m pytest -q tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe
 python3 -m pytest -q tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation
 python3 -m pytest -q tests/test_planning_foundation.py::test_windows_symlink_privilege_cno_is_machine_readable_non_pass
+python3 -m pytest -q tests/test_planning_foundation.py::test_unrelated_notimplementederror_is_not_automatic_cno
 ```
 
 The validator positively checks the canonical lifecycle, all legal edges,

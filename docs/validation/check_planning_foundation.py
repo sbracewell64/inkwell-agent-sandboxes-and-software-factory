@@ -113,6 +113,7 @@ CLOSURE_REQUIRED_TESTS = (
     "tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe",
     "tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation",
     "tests/test_planning_foundation.py::test_windows_symlink_privilege_cno_is_machine_readable_non_pass",
+    "tests/test_planning_foundation.py::test_unrelated_notimplementederror_is_not_automatic_cno",
 )
 CLOSURE_EXPECTED_OUTCOMES = {nodeid: "passed" for nodeid in CLOSURE_REQUIRED_TESTS}
 PLANNING_SURFACE_KEYS = (
@@ -376,6 +377,30 @@ def _watched_test_closure_controls() -> list[str]:
         )
         if status != expected:
             failures.append(name)
+    unrelated_nodeid = (
+        "tests/test_planning_foundation.py::"
+        "test_unrelated_notimplementederror_is_not_automatic_cno"
+    )
+    if unrelated_nodeid not in CLOSURE_REQUIRED_TESTS:
+        failures.append("closure-unrelated-notimplemented-required")
+    else:
+        omitted = tuple(
+            nodeid for nodeid in CLOSURE_REQUIRED_TESTS if nodeid != unrelated_nodeid
+        )
+        omitted_reports = tuple((nodeid, "passed") for nodeid in omitted)
+        omitted_status, _ = evaluate_test_closure(omitted, omitted_reports)
+        renamed = tuple(
+            nodeid
+            if nodeid != unrelated_nodeid
+            else nodeid + "_renamed"
+            for nodeid in CLOSURE_REQUIRED_TESTS
+        )
+        renamed_reports = tuple((nodeid, "passed") for nodeid in renamed)
+        renamed_status, _ = evaluate_test_closure(renamed, renamed_reports)
+        if omitted_status == "observed-good":
+            failures.append("closure-unrelated-notimplemented-omitted")
+        if renamed_status == "observed-good":
+            failures.append("closure-unrelated-notimplemented-renamed")
     return failures
 
 

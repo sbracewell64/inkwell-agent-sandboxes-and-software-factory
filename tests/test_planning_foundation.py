@@ -47,6 +47,34 @@ def test_closure_gate_requires_nonempty_exact_test_universe() -> None:
     failures = _VALIDATOR._watched_test_closure_controls()
     assert failures == []
 
+    unrelated_nodeid = (
+        "tests/test_planning_foundation.py::"
+        "test_unrelated_notimplementederror_is_not_automatic_cno"
+    )
+    assert unrelated_nodeid in _VALIDATOR.CLOSURE_REQUIRED_TESTS
+    omitted = tuple(
+        nodeid
+        for nodeid in _VALIDATOR.CLOSURE_REQUIRED_TESTS
+        if nodeid != unrelated_nodeid
+    )
+    omitted_status, _ = _VALIDATOR.evaluate_test_closure(
+        omitted,
+        tuple((nodeid, "passed") for nodeid in omitted),
+    )
+    assert omitted
+    assert omitted_status != "observed-good"
+
+    renamed = tuple(
+        nodeid if nodeid != unrelated_nodeid else nodeid + "_renamed"
+        for nodeid in _VALIDATOR.CLOSURE_REQUIRED_TESTS
+    )
+    renamed_status, _ = _VALIDATOR.evaluate_test_closure(
+        renamed,
+        tuple((nodeid, "passed") for nodeid in renamed),
+    )
+    assert len(renamed) == len(_VALIDATOR.CLOSURE_REQUIRED_TESTS)
+    assert renamed_status != "observed-good"
+
     required = ("tests/test_planning_foundation.py::required",)
     status, errors = _VALIDATOR.evaluate_test_closure(
         required,
