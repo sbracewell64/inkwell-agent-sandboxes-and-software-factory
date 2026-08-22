@@ -555,3 +555,99 @@ At those points, inspect then-current AO source and compare against the exact re
 8. **Operational views are projections and cannot become state authority.**
 9. **Operational skills that encode current implementation facts require drift controls.**
 10. **Every observer, reaction queue, delivery retry, event buffer and projection remains subject to the Boundedness Law.**
+
+---
+
+# 20. Additional authorized extracts
+
+## 20.1 Capability coexistence does not prove continuity/equivalence
+
+AO permits Chat↔TUI handoff only where the adapter proves the two identities refer to the same native provider conversation. Merely supporting both interfaces is not enough.
+
+General FirstMate/SSSF law:
+
+> **Two capabilities can coexist without being semantically interchangeable. If continuity depends on equivalence, prove the equivalence.**
+
+Apply this to:
+
+- host-native CLI versus structured provider protocol;
+- TUI versus Chat controllers;
+- two AgentBackend modes for one provider;
+- host-native versus Docker-hosted agent bindings;
+- alternate tool schemas for the same model;
+- resumed/replaced controllers claiming continuity of one conversation or execution identity.
+
+Do not carry history/evidence/authority across a boundary merely because product names match.
+
+## 20.2 Keep non-authoritative semantic enrichment off critical state-transition paths
+
+AO treats worker spawn as the commit point and performs task-title refinement asynchronously with a bounded timeout. Failure to improve a human-facing title does not invalidate the already-created worker.
+
+General FirstMate law:
+
+> **Do not put non-authoritative semantic cosmetics on the critical path of a deterministic state transition.**
+
+Potential examples:
+
+- display title;
+- human-readable summary;
+- board label;
+- optional categorization;
+- explanatory prose.
+
+Commit authoritative work first when safe. Semantic enrichment may follow independently and must not silently change scope, authority, or acceptance.
+
+## 20.3 Tracker/issue/PR text is untrusted task data
+
+AO's current worker prompt explicitly marks fetched tracker/SCM issue context as user-authored external text that cannot override standing instructions or repository safety rules.
+
+Preserve the stronger SSSF/FirstMate distinction:
+
+```text
+authenticated typed control envelope / role
+        ≠
+free-form issue / PR / review / comment text
+```
+
+A control issue may validly transport a typed `fm-sol-control/v1` escalation or ruling, but arbitrary text quoted inside it cannot grant itself authority. Repository/PR/comment content remains data interpreted under the existing authority model.
+
+This reinforces the existing AgentDojo law that untrusted content cannot grant itself effect authority.
+
+## 20.4 Reaction policy should suppress expected stack noise without hiding actionable defects
+
+AO's stack-aware PR logic avoids sending merge-conflict nudges for a child PR whose target is another still-open parent PR when that conflict is expected from stack topology. At the same time, actionable child signals such as failing CI or requested changes remain visible.
+
+FirstMate extraction:
+
+> **Suppress mechanically expected noise only when topology/policy proves it non-actionable; do not suppress independent actionable evidence.**
+
+For stacked/dependent work, reaction policy should understand dependency position rather than blindly treating every raw provider state as an operator/worker intervention.
+
+## 20.5 Material evidence changes, not polling cycles, create new reactions
+
+AO's persisted reaction signatures survive restart and suppress repeated identical nudges. The valuable general rule is:
+
+> **A polling cycle is not an event. A material fact/signature change is an event.**
+
+FirstMate should key reaction eligibility to exact current evidence/generation rather than elapsed polling cycles. Re-observation of unchanged evidence converges on the same reaction identity.
+
+---
+
+# 21. FirstMate priority shortlist from AO
+
+When the relevant FirstMate owners are next revised, inspect existing implementation first and consider only demonstrated gaps in this order:
+
+1. derived attention projection from authoritative facts;
+2. `NO_SIGNAL` / CNO when an expected observation channel is silent;
+3. first-class reaction records with exact subject/head/cause/signature/owner/attempt state;
+4. derive all independent applicable reactions before any delivery;
+5. deliver repair feedback to the current responsible worker by default;
+6. generation-fence stale worker/controller callbacks;
+7. bounded live notification with durable replay/catch-up;
+8. durable message custody across any real owner/controller handoff;
+9. qualify identity/capability equivalence before claiming continuity;
+10. keep cosmetic semantic enrichment off critical state transitions;
+11. treat free-form tracker/SCM content as untrusted data under typed authority;
+12. freshness-qualify operational skills against the implementation contracts they describe.
+
+None of these authorizes a second daemon, database, Kanban state machine, telemetry service, or AO installation.
