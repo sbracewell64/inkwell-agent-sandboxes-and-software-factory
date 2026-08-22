@@ -79,9 +79,11 @@ real-provider-proven, and it does not unlock held SBX-2.
 `PLANNING_STATE.json` contains the machine-readable
 `sssf.planning-authority-projection.v1` projection observed from the fetched
 `refs/remotes/origin/planning/future-sssf` ref. It projects all current FUT-001
-through FUT-013 states, the named LAUNCH/SBX/Wayfinder/DSH roadmap identities,
-and BOUND-1 as `SEQUENCED`. BOUND-1 is a mandatory predecessor: it must
-complete and qualify before SBX-2 can leave `HELD`.
+through FUT-013 states, the complete governed LAUNCH-1, SBX-0..8,
+WAYFINDER-1, and DSH-0A/0B through DSH-8 roadmap identities, and BOUND-1 as
+`SEQUENCED`. The BOUND-1 predecessor rule is derived from the immutable
+authority bytes: it must complete and qualify before SBX-2 activation, and SBX-2
+can leave `HELD` only after that qualification.
 
 The projection is deliberately bounded. It answers only future-item state,
 named lifecycle state, and the BOUND-1 predecessor order. It cannot answer
@@ -89,7 +91,8 @@ SBX-2 readiness or activation, implementation, landing, acceptance,
 certification, or live enablement; every such query is CNO/non-PASS. The
 validator observes the current authority ref/tree and rejects candidate-authored
 stale-generation self-consistency, omitted FUT items, omitted or demoted
-LAUNCH/SBX/Wayfinder/DSH identities, and omitted BOUND-1.
+LAUNCH/SBX/Wayfinder/DSH identities, duplicate or conflicting authority
+headings/states, and omitted BOUND-1 predecessor bytes.
 
 ## Deterministic acceptance
 
@@ -103,6 +106,10 @@ python3 -m pytest -q tests/test_planning_foundation.py::test_older_consistent_sn
 python3 -m pytest -q tests/test_planning_foundation.py::test_windows_symlink_privilege_cno_is_machine_readable_non_pass
 python3 -m pytest -q tests/test_planning_foundation.py::test_unrelated_notimplementederror_is_not_automatic_cno
 python3 -m pytest -q tests/test_planning_foundation.py::test_closure_gate_includes_unrelated_notimplementederror_regression
+python3 -m pytest -q tests/test_planning_foundation.py::test_sbx2_state_is_observed_from_authority_not_candidate_expectation
+python3 -m pytest -q tests/test_planning_foundation.py::test_missing_governed_identity_or_bound1_predecessor_is_nonpass
+python3 -m pytest -q tests/test_planning_foundation.py::test_authority_projection_rejects_missing_duplicate_or_conflicting_governed_identities
+python3 -m pytest -q tests/test_planning_foundation.py::test_closure_gate_includes_authority_omission_and_predecessor_regressions
 ```
 
 The validator positively checks the canonical lifecycle, all legal edges,

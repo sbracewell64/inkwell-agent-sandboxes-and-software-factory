@@ -64,6 +64,13 @@
       {"identity": "DSH-0A", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "DSH-0B", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "DSH-1", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-2", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-3", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-4", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-5", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-6", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-7", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-8", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "BOUND-1", "state": "SEQUENCED", "source_path": "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"}
     ],
     "mandatory_predecessors": [
@@ -72,7 +79,8 @@
         "predecessor_state": "SEQUENCED",
         "successor": "SBX-2",
         "successor_state": "HELD",
-        "rule": "BOUND-1 must complete and qualify before SBX-2 can leave HELD"
+        "rule": "BOUND-1 must complete and qualify before SBX-2 activation; SBX-2 can leave HELD only after that qualification.",
+        "authority_rule": "complete and qualify before `SBX-2` activation"
       }
     ]
   },

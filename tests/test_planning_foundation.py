@@ -173,7 +173,7 @@ def _authority_blob_fixture() -> dict[str, str]:
         ("LAUNCH-1", "ACTIVE"),
         ("SBX-0", "ACTIVE"),
         ("SBX-1", "SEQUENCED"),
-        ("SBX-2", "HELD"),
+        ("SBX-2", None),
         ("SBX-3", None),
         ("SBX-4", None),
         ("SBX-5", None),
@@ -184,13 +184,45 @@ def _authority_blob_fixture() -> dict[str, str]:
         ("DSH-0A", None),
         ("DSH-0B", None),
         ("DSH-1", None),
+        ("DSH-2", None),
+        ("DSH-3", None),
+        ("DSH-4", None),
+        ("DSH-5", None),
+        ("DSH-6", None),
+        ("DSH-7", None),
+        ("DSH-8", None),
     )
     roadmap = "\n".join(
-        f"## {identity}\n" + (f"Planning state: `{state}`\n" if state else "roadmap substep\n")
+        (
+            f"## {identity}\n"
+            + (f"Planning state: `{state}`\n" if state else "roadmap substep\n")
+            + ("landed bytes do not establish SBX-2 unlock.\n" if identity == "SBX-1" else "")
+        )
         for identity, state in lifecycle
     ) + "\n## BOUND-1\ncomplete and qualify before `SBX-2` can leave `HELD`\n"
+    future_rows = "\n".join(
+        f"| FUT-{index:03d} | item | {state} |"
+        for index, state in enumerate(
+            (
+                "SEQUENCED",
+                "PRESERVE",
+                "ACTIVE",
+                "PRESERVE",
+                "CANDIDATE",
+                "CANDIDATE",
+                "CANDIDATE",
+                "CANDIDATE",
+                "CANDIDATE",
+                "CANDIDATE",
+                "CANDIDATE",
+                "CANDIDATE",
+                "PRESERVE",
+            ),
+            1,
+        )
+    )
     return {
-        "docs/development/FUTURE_CANDIDATES.md": "| FUT-001 | item | SEQUENCED |",
+        "docs/development/FUTURE_CANDIDATES.md": future_rows,
         "docs/development/ROADMAP.md": roadmap,
         "docs/development/INCREMENT_PROTOCOL.md": "\n".join(
             (
@@ -203,6 +235,7 @@ def _authority_blob_fixture() -> dict[str, str]:
             ("Every list, queue, log, retry chain", "EXPLICIT_BOUND", "SAFE_UNBOUNDED")
         ),
         "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md": (
+            "# BOUND-1 — Boundedness audit\n"
             "Planning state:** `SEQUENCED`\ncomplete and qualify before `SBX-2` activation"
         ),
     }
@@ -218,17 +251,13 @@ def test_authority_projection_preserves_sbx2_state_and_rejects_missing_identity(
 
     promoted = copy.deepcopy(blobs)
     promoted["docs/development/ROADMAP.md"] = promoted["docs/development/ROADMAP.md"].replace(
-        "## SBX-2\nPlanning state: `HELD`", "## SBX-2\nPlanning state: `ACTIVE`"
+        "## SBX-2\nroadmap substep", "## SBX-2\nPlanning state: `ACTIVE`"
     )
     promoted_observation, error = _VALIDATOR._project_authoritative_planning_blobs(
         "a" * 40, "b" * 40, promoted
     )
-    assert error is None
-    assert promoted_observation is not None
-    promoted_sbx2 = next(
-        item for item in promoted_observation["lifecycle_identities"] if item["identity"] == "SBX-2"
-    )
-    assert promoted_sbx2["state"] == "ACTIVE"
+    assert promoted_observation is None
+    assert error is not None and "unexpected explicit state" in error
 
     omitted = copy.deepcopy(blobs)
     omitted["docs/development/ROADMAP.md"] = omitted["docs/development/ROADMAP.md"].replace(
@@ -243,11 +272,6 @@ def test_authority_projection_preserves_sbx2_state_and_rejects_missing_identity(
 
 def test_authority_projection_derives_held_sbx2_from_unlock_boundary() -> None:
     blobs = _authority_blob_fixture()
-    blobs["docs/development/ROADMAP.md"] = blobs["docs/development/ROADMAP.md"].replace(
-        "## SBX-1\nPlanning state: `SEQUENCED`\n## SBX-2\nPlanning state: `HELD`",
-        "## SBX-1\nPlanning state: `SEQUENCED`; landed bytes do not establish "
-        "SBX-2 unlock.\n## SBX-2\nroadmap substep",
-    )
 
     observation, error = _VALIDATOR._project_authoritative_planning_blobs(
         "a" * 40, "b" * 40, blobs
@@ -261,20 +285,129 @@ def test_authority_projection_derives_held_sbx2_from_unlock_boundary() -> None:
 
 def test_authority_projection_derives_bound1_predecessor_markers() -> None:
     blobs = _authority_blob_fixture()
-    blobs["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"] = (
-        "Planning state:** `ACTIVE`\npredecessor text removed"
-    )
-
     observation, error = _VALIDATOR._project_authoritative_planning_blobs("a" * 40, "b" * 40, blobs)
 
     assert error is None
     assert observation is not None
     assert observation["bound1_markers"] == {
-        "state": "ACTIVE",
-        "before": None,
-        "required_phrase": None,
+        "predecessor": "BOUND-1",
+        "state": "SEQUENCED",
+        "before": "SBX-2",
+        "required_phrase": "complete and qualify before `SBX-2` activation",
         "leave_held_phrase": "complete and qualify before `SBX-2` can leave `HELD`",
     }
+
+    removed = copy.deepcopy(blobs)
+    removed["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"] = (
+        "# BOUND-1 — Boundedness audit\n> **Planning state:** `SEQUENCED`.\n"
+    )
+    removed_observation, removed_error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, removed
+    )
+    assert removed_observation is None
+    assert removed_error is not None and "predecessor relationship" in removed_error
+
+
+def test_sbx2_state_is_observed_from_authority_not_candidate_expectation() -> None:
+    blobs = _authority_blob_fixture()
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, blobs
+    )
+    assert error is None
+    assert observation is not None
+    sbx2 = next(item for item in observation["lifecycle_identities"] if item["identity"] == "SBX-2")
+    assert sbx2["state"] == "HELD"
+
+    promoted = copy.deepcopy(blobs)
+    promoted["docs/development/ROADMAP.md"] = promoted["docs/development/ROADMAP.md"].replace(
+        "do not establish", "establish", 1
+    )
+    promoted_observation, promoted_error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, promoted
+    )
+    assert promoted_observation is None
+    assert promoted_error is not None and "unlock boundary" in promoted_error
+
+
+def test_missing_governed_identity_or_bound1_predecessor_is_nonpass() -> None:
+    blobs = _authority_blob_fixture()
+    omitted = copy.deepcopy(blobs)
+    omitted["docs/development/ROADMAP.md"] = omitted["docs/development/ROADMAP.md"].replace(
+        "## DSH-8\nroadmap substep\n", "", 1
+    )
+    omitted_observation, omitted_error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, omitted
+    )
+    assert omitted_observation is None
+    assert omitted_error is not None and "omits lifecycle identity" in omitted_error
+
+    removed_relation = copy.deepcopy(blobs)
+    removed_relation["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"] = (
+        "# BOUND-1 — Boundedness audit\n> **Planning state:** `SEQUENCED`.\n"
+    )
+    relation_observation, relation_error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, removed_relation
+    )
+    assert relation_observation is None
+    assert relation_error is not None and "predecessor relationship" in relation_error
+
+
+def test_authority_projection_rejects_missing_duplicate_or_conflicting_governed_identities() -> None:
+    blobs = _authority_blob_fixture()
+
+    for identity in ("LAUNCH-1", "SBX-3", "DSH-1"):
+        duplicated = copy.deepcopy(blobs)
+        path = "docs/development/ROADMAP.md"
+        block = _VALIDATOR._identity_heading_blocks(duplicated[path], identity)[0]
+        duplicated[path] += "\n" + block
+        observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+            "a" * 40, "b" * 40, duplicated
+        )
+        assert observation is None
+        assert error is not None and "duplicate lifecycle identity" in error
+
+    duplicate_state = copy.deepcopy(blobs)
+    path = "docs/development/ROADMAP.md"
+    block = _VALIDATOR._identity_heading_blocks(duplicate_state[path], "LAUNCH-1")[0]
+    duplicate_state[path] = duplicate_state[path].replace(
+        block, block + "\nPlanning state: `ACTIVE`", 1
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, duplicate_state
+    )
+    assert observation is None
+    assert error is not None and "missing or duplicated" in error
+
+    conflicting_bound = copy.deepcopy(blobs)
+    conflicting_bound["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"] += (
+        "\n> **Planning state:** `ACTIVE`.\n"
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, conflicting_bound
+    )
+    assert observation is None
+    assert error is not None and "duplicated" in error
+
+
+def test_closure_gate_includes_authority_omission_and_predecessor_regressions() -> None:
+    required = _VALIDATOR.CLOSURE_REQUIRED_TESTS
+    authority_nodes = _VALIDATOR.AUTHORITY_CLOSURE_NODEIDS
+    assert set(authority_nodes).issubset(required)
+    for nodeid in authority_nodes:
+        omitted = tuple(item for item in required if item != nodeid)
+        omitted_status, _ = _VALIDATOR.evaluate_test_closure(
+            omitted,
+            tuple((item, "passed") for item in omitted),
+            required_nodeids=required,
+        )
+        assert omitted_status != "observed-good"
+        renamed = tuple(item if item != nodeid else item + "_renamed" for item in required)
+        renamed_status, _ = _VALIDATOR.evaluate_test_closure(
+            renamed,
+            tuple((item, "passed") for item in renamed),
+            required_nodeids=required,
+        )
+        assert renamed_status != "observed-good"
 
 
 def test_bound1_omission_is_nonpass() -> None:
