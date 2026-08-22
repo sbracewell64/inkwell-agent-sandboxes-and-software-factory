@@ -89,7 +89,12 @@ The immutable action objects were observed through the GitHub API at:
   events.
 - `extractions/setup-just` v2 — `dd310ad5a97d8e7b41793f8ef055398d51ad4de6`;
   the workflow passes `github-token: ''`, so setup-just receives no GitHub
-  credential and bootstrap does not broaden credential authority.
+  credential and bootstrap does not broaden credential authority. Because the
+  action still queries the rate-limited GitHub releases API, a failed action
+  attempt falls back to the same exact `1.58.0` release's versioned Ubuntu or
+  Windows asset URL. Each fallback archive is checked against its pinned
+  SHA-256 before extraction, and a final version assertion remains mandatory.
+  The fallback uses no GitHub API and receives no credential.
 
 No declared fleet verifier exists for action-tag resolution. The API returned
 commit objects (observed-good as a direct three-valued observation), and the

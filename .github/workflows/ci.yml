@@ -45,9 +45,36 @@ jobs:
           bun-version: '1.3.14'
           no-cache: true
       - name: Set up exact just
+        id: setup-just
+        continue-on-error: true
         uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2
         with:
           just-version: '1.58.0'
           github-token: ''
+      - name: Install exact just without the GitHub API (Ubuntu fallback)
+        if: runner.os == 'Linux' && steps.setup-just.outcome == 'failure'
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/just.tar.gz"
+          bindir="$RUNNER_TEMP/just-bin"
+          curl --fail --location --retry 3 --output "$archive" https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz
+          echo '4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d  '"$archive" | sha256sum --check
+          mkdir "$bindir"
+          tar --extract --gzip --file "$archive" --directory "$bindir" just
+          echo "$bindir" >> "$GITHUB_PATH"
+      - name: Install exact just without the GitHub API (Windows fallback)
+        if: runner.os == 'Windows' && steps.setup-just.outcome == 'failure'
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'just.zip'
+          $bindir = Join-Path $env:RUNNER_TEMP 'just-bin'
+          Invoke-WebRequest -Uri 'https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-pc-windows-msvc.zip' -OutFile $archive
+          if ((Get-FileHash -Algorithm SHA256 $archive).Hash -ne '759F16FB7AA17C5C8B9594B6D4A8C1A6630DFD042CF2B3FF84841454D3D188DC') { throw 'just archive SHA-256 mismatch' }
+          New-Item -ItemType Directory -Path $bindir | Out-Null
+          Expand-Archive -Path $archive -DestinationPath $bindir
+          Add-Content -Path $env:GITHUB_PATH -Value $bindir
+      - name: Verify exact just
+        shell: bash
+        run: test "$(just --version)" = 'just 1.58.0'
       - name: Run non-vacuous offline gate
         run: python tools/ci_gate.py run --evidence ci-evidence-${{ runner.os }}.json
