@@ -302,6 +302,12 @@ def _project_authoritative_planning_blobs(
                     f"authority roadmap has an unexpected state declaration at {commit}: "
                     f"{identity}"
                 )
+            substep_error = _validate_roadmap_substep_declaration(block, identity)
+            if substep_error:
+                return None, (
+                    f"authority lifecycle declaration is invalid at {commit}: "
+                    f"{substep_error}"
+                )
             state = "ROADMAP_SUBSTEP"
         lifecycle_items.append(
             {
@@ -1483,6 +1489,21 @@ def _planning_state_declarations(text: str) -> list[str]:
             r"(?i)planning\s+state\s*:\s*\**\s*`([^`]+)`", text
         )
     ]
+
+
+def _validate_roadmap_substep_declaration(text: str, identity: str) -> str | None:
+    body = re.sub(
+        rf"(?m)^#{{2,3}}\s+{re.escape(identity)}\b[^\n]*\n?",
+        "",
+        text,
+        count=1,
+    )
+    substantive = re.sub(r"(?m)^\s*(?:---+|```[^\n]*)\s*$", "", body).strip()
+    if not substantive:
+        return f"{identity} substep declaration body is missing"
+    if re.search(r"(?i)\bplanning\s+state\b", body):
+        return f"{identity} substep contains a malformed state declaration"
+    return None
 
 
 def _sbx2_unlock_boundary_matches(text: str) -> list[str]:
