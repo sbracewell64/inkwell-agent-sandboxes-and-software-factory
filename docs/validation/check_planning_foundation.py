@@ -302,12 +302,7 @@ def _project_authoritative_planning_blobs(
                     f"authority roadmap has an unexpected state declaration at {commit}: "
                     f"{identity}"
                 )
-            if not _lifecycle_substep_has_declaration(block, identity):
-                return None, (
-                    f"authority lifecycle state declaration is missing or malformed at "
-                    f"{commit}: {identity}"
-                )
-            state = "SEQUENCED"
+            state = "ROADMAP_SUBSTEP"
         lifecycle_items.append(
             {
                 "identity": identity,
@@ -1407,9 +1402,13 @@ def _validate_future_detail_declarations(
             return f"malformed FUT detail heading: {heading.group(0)}"
         block_end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
         block = text[heading.end() : block_end]
-        status_heading = re.search(r"(?m)^###\s+Status\s*$", block)
-        if status_heading is None:
-            return f"missing state declaration for FUT-{start:03d} through FUT-{end:03d}"
+        status_headings = list(re.finditer(r"(?m)^###\s+Status\s*$", block))
+        if len(status_headings) != 1:
+            return (
+                f"missing or duplicate state declaration for "
+                f"FUT-{start:03d} through FUT-{end:03d}"
+            )
+        status_heading = status_headings[0]
         status_block = block[status_heading.end() :]
         next_subheading = re.search(r"(?m)^###\s+", status_block)
         if next_subheading:
@@ -1484,11 +1483,6 @@ def _planning_state_declarations(text: str) -> list[str]:
             r"(?i)planning\s+state\s*:\s*\**\s*`([^`]+)`", text
         )
     ]
-
-
-def _lifecycle_substep_has_declaration(block: str, identity: str) -> bool:
-    body = re.sub(rf"(?m)^#{{2,3}}\s+{re.escape(identity)}\b[^\n]*\n?", "", block, count=1)
-    return bool(body.strip())
 
 
 def _sbx2_unlock_boundary_matches(text: str) -> list[str]:

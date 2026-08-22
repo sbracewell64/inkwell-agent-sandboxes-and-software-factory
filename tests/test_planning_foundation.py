@@ -414,6 +414,18 @@ def test_authority_projection_rejects_missing_duplicate_or_conflicting_governed_
     assert observation is None
     assert error is not None and "conflicting state declarations" in error
 
+    duplicate_future_status = copy.deepcopy(blobs)
+    duplicate_future_status[path] = duplicate_future_status[path].replace(
+        "## FUT-005 — item\n\n### Status\n\n`CANDIDATE`",
+        "## FUT-005 — item\n\n### Status\n\n`CANDIDATE`\n\n### Status\n\n`CANDIDATE`",
+        1,
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, duplicate_future_status
+    )
+    assert observation is None
+    assert error is not None and "duplicate state declaration" in error
+
     successor_relation = copy.deepcopy(blobs)
     bound_path = "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"
     successor_relation[bound_path] = successor_relation[bound_path].replace(
