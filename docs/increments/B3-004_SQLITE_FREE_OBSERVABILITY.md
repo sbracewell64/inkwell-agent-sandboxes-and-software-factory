@@ -482,3 +482,15 @@ SSSF now uses its already-owned Python standard-library SQLite capability for ho
 Observability reads are explicitly read-only, missing databases cannot be silently created, ADW identifiers are parameterized, and deterministic fixture validation exercises the real Just front doors without requiring live runtime state.
 
 **Result: PASS**
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

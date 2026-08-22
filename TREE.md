@@ -120,6 +120,11 @@ docs/validation/check_ci_contract.py
 docs/validation/check_executor_supervisor.py
                           provider-free process/Pi adapter fixtures, including watched-red
                           stdin inheritance and explicit Windows cleanup refusal.
+docs/validation/check_boundedness.py
+                          BOUND-1 boundedness registry validator: bidirectional source
+                          marker <-> registry coverage, ast probes that re-read each limit
+                          from its owner, limit-1/limit/limit+1 boundary proof, and
+                          property-specific watched-red controls.
 docs/validation/check_sbx0_inventory.py
                           exact SBX-0 source-generation/content-digest handoff validator,
                           classification-compatible owner-per-fact coverage, and watched-red CNO controls.
@@ -152,6 +157,9 @@ commands/prime.md     `/prime` — boots a net-new agent on this whole system.
 
 ```
 docs/reference/EVIDENCE_MANIFEST.md  authoritative manifest v1 contract and HD-09 boundary.
+docs/reference/BOUNDEDNESS_REGISTRY.json  sole authoritative registry of governed growth
+                          surfaces, their owners, bounds, and behaviour at the boundary.
+docs/development/BOUNDEDNESS_LAW.md  the governing growth-contract law.
 docs/reference/SBX-0_SEMANTICS_INVENTORY.json  exact SBX-0 source-bound handoff inventory;
                       mutable report input is not repository authority.
 docs/increments/SBX-0_SEMANTICS_INVENTORY.md  publication scope and non-promotion boundary.

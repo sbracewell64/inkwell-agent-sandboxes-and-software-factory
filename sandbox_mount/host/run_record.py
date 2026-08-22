@@ -162,6 +162,7 @@ def close(run_id: str) -> dict:
     return record
 
 
+# BOUNDEDNESS-OWNER: sssf.sandbox_mount.run_record_store
 def list_runs() -> list[dict]:
     """Every record, newest first."""
     if not RUNS_DIR.is_dir():

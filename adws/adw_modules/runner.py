@@ -18,6 +18,19 @@ from .console import Console
 from .data_types import AgentCall, EnvelopeBase, EventRecord, Phase, PhaseParams
 from .utils import ensure_dir, now_iso
 
+# What a phase records about its own failure. Bounded, and never bounded
+# silently: a clipped message says so, because a truncation mark is the
+# difference between "that is the whole error" and "there was more".
+# BOUNDEDNESS-OWNER: sssf.run.phase_error_text
+PHASE_ERROR_MAX_CHARS = 1000
+
+
+def _bounded_error(text: str) -> str:
+    if len(text) <= PHASE_ERROR_MAX_CHARS:
+        return text
+    kept = PHASE_ERROR_MAX_CHARS - 40
+    return f"{text[:kept]}…[truncated, {len(text)} chars total]"
+
 
 class PhaseHandle:
     def __init__(self, run: "Run", phase: Phase):
@@ -46,14 +59,17 @@ class Run:
         self.tracer = tracer
         self.console = Console(tracer, adw_id)
         self.engineer = engineer
+        # BOUNDEDNESS-OWNER: sssf.run.phase_list
         self.phases: list[Phase] = []
         self.tokens = 0
         self.cost = 0.0
         self._seq = tracer.max_phase_seq(adw_id)   # a joined run continues the sequence
         self.repo_root = git_helper.repo_root()    # where every agent is spawned to work
+        # BOUNDEDNESS-OWNER: sssf.run.session_runtime_dir
         self.session_dir = ensure_dir(Path(cfg.defaults.data_dir) / "sessions" / adw_id)
         self.context_handoff_dir = ensure_dir(self.session_dir / "context_handoff")
         self._agent_map_path = self.session_dir / "agent_map.json"
+        # BOUNDEDNESS-OWNER: sssf.run.agent_map
         self.agent_map: dict = (json.loads(self._agent_map_path.read_text())
                                 if self._agent_map_path.exists() else {})
 
@@ -87,7 +103,7 @@ class Run:
             yield PhaseHandle(self, phase)
         except BaseException as error:
             phase.status = "fail"                      # success must be earned
-            phase.error = str(error)[:1000]
+            phase.error = _bounded_error(str(error))
             phase.ended_at = now_iso()
             self.tracer.event(EventRecord(adw_id=self.adw_id, phase_id=phase.phase_id,
                                           type="error", name=params.name,

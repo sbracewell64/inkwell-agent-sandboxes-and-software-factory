@@ -247,3 +247,15 @@ bound to the bytes being landed. An absent, empty, mismatched, skipped,
 cancelled, neutral, timed-out, or failing review or check is not PASS and does
 not authorize landing, and a check observed on an earlier head never qualifies
 a later one.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

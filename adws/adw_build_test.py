@@ -26,6 +26,7 @@ from adw_modules import agents, gates, quality, session, utils
 from adw_modules.data_types import AgentCall, BuildOutput, PhaseParams
 
 REQUIRED_AGENTS = ["builder"]
+# BOUNDEDNESS-OWNER: sssf.adw.build_test_fix_loops
 MAX_FIX_LOOPS = 3
 
 

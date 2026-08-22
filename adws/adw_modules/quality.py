@@ -11,12 +11,14 @@ from __future__ import annotations
 import os
 import shlex
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Callable
 
 from .data_types import (EventRecord, QualityCheckResult, QualityCheckSpec, QualityResult,
                          VerifyOutput)
+from .subprocess_supervisor import BoundedStreamCapture, ChildDeadline
 from .utils import now_iso, operator_env
 
 OXLINT_VERSION = "1.36.0"
@@ -24,7 +26,17 @@ OXLINT_VERSION = "1.36.0"
 # How much of a failing command's output rides back inside the envelope. Enough
 # for a builder to act on without opening the artifact; bounded so a runaway
 # stack trace can't swamp the next agent's context.
+# BOUNDEDNESS-OWNER: sssf.quality.output_tail
 TAIL_CHARS = 4_000
+
+# A quality check is an arbitrary external command, so its streams are bounded
+# on the way in rather than after they have already been held whole in memory
+# and written whole to the artifact. Reaching either ceiling is stated in the
+# command log and in the tail the builder receives.
+# BOUNDEDNESS-OWNER: sssf.quality.stdout_capture
+CHECK_MAX_STDOUT_BYTES = 8 * 1024 * 1024
+# BOUNDEDNESS-OWNER: sssf.quality.stderr_capture
+CHECK_MAX_STDERR_BYTES = 2 * 1024 * 1024
 
 
 # Invoked by bare name, exactly as the operator would type it: an ADW inherits
@@ -46,9 +58,49 @@ def _check_dir(run, name: str) -> Path:
     return path
 
 
+def _bounded_run(
+    spec: QualityCheckSpec, run, env
+) -> tuple[BoundedStreamCapture, BoundedStreamCapture, ChildDeadline, int]:
+    """Run one check with both streams and the wall clock bounded.
+
+    `subprocess.run(capture_output=True)` holds whatever the child produces, so
+    a runaway check is an unbounded buffer AND an unbounded artifact. Reading
+    through `BoundedStreamCapture` keeps the ceiling on the way in, and the
+    child gets the same finite wall clock it always had.
+    """
+    out_capture = BoundedStreamCapture(CHECK_MAX_STDOUT_BYTES)
+    err_capture = BoundedStreamCapture(CHECK_MAX_STDERR_BYTES)
+    # Built before the launch: a ceiling this refuses must refuse a process that
+    # does not exist yet, not orphan one that is already running.
+    deadline = ChildDeadline(spec.timeout_seconds)
+    process = subprocess.Popen(
+        spec.argv,
+        cwd=run.repo_root,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    deadline.arm(process)
+    readers = [
+        threading.Thread(target=out_capture.read_from, args=(process.stdout,)),
+        threading.Thread(target=err_capture.read_from, args=(process.stderr,)),
+    ]
+    for reader in readers:
+        reader.start()
+    try:
+        returncode = process.wait()
+    finally:
+        for reader in readers:
+            reader.join()
+        deadline.cancel()
+    return out_capture, err_capture, deadline, returncode
+
+
 def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
     phase = run.phases[-1]
     output_dir = _check_dir(run, spec.name)
+    # BOUNDEDNESS-OWNER: sssf.quality.command_log_artifact
     output_artifact = output_dir / "command.log"
     command = shlex.join(spec.argv)
     env = operator_env()             # the engineer's own shell environment
@@ -58,22 +110,22 @@ def _run(spec: QualityCheckSpec, run) -> QualityCheckResult:
     clock = time.monotonic()
     stdout = ""
     stderr = ""
+    bound_notes: list[str] = []
     try:
-        completed = subprocess.run(
-            spec.argv,
-            cwd=run.repo_root,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=spec.timeout_seconds,
-        )
-        returncode = completed.returncode
-        stdout = completed.stdout
-        stderr = completed.stderr
-    except subprocess.TimeoutExpired as error:
-        returncode = 124
-        stdout = error.stdout or ""
-        stderr = (error.stderr or "") + f"\nTimed out after {spec.timeout_seconds}s."
+        out_capture, err_capture, deadline, returncode = _bounded_run(spec, run, env)
+        stdout = out_capture.data.decode("utf-8", "replace")
+        stderr = err_capture.data.decode("utf-8", "replace")
+        if deadline.expired.is_set():
+            returncode = 124
+            stderr += f"\nTimed out after {spec.timeout_seconds}s."
+        for name, capture in (("stdout", out_capture), ("stderr", err_capture)):
+            if capture.truncated:
+                bound_notes.append(
+                    f"{name} truncated at {capture.limit} bytes "
+                    f"({capture.seen} bytes seen)"
+                )
+        if bound_notes:
+            stderr += "\n" + "\n".join(f"[bounded] {note}" for note in bound_notes)
     except OSError as error:
         returncode = 127
         stderr = str(error)

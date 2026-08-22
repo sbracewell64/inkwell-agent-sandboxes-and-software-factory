@@ -24,6 +24,15 @@ TERMINAL_OUTCOMES = frozenset({"succeeded", "failed", "cancelled", "cno"})
 EVIDENCE_CLASSES = frozenset({"qualifying", "diagnostic"})
 ARTIFACT_TYPES = frozenset({"binary", "json", "jsonl", "sqlite3", "text"})
 
+# A manifest names artifacts a run produced, so both the bytes it reads and the
+# directory chain it walks to reach them are attacker- and accident-reachable
+# growth. Neither is truncated: exceeding either ceiling is a typed refusal,
+# because a partially-read artifact must never digest as a whole one.
+# BOUNDEDNESS-OWNER: sssf.evidence.artifact_read_bytes
+MAX_ARTIFACT_BYTES = 512 * 1024 * 1024
+# BOUNDEDNESS-OWNER: sssf.evidence.artifact_path_depth
+MAX_ARTIFACT_PATH_DEPTH = 64
+
 # This executable module is the only schema/serialization/validation owner.
 # The schema command emits this projection for tooling and documentation.
 EVIDENCE_MANIFEST_SCHEMA: dict[str, Any] = {
@@ -486,6 +495,11 @@ def _read_frozen_artifact(root: Path, relative: str) -> bytes:
 
         current_descriptor = root_descriptor
         parts = PurePosixPath(relative).parts
+        if len(parts) > MAX_ARTIFACT_PATH_DEPTH:
+            raise ArtifactRefusal(
+                Observation.OBSERVED_BAD,
+                f"artifact path depth exceeds {MAX_ARTIFACT_PATH_DEPTH}: {relative}",
+            )
         for component in parts[:-1]:
             try:
                 before = os.stat(
@@ -583,11 +597,20 @@ def _read_frozen_artifact(root: Path, relative: str) -> bytes:
             )
 
         chunks: list[bytes] = []
+        read_bytes = 0
         try:
             while True:
                 chunk = os.read(artifact_descriptor, 1024 * 1024)
                 if not chunk:
                     break
+                read_bytes += len(chunk)
+                if read_bytes > MAX_ARTIFACT_BYTES:
+                    # REJECT, not truncate: a digest over a prefix would claim
+                    # to identify an artifact it never finished reading.
+                    raise ArtifactRefusal(
+                        Observation.OBSERVED_BAD,
+                        f"artifact exceeds the {MAX_ARTIFACT_BYTES} byte read ceiling: {relative}",
+                    )
                 chunks.append(chunk)
             after_read = os.fstat(artifact_descriptor)
         except OSError as exc:

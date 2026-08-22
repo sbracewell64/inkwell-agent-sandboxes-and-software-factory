@@ -44,6 +44,13 @@ Never hand-edit session evidence.
 - `tests/test_windows_host_observation_boundary.py` — executable red/green over
   the host doctor, including the controls that a present-but-failing tool is
   still FAIL and that a present tool is really executed
+## Boundedness audit and enforcement
+
+- `docs/development/BOUNDEDNESS_LAW.md` — the governing growth-contract law
+- `docs/reference/BOUNDEDNESS_REGISTRY.json` — sole authoritative registry of governed growth surfaces
+- `docs/validation/check_boundedness.py` — sole boundedness validator, boundary proof, and watched-red controls
+- `docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md` — activation record, bindings, and what remains CNO
+- `BOUNDEDNESS-OWNER` / `BOUNDEDNESS-POLICY` markers in source — the near-owner declarations the validator reconciles against the registry
 
 ## Frozen evaluator surface
 

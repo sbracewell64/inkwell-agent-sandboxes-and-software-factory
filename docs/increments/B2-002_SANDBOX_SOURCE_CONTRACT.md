@@ -166,3 +166,15 @@ B2-002 is proven.
 A fresh sandbox now derives its default source from the canonical host repository and exact committed host HEAD, persists that provenance, gates the guest checkout against it, independently re-verifies it during SETUP, and retains the provenance after teardown.
 
 The host and sandbox can no longer silently disagree about which SSSF source revision a run executed.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

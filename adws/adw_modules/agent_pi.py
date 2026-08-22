@@ -17,7 +17,21 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .data_types import PiRequest, PiResult
+from .subprocess_supervisor import (
+    BoundedJournalWriter,
+    BoundedStreamCapture,
+    ChildDeadline,
+)
 from .utils import now_iso, operator_env
+
+# One pi turn streams its own child, so it owns that child's three growth
+# surfaces rather than inheriting whatever the model decides to produce.
+# BOUNDEDNESS-OWNER: sssf.agent_pi.raw_output_journal
+RAW_OUTPUT_MAX_BYTES = 64 * 1024 * 1024
+# BOUNDEDNESS-OWNER: sssf.agent_pi.stderr_capture
+STDERR_MAX_BYTES = 1024 * 1024
+# BOUNDEDNESS-OWNER: sssf.agent_pi.turn_wall_clock
+PI_TURN_MAX_SECONDS = 3600.0
 
 PI_PATH = os.environ.get("PI_PATH", "pi")
 MODELS_JSON = os.environ.get("PI_MODELS_PATH",
@@ -281,11 +295,15 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
                                env=operator_env())
     if on_spawn:
         on_spawn(process.pid)
+    # A turn that never ends is unbounded duration, and the raw journal grows
+    # with whatever the child emits. Both get a finite ceiling here; neither
+    # ceiling is allowed to be reached quietly.
+    deadline = ChildDeadline(PI_TURN_MAX_SECONDS).arm(process)
     with raw_path.open("a") as raw:
+        journal = BoundedJournalWriter(raw, RAW_OUTPUT_MAX_BYTES)
         assert process.stdout is not None
         for line in process.stdout:
-            raw.write(line)
-            raw.flush()                      # events land on disk as they happen
+            journal.append(line)             # events land on disk as they happen
             line = line.strip()
             if not line:
                 continue
@@ -312,10 +330,26 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
             if on_event:
                 on_event(event)
 
-    stderr = process.stderr.read() if process.stderr else ""
+    stderr_capture = BoundedStreamCapture(STDERR_MAX_BYTES)
+    if process.stderr is not None:
+        stderr_capture.read_from(process.stderr)
+    stderr = stderr_capture.data.decode("utf-8", "replace")
     result.returncode = process.wait()
+    deadline.cancel()
     if on_exit:
         on_exit(process.pid)
+    if deadline.expired.is_set():
+        # CANCEL at the wall clock, stated rather than reported as a plain
+        # nonzero exit that reads like the agent simply failed.
+        raise RuntimeError(
+            f"pi turn cancelled at the {PI_TURN_MAX_SECONDS:.0f}s wall-clock ceiling "
+            f"(exit {result.returncode}); journal {journal.status()}"
+        )
+    if journal.truncated:
+        raise RuntimeError(
+            f"pi raw output journal reached its {RAW_OUTPUT_MAX_BYTES} byte ceiling "
+            f"after {journal.seen} bytes; the turn is not a complete record"
+        )
     if result.returncode != 0 and not result.text:
         raise RuntimeError(f"pi exited {result.returncode}: {stderr.strip()[-800:]}")
     return result

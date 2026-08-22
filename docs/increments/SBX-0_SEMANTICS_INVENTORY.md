@@ -142,3 +142,15 @@ identity only. It does **not** establish SBX-0 exit, SBX-1 activation or
 acceptance, real Docker/provider custody, Windows host observation, independent
 semantic review, landing authorization, or SBX-2 unlock. Work on SBX-2,
 Wayfinder, and DSH is explicitly out of scope.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

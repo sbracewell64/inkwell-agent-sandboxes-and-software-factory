@@ -157,6 +157,7 @@ def path_entries() -> list[str]:
     ]
 
 
+# BOUNDEDNESS-OWNER: sssf.windows_host.path_entry_set
 def dedupe_paths(entries: list[str]) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
@@ -173,6 +174,7 @@ def dedupe_paths(entries: list[str]) -> list[str]:
     return result
 
 
+# BOUNDEDNESS-OWNER: sssf.windows_host.git_candidate_set
 def discover_git_root() -> Path | None:
     candidates: list[Path] = []
 

@@ -137,3 +137,15 @@ are not part of the proof.
 - A real provider must prove its own process/environment custody and
   authoritative residual reconciliation against this contract before any
   Docker acceptance claim.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

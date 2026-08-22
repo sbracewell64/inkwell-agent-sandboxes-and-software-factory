@@ -2,7 +2,9 @@
 
 > **Authority:** Captain-directed cross-cutting SSSF requirement.
 >
-> **Status:** DECIDED as an architectural law; implementation and repository-wide audit are not yet PROVEN.
+> **Status:** DECIDED as an architectural law. The initial repository-wide audit and the continuous enforcement mechanism landed with `BOUND-1`; see `docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md` for what that increment does and does not establish. BOUND-1 is a landed implementation, not an accepted, certified, or SBX-2-unlocking one.
+>
+> **Owners in this repository:** the registry is `docs/reference/BOUNDEDNESS_REGISTRY.json`; the validator is `docs/validation/check_boundedness.py`; source ownership is declared with `BOUNDEDNESS-OWNER` markers and shared enforcement mechanisms with `BOUNDEDNESS-POLICY` markers.
 >
 > **Scope:** SSSF, SandboxProvider implementations, AgentBackend implementations, FirstMate-facing execution surfaces owned by SSSF, DSH ExecutionCells and admitted DSH plugins/capabilities, validators, evidence stores, retained artifacts, and future remote/elastic executors.
 >

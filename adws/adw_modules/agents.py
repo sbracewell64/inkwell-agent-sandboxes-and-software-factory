@@ -32,6 +32,7 @@ from .data_types import (
 )
 from .utils import new_id
 
+# BOUNDEDNESS-OWNER: sssf.agents.json_fix_attempts
 JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSON
 
 
@@ -154,7 +155,18 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     # instead of only reported — the difference between a run that continues
     # and a run that dies on someone else's scratch file.
     tree_before = permissions.snapshot(run)
-    preserved_before = permissions.preserve(run, tree_before)
+    preserved_before, unpreserved = permissions.preserve(run, tree_before)
+    if unpreserved:
+        # The capture is bounded, so say which paths it could not hold. An
+        # unpreserved path is exactly the one a later rollback cannot restore.
+        run.tracer.event(EventRecord(
+            adw_id=run.adw_id, phase_id=phase.phase_id,
+            type="log", name="preserve_bounded",
+            payload={"agent": agent.name,
+                     "unpreserved_paths": unpreserved,
+                     "per_file_limit_bytes": permissions.PRESERVE_MAX_BYTES,
+                     "total_limit_bytes": permissions.PRESERVE_TOTAL_MAX_BYTES,
+                     "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS"}))
 
     result = send(user_text)
     envelope, attempt = _parse_with_retries(run, phase, call, result, send)
@@ -162,6 +174,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     # Claim gates use a three-valued outcome. Only explicit PASS advances; both
     # judged defects and unavailable evidence return to the SAME session while
     # retaining FAIL versus COULD_NOT_OBSERVE in the trace.
+    # BOUNDEDNESS-OWNER: sssf.agents.gate_correction_attempts
     for gate_attempt in range(1, max(1, phase.params.retries + 1) + 1):
         problems = []
         for gate_name, report in _evaluate_gates(call, envelope, run):

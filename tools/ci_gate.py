@@ -8,6 +8,7 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import threading
 import time
 from typing import Any
 
@@ -24,6 +25,10 @@ COULD_NOT_OBSERVE_EXIT = 125
 # Validators name each reason on its own line using this prefix, the shape
 # docs/validation/check_line_endings.py already prints.
 CNO_REASON_PREFIX = "could-not-observe: "
+# BOUNDEDNESS-OWNER: sssf.ci_gate.check_timeout_seconds
+TIMEOUT_MIN_SECONDS = 1
+TIMEOUT_MAX_SECONDS = 300
+CHECK_MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 _CANCEL_REQUESTED = False
 
 
@@ -58,10 +63,62 @@ def load_checks(path: Path) -> list[dict[str, Any]]:
             or not all(isinstance(part, str) and part for part in command)
         ):
             raise ValueError(f"{check_id}: command must be a nonempty string list")
-        if not isinstance(timeout, int) or not 1 <= timeout <= 300:
-            raise ValueError(f"{check_id}: timeout_seconds must be 1..300")
+        if not isinstance(timeout, int) or not TIMEOUT_MIN_SECONDS <= timeout <= TIMEOUT_MAX_SECONDS:
+            raise ValueError(
+                f"{check_id}: timeout_seconds must be "
+                f"{TIMEOUT_MIN_SECONDS}..{TIMEOUT_MAX_SECONDS}"
+            )
 
     return checks
+
+
+# BOUNDEDNESS-OWNER: sssf.ci_gate.check_output_capture
+# BOUNDEDNESS-POLICY: sssf.policy.bounded-check-output.v1
+class _BoundedOutput:
+    """A finite retained-byte ceiling for one check's combined output.
+
+    `communicate()` holds whatever the child produced. A check that loops
+    printing is then bounded only by the gate's own memory, which is not a
+    bound. Retention stops at `limit`; `seen` keeps counting, so the evidence
+    can always say a log was clipped rather than simply being shorter.
+    """
+
+    def __init__(self, limit: int) -> None:
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+            raise ValueError("check output limit must be a positive integer")
+        self.limit = limit
+        self.seen = 0
+        self.truncated = False
+        self._data = bytearray()
+
+    def feed(self, chunk: bytes) -> None:
+        if not chunk:
+            return
+        self.seen += len(chunk)
+        remaining = self.limit - len(self._data)
+        if remaining > 0:
+            self._data.extend(chunk[:remaining])
+        if len(chunk) > remaining:
+            self.truncated = True
+
+    def read_from(self, pipe) -> None:
+        try:
+            while True:
+                chunk = pipe.read(65536)
+                if not chunk:
+                    break
+                self.feed(chunk)
+        finally:
+            pipe.close()
+
+    def text(self) -> str:
+        rendered = self._data.decode("utf-8", "replace")
+        if self.truncated:
+            rendered += (
+                f"\n[bounded] output truncated at {self.limit} bytes "
+                f"({self.seen} bytes seen)"
+            )
+        return rendered
 
 
 def _expanded_command(command: list[str]) -> list[str]:
@@ -103,14 +160,18 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
             cwd=ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
         )
     except OSError as exc:
         result["reason"] = f"tool unavailable: {exc}"
         return result
 
     deadline = time.monotonic() + check["timeout_seconds"]
-    output = ""
+    # A check's own output is unbounded input to this process, so it is held
+    # against a ceiling on the way in. Reaching it is stated in the evidence,
+    # never a quietly shorter log.
+    capture = _BoundedOutput(CHECK_MAX_OUTPUT_BYTES)
+    reader = threading.Thread(target=capture.read_from, args=(process.stdout,))
+    reader.start()
 
     while True:
         if _CANCEL_REQUESTED:
@@ -125,7 +186,7 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
             break
 
         try:
-            output, _ = process.communicate(timeout=min(0.2, remaining))
+            process.wait(timeout=min(0.2, remaining))
             result["returncode"] = process.returncode
             if process.returncode == COULD_NOT_OBSERVE_EXIT:
                 result["reason"] = child_cno_reason(output)
@@ -137,8 +198,13 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
         except subprocess.TimeoutExpired:
             continue
 
+    reader.join(timeout=5)
+    output = capture.text()
     if output:
         result["output"] = output.rstrip()
+    result["output_limit_bytes"] = capture.limit
+    result["output_bytes_seen"] = capture.seen
+    result["output_truncated"] = capture.truncated
     return result
 
 

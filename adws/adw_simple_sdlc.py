@@ -50,7 +50,9 @@ from adw_modules.data_types import (AgentCall, BuildOutput, ChangeCapture,
                                     ReviewOutput)
 
 REQUIRED_AGENTS = ["planner", "builder", "reviewer", "documenter"]
+# BOUNDEDNESS-OWNER: sssf.adw.simple_sdlc_fix_loops
 MAX_FIX_LOOPS = 3
+# BOUNDEDNESS-OWNER: sssf.adw.simple_sdlc_revision_loops
 MAX_REVISION_LOOPS = 2
 
 DOCUMENT_NOTES = ("Read diff_path in full before writing. Document only what the "

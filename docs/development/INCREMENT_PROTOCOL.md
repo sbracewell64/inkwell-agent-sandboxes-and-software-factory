@@ -95,7 +95,32 @@ Record:
 
 For growth surfaces, retain the bound/policy identity, observed high-water or boundary evidence where applicable, and any overflow/backpressure/eviction outcome relied upon for acceptance.
 
-### 7. Document
+### 7. Declare the boundedness delta
+
+Every increment states what it did to the governed growth surfaces in
+`docs/reference/BOUNDEDNESS_REGISTRY.json`. Either:
+
+```text
+boundedness_delta:
+  added: [...surface_ids]
+  changed: [...surface_ids]
+  retired: [...surface_ids]
+```
+
+or, when the diff cannot create or change a growing surface:
+
+```text
+boundedness_delta: none
+boundedness_reason: <why the diff cannot create or change a growing surface>
+```
+
+An increment that touches a registered growth owner without declaring the
+corresponding delta is incomplete. `docs/validation/check_boundedness.py`
+enforces this: a missing delta, or one citing a surface the registry does not
+know, is a required-CI failure rather than a review note. The governing law is
+`docs/development/BOUNDEDNESS_LAW.md`.
+
+### 8. Document
 
 Update:
 
@@ -105,7 +130,7 @@ Update:
 - ADR if applicable,
 - boundedness registry for every added/changed/retired growth surface once commissioned.
 
-### 8. Freeze
+### 9. Freeze
 
 Commit the increment and tag a milestone when it establishes a reusable trusted state.
 

@@ -16,6 +16,7 @@ from rich.text import Text
 from .data_types import EnvelopeBase, EventRecord, GateStatus, Phase
 
 KIND_COLOR = {"engineer": "cyan", "agent": "magenta", "code": "yellow"}
+# BOUNDEDNESS-OWNER: sssf.console.line_length
 MAX_LINE = 160          # dynamic text (summaries, violations, errors) is clipped
 
 
@@ -83,6 +84,7 @@ class Console:
 
     def phase_ended(self, phase: Phase, seconds: float) -> None:
         ok = phase.status == "success"
+        # BOUNDEDNESS-OWNER: sssf.console.phase_results
         self.results.append(phase.status)
         line = (f"  {'[green]✓[/green]' if ok else '[red]✗[/red]'} "
                 f"{escape(phase.params.name)} [dim]{seconds:.1f}s[/dim]")

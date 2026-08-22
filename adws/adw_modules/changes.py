@@ -59,6 +59,7 @@ def capture(run, params: ChangeCapture) -> ChangeSet:
 
     text = git_helper.diff_text(base.commit)
     lines = text.splitlines()
+    # BOUNDEDNESS-OWNER: sssf.changes.diff_lines
     truncated = len(lines) > params.max_diff_lines
     if truncated:
         text = "\n".join(lines[:params.max_diff_lines])

@@ -88,6 +88,11 @@
       "timeout_seconds": 300
     },
     {
+      "id": "boundedness-registry-validator",
+      "command": ["{python}", "docs/validation/check_boundedness.py"],
+      "timeout_seconds": 180
+    },
+    {
       "id": "inkwell-unit-tests",
       "command": [
         "just",

@@ -91,3 +91,15 @@ remain FAIL. CNO exhausts the same bounded correction budget but remains typed
 in persistence and rendering. Rollback is one increment commit; old databases
 remain readable because the legacy column is retained, although rollback would
 restore the known vacuous-success defect.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

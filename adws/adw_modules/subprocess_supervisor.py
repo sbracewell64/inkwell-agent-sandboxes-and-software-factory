@@ -11,6 +11,7 @@ from __future__ import annotations
 import errno
 import ctypes
 import hashlib
+import json
 import multiprocessing
 import os
 import re
@@ -94,11 +95,19 @@ class SupervisedResult:
         return max(0.0, self.ended_monotonic - self.started_monotonic)
 
 
+# BOUNDEDNESS-OWNER: sssf.supervisor.attempt_budget
 class AttemptBudget:
-    """Thread-safe shared native-process budget."""
+    """Thread-safe shared native-process budget.
+
+    ``claim`` returns ``None`` once ``total`` attempts are spent: the declared
+    boundary behaviour is REJECT, and spent work is never uncharged to make the
+    accounting pass.
+    """
 
     def __init__(self, total: int) -> None:
-        if not isinstance(total, int) or total < 1:
+        if not isinstance(total, int) or isinstance(total, bool) or total < 1:
+            # bool is an int in Python, and AttemptBudget(True) would be a
+            # one-attempt budget nobody meant to ask for.
             raise ValueError("attempt budget must be a positive integer")
         self.total = total
         self._used = 0
@@ -139,10 +148,13 @@ class SupervisorRequest:
     cwd: str
     environment: Mapping[str, str]
     environment_allowlist: frozenset[str]
+    # BOUNDEDNESS-OWNER: sssf.supervisor.child_wall_clock
     timeout_seconds: float
     term_grace_seconds: float = 1.0
     verification_grace_seconds: float = 1.0
+    # BOUNDEDNESS-OWNER: sssf.supervisor.stdout_capture
     max_stdout_bytes: int = 4 * 1024 * 1024
+    # BOUNDEDNESS-OWNER: sssf.supervisor.stderr_capture
     max_stderr_bytes: int = 1024 * 1024
     poll_interval_seconds: float = 0.02
     # Test-only platform injection also makes the refusal contract executable
@@ -226,12 +238,55 @@ def _validate(request: SupervisorRequest) -> str | None:
     return None
 
 
+# BOUNDEDNESS-POLICY: sssf.policy.bounded-stream-capture.v1
 @dataclass
-class _Capture:
+class BoundedStreamCapture:
+    """One retained-byte ceiling for a child stream, with explicit overflow.
+
+    This is the repository's single owner of "hold at most N bytes of a child
+    process stream".  ``limit`` bounds what is RETAINED; ``seen`` keeps counting
+    what actually arrived, so a truncated capture can never be mistaken for a
+    complete one.  Reaching the ceiling sets ``overflowed`` — the declared
+    boundary behaviour is TRUNCATE_WITH_EXPLICIT_STATUS, never a silent drop.
+
+    Callers that stream a child's output themselves (quality checks, the pi
+    turn, the CI gate) bind their ceiling here rather than growing a private
+    unbounded buffer.
+    """
+
     limit: int
     data: bytearray = field(default_factory=bytearray)
     seen: int = 0
     overflowed: threading.Event = field(default_factory=threading.Event)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.limit, int) or isinstance(self.limit, bool) or self.limit < 1:
+            raise ValueError("bounded stream capture limit must be a positive integer")
+
+    def feed(self, chunk: bytes) -> None:
+        """Admit one chunk against the ceiling.  Overflow is recorded, not hidden."""
+        if not chunk:
+            return
+        self.seen += len(chunk)
+        remaining = self.limit - len(self.data)
+        if remaining > 0:
+            self.data.extend(chunk[:remaining])
+        if len(chunk) > remaining:
+            self.overflowed.set()
+
+    @property
+    def truncated(self) -> bool:
+        return self.overflowed.is_set()
+
+    def status(self) -> dict[str, object]:
+        """The facts a caller must carry so truncation is never silent."""
+        return {
+            "limit_bytes": self.limit,
+            "retained_bytes": len(self.data),
+            "bytes_seen": self.seen,
+            "truncated": self.truncated,
+            "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
+        }
 
     def read_from(self, pipe) -> None:
         try:
@@ -239,14 +294,127 @@ class _Capture:
                 chunk = pipe.read(65536)
                 if not chunk:
                     break
-                self.seen += len(chunk)
-                remaining = self.limit - len(self.data)
-                if remaining > 0:
-                    self.data.extend(chunk[:remaining])
-                if len(chunk) > remaining:
-                    self.overflowed.set()
+                self.feed(chunk)
         finally:
             pipe.close()
+
+
+# Retained for the internal call sites that predate the public name.
+_Capture = BoundedStreamCapture
+
+
+# BOUNDEDNESS-POLICY: sssf.policy.bounded-journal.v1
+class BoundedJournalWriter:
+    """An append-only child-output journal with a finite byte ceiling.
+
+    A raw agent journal grows with whatever the child decides to emit, so the
+    file needs its own bound rather than inheriting the child's appetite.  At
+    the ceiling the writer stops appending payload and writes ONE terminal
+    record naming the limit and the bytes it stopped accepting, so a reader can
+    always tell a complete journal from a bounded one.
+    """
+
+    TRUNCATION_TYPE = "sssf_journal_truncated"
+
+    def __init__(self, handle, limit_bytes: int) -> None:
+        if not isinstance(limit_bytes, int) or isinstance(limit_bytes, bool) or limit_bytes < 1:
+            raise ValueError("bounded journal limit must be a positive integer")
+        self._handle = handle
+        self.limit = limit_bytes
+        self.written = 0
+        self.seen = 0
+        self.truncated = False
+
+    def append(self, line: str) -> bool:
+        """Append one line.  Returns whether the payload was admitted."""
+        encoded = len(line.encode("utf-8", "replace"))
+        self.seen += encoded
+        if self.truncated or self.written + encoded > self.limit:
+            self._close_out()
+            return False
+        self._handle.write(line)
+        self._handle.flush()
+        self.written += encoded
+        return True
+
+    def _close_out(self) -> None:
+        if self.truncated:
+            return
+        self.truncated = True
+        # The terminal record IS the explicit status: a bounded journal never
+        # simply stops mid-stream with no statement that it did.
+        self._handle.write(
+            json.dumps(
+                {
+                    "type": self.TRUNCATION_TYPE,
+                    "limit_bytes": self.limit,
+                    "retained_bytes": self.written,
+                    "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
+                }
+            )
+            + "\n"
+        )
+        self._handle.flush()
+
+    def status(self) -> dict[str, object]:
+        return {
+            "limit_bytes": self.limit,
+            "retained_bytes": self.written,
+            "bytes_seen": self.seen,
+            "truncated": self.truncated,
+            "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
+        }
+
+
+# BOUNDEDNESS-POLICY: sssf.policy.child-wall-clock.v1
+class ChildDeadline:
+    """A finite wall clock for a child a caller streams itself.
+
+    ``supervise`` owns the deadline for children it launches; a caller that
+    reads a child's pipes directly (the pi turn, a quality check) still needs
+    one, because an agent that never terminates is unbounded duration.  At the
+    deadline the child is asked to stop (SIGTERM), then made to (SIGKILL), and
+    ``expired`` records that the outcome is a CANCEL rather than a completion.
+    """
+
+    def __init__(self, seconds: float) -> None:
+        if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+            raise ValueError("child deadline must be a positive number of seconds")
+        self.seconds = float(seconds)
+        self.expired = threading.Event()
+        self._timer: threading.Timer | None = None
+
+    def arm(self, process) -> "ChildDeadline":
+        def fire() -> None:
+            self.expired.set()
+            try:
+                process.terminate()
+            except (OSError, ValueError):
+                return
+            try:
+                process.wait(timeout=1.0)
+            except Exception:
+                try:
+                    process.kill()
+                except (OSError, ValueError):
+                    pass
+
+        self._timer = threading.Timer(self.seconds, fire)
+        self._timer.daemon = True
+        self._timer.start()
+        return self
+
+    def cancel(self) -> None:
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer = None
+
+    def status(self) -> dict[str, object]:
+        return {
+            "limit_seconds": self.seconds,
+            "expired": self.expired.is_set(),
+            "on_limit_behavior": "CANCEL",
+        }
 
 
 def _linux_identity(pid: int) -> ProcessIdentity | None:
@@ -281,6 +449,7 @@ def _linux_ppids() -> dict[int, int]:
     return found
 
 
+# BOUNDEDNESS-OWNER: sssf.supervisor.descendant_custody_set
 def _descendants(root_pid: int) -> list[ProcessIdentity]:
     if not sys_platform_linux():
         return []

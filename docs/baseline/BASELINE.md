@@ -13,6 +13,16 @@ certified, and not real-provider-proven; it does not unlock SBX-2. Real
 provider/Docker custody, supported Windows-host execution, and the missing
 historical landing-governance evidence remain CNO or unmet.
 
+BOUND-1 is a **landed implementation** of the repository-wide boundedness audit
+and its continuous enforcement: `docs/reference/BOUNDEDNESS_REGISTRY.json` bound
+against exact main `991d3a64f1b96a8b9637f97060d692af3518228f`, tree
+`7b88546cd1f63e8304325ee35be37893268ae0e0`, with
+`docs/validation/check_boundedness.py` registered in required CI. BOUND-1 is not
+accepted, not certified, and not PROVEN; it does not unlock SBX-2 and does not
+change the Docker → baseline → Wayfinder → DSH sequence. Assignment-distinct
+semantic review, exact-head CI on the landed bytes, LandingAuthorization, and
+Windows-host observation of the changed owners remain CNO or unmet.
+
 ## Source baseline
 
 - Repository: `disler/inkwell-agent-sandboxes-and-software-factory`

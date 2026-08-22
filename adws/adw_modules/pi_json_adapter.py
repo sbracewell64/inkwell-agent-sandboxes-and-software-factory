@@ -76,11 +76,15 @@ class PiAdapterRequest:
     phase_id: str
     attempt_number: int
     pi_argv0: str = "pi"
+    # BOUNDEDNESS-OWNER: sssf.pi_adapter.turn_wall_clock
     timeout_seconds: float = 120.0
     term_grace_seconds: float = 1.0
     verification_grace_seconds: float = 1.0
+    # BOUNDEDNESS-OWNER: sssf.pi_adapter.stdout_bytes
     max_stdout_bytes: int = 4 * 1024 * 1024
+    # BOUNDEDNESS-OWNER: sssf.pi_adapter.stderr_bytes
     max_stderr_bytes: int = 1024 * 1024
+    # BOUNDEDNESS-OWNER: sssf.pi_adapter.event_bytes
     max_event_bytes: int = 4 * 1024 * 1024
     total_attempt_budget: int = 1
     environment: Mapping[str, str] = field(default_factory=dict)

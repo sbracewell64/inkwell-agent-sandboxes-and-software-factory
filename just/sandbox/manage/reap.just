@@ -37,11 +37,22 @@ reap *FLAGS:
     TMPD=$(mktemp -d -t sbx-reap)
     trap 'rm -rf "$TMPD"' EXIT
 
-    # UNVERIFIED: whether GET /keys paginates past some page size. Observed 4 keys
-    # in one response with no pagination envelope. If a fleet ever exceeds that,
-    # this needs an `offset` loop.
+    # The provider's key listing has no observed pagination envelope, so a
+    # response at the page ceiling cannot be told apart from a complete one.
+    # That is a could-not-observe, and reap refuses rather than reaping against
+    # a list it may only have half of: a key omitted from the list looks exactly
+    # like a key nobody needs to revoke.
+    # BOUNDEDNESS-OWNER: sssf.reap.provider_key_page
+    KEY_PAGE_CEILING=200
     curl -sS --max-time 30 "$API/keys" -H "Authorization: Bearer $OPENROUTER_PROVISIONING_KEY" > "$TMPD/keys.json" \
         || { echo "!! could not list keys"; exit 1; }
+    KEY_COUNT=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1])).get("data", [])))' "$TMPD/keys.json")
+    if [ "$KEY_COUNT" -ge "$KEY_PAGE_CEILING" ]; then
+        echo "!! could-not-observe: provider returned $KEY_COUNT keys, at or above the"
+        echo "   $KEY_PAGE_CEILING page ceiling, and exposes no pagination cursor."
+        echo "   Refusing to reap against a possibly truncated key list."
+        exit 1
+    fi
     ssh "${SSH_OPTS[@]}" exe.dev ls --json > "$TMPD/vms.json" 2>/dev/null || echo '{"vms":[]}' > "$TMPD/vms.json"
 
     # Selection in python (stdlib, same reason run_record.py is): three-way join of
