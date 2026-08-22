@@ -49,6 +49,24 @@ At minimum inspect:
 - currently implemented or contractually represented DSH child/depth/fan-out/budget surfaces;
 - any additional monotone/growth state found during direct source inspection.
 
+### Research-assisted discovery lens
+
+The initial discovery pass may use the semantic questions preserved from `dzhng/skills` `audit-performance`, recorded at exact reviewed upstream identity in `docs/development/DZHNG_SKILLS_RESEARCH.md`.
+
+For each candidate path/surface, ask at least:
+
+- what triggers the work;
+- what quantity can amplify: rows, bytes, pages, retries, descendants, files, jobs, events, duration, or another resource dimension;
+- what the worst-case amplification depends on: input, history, tenants, outage duration, backlog, repeated failure, or time;
+- what must change before another retry/poll/scan can make forward progress;
+- whether a poison/terminal item can permanently occupy a queue head or fixed prefix;
+- whether a partial recovery repeatedly restarts the same prefix instead of persisting progress;
+- whether both sides of a transport and every durable/in-memory queue are bounded;
+- whether an existing owner, cap, deadline, backoff, index, eviction rule, or healing mechanism already makes the candidate safely bounded;
+- what deterministic overload/overflow behavior occurs when the boundary is reached.
+
+This lens improves **surface discovery only**. An agent report, performance ledger, or semantic dismissal cannot establish boundedness. Registry ownership, source/enforcement evidence, boundary behavior, and the canonical validator remain authoritative. A candidate dismissed because it appears cheap or self-healing must still be represented if it is a growth surface covered by the governing law; the registry records the actual bound/derivation/invariant.
+
 ## Required registry
 
 Produce one authoritative repository-contained machine-readable registry, recommended:
