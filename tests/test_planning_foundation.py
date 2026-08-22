@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -200,29 +201,31 @@ def _authority_blob_fixture() -> dict[str, str]:
         )
         for identity, state in lifecycle
     ) + "\n## BOUND-1\ncomplete and qualify before `SBX-2` can leave `HELD`\n"
+    future_states = (
+        "SEQUENCED",
+        "PRESERVE",
+        "ACTIVE",
+        "PRESERVE",
+        "CANDIDATE",
+        "CANDIDATE",
+        "CANDIDATE",
+        "CANDIDATE",
+        "CANDIDATE",
+        "CANDIDATE",
+        "CANDIDATE",
+        "CANDIDATE",
+        "PRESERVE",
+    )
     future_rows = "\n".join(
         f"| FUT-{index:03d} | item | {state} |"
-        for index, state in enumerate(
-            (
-                "SEQUENCED",
-                "PRESERVE",
-                "ACTIVE",
-                "PRESERVE",
-                "CANDIDATE",
-                "CANDIDATE",
-                "CANDIDATE",
-                "CANDIDATE",
-                "CANDIDATE",
-                "CANDIDATE",
-                "CANDIDATE",
-                "CANDIDATE",
-                "PRESERVE",
-            ),
-            1,
-        )
+        for index, state in enumerate(future_states, 1)
+    )
+    future_details = "\n".join(
+        f"## FUT-{index:03d} — item\n\n### Status\n\n`{state}`\n"
+        for index, state in enumerate(future_states, 1)
     )
     return {
-        "docs/development/FUTURE_CANDIDATES.md": future_rows,
+        "docs/development/FUTURE_CANDIDATES.md": future_rows + "\n" + future_details,
         "docs/development/ROADMAP.md": roadmap,
         "docs/development/INCREMENT_PROTOCOL.md": "\n".join(
             (
@@ -387,6 +390,41 @@ def test_authority_projection_rejects_missing_duplicate_or_conflicting_governed_
     )
     assert observation is None
     assert error is not None and "duplicated" in error
+
+    missing_future_heading = copy.deepcopy(blobs)
+    path = "docs/development/FUTURE_CANDIDATES.md"
+    missing_future_heading[path] = re.sub(
+        r"(?ms)^## FUT-013\b.*?\Z", "", missing_future_heading[path]
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, missing_future_heading
+    )
+    assert observation is None
+    assert error is not None and "missing or duplicate detail heading" in error
+
+    conflicting_future_state = copy.deepcopy(blobs)
+    conflicting_future_state[path] = conflicting_future_state[path].replace(
+        "## FUT-004 — item\n\n### Status\n\n`PRESERVE`",
+        "## FUT-004 — item\n\n### Status\n\n`ACTIVE`",
+        1,
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, conflicting_future_state
+    )
+    assert observation is None
+    assert error is not None and "conflicting state declarations" in error
+
+    successor_relation = copy.deepcopy(blobs)
+    bound_path = "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"
+    successor_relation[bound_path] = successor_relation[bound_path].replace(
+        "before `SBX-2` activation", "before `SBX-7` activation", 1
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, successor_relation
+    )
+    assert error is None
+    assert observation is not None
+    assert observation["bound1_markers"]["before"] == "SBX-7"
 
 
 def test_closure_gate_includes_authority_omission_and_predecessor_regressions() -> None:
