@@ -14,15 +14,18 @@ authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40
 
 The durable state record carries a bounded machine-readable projection observed
 from the fetched `refs/remotes/origin/planning/future-sssf` authority. It
-includes FUT-001 through FUT-013, the named LAUNCH/SBX/Wayfinder/DSH roadmap
-identities, and `BOUND-1` as `SEQUENCED`. `BOUND-1` must complete and qualify
-before `SBX-2` can leave `HELD`.
+includes FUT-001 through FUT-013; the complete governed LAUNCH-1, SBX-0..8,
+WAYFINDER-1, and DSH-0A/0B through DSH-8 roadmap identity universe; and
+`BOUND-1` as `SEQUENCED`. The authority requires `BOUND-1` to complete and
+qualify before `SBX-2` activation; only then may `SBX-2` leave `HELD`.
 
-The projection answers only item state, named lifecycle state, and predecessor
-order. It cannot answer SBX-2 readiness or activation, implementation,
-landing, acceptance, certification, or live enablement; out-of-scope answers
-are CNO/non-PASS. The validator observes the current Git authority ref and
-rejects stale self-consistent candidate projections.
+The projection answers only item state, governed lifecycle state, and
+predecessor order. It cannot answer SBX-2 readiness or activation,
+implementation, landing, acceptance, certification, or live enablement;
+out-of-scope answers are CNO/non-PASS. The validator observes the current Git
+authority ref and rejects stale self-consistent candidate projections and
+missing, unexpected, duplicate, malformed, or conflicting governed
+declarations.
 
 ## Contract boundary
 
