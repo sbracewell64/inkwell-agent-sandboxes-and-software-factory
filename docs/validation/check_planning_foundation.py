@@ -100,7 +100,36 @@ AUTHORITATIVE_PLANNING_PATHS = (
 )
 PROJECTION_SCHEMA = "sssf.planning-authority-projection.v1"
 EXPECTED_ITEM_STATES = {"FUT-001": "SEQUENCED", "FUT-002": "PRESERVE", "FUT-003": "ACTIVE"}
-EXPECTED_SANDBOX_STATES = {"SBX-2": "HELD"}
+GOVERNED_FUTURE_IDS = tuple(f"FUT-{index:03d}" for index in range(1, 14))
+GOVERNED_LIFECYCLE_IDENTITIES = (
+    "LAUNCH-1",
+    "SBX-0",
+    "SBX-1",
+    "SBX-2",
+    "SBX-3",
+    "SBX-4",
+    "SBX-5",
+    "SBX-6",
+    "SBX-7",
+    "SBX-8",
+    "WAYFINDER-1",
+    "DSH-0A",
+    "DSH-0B",
+    "DSH-1",
+    "DSH-2",
+    "DSH-3",
+    "DSH-4",
+    "DSH-5",
+    "DSH-6",
+    "DSH-7",
+    "DSH-8",
+)
+EXPECTED_EXPLICIT_LIFECYCLE_STATES = {
+    "LAUNCH-1": "ACTIVE",
+    "SBX-0": "ACTIVE",
+    "SBX-1": "SEQUENCED",
+    "WAYFINDER-1": "SEQUENCED",
+}
 DOCKER_FIRST_ORDER = """Docker SBX-2..8
 -> Docker-backed ordinary PR
 -> immutable post-Docker/pre-DSH baseline
@@ -114,10 +143,20 @@ CLOSURE_REQUIRED_TESTS = (
     "tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation",
     "tests/test_planning_foundation.py::test_authority_projection_preserves_sbx2_state_and_rejects_missing_identity",
     "tests/test_planning_foundation.py::test_authority_projection_derives_bound1_predecessor_markers",
+    "tests/test_planning_foundation.py::test_sbx2_state_is_observed_from_authority_not_candidate_expectation",
+    "tests/test_planning_foundation.py::test_missing_governed_identity_or_bound1_predecessor_is_nonpass",
+    "tests/test_planning_foundation.py::test_authority_projection_rejects_missing_duplicate_or_conflicting_governed_identities",
+    "tests/test_planning_foundation.py::test_closure_gate_includes_authority_omission_and_predecessor_regressions",
     "tests/test_planning_foundation.py::test_windows_symlink_privilege_cno_is_machine_readable_non_pass",
     "tests/test_planning_foundation.py::test_unrelated_notimplementederror_is_not_automatic_cno",
 )
 CLOSURE_EXPECTED_OUTCOMES = {nodeid: "passed" for nodeid in CLOSURE_REQUIRED_TESTS}
+AUTHORITY_CLOSURE_NODEIDS = (
+    "tests/test_planning_foundation.py::test_sbx2_state_is_observed_from_authority_not_candidate_expectation",
+    "tests/test_planning_foundation.py::test_missing_governed_identity_or_bound1_predecessor_is_nonpass",
+    "tests/test_planning_foundation.py::test_authority_projection_rejects_missing_duplicate_or_conflicting_governed_identities",
+    "tests/test_planning_foundation.py::test_closure_gate_includes_authority_omission_and_predecessor_regressions",
+)
 PLANNING_SURFACE_KEYS = (
     "candidates",
     "roadmap",
@@ -196,41 +235,65 @@ def _observe_authoritative_planning_source(root: Path) -> tuple[dict[str, Any] |
 def _project_authoritative_planning_blobs(
     commit: str, tree: str, blobs: dict[str, str]
 ) -> tuple[dict[str, Any] | None, str | None]:
-    future_items = _extract_register_items(blobs[AUTHORITATIVE_PLANNING_PATHS[0]])
-    if not future_items:
-        return None, f"authority future-item register is empty at {commit}"
-    lifecycle_ids = (
-        "LAUNCH-1",
-        "SBX-0",
-        "SBX-1",
-        "SBX-2",
-        "SBX-3",
-        "SBX-4",
-        "SBX-5",
-        "SBX-6",
-        "SBX-7",
-        "SBX-8",
-        "WAYFINDER-1",
-        "DSH-0A",
-        "DSH-0B",
-        "DSH-1",
+    future_items, future_error = _parse_future_register(
+        blobs[AUTHORITATIVE_PLANNING_PATHS[0]]
     )
+    if future_error:
+        return None, f"authority future-item register is invalid at {commit}: {future_error}"
+    assert future_items is not None
+
     roadmap = blobs["docs/development/ROADMAP.md"]
+    observed_heading_ids = _extract_lifecycle_heading_ids(roadmap)
+    unexpected = sorted(set(observed_heading_ids) - set(GOVERNED_LIFECYCLE_IDENTITIES))
+    if unexpected:
+        return None, (
+            f"authority roadmap contains unexpected lifecycle identities at {commit}: "
+            + ", ".join(unexpected)
+        )
+
     lifecycle_items: list[dict[str, str]] = []
-    for identity in lifecycle_ids:
-        block = _identity_heading_block(roadmap, identity)
-        if not block:
+    for identity in GOVERNED_LIFECYCLE_IDENTITIES:
+        blocks = _identity_heading_blocks(roadmap, identity)
+        if not blocks:
             return None, f"authority roadmap omits lifecycle identity at {commit}: {identity}"
-        state_match = re.search(r"(?i)planning state:\s*`([^`]+)`", block)
-        if state_match:
-            state = state_match.group(1).upper()
-        elif identity == "SBX-2" and re.search(
-            r"do(?:es)? not(?: by itself)? establish.*SBX-2 unlock",
-            _identity_heading_block(roadmap, "SBX-1"),
-            re.IGNORECASE | re.DOTALL,
-        ):
+        if len(blocks) != 1:
+            return None, (
+                f"authority roadmap has duplicate lifecycle identity at {commit}: "
+                f"{identity} ({len(blocks)} headings)"
+            )
+        block = blocks[0]
+        state_matches = _planning_state_declarations(block)
+        if identity in EXPECTED_EXPLICIT_LIFECYCLE_STATES:
+            expected_state = EXPECTED_EXPLICIT_LIFECYCLE_STATES[identity]
+            if len(state_matches) != 1:
+                return None, (
+                    f"authority lifecycle state declaration is missing or duplicated at "
+                    f"{commit}: {identity}"
+                )
+            state = state_matches[0].upper()
+            if state != expected_state:
+                return None, (
+                    f"authority lifecycle state is unexpected at {commit}: "
+                    f"{identity}={state}"
+                )
+        elif identity == "SBX-2":
+            if state_matches:
+                return None, (
+                    f"authority SBX-2 has an unexpected explicit state declaration at {commit}"
+                )
+            sbx1_blocks = _identity_heading_blocks(roadmap, "SBX-1")
+            if len(sbx1_blocks) != 1:
+                return None, f"authority SBX-1 unlock boundary is unavailable at {commit}"
+            unlock_matches = _sbx2_unlock_boundary_matches(sbx1_blocks[0])
+            if len(unlock_matches) != 1:
+                return None, f"authority SBX-2 unlock boundary is missing or duplicated at {commit}"
             state = "HELD"
         else:
+            if state_matches:
+                return None, (
+                    f"authority roadmap has an unexpected state declaration at {commit}: "
+                    f"{identity}"
+                )
             state = "ROADMAP_SUBSTEP"
         lifecycle_items.append(
             {
@@ -239,6 +302,7 @@ def _project_authoritative_planning_blobs(
                 "source_path": "docs/development/ROADMAP.md",
             }
         )
+
     protocol_markers = (
         "boundedness_delta:",
         "New or changed growth surfaces must use the boundedness registry/owner mechanism",
@@ -253,15 +317,23 @@ def _project_authoritative_planning_blobs(
     )
     if any(marker not in blobs["docs/development/BOUNDEDNESS_LAW.md"] for marker in law_markers):
         return None, f"authority boundedness law lacks governing marker at {commit}"
-    bound1 = blobs["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"]
-    bound1_state = re.search(r"(?i)planning state:\**\s*`([^`]+)`", bound1)
-    if not bound1_state:
-        return None, f"authority BOUND-1 state is unavailable at {commit}"
-    bound1_state_value = bound1_state.group(1).upper()
+
+    bound1_markers, bound1_error = _parse_bound1_authority_blob(
+        blobs["docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"],
+        roadmap,
+    )
+    if bound1_error:
+        return None, f"authority BOUND-1 contract is invalid at {commit}: {bound1_error}"
+    assert bound1_markers is not None
+    if bound1_markers["state"] != "SEQUENCED":
+        return None, (
+            f"authority BOUND-1 state is unexpected at {commit}: "
+            f"{bound1_markers['state']}"
+        )
     lifecycle_items.append(
         {
-            "identity": "BOUND-1",
-            "state": bound1_state_value,
+            "identity": bound1_markers["predecessor"],
+            "state": bound1_markers["state"],
             "source_path": "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md",
         }
     )
@@ -275,24 +347,8 @@ def _project_authoritative_planning_blobs(
         "lifecycle_identities": lifecycle_items,
         "protocol_markers": list(protocol_markers),
         "law_markers": list(law_markers),
-        "bound1_markers": {
-            "state": bound1_state_value,
-            "before": (
-                "SBX-2"
-                if "complete and qualify before `SBX-2` activation" in bound1
-                else None
-            ),
-            "required_phrase": (
-                "complete and qualify before `SBX-2` activation"
-                if "complete and qualify before `SBX-2` activation" in bound1
-                else None
-            ),
-            "leave_held_phrase": (
-                "complete and qualify before `SBX-2` can leave `HELD`"
-                if "complete and qualify before `SBX-2` can leave `HELD`" in roadmap
-                else None
-            ),
-        },
+        "bound1_markers": bound1_markers,
+        "source_blobs": dict(blobs),
     }, None
 
 
@@ -556,6 +612,32 @@ def _watched_test_closure_controls() -> list[str]:
             failures.append("closure-unrelated-notimplemented-omitted")
         if renamed_status == "observed-good":
             failures.append("closure-unrelated-notimplemented-renamed")
+
+    for authority_nodeid in AUTHORITY_CLOSURE_NODEIDS:
+        if authority_nodeid not in CLOSURE_REQUIRED_TESTS:
+            failures.append("closure-authority-regression-not-required:" + authority_nodeid)
+            continue
+        omitted = tuple(
+            nodeid for nodeid in CLOSURE_REQUIRED_TESTS if nodeid != authority_nodeid
+        )
+        omitted_status, _ = evaluate_test_closure(
+            omitted,
+            tuple((nodeid, "passed") for nodeid in omitted),
+        )
+        renamed = tuple(
+            nodeid
+            if nodeid != authority_nodeid
+            else nodeid + "_renamed"
+            for nodeid in CLOSURE_REQUIRED_TESTS
+        )
+        renamed_status, _ = evaluate_test_closure(
+            renamed,
+            tuple((nodeid, "passed") for nodeid in renamed),
+        )
+        if omitted_status == "observed-good":
+            failures.append("closure-authority-regression-omitted:" + authority_nodeid)
+        if renamed_status == "observed-good":
+            failures.append("closure-authority-regression-renamed:" + authority_nodeid)
     return failures
 
 
@@ -755,25 +837,40 @@ def _validate_projection(
         errors.append(
             "planning authority projection omits or demotes a LAUNCH/SBX/Wayfinder/DSH identity"
         )
-    predecessors = projection.get("mandatory_predecessors")
-    expected_predecessors = [
-        {
-            "predecessor": "BOUND-1",
-            "predecessor_state": "SEQUENCED",
-            "successor": "SBX-2",
-            "successor_state": "HELD",
-            "rule": "BOUND-1 must complete and qualify before SBX-2 can leave HELD",
-        }
-    ]
-    if predecessors != expected_predecessors:
-        errors.append("BOUND-1 predecessor rule is missing or demoted")
-    if observation.get("bound1_markers") != {
-        "state": "SEQUENCED",
-        "before": "SBX-2",
-        "required_phrase": "complete and qualify before `SBX-2` activation",
-        "leave_held_phrase": None,
-    }:
-        errors.append("current authority BOUND-1 observation is incomplete")
+    observed_lifecycle = {
+        item.get("identity"): item
+        for item in observation.get("lifecycle_identities", [])
+        if isinstance(item, dict)
+    }
+    observed_sbx2 = observed_lifecycle.get("SBX-2")
+    bound1 = observation.get("bound1_markers")
+    if (
+        not isinstance(observed_sbx2, dict)
+        or not isinstance(bound1, dict)
+        or bound1.get("predecessor") != "BOUND-1"
+        or bound1.get("before") != "SBX-2"
+        or not isinstance(bound1.get("required_phrase"), str)
+        or not bound1["required_phrase"]
+    ):
+        errors.append("current authority BOUND-1 predecessor observation is incomplete")
+    else:
+        source_phrase = str(bound1["required_phrase"]).replace("`", "")
+        expected_rule = (
+            f"{bound1['predecessor']} must {source_phrase}; "
+            f"{bound1['before']} can leave {observed_sbx2.get('state')} only after that qualification."
+        )
+        expected_predecessors = [
+            {
+                "predecessor": bound1["predecessor"],
+                "predecessor_state": bound1.get("state"),
+                "successor": bound1["before"],
+                "successor_state": observed_sbx2.get("state"),
+                "rule": expected_rule,
+                "authority_rule": bound1["required_phrase"],
+            }
+        ]
+        if projection.get("mandatory_predecessors") != expected_predecessors:
+            errors.append("BOUND-1 predecessor rule is missing or demoted")
     protocol = project["surfaces"].get("increment_protocol", "")
     law = project["surfaces"].get("boundedness_law", "")
     if any(marker not in protocol for marker in observation.get("protocol_markers", [])):
@@ -821,8 +918,21 @@ def _validate_authoritative_planning_source(
         errors.append(
             "authoritative planning source identity/generation is stale, missing, or mismatched"
         )
-    if not isinstance(state, dict) or state.get("current_sandbox_states") != EXPECTED_SANDBOX_STATES:
-        errors.append("authoritative SBX-2 state is not exactly HELD")
+    observed_sbx2 = next(
+        (
+            item
+            for item in observation.get("lifecycle_identities", [])
+            if isinstance(item, dict) and item.get("identity") == "SBX-2"
+        ),
+        None,
+    )
+    observed_sandbox_states = (
+        {"SBX-2": observed_sbx2.get("state")}
+        if isinstance(observed_sbx2, dict)
+        else None
+    )
+    if not isinstance(state, dict) or state.get("current_sandbox_states") != observed_sandbox_states:
+        errors.append("candidate SBX-2 state is not bound to the observed authority state")
     for key in ("lifecycle",) + PLANNING_SURFACE_KEYS:
         text = project["surfaces"].get(key, "")
         if _authority_identity_line(observation) not in text:
@@ -844,7 +954,12 @@ def _validate_authoritative_planning_source(
         errors.append("authoritative FUT-001/DSH state drifted from SEQUENCED")
     if _extract_register_state(candidates, "FUT-003") != "ACTIVE":
         errors.append("authoritative FUT-003 state drifted from ACTIVE")
-    if _extract_register_items(candidates) != observation["future_items"]:
+    candidate_items, candidate_register_error = _parse_future_register(candidates)
+    if candidate_register_error:
+        errors.append(
+            "candidate register is malformed or incomplete: " + candidate_register_error
+        )
+    elif candidate_items != observation["future_items"]:
         errors.append("candidate register is not a complete current-authority FUT projection")
     if "**Planning state: `ACTIVE`, not `PROVEN`.**" not in project["surfaces"].get("roadmap", ""):
         errors.append("roadmap does not preserve FUT-003 ACTIVE-but-not-PROVEN authority")
@@ -1222,27 +1337,132 @@ def _validate_state(
                     errors.append(f"broken planning cross-reference: {reference}")
 
 
+def _parse_register_rows(text: str) -> tuple[list[dict[str, str]], str | None]:
+    rows: list[dict[str, str]] = []
+    for line_number, line in enumerate(text.splitlines(), 1):
+        if not line.lstrip().startswith("|") or not re.search(r"\bFUT-[0-9]{3}\b", line):
+            continue
+        columns = [column.strip() for column in line.strip().split("|")]
+        if len(columns) < 4 or not re.fullmatch(r"FUT-[0-9]{3}", columns[1]):
+            return [], f"malformed FUT register row at line {line_number}"
+        if not columns[2] or not columns[3]:
+            return [], f"malformed FUT register row at line {line_number}"
+        rows.append({"item_id": columns[1], "state": columns[3]})
+    if not rows:
+        return [], "register has no FUT rows"
+    return rows, None
+
+
+def _parse_future_register(text: str) -> tuple[list[dict[str, str]] | None, str | None]:
+    rows, row_error = _parse_register_rows(text)
+    if row_error:
+        return None, row_error
+    ids = [row["item_id"] for row in rows]
+    unknown = sorted(set(ids) - set(GOVERNED_FUTURE_IDS))
+    if unknown:
+        return None, "unexpected FUT identities: " + ", ".join(unknown)
+    duplicates = sorted({item_id for item_id in ids if ids.count(item_id) > 1})
+    if duplicates:
+        return None, "duplicate FUT identities: " + ", ".join(duplicates)
+    missing = [item_id for item_id in GOVERNED_FUTURE_IDS if item_id not in ids]
+    if missing:
+        return None, "missing FUT identities: " + ", ".join(missing)
+    invalid_states = sorted(
+        f"{row['item_id']}={row['state']}"
+        for row in rows
+        if row["state"] not in STATES
+    )
+    if invalid_states:
+        return None, "malformed FUT states: " + ", ".join(invalid_states)
+    return rows, None
+
+
 def _extract_register_items(text: str) -> list[dict[str, str]]:
-    items: list[dict[str, str]] = []
-    for match in re.finditer(
-        r"(?m)^\|\s*(FUT-[0-9]+)\s*\|[^|]+\|\s*([A-Z_]+)\s*\|",
-        text,
-    ):
-        items.append({"item_id": match.group(1), "state": match.group(2)})
-    return items
+    rows, _ = _parse_register_rows(text)
+    return rows
 
 
 def _extract_register_state(text: str, item_id: str) -> str | None:
-    match = re.search(rf"\|\s*{re.escape(item_id)}\s*\|[^|]+\|\s*([A-Z_]+)\s*\|", text)
-    return match.group(1) if match else None
+    match = re.search(rf"\|\s*{re.escape(item_id)}\s*\|[^|]+\|\s*([^|]+?)\s*\|", text)
+    return match.group(1).strip() if match else None
+
+
+def _extract_lifecycle_heading_ids(text: str) -> list[str]:
+    pattern = re.compile(
+        r"(?m)^#{2,3}\s+(?P<identity>"
+        r"(?:LAUNCH-[0-9]+|SBX-[0-9]+|WAYFINDER-[0-9]+|DSH-(?:0A|0B|[0-9]+))"
+        r")\b"
+    )
+    return [match.group("identity") for match in pattern.finditer(text)]
+
+
+def _identity_heading_blocks(text: str, identity: str) -> list[str]:
+    pattern = re.compile(
+        rf"(?ms)^#{{2,3}}\s+{re.escape(identity)}(?=\s|$).*?(?=^#{{2,3}}\s+|\Z)"
+    )
+    return [match.group(0) for match in pattern.finditer(text)]
 
 
 def _identity_heading_block(text: str, identity: str) -> str:
-    match = re.search(
-        rf"(?ms)^#{{2,3}}\s+{re.escape(identity)}\b.*?(?=^#{{2,3}}\s+|\Z)",
-        text,
+    blocks = _identity_heading_blocks(text, identity)
+    return blocks[0] if blocks else ""
+
+
+def _planning_state_declarations(text: str) -> list[str]:
+    return [
+        match.group(1).strip()
+        for match in re.finditer(
+            r"(?i)planning\s+state\s*:\s*\**\s*`([^`]+)`", text
+        )
+    ]
+
+
+def _sbx2_unlock_boundary_matches(text: str) -> list[str]:
+    return [
+        " ".join(match.group(0).split())
+        for match in re.finditer(
+            r"(?i)\bdo(?:es)?\s+not(?:\s+by\s+itself)?\s+establish\b"
+            r"[^\n.]*\bSBX-2\s+unlock\b",
+            text,
+        )
+    ]
+
+
+def _parse_bound1_authority_blob(
+    text: str, roadmap: str
+) -> tuple[dict[str, str | None] | None, str | None]:
+    titles = re.findall(r"(?m)^#\s+(BOUND-1)\b", text)
+    if len(titles) != 1:
+        return None, "BOUND-1 heading is missing or duplicated"
+    states = _planning_state_declarations(text)
+    if len(states) != 1:
+        return None, "BOUND-1 state declaration is missing or duplicated"
+    state = states[0].upper()
+    if state not in STATES:
+        return None, f"BOUND-1 state is malformed: {state}"
+    relations = [
+        " ".join(match.group(1).split())
+        for match in re.finditer(
+            r"(?i)\b(complete\s+and\s+qualify\s+before\s+`?"
+            r"(SBX-2)`?\s+activation)\b",
+            text,
+        )
+    ]
+    if len(relations) != 1:
+        return None, "BOUND-1 predecessor relationship is missing or duplicated"
+    leave_held = re.findall(
+        r"(?i)complete\s+and\s+qualify\s+before\s+`SBX-2`\s+can\s+leave\s+`HELD`",
+        roadmap,
     )
-    return match.group(0) if match else ""
+    if len(leave_held) > 1:
+        return None, "BOUND-1 leave-HELD relationship is duplicated"
+    return {
+        "predecessor": titles[0],
+        "state": state,
+        "before": "SBX-2",
+        "required_phrase": relations[0],
+        "leave_held_phrase": leave_held[0] if leave_held else None,
+    }, None
 
 
 def _heading_block(text: str, heading: str) -> str:
@@ -1644,6 +1864,41 @@ def _expect_red(
         failures.append(name)
 
 
+def _expect_authority_nonpass(
+    name: str,
+    project: dict[str, Any],
+    mutate: Any,
+    failures: list[str],
+) -> None:
+    observation = project.get("authority_observation")
+    if not isinstance(observation, dict) or not isinstance(observation.get("source_blobs"), dict):
+        failures.append(name)
+        return
+    mutated = copy.deepcopy(project)
+    blobs = copy.deepcopy(observation["source_blobs"])
+    try:
+        mutate(blobs)
+        replacement, replacement_error = _project_authoritative_planning_blobs(
+            observation["source_commit"], observation["source_tree"], blobs
+        )
+    except (KeyError, TypeError, AttributeError, IndexError) as error:
+        replacement = None
+        replacement_error = f"authority mutation control raised: {error}"
+    mutated["authority_observation"] = replacement
+    mutated["authority_observation_error"] = replacement_error
+    status, _ = validate_project(mutated, run_controls=False)
+    if status == "observed-good":
+        failures.append(name)
+
+
+def _remove_authority_heading(blobs: dict[str, str], identity: str) -> None:
+    path = "docs/development/ROADMAP.md"
+    blocks = _identity_heading_blocks(blobs[path], identity)
+    if len(blocks) != 1:
+        raise ValueError(f"cannot remove unique authority heading: {identity}")
+    blobs[path] = blobs[path].replace(blocks[0], "", 1)
+
+
 def _materialize_fixture_references(state: dict[str, Any], root: Path) -> None:
     """Create ordinary fixture artifacts without materializing remote identities."""
     references: set[str] = set()
@@ -1866,6 +2121,117 @@ def _watched_red_controls(
         "candidate-authored-stale-generation-self-consistency",
         stale_generation,
         "stale, missing, or mismatched",
+        failures,
+    )
+
+    def promote_sbx2_authority(blobs: dict[str, str]) -> None:
+        path = "docs/development/ROADMAP.md"
+        original = blobs[path]
+        changed = original.replace("do not establish", "establish", 1)
+        if changed == original:
+            raise ValueError("SBX-2 unlock boundary mutation did not apply")
+        blobs[path] = changed
+
+    _expect_authority_nonpass(
+        "authority-sbx2-promotion",
+        project,
+        promote_sbx2_authority,
+        failures,
+    )
+
+    for identity in GOVERNED_LIFECYCLE_IDENTITIES:
+        _expect_authority_nonpass(
+            "authority-omitted-" + identity.lower(),
+            project,
+            lambda blobs, identity=identity: _remove_authority_heading(blobs, identity),
+            failures,
+        )
+
+    def duplicate_heading(blobs: dict[str, str], identity: str) -> None:
+        path = "docs/development/ROADMAP.md"
+        blocks = _identity_heading_blocks(blobs[path], identity)
+        if len(blocks) != 1:
+            raise ValueError(f"cannot duplicate unique authority heading: {identity}")
+        blobs[path] += "\n" + blocks[0]
+
+    for identity in ("LAUNCH-1", "SBX-3", "DSH-1"):
+        _expect_authority_nonpass(
+            "authority-duplicate-" + identity.lower() + "-heading",
+            project,
+            lambda blobs, identity=identity: duplicate_heading(blobs, identity),
+            failures,
+        )
+
+    def duplicate_launch_state(blobs: dict[str, str]) -> None:
+        path = "docs/development/ROADMAP.md"
+        block = _identity_heading_blocks(blobs[path], "LAUNCH-1")[0]
+        blobs[path] = blobs[path].replace(
+            block,
+            block + "\n**Planning state: `ACTIVE`.**",
+            1,
+        )
+
+    _expect_authority_nonpass(
+        "authority-duplicate-launch-state",
+        project,
+        duplicate_launch_state,
+        failures,
+    )
+
+    def contradictory_bound1_state(blobs: dict[str, str]) -> None:
+        path = "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"
+        blobs[path] += "\n> **Planning state:** `ACTIVE`.\n"
+
+    _expect_authority_nonpass(
+        "authority-contradictory-bound1-state",
+        project,
+        contradictory_bound1_state,
+        failures,
+    )
+
+    def remove_bound1_relationship(blobs: dict[str, str]) -> None:
+        path = "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"
+        original = blobs[path]
+        changed = original.replace(
+            "complete and qualify before `SBX-2` activation",
+            "predecessor relationship removed",
+            1,
+        )
+        if changed == original:
+            raise ValueError("BOUND-1 relationship mutation did not apply")
+        blobs[path] = changed
+
+    _expect_authority_nonpass(
+        "authority-removed-bound1-predecessor",
+        project,
+        remove_bound1_relationship,
+        failures,
+    )
+
+    def duplicate_future_row(blobs: dict[str, str]) -> None:
+        path = "docs/development/FUTURE_CANDIDATES.md"
+        row = next(line for line in blobs[path].splitlines() if line.startswith("| FUT-001 |"))
+        blobs[path] += "\n" + row
+
+    _expect_authority_nonpass(
+        "authority-duplicate-future-item",
+        project,
+        duplicate_future_row,
+        failures,
+    )
+
+    def malformed_future_state(blobs: dict[str, str]) -> None:
+        path = "docs/development/FUTURE_CANDIDATES.md"
+        original = blobs[path]
+        changed = original.replace("| FUT-013 | Agent engineering skill repositories as research sources | PRESERVE |", "| FUT-013 | Agent engineering skill repositories as research sources | BROKEN |", 1)
+        if changed == original:
+            raise ValueError("FUT malformed-state mutation did not apply")
+        blobs[path] = changed
+
+    _expect_authority_nonpass(
+        "authority-malformed-future-state",
+        project,
+        malformed_future_state,
         failures,
     )
 
@@ -2146,8 +2512,10 @@ def main() -> int:
         "watched-red: stale-contradictory-adr-status, omitted-future-item-projection, "
         "omitted-wayfinder-lifecycle-identity, demoted-sbx-lifecycle-identity, "
         "omitted-bound1-predecessor, out-of-scope-sbx2-readiness, "
-        "candidate-authored-stale-generation-self-consistency, illegal-transition, "
-        "unknown-transition, skipped-transition, missing-durable-sequenced-record, "
+        "candidate-authored-stale-generation-self-consistency, authority-sbx2-promotion, "
+        "authority-omitted-governed-identities, authority-duplicate-headings-and-states, "
+        "authority-removed-bound1-predecessor, authority-future-register-integrity, "
+        "illegal-transition, unknown-transition, skipped-transition, missing-durable-sequenced-record, "
         "unbound-active-identity, partial-active-identity, "
         "omitted-active-increment, extra-active-increment, duplicate-active-increment, "
         "incomplete-proven-proof-contract, invented-deferred-return-state, "

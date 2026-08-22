@@ -88,8 +88,8 @@ The immutable action objects were observed through the GitHub API at:
   for validators whose acceptance is derived from pytest collection/report
   events.
 - `extractions/setup-just` v2 — `dd310ad5a97d8e7b41793f8ef055398d51ad4de6`;
-  its release lookup uses the job-scoped, read-only GitHub token so bootstrap
-  does not consume the shared unauthenticated API rate limit.
+  the workflow passes `github-token: ''`, so setup-just receives no GitHub
+  credential and bootstrap does not broaden credential authority.
 
 No declared fleet verifier exists for action-tag resolution. The API returned
 commit objects (observed-good as a direct three-valued observation), and the
