@@ -33,7 +33,12 @@ Add the smallest repository-owned GitHub workflow that:
 3. the B3-002 strict line-ending validator;
 4. the B3-004 SQLite-free observability validator;
 5. the B2-002 sandbox-source static validator;
-6. the canonical `just inkwell test` application suite.
+6. the executor-supervisor and Pi-adapter validator;
+7. the production-extension-path validator;
+8. the SBX-0 semantics-inventory validator;
+9. the sandbox-provider contract validator;
+10. the planning-foundation validator;
+11. the canonical `just inkwell test` application suite.
 
 The B2-001 repository-ownership validator is excluded because it calls the
 canonical remote and GitHub CLI. It is not provider-free/offline. No ADW,
@@ -65,7 +70,8 @@ so a GitHub success can only follow nonempty deterministic execution.
 ## Workflow controls
 
 `.github/workflows/ci.yml` has one two-OS matrix job. Every matrix expansion
-runs the same six enumerated checks. The contract validator requires:
+runs the same checks enumerated by `ci/checks.json`. The contract validator
+requires:
 
 - exact `pull_request` and `push` triggers targeting `main`;
 - no path filter and no `pull_request_target`;
@@ -83,7 +89,17 @@ The immutable action objects were observed through the GitHub API at:
 - `actions/checkout` v4.2.2 — `11bd71901bbe5b1630ceea73d27597364c9af683`;
 - `actions/setup-python` v5.6.0 — `a26af69be951a213d495a4c3e4e4022e16d87065`;
 - `oven-sh/setup-bun` v2.0.2 — `735343b667d3e6f658f44d0eca948eb6282f2b76`;
-- `extractions/setup-just` v2 — `dd310ad5a97d8e7b41793f8ef055398d51ad4de6`.
+- Pytest `8.3.5` and its exact dependency versions are installed explicitly
+  for validators whose acceptance is derived from pytest collection/report
+  events.
+- `extractions/setup-just` v2 — `dd310ad5a97d8e7b41793f8ef055398d51ad4de6`;
+  the workflow passes `github-token: ''`, so setup-just receives no GitHub
+  credential and bootstrap does not broaden credential authority. Because the
+  action still queries the rate-limited GitHub releases API, a failed action
+  attempt falls back to the same exact `1.58.0` release's versioned Ubuntu or
+  Windows asset URL. Each fallback archive is checked against its pinned
+  SHA-256 before extraction, and a final version assertion remains mandatory.
+  The fallback uses no GitHub API and receives no credential.
 
 No declared fleet verifier exists for action-tag resolution. The API returned
 commit objects (observed-good as a direct three-valued observation), and the
@@ -149,7 +165,7 @@ future check is inferred from run `31907345967`.
 1. The workflow path and ordinary PR/default-branch triggers pass the contract
    validator.
 2. Both Linux and Windows jobs execute at least one enumerated check.
-3. All six provider-free checks execute without credentials, providers,
+3. All enumerated provider-free checks execute without credentials, providers,
    sandboxes, spend, or external state mutation.
 4. Empty or partial execution cannot project success.
 5. Project evidence retains all three observation values.

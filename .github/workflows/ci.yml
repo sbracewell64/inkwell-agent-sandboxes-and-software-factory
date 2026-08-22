@@ -29,21 +29,52 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
           persist-credentials: false
+      - name: Fetch current planning authority
+        run: git fetch --no-tags --depth=1 origin d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:refs/remotes/origin/planning/future-sssf
       - name: Set up exact Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12.8'
           check-latest: false
           token: ''
+      - name: Install exact Python test runner
+        run: python -m pip install pytest==8.3.5 iniconfig==2.0.0 packaging==24.2 pluggy==1.5.0 colorama==0.4.6
       - name: Set up exact Bun without a mutable cache
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: '1.3.14'
           no-cache: true
       - name: Set up exact just
+        id: setup-just
+        continue-on-error: true
         uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2
         with:
           just-version: '1.58.0'
           github-token: ''
+      - name: Install exact just without the GitHub API (Ubuntu fallback)
+        if: runner.os == 'Linux' && steps.setup-just.outcome == 'failure'
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/just.tar.gz"
+          bindir="$RUNNER_TEMP/just-bin"
+          curl --fail --location --retry 3 --output "$archive" https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz
+          echo '4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d  '"$archive" | sha256sum --check
+          mkdir "$bindir"
+          tar --extract --gzip --file "$archive" --directory "$bindir" just
+          echo "$bindir" >> "$GITHUB_PATH"
+      - name: Install exact just without the GitHub API (Windows fallback)
+        if: runner.os == 'Windows' && steps.setup-just.outcome == 'failure'
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'just.zip'
+          $bindir = Join-Path $env:RUNNER_TEMP 'just-bin'
+          Invoke-WebRequest -Uri 'https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-pc-windows-msvc.zip' -OutFile $archive
+          if ((Get-FileHash -Algorithm SHA256 $archive).Hash -ne '759F16FB7AA17C5C8B9594B6D4A8C1A6630DFD042CF2B3FF84841454D3D188DC') { throw 'just archive SHA-256 mismatch' }
+          New-Item -ItemType Directory -Path $bindir | Out-Null
+          Expand-Archive -Path $archive -DestinationPath $bindir
+          Add-Content -Path $env:GITHUB_PATH -Value $bindir
+      - name: Verify exact just
+        shell: bash
+        run: test "$(just --version)" = 'just 1.58.0'
       - name: Run non-vacuous offline gate
         run: python tools/ci_gate.py run --evidence ci-evidence-${{ runner.os }}.json
