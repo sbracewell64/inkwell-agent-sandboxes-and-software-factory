@@ -241,6 +241,14 @@ def _project_authoritative_planning_blobs(
     if future_error:
         return None, f"authority future-item register is invalid at {commit}: {future_error}"
     assert future_items is not None
+    future_declaration_error = _validate_future_detail_declarations(
+        blobs[AUTHORITATIVE_PLANNING_PATHS[0]], future_items
+    )
+    if future_declaration_error:
+        return None, (
+            f"authority future-item declarations are invalid at {commit}: "
+            f"{future_declaration_error}"
+        )
 
     roadmap = blobs["docs/development/ROADMAP.md"]
     observed_heading_ids = _extract_lifecycle_heading_ids(roadmap)
@@ -294,7 +302,12 @@ def _project_authoritative_planning_blobs(
                     f"authority roadmap has an unexpected state declaration at {commit}: "
                     f"{identity}"
                 )
-            state = "ROADMAP_SUBSTEP"
+            if not _lifecycle_substep_has_declaration(block, identity):
+                return None, (
+                    f"authority lifecycle state declaration is missing or malformed at "
+                    f"{commit}: {identity}"
+                )
+            state = "SEQUENCED"
         lifecycle_items.append(
             {
                 "identity": identity,
@@ -1377,6 +1390,62 @@ def _parse_future_register(text: str) -> tuple[list[dict[str, str]] | None, str 
     return rows, None
 
 
+def _validate_future_detail_declarations(
+    text: str, rows: list[dict[str, str]]
+) -> str | None:
+    declared: dict[str, list[str]] = {item_id: [] for item_id in GOVERNED_FUTURE_IDS}
+    headings = list(
+        re.finditer(
+            r"(?m)^##\s+FUT-(\d{3})(?:\s+through\s+FUT-(\d{3}))?\b[^\n]*$",
+            text,
+        )
+    )
+    for index, heading in enumerate(headings):
+        start = int(heading.group(1))
+        end = int(heading.group(2) or heading.group(1))
+        if start < 1 or end > len(GOVERNED_FUTURE_IDS) or end < start:
+            return f"malformed FUT detail heading: {heading.group(0)}"
+        block_end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
+        block = text[heading.end() : block_end]
+        status_heading = re.search(r"(?m)^###\s+Status\s*$", block)
+        if status_heading is None:
+            return f"missing state declaration for FUT-{start:03d} through FUT-{end:03d}"
+        status_block = block[status_heading.end() :]
+        next_subheading = re.search(r"(?m)^###\s+", status_block)
+        if next_subheading:
+            status_block = status_block[: next_subheading.start()]
+        standalone_states = re.findall(
+            r"(?m)^`(" + "|".join(STATES) + r")`", status_block
+        )
+        item_states = re.findall(
+            r"(?m)^-\s+`(FUT-[0-9]{3})`\s+[^\n]*?`("
+            + "|".join(STATES)
+            + r")`",
+            status_block,
+        )
+        if start == end and len(standalone_states) == 1 and not item_states:
+            declared[f"FUT-{start:03d}"].append(standalone_states[0])
+            continue
+        if standalone_states or len(item_states) != end - start + 1:
+            return f"missing, duplicate, or malformed state for FUT-{start:03d} through FUT-{end:03d}"
+        for item_id, state in item_states:
+            number = int(item_id.removeprefix("FUT-"))
+            if number < start or number > end:
+                return f"out-of-range state declaration for {item_id}"
+            declared[item_id].append(state)
+    row_states = {row["item_id"]: row["state"] for row in rows}
+    for item_id in GOVERNED_FUTURE_IDS:
+        declarations = declared[item_id]
+        if len(declarations) != 1:
+            return f"missing or duplicate detail heading for {item_id}"
+        if declarations[0] != row_states[item_id]:
+            return (
+                f"conflicting state declarations for {item_id}: "
+                f"register={row_states[item_id]}, detail={declarations[0]}"
+            )
+    return None
+
+
 def _extract_register_items(text: str) -> list[dict[str, str]]:
     rows, _ = _parse_register_rows(text)
     return rows
@@ -1417,6 +1486,11 @@ def _planning_state_declarations(text: str) -> list[str]:
     ]
 
 
+def _lifecycle_substep_has_declaration(block: str, identity: str) -> bool:
+    body = re.sub(rf"(?m)^#{{2,3}}\s+{re.escape(identity)}\b[^\n]*\n?", "", block, count=1)
+    return bool(body.strip())
+
+
 def _sbx2_unlock_boundary_matches(text: str) -> list[str]:
     return [
         " ".join(match.group(0).split())
@@ -1440,13 +1514,16 @@ def _parse_bound1_authority_blob(
     state = states[0].upper()
     if state not in STATES:
         return None, f"BOUND-1 state is malformed: {state}"
-    relations = [
-        " ".join(match.group(1).split())
-        for match in re.finditer(
+    relation_matches = list(
+        re.finditer(
             r"(?i)\b(complete\s+and\s+qualify\s+before\s+`?"
-            r"(SBX-2)`?\s+activation)\b",
+            r"(SBX-[0-9]+)`?\s+activation)\b",
             text,
         )
+    )
+    relations = [
+        " ".join(match.group(1).split())
+        for match in relation_matches
     ]
     if len(relations) != 1:
         return None, "BOUND-1 predecessor relationship is missing or duplicated"
@@ -1459,7 +1536,7 @@ def _parse_bound1_authority_blob(
     return {
         "predecessor": titles[0],
         "state": state,
-        "before": "SBX-2",
+        "before": relation_matches[0].group(2).upper(),
         "required_phrase": relations[0],
         "leave_held_phrase": leave_held[0] if leave_held else None,
     }, None
