@@ -32,6 +32,31 @@ The implementing increment must use the generalized form and requirements in `do
 
 When activated, bind exact current canonical SSSF main/tree and current accepted owners. Re-observe source rather than assuming the research/planning snapshot still describes the implementation.
 
+## Activation predecessor predicate
+
+The smallest closed activation predicate is `BOUND1-ACTIVATION-PREDECESSOR-v1`, defined by Browser Sol ruling `SOL-FM-BOUND1-MECHANICAL-PREDECESSOR-001` at planning generation `e3e47458e6e2e9f40be6462eb0d7a81b2148ce88` / tree `3aab919810d41bbe9acc567fdca6dbdfb70bfbd6`, with this BOUND-1 document at blob `50195d65e1ec2d59d256352cf11c207212e26b91`.
+
+Activation eligibility requires exactly these predecessor axes:
+
+1. `recurrence-architecture-plan-independent-review` is `SATISFIED_WITH_EVIDENCE`, established by ruling `SOL-FM-RECURRENCE-PLAN-G5-NATIVE-MERITS-20260822-0324` over reviewed subject digest `3572d7f34c81d9b5f6e1b0a7a517c0b8430ede0934904cac0f1208ec73628782`.
+2. `sssf-fut003-planning-foundation-repair-pr25` is bound to exact candidate `15dec5a2d4d7ce430052d0db0be1078d0a6e50e4` and has one of these terminal semantic dispositions:
+   - `SEMANTICALLY_ACCEPTED_HELD`;
+   - `LANDED_WITH_POST_MERGE_EXACT_MAIN_PROOF`;
+   - `SUPERSEDED_BY_QUALIFIED_SEMANTIC_SUCCESSOR`.
+
+At predicate definition time PR #25 satisfies the second axis as `SEMANTICALLY_ACCEPTED_HELD` under ruling `SOL-FM-SSSF-PR25-REPAIR-DELTA-APPROVED-20260822-0103` with exact-head CI run `32542027855` successful.
+
+PR #25 landing is **not** required for BOUND-1 activation. PR #26 (`sssf-pr26-b4-002-head-scope-correction`) is not an activation predecessor and its landing is also not required. Publication-effect guards, LandingAuthorization consumers, Control #8 implementation, and later Control #9 implementation increments retain their own effect/landing/custody gates but do not broaden this activation predicate unless a direct resource dependency is observed.
+
+Immediately before activation, re-observe:
+
+- the exact PR #25 candidate identity and the continued applicability of its semantic disposition;
+- the governed planning extent, lifecycle/state declarations, admission/exclusion rules, and normalization/canonicalization relevant to that disposition;
+- that no active writer or mutation owner is changing the PR #25 candidate or its authoritative planning subject;
+- the then-current exact SSSF main/tree and accepted implementation owners.
+
+Unrelated supporting-research movement does not invalidate the predicate. A material change to BOUND-1 starting-state/sequence bytes, a material change to the governed planning axes above, candidate movement, active overlapping mutation, or inability to observe any required axis makes activation `CNO` until the predicate is re-qualified. Satisfying this predicate makes BOUND-1 activation-eligible; it does not itself activate BOUND-1, qualify the increment, unlock SBX-2, or waive publication, review, landing, security, cost, or evidence gates.
+
 ## Audit scope
 
 At minimum inspect:
