@@ -366,8 +366,29 @@ def test_authority_projection_rejects_missing_duplicate_or_conflicting_governed_
         observation, error = _VALIDATOR._project_authoritative_planning_blobs(
             "a" * 40, "b" * 40, duplicated
         )
-        assert observation is None
-        assert error is not None and "duplicate lifecycle identity" in error
+    assert observation is None
+    assert error is not None and "duplicate lifecycle identity" in error
+
+    missing_substep_body = copy.deepcopy(blobs)
+    path = "docs/development/ROADMAP.md"
+    missing_substep_body[path] = missing_substep_body[path].replace(
+        "## DSH-1\nroadmap substep\n", "## DSH-1\n", 1
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, missing_substep_body
+    )
+    assert observation is None
+    assert error is not None and "substep declaration body is missing" in error
+
+    malformed_substep_state = copy.deepcopy(blobs)
+    malformed_substep_state[path] = malformed_substep_state[path].replace(
+        "## SBX-3\nroadmap substep\n", "## SBX-3\nPlanning state ACTIVE\n", 1
+    )
+    observation, error = _VALIDATOR._project_authoritative_planning_blobs(
+        "a" * 40, "b" * 40, malformed_substep_state
+    )
+    assert observation is None
+    assert error is not None and "malformed state declaration" in error
 
     duplicate_state = copy.deepcopy(blobs)
     path = "docs/development/ROADMAP.md"
