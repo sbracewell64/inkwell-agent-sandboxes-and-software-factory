@@ -86,6 +86,13 @@ def contract_errors(root: Path) -> list[str]:
         "no-cache: true",
         "just-version: '1.58.0'",
         "github-token: ''",
+        "continue-on-error: true",
+        "steps.setup-just.outcome == 'failure'",
+        "https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz",
+        "4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d",
+        "https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-pc-windows-msvc.zip",
+        "759F16FB7AA17C5C8B9594B6D4A8C1A6630DFD042CF2B3FF84841454D3D188DC",
+        "test \"$(just --version)\" = 'just 1.58.0'",
         "python tools/ci_gate.py run --evidence ci-evidence-${{ runner.os }}.json",
     )
     for fragment in required_fragments:
