@@ -1,5 +1,14 @@
 # LAUNCH-1 — Windows FirstMate Front Door
 
+## Historical provenance
+
+This record describes original PR #17 and resulting `main`
+`312001ddbbead5cc957bc8db19f4b0b2c1d9d34c`. Its six-field public identity is
+superseded adverse provenance, not current acceptance. PR #19 at
+`6f409ff111ddca747e76f1fde20645f98e09d7d2` is preserved unchanged as
+predecessor evidence. LAUNCH-1-R2 rederives the four-field correction from
+exact current `main` `991d3a64f1b96a8b9637f97060d692af3518228f`.
+
 ## Intent
 
 Implement the smallest tracked Windows double-click front door for the
@@ -60,6 +69,11 @@ shortcut target.
 - executable missing Bash, Git, and grep fixtures proving prerequisite-specific
   refusals before misleading repository or registration diagnostics, including
   watched-red preflight-omission variants.
+
+This historical proof contract is superseded, not rewritten. The current-main
+public identity correction is owned by
+`docs/increments/LAUNCH-1-POSTMERGE-IDENTITY-CORRECTION.md`; none of the
+observations below transfers to its successor.
 
 A direct host launch was also observed through the tracked front door in the
 named disposable Herdr lab only:
