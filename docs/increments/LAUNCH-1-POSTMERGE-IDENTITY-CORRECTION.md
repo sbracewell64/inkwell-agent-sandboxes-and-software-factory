@@ -72,8 +72,9 @@ check it did not execute.
 ## Evidence accounting
 
 The prior PR #19 host narrative is retained through its immutable Git object and
-PR, not copied as successor proof. A fresh successor host record may be added
-only after observation and must bind the tested source commit/tree, launcher
-blob, commands, outputs, guard/lab identity when applicable, and shortcut
-inspection. Exact-head CI and assignment-distinct review remain CNO until the
+PR, not copied as successor proof. Fresh successor observations are retained in
+`docs/evidence/LAUNCH-1-R2_HOST_PROOF.md`, bound to tested source commit/tree,
+launcher/test blobs, commands, outputs, and shortcut inspection. The unguarded
+successor reflag did not authorize Herdr lifecycle behavior, so guarded detach
+remains CNO. Exact-head CI and assignment-distinct review remain CNO until the
 successor PR exists and those observations complete.
