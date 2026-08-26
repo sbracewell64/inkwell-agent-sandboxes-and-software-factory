@@ -31,6 +31,14 @@ planning:
   lifecycle: docs/development/PLANNING_LIFECYCLE.md
   candidate_register: docs/development/FUTURE_CANDIDATES.md
   roadmap: docs/development/ROADMAP.md
+  dependency_graph:
+    schema: planning-dependency-graph/v1
+    location: docs/development/ROADMAP.md#machine-readable-dependency-graph
+    validator: docs/validation/check_planning_dependency_graph.py
+    rule: >-
+      Typed dependency edges and predecessor predicates are authoritative over prose
+      ordering in the roadmap. The block is a projection of the roadmap's own sections and
+      is not a second planning owner, status store or scheduler.
   sandbox_dsh_implementation_plan: docs/development/SANDBOX_DSH_IMPLEMENTATION_PLAN.md
   decisions: docs/decisions/
   rule: preserved_does_not_mean_approved_and_sequenced_does_not_mean_active

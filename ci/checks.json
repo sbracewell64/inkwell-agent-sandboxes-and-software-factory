@@ -37,6 +37,11 @@
       "timeout_seconds": 60
     },
     {
+      "id": "planning-dependency-graph-validator",
+      "command": ["{python}", "docs/validation/check_planning_dependency_graph.py"],
+      "timeout_seconds": 60
+    },
+    {
       "id": "inkwell-unit-tests",
       "command": ["just", "inkwell", "test"],
       "timeout_seconds": 180

@@ -22,6 +22,22 @@ EXPECTED_ACTIONS = {
     "oven-sh/setup-bun": "735343b667d3e6f658f44d0eca948eb6282f2b76",
     "extractions/setup-just": "dd310ad5a97d8e7b41793f8ef055398d51ad4de6",
 }
+# The pinned fragment below is a contiguous substring, so it cannot see a trigger
+# APPENDED after the `push` block. The allowed trigger set is therefore also
+# pinned structurally: the whole `on:` mapping must be exactly this text, and its
+# event keys exactly these, so an added `workflow_dispatch:`, `schedule:`,
+# `pull_request_target:` or extra base branch is refused rather than ignored —
+# including when it is written below a blank line or a comment, neither of which
+# ends a YAML block mapping. See `workflow_on_block`.
+EXPECTED_ON_BLOCK = (
+    "on:\n"
+    "  pull_request:\n"
+    "    branches: [main, planning/future-sssf]\n"
+    "  push:\n"
+    "    branches: [main]\n"
+)
+EXPECTED_EVENTS = ("pull_request", "push")
+
 EXPECTED_CHECKS = {
     "ci-contract-and-watched-red-controls": (
         "{python}", "docs/validation/check_ci_contract.py"
@@ -44,8 +60,47 @@ EXPECTED_CHECKS = {
     "production-extension-path-validator": (
         "{python}", "docs/validation/check_production_extension_path.py"
     ),
+    "planning-dependency-graph-validator": (
+        "{python}", "docs/validation/check_planning_dependency_graph.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
+
+
+def workflow_on_block(text: str) -> str | None:
+    """The workflow's whole `on:` mapping, or None if absent or duplicated.
+
+    The block runs from `on:` to the first line that actually ends a block
+    mapping: one that is non-blank, not a comment, and not indented. Blank lines
+    and comments do **not** terminate it. YAML ignores both, so a trigger written
+    below one is a live trigger event, and an extractor that stopped at the first
+    blank line would report a green trigger set while GitHub honoured the extra
+    event. Trailing blank and comment lines are then dropped, because they belong
+    to the gap before the next top-level key rather than to the trigger set.
+    """
+    lines = text.splitlines(keepends=True)
+    start = None
+    for index, raw in enumerate(lines):
+        if raw.rstrip("\n") == "on:":
+            if start is not None:
+                return None
+            start = index
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        body = lines[index].rstrip("\n")
+        if not body or body.lstrip().startswith("#"):
+            continue
+        if not body.startswith((" ", "\t")):
+            end = index
+            break
+    while end > start + 1:
+        body = lines[end - 1].rstrip("\n")
+        if body and not body.lstrip().startswith("#"):
+            break
+        end -= 1
+    return "".join(lines[start:end])
 
 
 def contract_errors(root: Path) -> list[str]:
@@ -60,7 +115,11 @@ def contract_errors(root: Path) -> list[str]:
 
     text = workflow_path.read_text(encoding="utf-8")
     required_fragments = (
-        "on:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [main]",
+        # A durable authoritative landing target must not be excluded from the
+        # required verification trigger. `planning/future-sssf` is the canonical
+        # planning base, so it is named exactly; a glob is not used, and `push`
+        # stays restricted to `main`.
+        "on:\n  pull_request:\n    branches: [main, planning/future-sssf]\n  push:\n    branches: [main]",
         "permissions:\n  contents: read",
         "concurrency:\n  group: deterministic-ci-${{ github.event.pull_request.number || github.ref }}\n  cancel-in-progress: true",
         "timeout-minutes: 10",
@@ -84,6 +143,19 @@ def contract_errors(root: Path) -> list[str]:
     for forbidden in ("pull_request_target:", "paths:", "paths-ignore:", "secrets."):
         if forbidden in text:
             errors.append(f"workflow contains forbidden trigger/credential surface: {forbidden}")
+
+    on_block = workflow_on_block(text)
+    if on_block is None:
+        errors.append("workflow trigger block is missing or declared more than once")
+    else:
+        events = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", on_block, flags=re.MULTILINE)
+        if tuple(events) != EXPECTED_EVENTS:
+            errors.append(
+                f"workflow trigger events are {events!r}; exactly {list(EXPECTED_EVENTS)} "
+                "are allowed"
+            )
+        if on_block != EXPECTED_ON_BLOCK:
+            errors.append("workflow trigger block differs from the exact allowed trigger set")
 
     observed_actions = dict(
         re.findall(r"uses:\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([0-9a-f]{40})", text)
@@ -230,6 +302,86 @@ def watched_red_errors() -> list[str]:
         if not contract_errors(contract_root):
             errors.append("substituted exact-head checkout did not go red")
 
+        # A trigger APPENDED after the pinned `push` block is invisible to a
+        # contiguous-substring pin, so the exact trigger set is controlled too.
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "  push:\n    branches: [main]\n",
+                "  push:\n    branches: [main]\n  workflow_dispatch:\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("appended workflow trigger did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "    branches: [main, planning/future-sssf]\n",
+                "    branches: [main, planning/future-sssf, planning/anything-else]\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("extra pull_request base branch did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "  push:\n    branches: [main]\n",
+                "  push:\n    branches: [main]\n  schedule:\n    - cron: '0 0 * * *'\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("appended schedule trigger did not go red")
+
+        # A blank line is not a YAML terminator, so a trigger written below one
+        # is still live. The most natural way to append is exactly this shape.
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "  push:\n    branches: [main]\n",
+                "  push:\n    branches: [main]\n\n  workflow_dispatch:\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("workflow trigger appended after a blank line did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "  push:\n    branches: [main]\n",
+                "  push:\n    branches: [main]\n\n  schedule:\n    - cron: '0 0 * * *'\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("schedule trigger appended after a blank line did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "  push:\n    branches: [main]\n",
+                "  push:\n    branches: [main]\n\n  # keep this handy\n  workflow_dispatch:\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("workflow trigger appended after a comment did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        if contract_errors(contract_root):
+            errors.append("the unmodified workflow did not stay green after the trigger controls")
+
         (contract_root / WORKFLOW).unlink()
         shutil.copy2(ROOT / WORKFLOW, contract_root / ".github" / "workflows" / "drift.yml")
         if not contract_errors(contract_root):
@@ -253,6 +405,12 @@ def main() -> int:
     print(f"{len(EXPECTED_CHECKS)} offline checks enumerated; Linux and Windows matrix is nonempty")
     print("watched-red: empty discovery/matrix, validator failure, missing tool")
     print("watched-red: cancellation/timeout and workflow path/trigger drift")
+    print(
+        f"trigger set pinned to {list(EXPECTED_EVENTS)}; watched-red: appended "
+        "workflow_dispatch, appended schedule, extra pull_request base branch, "
+        "trigger appended after a blank line, schedule appended after a blank line, "
+        "trigger appended after a comment"
+    )
     return 0
 
 
