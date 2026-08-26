@@ -69,6 +69,7 @@ Never hand-edit session evidence.
 - `bin/sssf-firstmate.cmd` — tracked transport-only Windows handoff at canonical `E:\\SSSF`
 - `tests/test_windows_front_door.py` — caller-cwd and visible-refusal behavior checks
 - `docs/operations/INSTALL_WINDOWS.md` — Windows installation and front-door runbook
+- `docs/evidence/LAUNCH-1-R2_HOST_PROOF.md` — exact-source successor fixture, Windows host, shortcut, and three-valued evidence
 
 ## Durable local system documentation
 

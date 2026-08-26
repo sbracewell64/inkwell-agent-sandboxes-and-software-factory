@@ -16,6 +16,10 @@ CANONICAL_WINDOWS_ROOT = r"E:\SSSF"
 CANONICAL_REPOSITORY = (
     "sbracewell64/inkwell-agent-sandboxes-and-software-factory"
 )
+PUBLIC_IDENTITY = (
+    f"SSSF front door: project=sssf repository={CANONICAL_REPOSITORY} "
+    f"root={CANONICAL_WINDOWS_ROOT} handoff=firstmate"
+)
 
 
 def _cmd_executable() -> str | None:
@@ -63,7 +67,18 @@ def _launcher_shell_commands() -> tuple[str, str]:
     return commands[0], commands[1].replace("%%", "%")
 
 
-def _create_checkout_fixture(root: Path) -> tuple[Path, Path, str]:
+def _assert_public_identity(output: str) -> None:
+    identity_lines = [
+        line for line in output.splitlines() if line.startswith("SSSF front door: ")
+    ]
+    if identity_lines != [PUBLIC_IDENTITY]:
+        raise AssertionError(f"unexpected public identity: {identity_lines!r}")
+    for prohibited in ("head=", "branch="):
+        if prohibited in output:
+            raise AssertionError(f"prohibited public identity field: {prohibited}")
+
+
+def _create_checkout_fixture(root: Path) -> tuple[Path, Path]:
     checkout = root / "checkout"
     firstmate = root / "firstmate"
     checkout.mkdir()
@@ -83,10 +98,6 @@ def _create_checkout_fixture(root: Path) -> tuple[Path, Path, str]:
         check=True,
         capture_output=True,
     )
-    head = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=checkout, check=True, capture_output=True, text=True
-    ).stdout.strip()
-
     (firstmate / "bin").mkdir(parents=True)
     (firstmate / "data").mkdir()
     for name in ("fm-launch.sh", "fm-admission.sh", "fm-session-start.sh"):
@@ -94,7 +105,7 @@ def _create_checkout_fixture(root: Path) -> tuple[Path, Path, str]:
         script.write_text("#!/bin/sh\nprintf 'Firstmate fixture\\n'\n", encoding="utf-8")
         script.chmod(0o755)
     (firstmate / "data" / "projects.md").write_text("- sssf [fixture]\n", encoding="utf-8")
-    return checkout, firstmate, head
+    return checkout, firstmate
 
 
 def _run_handoff(
@@ -123,35 +134,42 @@ def _run_handoff(
 
 
 class WindowsFrontDoorContractTests(unittest.TestCase):
-    def test_identity_output_executes_attached_and_detached_checkout_fixtures(self) -> None:
+    def test_public_identity_executes_attached_and_detached_checkout_fixtures(self) -> None:
         _, handoff = _launcher_shell_commands()
         with tempfile.TemporaryDirectory() as temporary_directory:
-            checkout, firstmate, head = _create_checkout_fixture(Path(temporary_directory))
+            checkout, firstmate = _create_checkout_fixture(Path(temporary_directory))
             attached = _run_handoff(handoff, checkout, firstmate, os.environ["PATH"])
             self.assertEqual(attached.returncode, 0, attached.stderr)
-            self.assertIn(f"head={head} branch=fixture-branch", attached.stdout)
+            _assert_public_identity(attached.stdout)
 
-            subprocess.run(["git", "checkout", "--detach", head], cwd=checkout, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "checkout", "--detach", "HEAD"],
+                cwd=checkout,
+                check=True,
+                capture_output=True,
+            )
             detached = _run_handoff(handoff, checkout, firstmate, os.environ["PATH"])
             self.assertEqual(detached.returncode, 0, detached.stderr)
-            self.assertIn(f"head={head} branch=detached", detached.stdout)
+            _assert_public_identity(detached.stdout)
 
-            manufactured_defect = handoff.replace(
-                "head=$(git rev-parse --verify HEAD 2>/dev/null)", "head=stale"
-            ).replace(
-                "branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)",
-                "branch=stale",
-            )
-            defective = _run_handoff(
-                manufactured_defect, checkout, firstmate, os.environ["PATH"]
-            )
-            self.assertNotIn(f"head={head} branch=detached", defective.stdout)
+            for prohibited in ("head=", "branch="):
+                defective_command = handoff.replace(
+                    "handoff=firstmate\\n'",
+                    f"handoff=firstmate {prohibited}stale\\n'",
+                )
+                self.assertNotEqual(defective_command, handoff)
+                defective = _run_handoff(
+                    defective_command, checkout, firstmate, os.environ["PATH"]
+                )
+                self.assertEqual(defective.returncode, 0, defective.stderr)
+                with self.assertRaises(AssertionError):
+                    _assert_public_identity(defective.stdout)
 
     def test_dependency_preflight_executes_missing_bash_git_and_grep_fixtures(self) -> None:
         bash_preflight, handoff = _launcher_shell_commands()
         with tempfile.TemporaryDirectory() as temporary_directory:
             fixture_root = Path(temporary_directory)
-            checkout, firstmate, _ = _create_checkout_fixture(fixture_root)
+            checkout, firstmate = _create_checkout_fixture(fixture_root)
             missing_bash = fixture_root / "missing-bash"
             bash_command = bash_preflight.replace("/bin/bash", str(missing_bash))
             bash_result = subprocess.run(
@@ -213,6 +231,8 @@ class WindowsFrontDoorContractTests(unittest.TestCase):
         self.assertIn("fm-admission.sh", source)
         self.assertIn("fm-session-start.sh", source)
         self.assertNotIn("%CD%", source)
+        self.assertNotIn("head=", source)
+        self.assertNotIn("branch=", source)
         self.assertNotIn("just local", source)
         self.assertNotIn("docker", source.lower())
         self.assertNotIn("wayfinder", source.lower())
@@ -238,12 +258,7 @@ class WindowsFrontDoorContractTests(unittest.TestCase):
             )
             output = f"{result.stdout}\n{result.stderr}"
             self.assertEqual(result.returncode, 0, output)
-            self.assertIn(
-                f"root={CANONICAL_WINDOWS_ROOT}",
-                output,
-            )
-            self.assertIn("handoff=firstmate", output)
-            self.assertIn(CANONICAL_REPOSITORY, output)
+            _assert_public_identity(output)
             self.assertIn("Firstmate", output)
 
     @unittest.skipUnless(_cmd_executable(), "could-not-observe: Windows cmd.exe is unavailable")
