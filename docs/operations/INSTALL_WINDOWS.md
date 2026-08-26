@@ -67,10 +67,11 @@ E:\SSSF\bin\sssf-firstmate.cmd
 ```
 
 The front door always validates and enters `E:\SSSF` through WSL before handing
-off to FirstMate's existing `fm-launch.sh` primary path. It prints the project,
-canonical repository, root, handoff, HEAD, and branch identity without printing
-credentials or auth-home paths. FirstMate remains responsible for harness
-selection, project registration, supervision, admission, and work decisions.
+off to FirstMate's existing `fm-launch.sh` primary path. It prints exactly the
+project, canonical repository, root, and handoff identity without printing
+credentials, auth-home paths, `head=`, or `branch=`. FirstMate remains
+responsible for harness selection, project registration, supervision,
+admission, and work decisions.
 
 Use `--print-menu` to validate the root/configuration and render FirstMate's
 menu without creating a session. `--detach` is reserved for bounded host
