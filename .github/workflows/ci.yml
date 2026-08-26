@@ -2,7 +2,7 @@ name: Deterministic CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, planning/future-sssf]
   push:
     branches: [main]
 

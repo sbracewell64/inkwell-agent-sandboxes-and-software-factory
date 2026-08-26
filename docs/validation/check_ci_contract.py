@@ -63,7 +63,11 @@ def contract_errors(root: Path) -> list[str]:
 
     text = workflow_path.read_text(encoding="utf-8")
     required_fragments = (
-        "on:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [main]",
+        # A durable authoritative landing target must not be excluded from the
+        # required verification trigger. `planning/future-sssf` is the canonical
+        # planning base, so it is named exactly; a glob is not used, and `push`
+        # stays restricted to `main`.
+        "on:\n  pull_request:\n    branches: [main, planning/future-sssf]\n  push:\n    branches: [main]",
         "permissions:\n  contents: read",
         "concurrency:\n  group: deterministic-ci-${{ github.event.pull_request.number || github.ref }}\n  cancel-in-progress: true",
         "timeout-minutes: 10",
