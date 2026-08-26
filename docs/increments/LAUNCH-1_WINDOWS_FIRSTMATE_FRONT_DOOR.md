@@ -1,5 +1,13 @@
 # LAUNCH-1 — Windows FirstMate Front Door
 
+## Historical provenance
+
+This record describes the original LAUNCH-1 candidate from PR #17. Its
+implementation and resulting `main` commit `312001ddbbead5cc957bc8db19f4b0b2c1d9d34c`
+are preserved as adverse provenance; LAUNCH-1-R1 repairs its public identity
+sink from exact current `main` `b902cdcecd65c8ba03031875297d31e990f12c11` under
+ruling `SOL-FM-SSSF-LAUNCH1-POSTMERGE-20260820-1052`.
+
 ## Intent
 
 Implement the smallest tracked Windows double-click front door for the
@@ -60,6 +68,10 @@ shortcut target.
 - executable missing Bash, Git, and grep fixtures proving prerequisite-specific
   refusals before misleading repository or registration diagnostics, including
   watched-red preflight-omission variants.
+
+This historical proof contract is superseded, not rewritten. The corrected
+public identity contract is owned by
+`docs/increments/LAUNCH-1-POSTMERGE-IDENTITY-CORRECTION.md`.
 
 A direct host launch was also observed through the tracked front door in the
 named disposable Herdr lab only:

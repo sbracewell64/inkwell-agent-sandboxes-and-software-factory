@@ -1,6 +1,6 @@
 # ADR-0004 — SSSF Windows FirstMate Front Door
 
-- **Status:** accepted for LAUNCH-1
+- **Status:** accepted for LAUNCH-1; public identity corrected by LAUNCH-1-R1
 - **Date:** 2026-08-20
 - **Starts from:** `bee9296a4c94b1dc3da6991acd1755a91fa681eb`
 
@@ -22,6 +22,17 @@ but does not bind a project, choose work, run a factory recipe, or replace
 FirstMate's supervision/admission authority. FirstMate retains its own home and
 project-registration semantics; `E:\SSSF` is the validated source identity for
 the handoff, not a second FirstMate home.
+
+### LAUNCH-1-R1 correction
+
+The original PR #17 and resulting `main` commit remain preserved as adverse
+provenance. Starting from exact current `main`
+`b902cdcecd65c8ba03031875297d31e990f12c11`, ruling
+`SOL-FM-SSSF-LAUNCH1-POSTMERGE-20260820-1052` requires the operator-facing
+identity sink to contain only project, repository, root, and handoff. The
+successor removes the unused public `HEAD` and branch observations; it does
+not blanket-ban source identity from artifacts with a distinct exact-property
+owner.
 
 The default mode opens the existing FirstMate menu. `--print-menu` is a
 side-effect-free inspection mode. `--detach` is a bounded host-validation mode
@@ -46,8 +57,8 @@ host-validation seam; `default` is refused.
 - Double-click launch is independent of caller cwd and fails visibly when the
   canonical checkout, WSL, FirstMate path, registry, or required scripts are
   missing.
-- The outer launch exposes only project, repository, root, handoff, HEAD, and
-  branch identity. No credentials or auth-home paths are embedded.
+- The outer launch exposes only project, repository, root, and handoff. No
+  credentials, auth-home paths, `head=`, or `branch=` values are embedded.
 - Project selection and all subsequent supervision/admission remain in the
   existing FirstMate path.
 - Host-specific live launch evidence is retained as observed-good only for the
