@@ -134,6 +134,23 @@ Blocking is represented by typed edges and predecessor predicates in the roadmap
 
 A gate may be reclassified from hard to soft only by explicit architecture or planning authority. Registering an item, adding an edge, or naming a predicate never advances that item's planning state.
 
+### The graph's validator
+
+Because the typed edges govern, the graph is enforced rather than merely declared. `docs/validation/check_planning_dependency_graph.py` is its canonical owner and runs in the offline gate through `ci/checks.json` alongside every other validator. It proves:
+
+- the schema generation is recognized, so an unknown or stale graph fails closed rather than being skipped;
+- node, predicate and status-axis identities are unique, and no name is reused across those namespaces;
+- every edge endpoint, owner reference, register reference, predicate target and status-axis blocker resolves;
+- only the declared edge-kind vocabulary appears, and only the declared authority classes and status-axis values;
+- registration never promotes lifecycle state — a node may claim `ACTIVE` or `PROVEN` only if it already held that state, no axis may be registered `PASS`, and a node whose owning section declares a planning state must agree with it;
+- Docker-first sequencing, the `WAYFINDER-0/1` hard pre-DSH chain and the Agent Lightning containment prerequisites are present and still hard, the Poker School relation is still nonserializing, and the Captain/source blocker still exempts the DSH cone;
+- the graph stays reachable from `docs/manifest.yaml` and from this document;
+- controls whose own review has not returned are referenced only inside the one authorized pending-dependency predicate.
+
+Each of those properties is paired with a watched-red control that plants the exact defect in a copy of the real sources. A control that goes red for an unrelated reason is treated as a failure of the control, not as evidence, and the unmodified sources are asserted green in the same run so the set can never pass vacuously.
+
+Anything the parser does not recognize is a red result. An unreadable graph is could-not-observe, never a pass.
+
 ## Authority boundary with FirstMate
 
 Future planning is not an execution queue.

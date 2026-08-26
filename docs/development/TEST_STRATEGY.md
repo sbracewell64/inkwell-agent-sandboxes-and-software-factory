@@ -78,6 +78,11 @@ a nonempty `harness_engineering` agent, then drives each one through the real
 configured extension is forwarded as `-e`. It exists because a strict-adapter
 rewrite once rejected those extensions and the rest of the gate did not notice.
 
+`docs/validation/check_planning_dependency_graph.py` enforces the typed planning
+dependency graph that `docs/development/ROADMAP.md` declares authoritative over
+prose ordering; the properties and their watched-red controls are documented by
+that graph's owner in `docs/development/PLANNING_LIFECYCLE.md`.
+
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and
 sandbox source invariants that do not need the network remain enumerated.

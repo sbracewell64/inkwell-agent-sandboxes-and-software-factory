@@ -112,6 +112,8 @@ This block is the authoritative typed dependency representation for the items be
 
 `observed_at` values are planning-time observations, never proofs. Every axis below is `CNO`, `BLOCKED` or unevaluated; nothing in this block marks any item `ACTIVE`, `PROVEN`, `QUALIFIED`, accepted, commissioned or runtime-effective.
 
+This block is enforced, not merely declared: `docs/validation/check_planning_dependency_graph.py` runs it in the offline gate. The properties it proves and their watched-red controls are documented in [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md#the-graphs-validator).
+
 ```yaml
 schema: planning-dependency-graph/v1
 owner: docs/development/ROADMAP.md
@@ -252,54 +254,138 @@ nodes:
     planning_state: SEQUENCED
 
 edges:
-  - {from: SBX-0, to: SBX-1, kind: HARD_PREREQUISITE}
-  - {from: SBX-1, to: SBX-2, kind: HARD_PREREQUISITE}
-  - {from: BOUND-1, to: SBX-2, kind: HARD_PREREQUISITE,
-     why: "BOUND-1 must be complete and qualified before SBX-2 activation"}
-  - {from: SBX-2, to: SBX-3, kind: HARD_PREREQUISITE}
-  - {from: SBX-3, to: SBX-4, kind: HARD_PREREQUISITE}
-  - {from: SBX-4, to: SBX-5, kind: HARD_PREREQUISITE}
-  - {from: SBX-5, to: SBX-6, kind: HARD_PREREQUISITE}
-  - {from: SBX-6, to: SBX-7, kind: HARD_PREREQUISITE}
-  - {from: SBX-7, to: SBX-8, kind: HARD_PREREQUISITE}
-  - {from: SBX-8, to: BASELINE-PR, kind: HARD_PREREQUISITE}
-  - {from: BASELINE-PR, to: POST-DOCKER-BASELINE, kind: HARD_PREREQUISITE}
-  - {from: POST-DOCKER-BASELINE, to: WAYFINDER-0, kind: HARD_PREREQUISITE}
-  - {from: WAYFINDER-0, to: WAYFINDER-1, kind: HARD_PREREQUISITE}
-  - {from: WAYFINDER-1, to: DSH-0A, kind: HARD_PREREQUISITE,
-     why: "DSH eligibility depends on WAYFINDER_TECHNICAL_GATE=PASS"}
-  - {from: WAYFINDER-1, to: WAYFINDER-POC-1, kind: HARD_PREREQUISITE}
-  - {from: WAYFINDER-POC-1, to: WAYFINDER_PRODUCT_COMMISSIONING,
-     kind: NONSERIALIZING_COMMISSIONING,
-     why: "mandatory for full product/fog-of-war commissioning PASS; Captain/source
-            blockage yields BLOCKED/INCOMPLETE without serializing DSH"}
-  - {from: WAYFINDER-POC-1, to: DSH-0A, kind: REOPENS_ON_DEFECT,
-     why: "a Wayfinder transport/identity/supervision defect material to downstream
-            unattended operation re-opens the affected DSH cone"}
-  - {from: DSH-0A, to: DSH-0B, kind: HARD_PREREQUISITE}
-  - {from: DSH-0B, to: DSH-1, kind: HARD_PREREQUISITE}
-  - {from: DSH-1, to: DSH-2, kind: HARD_PREREQUISITE}
-  - {from: DSH-2, to: DSH-3, kind: HARD_PREREQUISITE}
-  - {from: SBX-7, to: DSH-3, kind: HARD_PREREQUISITE}
-  - {from: SBX-3, to: AL-1, kind: HARD_PREREQUISITE}
-  - {from: SBX-4, to: AL-1, kind: HARD_PREREQUISITE}
-  - {from: SBX-5, to: AL-1, kind: HARD_PREREQUISITE}
-  - {from: SBX-6, to: AL-1, kind: HARD_PREREQUISITE}
-  - {from: BOUND-1, to: AL-1, kind: HARD_PREREQUISITE}
-  - {from: SDLC-L2, to: AL-1, kind: CONSTRAINS_DESIGN,
-     why: "AL-1's protected surfaces are SDLC-L2's applies_to list; the refusal half is
-            the mechanism AL-1 needs for benchmark/scorer and held-out custody"}
-  - {from: BOUND-1, to: SDLC-L1, kind: CONSTRAINS_DESIGN}
-  - {from: BOUND-1, to: SDLC-L2, kind: CONSTRAINS_DESIGN}
-  - {from: BOUND-1, to: SDLC-L3, kind: CONSTRAINS_DESIGN}
-  - {from: BOUND-1, to: SDLC-L4, kind: CONSTRAINS_DESIGN}
-  - {from: DSH-1, to: FUT-007, kind: SOFT_UNLOCK}
-  - {from: DSH-1, to: FUT-008, kind: SOFT_UNLOCK, scope: early-schema-evaluation}
-  - {from: DSH-2, to: FUT-005, kind: SOFT_UNLOCK}
-  - {from: DSH-2, to: FUT-006, kind: SOFT_UNLOCK, scope: serial}
-  - {from: DSH-3, to: FUT-006, kind: SOFT_UNLOCK, scope: parallel}
-  - {from: DSH-3, to: FUT-008, kind: SOFT_UNLOCK, scope: hierarchical}
-
+  - from: SBX-0
+    to: SBX-1
+    kind: HARD_PREREQUISITE
+  - from: SBX-1
+    to: SBX-2
+    kind: HARD_PREREQUISITE
+  - from: BOUND-1
+    to: SBX-2
+    kind: HARD_PREREQUISITE
+    why: >
+      BOUND-1 must be complete and qualified before SBX-2 activation
+  - from: SBX-2
+    to: SBX-3
+    kind: HARD_PREREQUISITE
+  - from: SBX-3
+    to: SBX-4
+    kind: HARD_PREREQUISITE
+  - from: SBX-4
+    to: SBX-5
+    kind: HARD_PREREQUISITE
+  - from: SBX-5
+    to: SBX-6
+    kind: HARD_PREREQUISITE
+  - from: SBX-6
+    to: SBX-7
+    kind: HARD_PREREQUISITE
+  - from: SBX-7
+    to: SBX-8
+    kind: HARD_PREREQUISITE
+  - from: SBX-8
+    to: BASELINE-PR
+    kind: HARD_PREREQUISITE
+  - from: BASELINE-PR
+    to: POST-DOCKER-BASELINE
+    kind: HARD_PREREQUISITE
+  - from: POST-DOCKER-BASELINE
+    to: WAYFINDER-0
+    kind: HARD_PREREQUISITE
+  - from: WAYFINDER-0
+    to: WAYFINDER-1
+    kind: HARD_PREREQUISITE
+  - from: WAYFINDER-1
+    to: DSH-0A
+    kind: HARD_PREREQUISITE
+    why: >
+      DSH eligibility depends on WAYFINDER_TECHNICAL_GATE=PASS, never on Poker
+      School availability
+  - from: WAYFINDER-1
+    to: WAYFINDER-POC-1
+    kind: HARD_PREREQUISITE
+  - from: WAYFINDER-POC-1
+    to: WAYFINDER_PRODUCT_COMMISSIONING
+    kind: NONSERIALIZING_COMMISSIONING
+    why: >
+      mandatory before full product/fog-of-war commissioning may be marked PASS; a
+      Captain/source blocker yields BLOCKED or INCOMPLETE without serializing DSH
+  - from: WAYFINDER-POC-1
+    to: DSH-0A
+    kind: REOPENS_ON_DEFECT
+    why: >
+      a Wayfinder transport/identity/supervision defect material to downstream
+      unattended operation re-opens the affected DSH cone
+  - from: DSH-0A
+    to: DSH-0B
+    kind: HARD_PREREQUISITE
+  - from: DSH-0B
+    to: DSH-1
+    kind: HARD_PREREQUISITE
+  - from: DSH-1
+    to: DSH-2
+    kind: HARD_PREREQUISITE
+  - from: DSH-2
+    to: DSH-3
+    kind: HARD_PREREQUISITE
+  - from: SBX-7
+    to: DSH-3
+    kind: HARD_PREREQUISITE
+  - from: SBX-3
+    to: AL-1
+    kind: HARD_PREREQUISITE
+  - from: SBX-4
+    to: AL-1
+    kind: HARD_PREREQUISITE
+  - from: SBX-5
+    to: AL-1
+    kind: HARD_PREREQUISITE
+  - from: SBX-6
+    to: AL-1
+    kind: HARD_PREREQUISITE
+  - from: BOUND-1
+    to: AL-1
+    kind: HARD_PREREQUISITE
+  - from: SDLC-L2
+    to: AL-1
+    kind: CONSTRAINS_DESIGN
+    why: >
+      AL-1's protected surfaces are SDLC-L2's applies_to list; the refusal half is
+      the mechanism AL-1 needs for benchmark/scorer and held-out custody
+  - from: BOUND-1
+    to: SDLC-L1
+    kind: CONSTRAINS_DESIGN
+  - from: BOUND-1
+    to: SDLC-L2
+    kind: CONSTRAINS_DESIGN
+  - from: BOUND-1
+    to: SDLC-L3
+    kind: CONSTRAINS_DESIGN
+  - from: BOUND-1
+    to: SDLC-L4
+    kind: CONSTRAINS_DESIGN
+  - from: DSH-1
+    to: FUT-007
+    kind: SOFT_UNLOCK
+  - from: DSH-1
+    to: FUT-008
+    kind: SOFT_UNLOCK
+    scope: early-schema-evaluation
+  - from: DSH-2
+    to: FUT-005
+    kind: SOFT_UNLOCK
+  - from: DSH-2
+    to: FUT-006
+    kind: SOFT_UNLOCK
+    scope: serial
+  - from: DSH-3
+    to: FUT-006
+    kind: SOFT_UNLOCK
+    scope: parallel
+  - from: DSH-3
+    to: FUT-008
+    kind: SOFT_UNLOCK
+    scope: hierarchical
 independent_nodes:
   - id: LAUNCH-1
     why: "may land before Docker; it must not imply Docker, Wayfinder or DSH is commissioned"
@@ -320,8 +406,9 @@ status_axes:
   WAYFINDER_TECHNICAL_GATE:
     values: [PASS, FAIL, CNO]
     observed_at_registration: CNO
-    why: "none of P1..P5 in WAYFINDER-TECHNICAL-GATE-v1 is observed-good; the gate has
-           not been evaluated, which is could-not-observe, not FAIL and not PASS"
+    why: >
+      none of P1..P5 in WAYFINDER-TECHNICAL-GATE-v1 is observed-good; the gate has not
+      been evaluated, which is could-not-observe, not FAIL and not PASS
   WAYFINDER_PRODUCT_COMMISSIONING:
     values: [PASS, INCOMPLETE, BLOCKED, FAIL, CNO]
     observed_at_registration: BLOCKED
@@ -342,14 +429,23 @@ predicates:
     projects: WAYFINDER_TECHNICAL_GATE
     class: SELF_HANDLE
     pass_requires_all:
-      - {id: P1, axis: "SBX-8 Docker commissioning accepted"}
-      - {id: P2, axis: "a real Docker-backed BASELINE-PR proven"}
-      - {id: P3, axis: "the immutable post-Docker/pre-DSH baseline frozen"}
-      - {id: P4, axis: "WAYFINDER-0: the Captain's existing Wayfinder transport is
-                        configured/commissionable"}
-      - {id: P5, axis: "WAYFINDER-1: a deterministic transport + identity smoke PASSES,
-                        proving Captain -> Wayfinder -> FirstMate attribution and the
-                        return path"}
+      - id: P1
+        axis: >
+          SBX-8 Docker commissioning accepted
+      - id: P2
+        axis: >
+          a real Docker-backed BASELINE-PR proven
+      - id: P3
+        axis: >
+          the immutable post-Docker/pre-DSH baseline frozen
+      - id: P4
+        axis: >
+          WAYFINDER-0: the Captain's existing Wayfinder transport is configured or
+          commissionable
+      - id: P5
+        axis: >
+          WAYFINDER-1: a deterministic transport + identity smoke PASSES, proving
+          Captain -> Wayfinder -> FirstMate attribution and the return path
     unobservable_axis_yields: CNO
     recheck: >
       re-observe each axis against the then-current canonical SSSF main and accepted
@@ -358,28 +454,39 @@ predicates:
   POKER-SCHOOL-SOURCE-CUSTODY-v1:
     class: CAPTAIN_REQUIRED
     owner: Captain
-    gates: [WAYFINDER-POC-1]
-    dependency_cone: [WAYFINDER-POC-1, WAYFINDER_PRODUCT_COMMISSIONING]
-    does_not_gate: [WAYFINDER-0, WAYFINDER-1, DSH-0A, DSH-0B, DSH-1, SBX-2, SBX-8, AL-1]
+    gates:
+      - WAYFINDER-POC-1
+    dependency_cone:
+      - WAYFINDER-POC-1
+      - WAYFINDER_PRODUCT_COMMISSIONING
+    does_not_gate:
+      - WAYFINDER-0
+      - WAYFINDER-1
+      - DSH-0A
+      - DSH-0B
+      - DSH-1
+      - SBX-2
+      - SBX-8
+      - AL-1
     axes:
       - id: A1
-        statement: >
+        axis: >
           at least one representative poker training video is present at the
           commissioning-owner-decided source location; the seed names
-          `E:\Poker-School\source-videos\`.
+          E:\Poker-School\source-videos\
         observed_at_registration: ABSENT
         evidence: >
-          `E:\Poker-School` does not exist; `E:\Poker` holds notes, documents and PNGs
-          and zero video files at depth <= 3.
+          E:\Poker-School does not exist; E:\Poker holds notes, documents and PNGs and
+          zero video files at depth <= 3.
       - id: A2
-        statement: >
-          the execution-host workspace question is answered: is `E:\Poker-School`
-          binding as a location or illustrative, and if binding does it bind only the
+        axis: >
+          the execution-host workspace question is answered: is E:\Poker-School binding
+          as a location or illustrative, and if binding does it bind only the
           human-facing artifacts or the working/cache artifacts too?
         observed_at_registration: UNANSWERED
-        note: >
-          workspace *layout* is SELF_HANDLE; only the binding-location question is
-          Captain/commissioning-owner authority.
+        evidence: >
+          workspace layout is SELF_HANDLE; only the binding-location question is
+          Captain or commissioning-owner authority.
     recheck: >
       re-observe the source location and the answer state of A2 immediately before any
       Phase A execution attempt. No source video may be invented, and no cloud or paid
@@ -391,34 +498,62 @@ predicates:
 
   AGENT-LIGHTNING-POC-ELIGIBILITY-v1:
     class: SELF_HANDLE
-    gates: [AL-1]
+    gates:
+      - AL-1
     requires_all:
-      - {id: G1, axis: "SBX-3 real deterministic Docker lifecycle sufficiently qualified"}
-      - {id: G2, axis: "SBX-4 source/security/credential/network boundary qualified"}
-      - {id: G3, axis: "sufficient SBX-5 cancellation/quiescence/recovery to contain
-                        failed optimizer runs"}
-      - {id: G4, axis: "sufficient SBX-6 exact run/source/evidence harvesting to
-                        reconstruct the experiment"}
-      - {id: G5, axis: "BOUND-1 applicable bounds active"}
-      - {id: G6, axis: "the experiment is scheduled before SBX-8 final commissioning so
-                        it can still expose substrate defects"}
+      - id: G1
+        axis: >
+          SBX-3 real deterministic Docker lifecycle sufficiently qualified
+      - id: G2
+        axis: >
+          SBX-4 source/security/credential/network boundary qualified
+      - id: G3
+        axis: >
+          sufficient SBX-5 cancellation/quiescence/recovery to contain failed optimizer
+          runs
+      - id: G4
+        axis: >
+          sufficient SBX-6 exact run/source/evidence harvesting to reconstruct the
+          experiment
+      - id: G5
+        axis: >
+          BOUND-1 applicable bounds active
+      - id: G6
+        axis: >
+          the experiment is scheduled before SBX-8 final commissioning so it can still
+          expose substrate defects
     unobservable_axis_yields: CNO
     recheck: >
-      re-observe upstream `microsoft/agent-lightning` identity and the SBX acceptance
+      re-observe upstream microsoft/agent-lightning identity and the SBX acceptance
       state immediately before execution; the pinned v1.0.1 reference is planning
       evidence, not a runtime pin.
-    registration_is_not: [execution, admission, spend authorization, containment proof]
+    registration_is_not:
+      - execution
+      - admission
+      - spend authorization
+      - containment proof
 
   SDLC-L3-RUNTIME-GATE-v1:
     class: EXTERNAL_DEPENDENCY
-    gates: ["SDLC-L3 runtime configuration gating only"]
-    does_not_gate: ["SDLC-L3 deterministic validators, fixtures and schema work"]
+    gates:
+      - SDLC-L3
+    gate_scope: >
+      runtime configuration gating only
+    does_not_gate_scope: >
+      SDLC-L3 deterministic validators, fixtures and schema work
     requires_all:
-      - "control #30 CRP owns immutable candidate/effective config release identity and
-         transactional activation"
-      - "control #31 HQC owns applicability/completeness verification without
-         duplicating the eval runner"
-      - "control #32 EIL supplies the recurrence/incident corpus"
+      - id: E1
+        axis: >
+          control #30 CRP owns immutable candidate/effective config release identity and
+          transactional activation
+      - id: E2
+        axis: >
+          control #31 HQC owns applicability/completeness verification without
+          duplicating the eval runner
+      - id: E3
+        axis: >
+          control #32 EIL supplies the recurrence/incident corpus
+    unobservable_axis_yields: CNO
     unresolved_semantics_rule: >
       #31 HQC and #32 EIL are planning commissions whose Browser Sol review is not
       complete. They are referenced here as pending dependencies only. No HQC or EIL
