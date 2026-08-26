@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import subprocess
+import sys
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(DEFAULT_ROOT))
+
+from tools.ci_gate import COULD_NOT_OBSERVE_EXIT  # noqa: E402
+
+# Bound every child so a wedged git is a timed-out observation rather than a
+# validator that never returns.
+CHILD_TIMEOUT_SECONDS = float(os.environ.get("SSSF_CHILD_TIMEOUT_SECONDS", "30"))
 
 EXPECTED_RULES = (
     "* text=auto eol=lf",
@@ -33,9 +42,12 @@ def git(root: Path, *args: str) -> tuple[str, str | None]:
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            timeout=CHILD_TIMEOUT_SECONDS,
         )
     except OSError as exc:
-        return "", str(exc)
+        return "", f"tool unavailable: {exc}"
+    except subprocess.TimeoutExpired:
+        return "", f"check timed out: git {' '.join(args)}"
 
     output = proc.stdout.strip()
 
@@ -192,7 +204,9 @@ def validate(root: Path) -> int:
             print(f"- could-not-observe: {error}")
 
         print_remediation()
-        return 1
+        # An observed defect outranks a failure to observe; only a run that
+        # judged nothing reports could-not-observe. Neither is a pass.
+        return 1 if observed_bad else COULD_NOT_OBSERVE_EXIT
 
     print("B3-002 strict line-ending contract: PASS")
     print("policy: * text=auto eol=lf")

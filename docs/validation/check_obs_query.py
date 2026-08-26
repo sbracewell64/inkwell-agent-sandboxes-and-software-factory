@@ -4,7 +4,6 @@ import argparse
 import os
 from pathlib import Path
 import shutil
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -14,6 +13,41 @@ ROOT = (
     .resolve()
     .parents[2]
 )
+
+sys.path.insert(
+    0,
+    str(ROOT),
+)
+
+from tools.ci_gate import (  # noqa: E402
+    COULD_NOT_OBSERVE_EXIT,
+)
+
+try:
+    import sqlite3
+except ImportError as exc:  # pragma: no cover - host without the stdlib module
+    sqlite3 = None
+    SQLITE3_ABSENT = (
+        "host python has no "
+        f"stdlib sqlite3 module: {exc}"
+    )
+else:
+    SQLITE3_ABSENT = ""
+
+# Bound every child so a wedged tool is a timed-out observation rather than a
+# validator that never returns. The gate runner's own row timeout is the outer
+# bound; this one names which child stopped answering.
+CHILD_TIMEOUT_SECONDS = float(
+    os.environ.get(
+        "SSSF_CHILD_TIMEOUT_SECONDS",
+        "30",
+    )
+)
+
+
+class Unobservable(Exception):
+    """A child tool could not run, so no predicate was observed."""
+
 
 HELPER = (
     ROOT
@@ -61,14 +95,25 @@ def run(
     env: dict[str, str]
     | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        args,
-        cwd=ROOT,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
+    try:
+        return subprocess.run(
+            args,
+            cwd=ROOT,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=CHILD_TIMEOUT_SECONDS,
+        )
+    except OSError as exc:
+        raise Unobservable(
+            f"tool unavailable: {exc}"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise Unobservable(
+            "check timed out: "
+            f"{' '.join(args)}"
+        ) from exc
 
 
 def create_fixture(
@@ -293,6 +338,13 @@ args = parser.parse_args()
 
 errors: list[str] = []
 
+could_not_observe: list[str] = []
+
+if SQLITE3_ABSENT:
+    could_not_observe.append(
+        SQLITE3_ABSENT
+    )
+
 if not HELPER.is_file():
     errors.append(
         "missing tools/obs_query.py"
@@ -303,11 +355,19 @@ if not OBS_JUST.is_file():
         "missing just/obs.just"
     )
 else:
-    text = OBS_JUST.read_text(
-        encoding="utf-8"
-    )
+    try:
+        text = OBS_JUST.read_text(
+            encoding="utf-8"
+        )
+    except (OSError, UnicodeError) as exc:
+        text = ""
 
-    if (
+        could_not_observe.append(
+            "could not read "
+            f"just/obs.just: {exc}"
+        )
+
+    if text and (
         "tools/obs_query.py"
         not in text
     ):
@@ -316,7 +376,7 @@ else:
             "use obs_query.py"
         )
 
-    if (
+    if text and (
         'env_var_or_default("SSSF_DB", '
         '"adws/adw_data/sssf.db")'
         not in text
@@ -350,7 +410,9 @@ if (
             f"to {resolved}"
         )
 
-if not errors:
+def observe(
+    errors: list[str],
+) -> None:
     with tempfile.TemporaryDirectory(
         prefix="sssf-b3-004-"
     ) as temp_dir:
@@ -433,6 +495,23 @@ if not errors:
         env["SSSF_DB"] = (
             fixture.as_posix()
         )
+
+        # The integration path is `just obs <cmd>`, and just/obs.just runs each
+        # query through `python`. Both are child dependencies of this predicate:
+        # absent, they leave it unobserved. Resolving them by name up front says
+        # which one is missing, instead of reading a recipe's exit 127 as a
+        # judgement the recipe never made.
+        for tool in (
+            "just",
+            "python",
+        ):
+            if shutil.which(tool) is None:
+                raise Unobservable(
+                    "tool unavailable: "
+                    f"{tool} (required by "
+                    "the just obs "
+                    "integration path)"
+                )
 
         for command, just_args in (
             (
@@ -525,6 +604,22 @@ if not errors:
                 "failure is not explicit"
             )
 
+
+if not errors and not could_not_observe:
+    try:
+        observe(errors)
+    except Unobservable as exc:
+        could_not_observe.append(
+            str(exc)
+        )
+    except OSError as exc:
+        could_not_observe.append(
+            "fixture workspace is "
+            f"unavailable: {exc}"
+        )
+
+# A judgement this validator did make outranks a failure to observe: CNO must
+# never mask an observed defect, and it never upgrades the property to PASS.
 if errors:
     print(
         "B3-004 sqlite-free "
@@ -533,10 +628,32 @@ if errors:
 
     for error in errors:
         print(
-            f"- {error}"
+            f"- observed-bad: {error}"
+        )
+
+    for reason in could_not_observe:
+        print(
+            "- could-not-observe: "
+            f"{reason}"
         )
 
     raise SystemExit(1)
+
+if could_not_observe:
+    print(
+        "B3-004 sqlite-free "
+        "observability: CNO"
+    )
+
+    for reason in could_not_observe:
+        print(
+            "- could-not-observe: "
+            f"{reason}"
+        )
+
+    raise SystemExit(
+        COULD_NOT_OBSERVE_EXIT
+    )
 
 print(
     "B3-004 sqlite-free "

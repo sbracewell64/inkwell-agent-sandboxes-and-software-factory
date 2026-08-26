@@ -155,6 +155,32 @@ def watched_red_errors() -> list[str]:
         if read_evidence(failing_evidence)["conclusion"] != "observed-bad":
             errors.append("failing validator was not preserved as observed-bad")
 
+        # A validator that could not execute its predicate reports observation
+        # failure through the reserved exit code and its own reason line. That
+        # row is could-not-observe, never observed-bad and never observed-good,
+        # and the gate still exits red.
+        cno_manifest = temp / "child-cno.json"
+        cno_evidence = temp / "child-cno-evidence.json"
+        fixture_manifest(
+            cno_manifest,
+            [
+                "{python}",
+                "-c",
+                "print('- could-not-observe: tool unavailable: fixture-child-tool'); "
+                f"raise SystemExit({ci_gate.COULD_NOT_OBSERVE_EXIT})",
+            ],
+        )
+        if ci_gate.execute(cno_manifest, cno_evidence) == 0:
+            errors.append("validator observation failure did not go red")
+        child_cno = read_evidence(cno_evidence)
+        if child_cno["conclusion"] != "could-not-observe":
+            errors.append("validator observation failure was narrowed away from CNO")
+        cno_row = child_cno["results"][0]
+        if cno_row["status"] != "could-not-observe":
+            errors.append("validator observation failure row was not CNO")
+        if "fixture-child-tool" not in cno_row.get("reason", ""):
+            errors.append("validator observation failure row lost the named tool")
+
         missing_manifest = temp / "missing.json"
         missing_evidence = temp / "missing-evidence.json"
         fixture_manifest(missing_manifest, ["sssf-tool-that-does-not-exist-6f65d2"])
@@ -258,6 +284,7 @@ def main() -> int:
     print("B4-001 deterministic CI contract: PASS")
     print(f"{len(EXPECTED_CHECKS)} offline checks enumerated; Linux and Windows matrix is nonempty")
     print("watched-red: empty discovery/matrix, validator failure, missing tool")
+    print("watched-red: validator observation failure stays could-not-observe with its named tool")
     print("watched-red: cancellation/timeout and workflow path/trigger drift")
     return 0
 

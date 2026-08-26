@@ -15,6 +15,15 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "ci" / "checks.json"
 DEFAULT_EVIDENCE = ROOT / "ci-evidence.json"
 STATUSES = ("observed-good", "observed-bad", "could-not-observe")
+# A validator that could not execute its predicate — a required child tool was
+# absent or unspawnable, timed out, or the host lacks a primitive it needs —
+# reports observation failure through this reserved exit code. Failure to
+# observe is not a predicate failure, so such a check is could-not-observe and
+# never observed-bad; it is not a pass either, and the gate still exits red.
+COULD_NOT_OBSERVE_EXIT = 125
+# Validators name each reason on its own line using this prefix, the shape
+# docs/validation/check_line_endings.py already prints.
+CNO_REASON_PREFIX = "could-not-observe: "
 _CANCEL_REQUESTED = False
 
 
@@ -57,6 +66,18 @@ def load_checks(path: Path) -> list[dict[str, Any]]:
 
 def _expanded_command(command: list[str]) -> list[str]:
     return [sys.executable if part == "{python}" else part for part in command]
+
+
+def child_cno_reason(output: str) -> str:
+    """Name why a validator could not observe, from its own reason lines."""
+    reasons = [
+        line.split(CNO_REASON_PREFIX, 1)[1].strip()
+        for line in output.splitlines()
+        if CNO_REASON_PREFIX in line
+    ]
+    if not reasons:
+        return f"validator could not observe (exit {COULD_NOT_OBSERVE_EXIT})"
+    return "; ".join(reasons)
 
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
@@ -106,9 +127,12 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
         try:
             output, _ = process.communicate(timeout=min(0.2, remaining))
             result["returncode"] = process.returncode
-            result["status"] = (
-                "observed-good" if process.returncode == 0 else "observed-bad"
-            )
+            if process.returncode == COULD_NOT_OBSERVE_EXIT:
+                result["reason"] = child_cno_reason(output)
+            else:
+                result["status"] = (
+                    "observed-good" if process.returncode == 0 else "observed-bad"
+                )
             break
         except subprocess.TimeoutExpired:
             continue
