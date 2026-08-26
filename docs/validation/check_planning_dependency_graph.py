@@ -596,6 +596,55 @@ def evaluate(sources: dict[str, str]) -> list[str]:
             f"{cross_checked} node states were cross-checked against their owning section"
         )
 
+    # --- SEQUENCED-universe totality ---------------------------------------
+    # `PLANNING_LIFECYCLE.md` makes a typed edge part of the durable location of
+    # a SEQUENCED item. A SEQUENCED node that is in no edge and carries no
+    # independence disposition leaves prose as its sole owner, which is the exact
+    # situation that rule exists to eliminate.
+    independent = graph.get("independent_nodes", [])
+    if not isinstance(independent, list):
+        errors.append("independent_nodes is not a list")
+        independent = []
+    independent_ids: set[str] = set()
+    hard_targets = {
+        target for (_, target), kinds in observed.items() if "HARD_PREREQUISITE" in kinds
+    }
+    for entry in independent:
+        if not isinstance(entry, dict) or "id" not in entry:
+            errors.append(f"independent_nodes entry without an id: {entry!r}")
+            continue
+        name = str(entry["id"])
+        if name not in ids:
+            errors.append(f"independent_nodes names {name!r}, which is not a declared node")
+            continue
+        if not str(entry.get("why", "")).strip():
+            errors.append(f"independent_nodes entry {name} declares no reason")
+            continue
+        if name in hard_targets:
+            errors.append(
+                f"independent_nodes declares {name} independent while it is the target of a "
+                "hard prerequisite"
+            )
+            continue
+        independent_ids.add(name)
+
+    edged = {name for pair in observed for name in pair}
+    sequenced = [
+        str(entry["id"])
+        for entry in nodes
+        if isinstance(entry, dict)
+        and "id" in entry
+        and str(entry.get("planning_state")) == "SEQUENCED"
+    ]
+    if not sequenced:
+        errors.append("could-not-observe: the graph declares no SEQUENCED node")
+    for name in sequenced:
+        if name not in edged and name not in independent_ids:
+            errors.append(
+                f"node {name} is SEQUENCED but participates in no typed edge and carries no "
+                "valid independence disposition"
+            )
+
     # --- status axes -------------------------------------------------------
     if not isinstance(axes, dict):
         errors.append("status_axes is not a mapping")
@@ -982,6 +1031,28 @@ def controls(sources: dict[str, str]) -> list[tuple[str, dict[str, str], str]]:
             "the graph block itself disappears",
             _replace(sources, ROADMAP, GRAPH_HEADING, "## Dependency notes"),
             "could-not-observe",
+        ),
+        (
+            # The exact F4 defect: dropping this edge leaves the FUT-001 umbrella
+            # SEQUENCED, edge-less and unjustified, with prose as its sole owner.
+            "a SEQUENCED node has neither a typed edge nor an independence disposition",
+            _replace(
+                sources,
+                ROADMAP,
+                "  - from: WAYFINDER-1\n    to: FUT-001\n    kind: HARD_PREREQUISITE\n    why: >\n",
+                "  - from: WAYFINDER-1\n    to: WAYFINDER-POC-1\n    kind: SOFT_UNLOCK\n    why: >\n",
+            ),
+            "is SEQUENCED but participates in no typed edge",
+        ),
+        (
+            "an independence disposition contradicts a hard prerequisite",
+            _replace(
+                sources,
+                ROADMAP,
+                "independent_nodes:\n",
+                'independent_nodes:\n  - id: SBX-8\n    why: "planted contradiction"\n',
+            ),
+            "independent while it is the target of a hard prerequisite",
         ),
         (
             "the manifest stops naming this validator as the enforcement owner",

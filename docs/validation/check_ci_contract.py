@@ -22,6 +22,20 @@ EXPECTED_ACTIONS = {
     "oven-sh/setup-bun": "735343b667d3e6f658f44d0eca948eb6282f2b76",
     "extractions/setup-just": "dd310ad5a97d8e7b41793f8ef055398d51ad4de6",
 }
+# The pinned fragment below is a contiguous substring, so it cannot see a trigger
+# APPENDED after the `push` block. The allowed trigger set is therefore also
+# pinned structurally: the workflow's `on:` block must be exactly this text, and
+# its event keys exactly these, so an added `workflow_dispatch:`, `schedule:`,
+# `pull_request_target:` or extra base branch is refused rather than ignored.
+EXPECTED_ON_BLOCK = (
+    "on:\n"
+    "  pull_request:\n"
+    "    branches: [main, planning/future-sssf]\n"
+    "  push:\n"
+    "    branches: [main]\n"
+)
+EXPECTED_EVENTS = ("pull_request", "push")
+
 EXPECTED_CHECKS = {
     "ci-contract-and-watched-red-controls": (
         "{python}", "docs/validation/check_ci_contract.py"
@@ -49,6 +63,31 @@ EXPECTED_CHECKS = {
     ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
+
+
+def workflow_on_block(text: str) -> str | None:
+    """The workflow's whole `on:` block, or None if it is absent or duplicated.
+
+    Top-level keys are separated by a blank line in this workflow, so the block
+    runs from `on:` to the first blank line or the first non-indented line —
+    whichever comes first. Anything appended inside it is therefore visible.
+    """
+    lines = text.splitlines(keepends=True)
+    start = None
+    for index, raw in enumerate(lines):
+        if raw.rstrip("\n") == "on:":
+            if start is not None:
+                return None
+            start = index
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        body = lines[index].rstrip("\n")
+        if not body or not body.startswith((" ", "\t")):
+            end = index
+            break
+    return "".join(lines[start:end])
 
 
 def contract_errors(root: Path) -> list[str]:
@@ -91,6 +130,19 @@ def contract_errors(root: Path) -> list[str]:
     for forbidden in ("pull_request_target:", "paths:", "paths-ignore:", "secrets."):
         if forbidden in text:
             errors.append(f"workflow contains forbidden trigger/credential surface: {forbidden}")
+
+    on_block = workflow_on_block(text)
+    if on_block is None:
+        errors.append("workflow trigger block is missing or declared more than once")
+    else:
+        events = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", on_block, flags=re.MULTILINE)
+        if tuple(events) != EXPECTED_EVENTS:
+            errors.append(
+                f"workflow trigger events are {events!r}; exactly {list(EXPECTED_EVENTS)} "
+                "are allowed"
+            )
+        if on_block != EXPECTED_ON_BLOCK:
+            errors.append("workflow trigger block differs from the exact allowed trigger set")
 
     observed_actions = dict(
         re.findall(r"uses:\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([0-9a-f]{40})", text)
@@ -237,6 +289,48 @@ def watched_red_errors() -> list[str]:
         if not contract_errors(contract_root):
             errors.append("substituted exact-head checkout did not go red")
 
+        # A trigger APPENDED after the pinned `push` block is invisible to a
+        # contiguous-substring pin, so the exact trigger set is controlled too.
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "  push:\n    branches: [main]\n",
+                "  push:\n    branches: [main]\n  workflow_dispatch:\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("appended workflow trigger did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "    branches: [main, planning/future-sssf]\n",
+                "    branches: [main, planning/future-sssf, planning/anything-else]\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("extra pull_request base branch did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        (contract_root / WORKFLOW).write_text(
+            workflow_text.replace(
+                "  push:\n    branches: [main]\n",
+                "  push:\n    branches: [main]\n  schedule:\n    - cron: '0 0 * * *'\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if not contract_errors(contract_root):
+            errors.append("appended schedule trigger did not go red")
+
+        shutil.copy2(ROOT / WORKFLOW, contract_root / WORKFLOW)
+        if contract_errors(contract_root):
+            errors.append("the unmodified workflow did not stay green after the trigger controls")
+
         (contract_root / WORKFLOW).unlink()
         shutil.copy2(ROOT / WORKFLOW, contract_root / ".github" / "workflows" / "drift.yml")
         if not contract_errors(contract_root):
@@ -260,6 +354,10 @@ def main() -> int:
     print(f"{len(EXPECTED_CHECKS)} offline checks enumerated; Linux and Windows matrix is nonempty")
     print("watched-red: empty discovery/matrix, validator failure, missing tool")
     print("watched-red: cancellation/timeout and workflow path/trigger drift")
+    print(
+        f"trigger set pinned to {list(EXPECTED_EVENTS)}; watched-red: appended "
+        "workflow_dispatch, appended schedule, extra pull_request base branch"
+    )
     return 0
 
 

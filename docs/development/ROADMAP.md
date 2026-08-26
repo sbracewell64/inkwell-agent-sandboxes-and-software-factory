@@ -304,6 +304,16 @@ edges:
   - from: WAYFINDER-1
     to: WAYFINDER-POC-1
     kind: HARD_PREREQUISITE
+  - from: WAYFINDER-1
+    to: FUT-001
+    kind: HARD_PREREQUISITE
+    why: >
+      the FUT-001 section states that real DSH activation follows the post-Docker
+      baseline and WAYFINDER-1 commissioning. The baseline is already reached
+      transitively through POST-DOCKER-BASELINE -> WAYFINDER-0 -> WAYFINDER-1, so this
+      one edge carries the umbrella's authorized position without restating it. FUT-001
+      is not independent: it has real prerequisites, and its children DSH-0A..DSH-3
+      keep their own hard edges.
   - from: WAYFINDER-POC-1
     to: WAYFINDER_PRODUCT_COMMISSIONING
     kind: NONSERIALIZING_COMMISSIONING
