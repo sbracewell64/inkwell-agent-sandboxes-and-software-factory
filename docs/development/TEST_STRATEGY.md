@@ -52,11 +52,22 @@ for every attempted check:
 - `observed-good` — the check executed and returned success;
 - `observed-bad` — the check executed and returned failure;
 - `could-not-observe` — discovery, tooling, timeout, or cancellation prevented
-  a result.
+  a result, or the check itself reported that it could not observe.
 
 GitHub success is projected only when discovery is nonempty, all discovered
 checks execute, and every result is `observed-good`. The calibrated negative
 controls live in `docs/validation/check_ci_contract.py`.
+
+A validator is the owner of the distinction between *its predicate is false*
+and *it could not run its predicate*. When a required child tool is absent or
+unspawnable, stops answering, or the host lacks a primitive the check needs, the
+validator exits `tools/ci_gate.py`'s reserved `COULD_NOT_OBSERVE_EXIT` (125) and
+prints one `- could-not-observe: <reason>` line per reason, naming the tool. The
+gate runner records that row as `could-not-observe` with those reasons, never as
+`observed-bad`. Every other nonzero exit stays `observed-bad`: an observed defect
+outranks a failure to observe, so a validator that judged anything reports FAIL
+even when part of its evidence was unavailable. `could-not-observe` is a real
+result and never a pass — the gate still exits red on it.
 
 The B4-002 provider-free process contract is
 `docs/validation/check_executor_supervisor.py`. Its deterministic fake Pi child

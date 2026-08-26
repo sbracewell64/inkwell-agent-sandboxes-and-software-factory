@@ -1,14 +1,27 @@
+import os
 from pathlib import Path
 import re
 import runpy
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from tools.ci_gate import COULD_NOT_OBSERVE_EXIT  # noqa: E402
 
 CANONICAL = (
     "https://github.com/"
     "sbracewell64/inkwell-agent-sandboxes-and-software-factory.git"
 )
+
+# Bound every child so a wedged git is a timed-out observation rather than a
+# validator that never returns.
+CHILD_TIMEOUT_SECONDS = float(os.environ.get("SSSF_CHILD_TIMEOUT_SECONDS", "30"))
+
+
+class Unobservable(Exception):
+    """A child tool could not run, so no predicate was observed."""
 
 
 def read(rel: str) -> str:
@@ -16,14 +29,22 @@ def read(rel: str) -> str:
 
 
 def git(*args: str) -> str:
-    return subprocess.check_output(
-        ("git", *args),
-        cwd=ROOT,
-        text=True,
-    ).strip()
+    try:
+        return subprocess.check_output(
+            ("git", *args),
+            cwd=ROOT,
+            text=True,
+            timeout=CHILD_TIMEOUT_SECONDS,
+        ).strip()
+    except OSError as exc:
+        raise Unobservable(f"tool unavailable: {exc}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise Unobservable(f"check timed out: git {' '.join(args)}") from exc
 
 
 errors: list[str] = []
+
+could_not_observe: list[str] = []
 
 record = runpy.run_path(
     str(ROOT / "sandbox_mount/host/run_record.py")
@@ -67,21 +88,37 @@ for required in (
     if required not in setup:
         errors.append(f"setup.just missing provenance gate: {required}")
 
-origin = git("remote", "get-url", "origin")
-if origin.removesuffix(".git") != CANONICAL.removesuffix(".git"):
-    errors.append(
-        f"origin is {origin!r}, expected canonical repository"
-    )
+origin = ""
+head = ""
 
-head = git("rev-parse", "HEAD")
-if not re.fullmatch(r"[0-9a-f]{40}", head):
-    errors.append(f"HEAD is not an exact commit SHA: {head!r}")
+try:
+    origin = git("remote", "get-url", "origin")
+    if origin.removesuffix(".git") != CANONICAL.removesuffix(".git"):
+        errors.append(
+            f"origin is {origin!r}, expected canonical repository"
+        )
 
+    head = git("rev-parse", "HEAD")
+    if not re.fullmatch(r"[0-9a-f]{40}", head):
+        errors.append(f"HEAD is not an exact commit SHA: {head!r}")
+except Unobservable as exc:
+    could_not_observe.append(str(exc))
+
+# An observed defect outranks a failure to observe; only a run that judged
+# nothing reports could-not-observe. Neither is a pass.
 if errors:
     print("B2-002 sandbox source contract: FAIL")
     for error in errors:
-        print(f"- {error}")
+        print(f"- observed-bad: {error}")
+    for reason in could_not_observe:
+        print(f"- could-not-observe: {reason}")
     raise SystemExit(1)
+
+if could_not_observe:
+    print("B2-002 sandbox source contract: CNO")
+    for reason in could_not_observe:
+        print(f"- could-not-observe: {reason}")
+    raise SystemExit(COULD_NOT_OBSERVE_EXIT)
 
 print("B2-002 sandbox source contract: PASS")
 print(f"canonical origin: {origin}")

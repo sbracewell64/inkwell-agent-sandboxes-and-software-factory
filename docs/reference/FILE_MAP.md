@@ -27,6 +27,16 @@ Never hand-edit session evidence.
 - `docs/validation/check_evidence_manifest.py` — positive and watched-red controls
 - `docs/validation/fixtures/evidence_manifest/` — canonical offline fixtures
 
+## Validator observation boundary
+
+- `tools/ci_gate.py` — three-valued gate runner and owner of the reserved
+  could-not-observe exit code validators report their own observation failure with
+- `docs/increments/HD-09_VALIDATOR_OBSERVATION_BOUNDARY.md` — the invariant, the
+  contract, and its proof
+- `tests/test_validator_observation_boundary.py` — executable red/green over the
+  validator and gate binaries, including the control that a real predicate
+  failure still reports observed-bad
+
 ## Sandbox contract and orchestration
 
 - `docs/reference/SBX-0_SEMANTICS_INVENTORY.json` — durable SBX-0 source-generation/content-digest handoff and classification-compatible owner-per-fact inventory

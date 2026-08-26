@@ -39,6 +39,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from tools.ci_gate import COULD_NOT_OBSERVE_EXIT  # noqa: E402
+
 CONFIG_DIR = ROOT / "adws" / "adw_sssf_config"
 AGENT_NAME = re.compile(r"^(\s*)-\s+name:\s*(\S+)\s*$")
 EXTENSION_KEY = re.compile(r"^(\s*)harness_engineering:\s*(\[\s*\])?\s*$")
@@ -212,8 +214,8 @@ def main() -> int:
     # Non-vacuity first: a control that drives no extension-bearing agent proves
     # nothing, and an empty result set is could-not-observe, never a pass.
     if not shipped:
-        print("FAIL: could-not-observe: no shipped roster declares a nonempty harness_engineering agent")
-        return 1
+        print("- could-not-observe: no shipped roster declares a nonempty harness_engineering agent")
+        return COULD_NOT_OBSERVE_EXIT
     print("shipped extension-bearing agents:")
     for config_name, agent_name, model, extensions in shipped:
         print(f"  {config_name}:{agent_name} model={model} extensions={extensions}")
