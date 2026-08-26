@@ -80,8 +80,19 @@ rewrite once rejected those extensions and the rest of the gate did not notice.
 
 `docs/validation/check_planning_dependency_graph.py` enforces the typed planning
 dependency graph that `docs/development/ROADMAP.md` declares authoritative over
-prose ordering; the properties and their watched-red controls are documented by
-that graph's owner in `docs/development/PLANNING_LIFECYCLE.md`.
+prose ordering; the properties and their watched-red controls, including the
+closed `SEQUENCED` universe (the totality invariant) and the meaning of an
+independence disposition, are documented by that graph's owner in
+`docs/development/PLANNING_LIFECYCLE.md`.
+
+`docs/validation/check_ci_contract.py` also pins the workflow's exact trigger
+contract: the whole `on:` mapping must be the authorized text and its event keys
+exactly `pull_request` and `push`, with `pull_request` restricted to the `main`
+and `planning/future-sssf` bases and `push` to `main`. A blank line or comment
+does not end a YAML block mapping, so the extractor reads through both; an event
+appended below one is a live trigger and goes red like any other. The exactness
+is deliberate — reformatting inside `on:` is red by design, because the contract
+is the bytes, not an approximation of them.
 
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and

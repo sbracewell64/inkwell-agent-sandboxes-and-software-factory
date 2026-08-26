@@ -20,6 +20,12 @@ proves the properties the rest of the planning owner actually consumes:
   `PROVEN` must be one of the states already observed before this graph existed,
   and every node whose owning section declares a planning state must agree
   with it;
+- the `SEQUENCED` universe is closed (the totality invariant): every `SEQUENCED`
+  node is either an edge endpoint or carries a valid independence disposition in
+  `independent_nodes` — one that names a declared node, gives a reason, and is
+  not claimed for a node that has a hard prerequisite. A `SEQUENCED` node with
+  neither leaves prose as its sole owner, which the lifecycle owner's
+  durable-location rule forbids;
 - Docker-first sequencing, the WAYFINDER-0/1 hard pre-DSH chain, and the Poker
   School nonserializing relation survive intact, and no hard prerequisite is
   quietly weakened into a soft or nonserializing one;

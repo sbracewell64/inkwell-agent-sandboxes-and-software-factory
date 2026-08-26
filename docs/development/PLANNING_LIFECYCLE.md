@@ -143,9 +143,18 @@ Because the typed edges govern, the graph is enforced rather than merely declare
 - every edge endpoint, owner reference, register reference, predicate target and status-axis blocker resolves;
 - only the declared edge-kind vocabulary appears, and only the declared authority classes and status-axis values;
 - registration never promotes lifecycle state — a node may claim `ACTIVE` or `PROVEN` only if it already held that state, no axis may be registered `PASS`, and a node whose owning section declares a planning state must agree with it;
+- the `SEQUENCED` universe is closed (the totality invariant): every `SEQUENCED` node either participates in the typed dependency representation as an edge endpoint, or carries a valid independence disposition (see below). A `SEQUENCED` node with neither would leave prose as its sole owner, which is the situation this document's durable-location rule exists to eliminate;
 - Docker-first sequencing, the `WAYFINDER-0/1` hard pre-DSH chain and the Agent Lightning containment prerequisites are present and still hard, the Poker School relation is still nonserializing, and the Captain/source blocker still exempts the DSH cone;
 - the graph stays reachable from `docs/manifest.yaml` and from this document;
 - controls whose own review has not returned are referenced only inside the one authorized pending-dependency predicate.
+
+#### Independence dispositions
+
+Some items genuinely have no roadmap-node prerequisite. The graph's `independent_nodes` block is where that is said out loud, and it is the only way a `SEQUENCED` node may stand outside the edge set. An entry names one declared node and gives the reason it has no predecessor.
+
+An independence disposition is a claim about dependency, not a shortcut past one. It is invalid — and the validator refuses it — when it names a node that does not exist, gives no reason, or claims independence for a node that is the target of a hard prerequisite. Never add a node to `independent_nodes` to satisfy the validator: if the item has prerequisites, encode the edge its authoritative section already implies.
+
+The check is graph-level, so a prerequisite that a node's prose states but nobody encoded as an edge would not contradict an independence claim. Strengthening that against the owning prose is recorded follow-on hardening, not a property this validator currently proves.
 
 Each of those properties is paired with a watched-red control that plants the exact defect in a copy of the real sources. A control that goes red for an unrelated reason is treated as a failure of the control, not as evidence, and the unmodified sources are asserted green in the same run so the set can never pass vacuously.
 
