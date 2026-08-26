@@ -119,9 +119,20 @@ Do not require this full table for `EXPLORE` discussion. It is a promotion gate,
 | PRESERVE | `FUTURE_CANDIDATES.md` or an existing research/reference record |
 | CANDIDATE | `FUTURE_CANDIDATES.md` with evaluation status |
 | DECIDED | ADR plus affected architecture docs |
-| SEQUENCED | `ROADMAP.md` plus ADR/candidate linkage |
+| SEQUENCED | `ROADMAP.md` plus ADR/candidate linkage, and a typed edge in the roadmap's dependency graph |
 | ACTIVE | Named increment, branch/PR, increment record |
 | PROVEN | Accepted increment, evidence, docs, proof matrix, immutable Git identity |
+
+## Dependency representation
+
+A planning state says *how far* an item has come. It does not say *what blocks it*. Those are separate questions and they have separate owners.
+
+Blocking is represented by typed edges and predecessor predicates in the roadmap's [machine-readable dependency graph](ROADMAP.md#machine-readable-dependency-graph), never by the order sections happen to appear in. Two consequences:
+
+- a hard prerequisite (`HARD_PREREQUISITE`) and a mandatory-but-nonserializing commissioning proof (`NONSERIALIZING_COMMISSIONING`) are distinguishable without reading prose, and a blocked item exposes its exact dependency cone;
+- accidental serialization by prose order is not a dependency, and a status projection must not read as globally stalled while independent executable nodes remain.
+
+A gate may be reclassified from hard to soft only by explicit architecture or planning authority. Registering an item, adding an edge, or naming a predicate never advances that item's planning state.
 
 ## Authority boundary with FirstMate
 

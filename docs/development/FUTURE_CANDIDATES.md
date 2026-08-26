@@ -21,6 +21,9 @@ State meanings are defined in [`PLANNING_LIFECYCLE.md`](PLANNING_LIFECYCLE.md).
 | FUT-011 | Instruction-artifact governance | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; `AGENT_ENGINEERING_SKILLS_RESEARCH.md`; unsequenced | One semantic owner per durable instruction, real consumers, truthful bounds, generated inventory where useful, and behavioral/pressure qualification where the instruction claims to change agent behavior. |
 | FUT-012 | Deterministic derived documentation | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | Generate mechanically derivable indexes/ownership/status views from canonical machine state; authored rationale remains authored and authoritative only in its proper domain. |
 | FUT-013 | Agent engineering skill repositories as research sources | PRESERVE | `AGENT_ENGINEERING_SKILLS_RESEARCH.md` | Preserve exact-reviewed agent-skills, Superpowers, Matt Pocock skills, and agent-rules-books as idea/source material; do not install a competing router or import skills wholesale. |
+| FUT-014 | Poker School Phase A Wayfinder product-commissioning POC | SEQUENCED | control #33 + gate revision `5418916312` + success-semantics ruling `SOL-FM-SSSF-WAYFINDER-POC-1-SUCCESS-SEMANTICS-20260826`; `ROADMAP.md` `WAYFINDER-POC-1` | Mandatory for full Wayfinder product/fog-of-war commissioning; conditionally nonserializing for DSH when blocked only by a Captain/source/non-technical condition. Currently `BLOCKED` on `POKER-SCHOOL-SOURCE-CUSTODY-v1`. Registration is not execution. |
+| FUT-015 | Agent Lightning gated sandbox optimization POC | SEQUENCED | control #34 `SOL-FM-SSSF-AGENT-LIGHTNING-SBX-POC-001`; `ROADMAP.md` `AL-1` | Post-`SBX-4` / pre-`SBX-8` window behind `AGENT-LIGHTNING-POC-ELIGIBILITY-v1` (`SBX-3..6` + `BOUND-1`). Skill only, not the full RL stack. Registration is not execution, admission, or spend authorization. |
+| FUT-016 | Deterministic control-band maintenance loop | CANDIDATE | control #36 `future_candidate_DETERMINISTIC_CONTROL_BAND_LOOP`; `ROADMAP.md` `CB-1` | `ROADMAP_CANDIDATE_ONLY`. Deterministic detector triggers a bounded task; no continuously reasoning monitor agent, no second daemon or orchestrator. Not sequenced for implementation. |
 
 ## FUT-001 — Bounded autonomous DSH execution cells
 
@@ -283,6 +286,8 @@ Shared constraints:
 
 Potential dependency shape for later evaluation is `FUT-010 -> FUT-009/FUT-011 -> selective FUT-012`, but this is not roadmap sequencing. No implementation authority follows from this registration.
 
+The semantic half of `SDLC-L3` (configuration regression evals, `ROADMAP.md`) extends `FUT-010` and `FUT-011` rather than opening a parallel register: `FUT-011` already owns *one semantic owner per durable instruction, real consumers, truthful bounds, and behavioral qualification where the instruction claims to change agent behavior*, and `FUT-010` owns the law-set extraction. Fixture and schema requirements arriving from `SDLC-L3` are recorded against those two entries. This cross-reference adds no state to either candidate.
+
 ## FUT-013 — Agent engineering skill research family
 
 ### Status
@@ -310,6 +315,55 @@ The primary architectural effect is new evidence for existing candidates rather 
 Direct use of an external `SKILL.md` by FirstMate is permitted only as a future qualification question. FirstMate already has code-owned supervision and an owned `.agents/skills` surface, so any import/adaptation must first demonstrate a real semantic gap, reduce to the smallest needed judgment instruction, prove trigger/consumer behavior, avoid collision with existing skills, and preserve FirstMate's SELF_HANDLE/BROWSER_SOL/CAPTAIN/EXTERNAL_DEPENDENCY authority model.
 
 No repository in this family is an allowlist, package dependency, active router, or implementation instruction by virtue of `PRESERVE` status.
+
+## FUT-014 — Poker School Phase A Wayfinder product-commissioning POC
+
+### Status
+
+`SEQUENCED`
+
+Roadmap owner: `WAYFINDER-POC-1` in [`ROADMAP.md`](ROADMAP.md). Commissioning contract: control #33, its Captain-authorized gate revision `5418916312`, and the success-semantics ruling `SOL-FM-SSSF-WAYFINDER-POC-1-SUCCESS-SEMANTICS-20260826`.
+
+The first substantial real project driven through the Captain's existing Wayfinder transport, with broad-project fog of war deliberately preserved. It is a **workload**, not a control-plane increment: it creates no durable supervision, dispatch, status, routing, benchmark, evaluator or reconciliation mechanism, and it mutates nothing in SSSF. The only SSSF-side artifact the Wayfinder programme owes is this planning registration.
+
+Gate split, exactly as authorized:
+
+- `WAYFINDER-0` and `WAYFINDER-1` are **hard** pre-DSH technical prerequisites;
+- `WAYFINDER-POC-1` is **mandatory** for full Wayfinder product/fog-of-war commissioning;
+- when it is blocked solely by Captain absence, missing source video, or another non-technical Captain/external condition that does not invalidate `WAYFINDER-0/1` transport correctness, it is **nonserializing**: record `WAYFINDER_PRODUCT_COMMISSIONING = BLOCKED` or `INCOMPLETE`, retain the exact blocker, and let DSH progress under the dependency-cone continuation law;
+- a defect it exposes in transport, identity or supervision that is material to downstream unattended operation re-opens the affected DSH dependency cone.
+
+Current status: `POKER_SCHOOL_PHASE_A = BLOCKED` and `WAYFINDER_PRODUCT_COMMISSIONING = BLOCKED` on `POKER-SCHOOL-SOURCE-CUSTODY-v1`, a Captain-owned blocker whose two axes — a representative source video at the commissioning-owner-decided location, and whether `E:\Poker-School` is binding or illustrative for the execution host — are both unsatisfied. `WAYFINDER_TECHNICAL_GATE = CNO`; none of its axes is observed-good.
+
+This registration authorizes no execution. Poker School does not run before the Wayfinder technical gate clears.
+
+## FUT-015 — Agent Lightning gated sandbox optimization POC
+
+### Status
+
+`SEQUENCED`
+
+Roadmap owner: `AL-1` in [`ROADMAP.md`](ROADMAP.md). Commission: control #34 `SOL-FM-SSSF-AGENT-LIGHTNING-SBX-POC-001`.
+
+A gated post-`SBX-4` / pre-`SBX-8` sandbox workload: a qualified coding optimizer is given broad reversible freedom over an isolated exact-SHA copy of SSSF against a fixed benchmark, in two arms — with and without the Agent Lightning Skill — while canonical SSSF, credentials, control state and evaluator authority are proven unreachable. The initial scope is the Skill only; the full RL trainer/gateway/controller stack is not authorized.
+
+Eligibility is `AGENT-LIGHTNING-POC-ELIGIBILITY-v1`: `SBX-3` lifecycle, `SBX-4` source/security/credential/network boundary, sufficient `SBX-5` cancellation/quiescence/recovery, sufficient `SBX-6` run/source/evidence harvesting, `BOUND-1` bounds active, and scheduling before `SBX-8`. Any unobservable axis is `CNO`.
+
+**Registration is not execution, not admission of Agent Lightning into SSSF, not a spend authorization, and not evidence of containment.** A sandbox result never directly becomes canonical SSSF; a useful change returns through a fresh ordinary increment. Follow-on evaluation of the full framework and of a standing optimizer role remains `PLANNING_ONLY_UNTIL_SEPARATE_RULING` and is not registered here.
+
+## FUT-016 — Deterministic control-band maintenance loop
+
+### Status
+
+`CANDIDATE` — disposition `ROADMAP_CANDIDATE_ONLY`, not sequenced.
+
+Roadmap owner: `CB-1` in [`ROADMAP.md`](ROADMAP.md). Source: control #36 `future_candidate_DETERMINISTIC_CONTROL_BAND_LOOP`.
+
+Deterministic observation reaches a typed threshold or control-band breach, which opens a bounded FirstMate task; an agent diagnoses only where reasoning is genuinely needed; the fix then follows the normal SSSF implementation, verification, review and authorization path, and the incident feeds the recurrence owner so a structural fix and regression fixture follow where warranted.
+
+Binding constraints on any future implementation: the detector stays deterministic code and never becomes a continuously reasoning monitor agent; action tiers are pre-authorized and bounded, with production, destructive, security and spend boundaries left to existing authority; it reuses the existing unattended supervision and control-plane mechanisms rather than adding a second daemon or orchestrator; and it is implemented only once the current execution, lineage and CRP owners can support it truthfully.
+
+No monitoring subsystem is deployed, scheduled or authorized by this registration.
 
 ## Not registered by default
 
