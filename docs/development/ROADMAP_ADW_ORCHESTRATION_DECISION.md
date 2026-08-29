@@ -1,4 +1,4 @@
-# Roadmap Decision — ADW Selection, Parallel ADWs, and DSH Orchestration Ownership
+# Roadmap Decision — ADW Selection, Parallel ADWs, DSH Orchestration Ownership, and Simplification Law
 
 **Status:** `PLANNING_ONLY`
 
@@ -17,6 +17,37 @@ The baseline SSSF architecture remains controlling:
 The existing ADW Python scripts are the reference architecture. They encode explicit sequences such as planner → code transition → builder → deterministic test → reviewer → deterministic acceptance. Python owns sequencing, retries, budgets, applicability, gates, acceptance, and terminal state.
 
 DSH is not presumed to replace this architecture.
+
+## Governing simplification hierarchy
+
+All future roadmap work, architecture review, implementation planning, and candidate admission should preserve this hierarchy unless a concrete requirement proves a narrower exception is necessary:
+
+1. **Python ADWs remain visible and understandable.** A competent maintainer should be able to identify the execution path without reconstructing hidden model behavior.
+2. **One deterministic outer execution-graph owner.** SSSF code owns phase sequencing, retries, budgets, applicability, acceptance, terminal state, and promotion/landing transitions.
+3. **One observability spine.** Typed producer events flow into raw durable JSONL/history plus the existing SQLite (`sssf.db`) query projection; UI/AX/diagnostics are projections, not competing truth stores.
+4. **One lifecycle owner per resource class.** Process, sandbox, credential, authority, workflow, and other stateful resources must not gain overlapping managers/controllers when an accepted owner already exists.
+5. **Agents remain bounded reasoning nodes.** Agents reduce uncertainty; they do not become durable state machines because they can reason about state.
+6. **Orchestrators recommend; CODE admits.** Semantic intelligence may classify tasks, recommend registered workflows, or propose parallelism. Deterministic code validates and authorizes every execution boundary.
+7. **Parallelism reuses a deterministic fan-out/join primitive.** Prefer one reusable CODE-owned concurrency mechanism over bespoke per-workflow schedulers and join semantics.
+8. **DSH capabilities are admitted one-by-one on demonstrated need.** Later DSH stages are not an inevitable maturity ladder; if DSH-1 plus registered serial/parallel ADWs is sufficient, later features remain unimplemented.
+9. **Extend existing owners before creating new systems.** Prefer a field, type, function, validator, projection, or node under an accepted owner over a new manager/coordinator/controller/registry/ledger/scheduler/daemon/state machine.
+10. **Every new abstraction must remove more complexity than it adds.** New machinery must identify the concrete problem it solves, why an existing owner cannot solve it cleanly, its added states/failure modes/authority surface, and the evidence that the net architecture is simpler or materially safer/more capable.
+
+### Simplification burden of proof
+
+For any roadmap proposal that introduces a new architectural noun or persistent component — especially a manager, coordinator, controller, registry, ledger, scheduler, daemon, state store, graph engine, agent memory authority, or observability service — FirstMate must explicitly answer before recommending implementation:
+
+- What exact problem is unsolved by the current owners?
+- Can the requirement be satisfied by extending an accepted type/function/validator/ADW/trace projection instead?
+- Does the proposal create a second source of truth, scheduler, workflow engine, recovery owner, process supervisor, or trace store?
+- What new lifecycle states, retries, failure modes, reconciliation paths, authority checks, and operator concepts are introduced?
+- Can a maintainer reconstruct why the system did what it did from typed state/evidence without reading an agent transcript?
+- What existing complexity is removed or made materially safer in exchange?
+- Is the measured/observed value sufficient to justify the net-complexity increase?
+
+If those questions do not establish a positive net value, **default disposition is DEFER/REJECT and retain the simpler accepted architecture**.
+
+Features being present on the roadmap do not create an obligation to implement them. Stable non-implementation is a valid successful outcome when the existing factory already satisfies the need.
 
 ## Current architectural decision: no DSH captain
 
@@ -166,6 +197,10 @@ Python/SSSF code must own:
 
 An agent may reason that parallel investigation is useful. It may not acquire spawn/admission, budget, join, acceptance, or landing authority merely by recommending parallelism.
 
+### Reusable fan-out/join preference
+
+If a production parallel ADW is justified, FirstMate should first attempt to design one minimal reusable deterministic fan-out/join primitive (or extend an accepted equivalent) rather than implementing bespoke concurrency machinery in each ADW. Individual workflows may compose that primitive with typed role/dependency/write-set declarations, but should not each invent their own scheduler, cancellation model, join semantics, or aggregate acceptance fold.
+
 ## When the orchestrator should reach for a parallel ADW
 
 FirstMate must define a typed, testable selection policy for when the winning workflow-selector layer may recommend a parallel-capable ADW instead of a serial ADW.
@@ -307,7 +342,8 @@ Before DSH architecture is considered settled, FirstMate should produce a plan-o
 8. specifies fan-out/join, conflict, capacity, budget, cancellation, CNO, maker/checker, and quiescence controls;
 9. specifies typed selection/admission contracts and watched-red negative controls;
 10. specifies JSONL/SQLite trace integration without a second state owner;
-11. identifies any amendments required to `FUT-001`, the DSH implementation plan, ADRs, validators, or workflow catalog before implementation.
+11. applies the governing simplification hierarchy to each recommendation, identifying which existing owner is extended, what new concepts are unavoidable, and what complexity is removed or justified;
+12. identifies any amendments required to `FUT-001`, the DSH implementation plan, ADRs, validators, or workflow catalog before implementation.
 
 No DSH-captain proof is required under the current architecture because DSH captain is not admitted. If a future capability gap motivates reconsideration, that is a new planning decision requiring Captain authorization.
 
@@ -329,4 +365,4 @@ No Docker, Wayfinder, DSH, maker/checker, provenance, security, cost, exact-head
 
 Before DSH progresses beyond deterministic protocol/bounded specialist-cell stages, the outer-vs-inner ADW selection owner and registered-workflow admission model must be resolved and recorded. Parallel ADW work may be researched/planned dependency-independently, but production activation requires its own ordinary increment and proof.
 
-**Default if unresolved:** retain baseline SSSF — registered Python ADWs connecting bounded specialized agents through CODE-owned seams, with serial execution unless a registered parallel ADW is explicitly admitted by deterministic policy.
+**Default if unresolved or if complexity does not earn admission:** retain baseline SSSF — registered Python ADWs connecting bounded specialized agents through CODE-owned seams, with serial execution unless a registered parallel ADW is explicitly admitted by deterministic policy.
