@@ -33,6 +33,7 @@ projection into the coding harness, which SSSF does not ship.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -218,6 +219,28 @@ def test_dirty_evaluator_mode_and_symlink_are_restored_without_dereferencing(tmp
     assert link.readlink() == Path("b.txt")
     assert (root / "tests/b.txt").read_text() == "b\n"
     assert (root / "tests/c.txt").read_text() == "c\n"
+
+
+def test_dirty_evaluator_is_restored_without_writing_through_a_hard_link(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        "app/victim.py": "value = 1\n",
+    })
+    evaluator = root / "tests/evaluator.py"
+    victim = root / "app/victim.py"
+    evaluator.write_text("assert False\n")
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+
+    evaluator.unlink()
+    os.link(victim, evaluator)
+
+    with pytest.raises(permissions.PermissionBreach):
+        permissions.enforce(run, None, _agent("builder", None), before, preserved)
+    assert evaluator.read_text() == "assert False\n"
+    assert victim.read_text() == "value = 1\n"
+    assert evaluator.stat().st_ino != victim.stat().st_ino
 
 
 def test_an_ordinary_recovered_slip_outside_the_surface_still_continues(tmp_path):

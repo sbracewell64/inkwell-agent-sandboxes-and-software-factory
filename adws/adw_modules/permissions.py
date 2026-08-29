@@ -367,6 +367,8 @@ def _restore(run, path: str, preserved: dict[str, PreservedPath]) -> bool:
                 target.unlink()
             target.symlink_to(os.fsdecode(saved.body))
         else:
+            if target.exists():
+                target.unlink()
             target.write_bytes(saved.body)
             target.chmod(saved.mode)
         return True
