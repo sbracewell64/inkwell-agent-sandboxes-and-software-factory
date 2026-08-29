@@ -44,6 +44,7 @@ import os
 import re
 import stat
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 from .data_types import AgentConfig, SSSFConfig
@@ -66,6 +67,13 @@ RECOVERED_LIMIT = 3
 # Per-file ceiling on what `preserve` will hold in memory for the length of a
 # phase. Anything larger keeps the old behaviour — reported, not restorable.
 PRESERVE_MAX_BYTES = 1 << 20
+
+
+@dataclass(frozen=True)
+class PreservedPath:
+    kind: str
+    body: bytes
+    mode: int
 
 
 def _git_out(args: list[str], cwd) -> str | None:
@@ -310,13 +318,13 @@ def evidence_is_current(recorded: str | None, run) -> bool | None:
     return recorded == current
 
 
-def preserve(run, tree: dict[str, str]) -> dict[str, bytes]:
-    """Capture the bytes of every already-dirty path, before an agent runs.
+def preserve(run, tree: dict[str, str]) -> dict[str, PreservedPath]:
+    """Capture every restorable already-dirty path before an agent runs.
 
     Without this, the module can only undo what an agent INTRODUCED — unlink a
     file it created, `git checkout` an edit it made on top of a clean file. Work
     that was already uncommitted when the phase opened was unrecoverable, and
-    unrecoverable is precisely what aborts a run. Holding the bytes turns the
+    unrecoverable is precisely what aborts a run. Holding the state turns the
     module's worst case (`git checkout adws/`, the incident in the docstring
     above) from "reported, gone" into "put back", which is both less damage and
     one less dead run.
@@ -324,32 +332,50 @@ def preserve(run, tree: dict[str, str]) -> dict[str, bytes]:
     Reading is best-effort: a path that vanishes between snapshot and read, or
     is too large to hold, simply is not preserved and keeps the old behaviour.
     """
-    kept: dict[str, bytes] = {}
+    kept: dict[str, PreservedPath] = {}
     for path in tree:
         target = Path(run.repo_root) / path
         try:
-            if target.is_file() and target.stat().st_size <= PRESERVE_MAX_BYTES:
-                kept[path] = target.read_bytes()
+            metadata = target.lstat()
+            mode = stat.S_IMODE(metadata.st_mode)
+            if stat.S_ISLNK(metadata.st_mode):
+                body = os.fsencode(os.readlink(target))
+                if len(body) <= PRESERVE_MAX_BYTES:
+                    kept[path] = PreservedPath("symlink", body, mode)
+            elif (stat.S_ISREG(metadata.st_mode)
+                  and metadata.st_size <= PRESERVE_MAX_BYTES):
+                kept[path] = PreservedPath("file", target.read_bytes(), mode)
         except OSError:
             continue
     return kept
 
 
-def _restore(run, path: str, preserved: dict[str, bytes]) -> bool:
+def _restore(run, path: str, preserved: dict[str, PreservedPath]) -> bool:
     """Put a preserved path back exactly as it was. True if it is now restored."""
     if path not in preserved:
         return False
     target = Path(run.repo_root) / path
+    saved = preserved[path]
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(preserved[path])
+        if target.is_symlink():
+            target.unlink()
+        elif target.exists() and not target.is_file():
+            return False
+        if saved.kind == "symlink":
+            if target.exists():
+                target.unlink()
+            target.symlink_to(os.fsdecode(saved.body))
+        else:
+            target.write_bytes(saved.body)
+            target.chmod(saved.mode)
         return True
     except OSError:
         return False
 
 
 def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str],
-               preserved: dict[str, bytes]) -> str:
+               preserved: dict[str, PreservedPath]) -> str:
     """Undo one unauthorized change. Returns a word describing what happened.
 
     A path that was already dirty when the agent started is restored to the
@@ -378,7 +404,7 @@ def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str],
 
 
 def enforce(run, phase, agent: AgentConfig, before: dict[str, str],
-            preserved: dict[str, bytes] | None = None) -> list[str]:
+            preserved: dict[str, PreservedPath] | None = None) -> list[str]:
     """Compare the tree against `before`; undo and raise if the agent overstepped.
 
     Returns the paths it legitimately changed, so the trace records what an

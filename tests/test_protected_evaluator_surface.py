@@ -186,6 +186,40 @@ def test_frozen_snapshot_includes_repository_mode_and_symlink_target(tmp_path):
         "tests/check.py", "tests/evaluator"]
 
 
+def test_dirty_evaluator_mode_and_symlink_are_restored_without_dereferencing(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/check.py": "assert True\n",
+        "tests/a.txt": "a\n",
+        "tests/b.txt": "b\n",
+        "tests/c.txt": "c\n",
+    })
+    link = root / "tests/evaluator"
+    link.symlink_to("a.txt")
+    subprocess.run(["git", "add", "tests/evaluator"], cwd=root, check=True)
+    subprocess.run(["git", "-c", "user.email=t@example", "-c", "user.name=t",
+                    "commit", "-qm", "link"], cwd=root, check=True)
+    target = root / "tests/check.py"
+    target.write_text("assert False\n")
+    link.unlink()
+    link.symlink_to("b.txt")
+    run = _Run(root, _cfg(frozen=["tests/"]))
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+
+    target.chmod(0o755)
+    link.unlink()
+    link.symlink_to("c.txt")
+
+    with pytest.raises(permissions.PermissionBreach):
+        permissions.enforce(run, None, _agent("builder", None), before, preserved)
+    assert target.read_text() == "assert False\n"
+    assert target.stat().st_mode & 0o111 == 0
+    assert link.is_symlink()
+    assert link.readlink() == Path("b.txt")
+    assert (root / "tests/b.txt").read_text() == "b\n"
+    assert (root / "tests/c.txt").read_text() == "c\n"
+
+
 def test_an_ordinary_recovered_slip_outside_the_surface_still_continues(tmp_path):
     """The negative half: the frozen surface is what stops being forgiven."""
     root = _repo(tmp_path, {"app/widget.py": "value = 1\n"})
