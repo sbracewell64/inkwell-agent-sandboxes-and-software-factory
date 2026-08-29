@@ -143,6 +143,21 @@ def test_deleting_the_frozen_regression_aborts_even_though_rollback_succeeded(tm
     assert (root / "tests/test_widget_regression.py").read_text() == "assert False\n"
 
 
+def test_same_numstat_rewrite_of_dirty_frozen_regression_is_refused(tmp_path):
+    root = _repo(tmp_path, {"tests/test_widget_regression.py": "assert False\n"})
+    target = root / "tests/test_widget_regression.py"
+    target.write_text("assert 0 == 1\n")
+    run = _Run(root, _cfg(frozen=["tests/test_widget_regression.py"]))
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+
+    target.write_text("assert 1 == 0\n")
+
+    with pytest.raises(permissions.PermissionBreach):
+        permissions.enforce(run, None, _agent("builder", None), before, preserved)
+    assert target.read_text() == "assert 0 == 1\n"
+
+
 def test_an_ordinary_recovered_slip_outside_the_surface_still_continues(tmp_path):
     """The negative half: the frozen surface is what stops being forgiven."""
     root = _repo(tmp_path, {"app/widget.py": "value = 1\n"})
@@ -203,6 +218,19 @@ def test_revising_a_defective_evaluator_creates_a_generation_and_voids_old_evide
     # commit would invalidate every piece of evidence.
     (root / "tests/test_unrelated.py").write_text("assert 1 == 1\n")
     assert generation(run) == second
+
+
+def test_untracked_evaluator_revision_creates_a_generation(tmp_path):
+    root = _repo(tmp_path, {"docs/validation/check_thing.py": "print('v1')\n"})
+    run = _Run(root, _cfg(frozen=["docs/validation/"]))
+    generation = _owner("evaluator_generation")
+    first = generation(run)
+
+    (root / "docs/validation/check_new.py").write_text("print('new')\n")
+
+    second = generation(run)
+    assert first is not None and second is not None and second != first
+    assert _owner("evidence_is_current")(first, run) is False
 
 
 def test_an_unobservable_evaluator_surface_is_could_not_observe(tmp_path):

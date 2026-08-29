@@ -85,8 +85,10 @@ def _git(args: list[str], cwd) -> str:
 def snapshot(run) -> dict[str, str]:
     """Fingerprint every path the working tree currently differs on.
 
-    Tracked files carry their numstat counts, so an edit to an already-dirty
-    file still registers as a change. Untracked files are listed by name.
+    Tracked files ordinarily carry their numstat counts. Frozen evaluator files
+    carry content digests, so a same-numstat rewrite of an already-dirty grader
+    still registers as a change. Untracked frozen evaluators are also digested.
+    Other untracked files are listed by name.
     Gitignored paths never appear, which is why the session runtime under
     `data_dir` — where handoff files legitimately land — needs no special case.
     """
@@ -95,11 +97,23 @@ def snapshot(run) -> dict[str, str]:
         fields = line.split("\t")
         if len(fields) >= 3:
             path = fields[-1].strip()
-            fingerprints[path] = f"{fields[0]},{fields[1]}"
+            if is_frozen_evaluator(path, run.cfg):
+                target = Path(run.repo_root) / path
+                body = hashlib.sha256(target.read_bytes()).hexdigest() \
+                    if target.is_file() else "absent"
+                fingerprints[path] = f"content:{body}"
+            else:
+                fingerprints[path] = f"{fields[0]},{fields[1]}"
     for path in _git(["ls-files", "--others", "--exclude-standard"],
                      run.repo_root).splitlines():
         if path.strip():
-            fingerprints[path.strip()] = "untracked"
+            path = path.strip()
+            if is_frozen_evaluator(path, run.cfg):
+                body = hashlib.sha256(
+                    (Path(run.repo_root) / path).read_bytes()).hexdigest()
+                fingerprints[path] = f"untracked:{body}"
+            else:
+                fingerprints[path] = "untracked"
     return fingerprints
 
 
@@ -241,7 +255,10 @@ def evaluator_generation(run) -> str | None:
     if not frozen_evaluator_paths(run.cfg):
         return None
     try:
-        listing = _git_out(["ls-files", "-z"], run.repo_root)
+        listing = _git_out(
+            ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            run.repo_root,
+        )
     except OSError:
         return None                      # no git, or no tree to ask it about
     if listing is None:
@@ -331,7 +348,7 @@ def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str],
             return "restored"
         return "REVERTED-BY-AGENT (uncommitted work lost, cannot restore)" \
             if path not in after else "left as-is (was already modified)"
-    if after.get(path) == "untracked":
+    if (after.get(path) or "").startswith("untracked"):
         try:
             (Path(run.repo_root) / path).unlink()
             return "deleted"

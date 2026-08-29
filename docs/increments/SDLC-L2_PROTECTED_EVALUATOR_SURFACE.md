@@ -115,7 +115,7 @@ runtime actually lives — `{data_dir}/sessions/{adw_id}/{agent_name}/`, built i
 `context_handoff/`, envelope, prompts and raw output, and the grant is still
 taken from configuration rather than from `.gitignore`.
 
-`evaluator_generation(run)` digests the tracked members of the declared surface
+`evaluator_generation(run)` digests the tracked and visible untracked members of the declared surface
 into one identity, and `evidence_is_current(recorded, run)` compares evidence
 against it. Both are three-valued: `None` is could-not-observe and is returned
 for a surface that is undeclared, unresolvable, unreadable, or sitting in a tree
