@@ -6,9 +6,9 @@
   "authoritative_planning_source": {
     "ref": "planning/future-sssf",
     "tracking_ref": "refs/remotes/origin/planning/future-sssf",
-    "source_commit": "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b",
-    "source_tree": "e29628eb5754a032dce989166f287b82d5c877dc",
-    "generation": "planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc",
+    "source_commit": "eab880656b4ef00174ea514cca128f6336632fcf",
+    "source_tree": "5328b8a437d894682f4ac1c5d7ae581694410c43",
+    "generation": "planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43",
     "identity_rule": "The ref, tracking ref, observed source commit, observed source tree, and generation must match the current authority before planning state is accepted."
   },
   "current_sandbox_states": {
@@ -19,9 +19,9 @@
     "state_basis": {
       "ref": "planning/future-sssf",
       "tracking_ref": "refs/remotes/origin/planning/future-sssf",
-      "source_commit": "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b",
-      "source_tree": "e29628eb5754a032dce989166f287b82d5c877dc",
-      "generation": "planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc"
+      "source_commit": "eab880656b4ef00174ea514cca128f6336632fcf",
+      "source_tree": "5328b8a437d894682f4ac1c5d7ae581694410c43",
+      "generation": "planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43"
     },
     "answerable_queries": [
       "future-item-state",
@@ -202,9 +202,9 @@
       "active_binding": null,
       "planning_authority_binding": {
         "ref": "planning/future-sssf",
-        "source_commit": "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b",
-        "source_tree": "e29628eb5754a032dce989166f287b82d5c877dc",
-        "generation": "planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc",
+        "source_commit": "eab880656b4ef00174ea514cca128f6336632fcf",
+        "source_tree": "5328b8a437d894682f4ac1c5d7ae581694410c43",
+        "generation": "planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43",
         "increment_ids": [
           "FP-001",
           "FM-FP-001"

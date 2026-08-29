@@ -42,7 +42,7 @@ durable current state and transition evidence is
 candidate register, roadmap, ADRs, and manifest point to that owner rather than
 restating a competing lifecycle.
 
-authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b; tree: e29628eb5754a032dce989166f287b82d5c877dc; generation: planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc
+authoritative planning source: planning/future-sssf; commit: eab880656b4ef00174ea514cca128f6336632fcf; tree: 5328b8a437d894682f4ac1c5d7ae581694410c43; generation: planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43
 
 `ACTIVE` is engineering authorization only. `ACTIVE` is intake eligibility
 only. `ACTIVE` is never task creation. `ACTIVE` is never execution authority.

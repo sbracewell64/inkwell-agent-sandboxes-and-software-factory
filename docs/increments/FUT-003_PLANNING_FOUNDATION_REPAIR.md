@@ -3,7 +3,7 @@
 **Status:** documentation and offline-validator candidate; not a FUT-003 runtime
 implementation and not a `PROVEN` or live-enable claim
 
-authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b; tree: e29628eb5754a032dce989166f287b82d5c877dc; generation: planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc
+authoritative planning source: planning/future-sssf; commit: eab880656b4ef00174ea514cca128f6336632fcf; tree: 5328b8a437d894682f4ac1c5d7ae581694410c43; generation: planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43
 
 - **Starts from:** `991d3a64f1b96a8b9637f97060d692af3518228f`
 - **Starting tree:** `7b88546cd1f63e8304325ee35be37893268ae0e0`
@@ -13,7 +13,7 @@ authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40
 - **Lifecycle owner:** [`PLANNING_LIFECYCLE.md`](../development/PLANNING_LIFECYCLE.md)
 - **State record:** [`PLANNING_STATE.json`](../development/PLANNING_STATE.json)
 - **Validation owner:** [`check_planning_foundation.py`](../validation/check_planning_foundation.py)
-- **Authoritative planning source:** `planning/future-sssf` at observed commit `d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b`, tree `e29628eb5754a032dce989166f287b82d5c877dc`, generation `planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc`
+- **Authoritative planning source:** `planning/future-sssf` at observed commit `eab880656b4ef00174ea514cca128f6336632fcf`, tree `5328b8a437d894682f4ac1c5d7ae581694410c43`, generation `planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43`
 
 ## Intent
 
@@ -46,6 +46,38 @@ was directly reproduced as follows:
 
 These observations remain adverse evidence for PR #24; they are not rewritten
 or treated as a pass after the correction.
+
+## Pending register-admission ruling — current validator state
+
+The generation rebind to `eab880656b4ef00174ea514cca128f6336632fcf` /
+`5328b8a437d894682f4ac1c5d7ae581694410c43` is complete across every state-bearing
+surface, the manifest, `PLANNING_STATE.json`, the CI authority fetch, and the
+CI-contract validator.
+
+The canonical validator nevertheless returns `OBSERVED_BAD` at this head, by design
+and not by defect:
+
+```
+current planning authority could-not-observe: authority future-item register is invalid
+at eab880656b4ef00174ea514cca128f6336632fcf: unexpected FUT identities: FUT-014, FUT-015, FUT-016
+```
+
+The observed authority declares four identities outside the currently governed
+universe — `FUT-014`, `FUT-015`, `FUT-016` (candidate register) and `WAYFINDER-0`
+(lifecycle roadmap). Admitting them widens what this validator asserts, which is a
+scope question held by Browser Sol (control issue 10). Until that ruling is relayed,
+the projection is **not** widened: the validator reports the gap as a non-PASS rather
+than projecting an incomplete universe as a pass, and rather than silently narrowing
+the observed authority to the older governed set.
+
+All four authority declarations are `SEQUENCED` or `CANDIDATE`; none is `ACTIVE`.
+Admission would record planning position only and would not create a task, execution,
+landing, acceptance, certification, or live enablement.
+
+The single-root-cause nature of the failure is established: with the four identities
+admitted, the validator returns `OBSERVED_GOOD` / `PASS` with zero errors and zero
+unverified controls, and no further semantic gap appears. That result was reproduced
+before this record was written and then reverted, so the admission is not carried here.
 
 ## Design and ownership
 

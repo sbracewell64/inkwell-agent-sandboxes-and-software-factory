@@ -1,6 +1,6 @@
 # ADR-0005 — FirstMate Planning-Transition Awareness
 
-authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b; tree: e29628eb5754a032dce989166f287b82d5c877dc; generation: planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc
+authoritative planning source: planning/future-sssf; commit: eab880656b4ef00174ea514cca128f6336632fcf; tree: 5328b8a437d894682f4ac1c5d7ae581694410c43; generation: planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43
 
 - **Status:** Accepted design direction; implementation `ACTIVE` under the authoritative planning generation; not `PROVEN` or production-enabled
 - **Date:** 2026-08-20
@@ -8,7 +8,7 @@ authoritative planning source: planning/future-sssf; commit: d75103fb7ef8dd4ca40
 - **Lifecycle owner:** [`PLANNING_LIFECYCLE.md`](../development/PLANNING_LIFECYCLE.md)
 - **Durable state record:** [`PLANNING_STATE.json`](../development/PLANNING_STATE.json)
 - **FirstMate evaluation baseline:** `sbracewell64/firstmate@f4e69d6ce411750b55fc9f186f60ce0e8b0cd786`
-- **Authoritative planning source:** `planning/future-sssf@d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:e29628eb5754a032dce989166f287b82d5c877dc`
+- **Authoritative planning source:** `planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43`
 
 ## Context
 

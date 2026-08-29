@@ -143,8 +143,8 @@ def test_older_consistent_snapshot_cannot_replace_authoritative_generation() -> 
 def test_current_planning_generation_is_observed_not_candidate_constant() -> None:
     project = _VALIDATOR.load_project()
     observation = project["authority_observation"]
-    assert observation["source_commit"] == "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b"
-    assert observation["source_tree"] == "e29628eb5754a032dce989166f287b82d5c877dc"
+    assert observation["source_commit"] == "eab880656b4ef00174ea514cca128f6336632fcf"
+    assert observation["source_tree"] == "5328b8a437d894682f4ac1c5d7ae581694410c43"
     sbx2 = next(item for item in observation["lifecycle_identities"] if item["identity"] == "SBX-2")
     assert sbx2["state"] == "HELD"
 
@@ -510,7 +510,7 @@ def test_ci_workflow_remains_credential_free() -> None:
     assert "github-token: ''" in workflow
     assert "github-token: ${{ github.token }}" not in workflow
     assert (
-        "d75103fb7ef8dd4ca40f62d40fc7479369bbdf0b:"
+        "eab880656b4ef00174ea514cca128f6336632fcf:"
         "refs/remotes/origin/planning/future-sssf"
     ) in workflow
 
