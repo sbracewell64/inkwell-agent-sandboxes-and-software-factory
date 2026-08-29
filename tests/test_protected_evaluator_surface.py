@@ -158,6 +158,34 @@ def test_same_numstat_rewrite_of_dirty_frozen_regression_is_refused(tmp_path):
     assert target.read_text() == "assert 0 == 1\n"
 
 
+def test_frozen_snapshot_includes_repository_mode_and_symlink_target(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/check.py": "assert True\n",
+        "tests/a.txt": "same\n",
+        "tests/b.txt": "same\n",
+        "tests/c.txt": "same\n",
+    })
+    link = root / "tests/evaluator"
+    link.symlink_to("a.txt")
+    subprocess.run(["git", "add", "tests/evaluator"], cwd=root, check=True)
+    subprocess.run(["git", "-c", "user.email=t@example", "-c", "user.name=t",
+                    "commit", "-qm", "link"], cwd=root, check=True)
+    run = _Run(root, _cfg(frozen=["tests/"]))
+
+    (root / "tests/check.py").write_text("assert False\n")
+    link.unlink()
+    link.symlink_to("b.txt")
+    before = permissions.snapshot(run)
+
+    (root / "tests/check.py").chmod(0o755)
+    link.unlink()
+    link.symlink_to("c.txt")
+    after = permissions.snapshot(run)
+
+    assert permissions.changed_paths(before, after) == [
+        "tests/check.py", "tests/evaluator"]
+
+
 def test_an_ordinary_recovered_slip_outside_the_surface_still_continues(tmp_path):
     """The negative half: the frozen surface is what stops being forgiven."""
     root = _repo(tmp_path, {"app/widget.py": "value = 1\n"})
@@ -227,6 +255,20 @@ def test_untracked_evaluator_revision_creates_a_generation(tmp_path):
     first = generation(run)
 
     (root / "docs/validation/check_new.py").write_text("print('new')\n")
+
+    second = generation(run)
+    assert first is not None and second is not None and second != first
+    assert _owner("evidence_is_current")(first, run) is False
+
+
+def test_evaluator_declaration_revision_creates_a_generation(tmp_path):
+    root = _repo(tmp_path, {"docs/validation/check_thing.py": "print('v1')\n"})
+    cfg = _cfg(frozen=["docs/validation/"])
+    run = _Run(root, cfg)
+    generation = _owner("evaluator_generation")
+    first = generation(run)
+
+    cfg.defaults.protected_evaluator_paths = ["docs/validation/check_thing.py"]
 
     second = generation(run)
     assert first is not None and second is not None and second != first

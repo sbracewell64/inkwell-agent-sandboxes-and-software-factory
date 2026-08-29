@@ -40,7 +40,9 @@ Three keys drive it, all in sssf.config.yaml:
 from __future__ import annotations
 
 import hashlib
+import os
 import re
+import stat
 import subprocess
 from pathlib import Path
 
@@ -82,6 +84,20 @@ def _git(args: list[str], cwd) -> str:
     return _git_out(args, cwd) or ""
 
 
+def _repository_identity(target: Path) -> str:
+    metadata = target.lstat()
+    if stat.S_ISLNK(metadata.st_mode):
+        mode = "120000"
+        body = os.fsencode(os.readlink(target))
+    elif stat.S_ISREG(metadata.st_mode):
+        mode = "100755" if metadata.st_mode & 0o111 else "100644"
+        body = target.read_bytes()
+    else:
+        mode = f"type:{stat.S_IFMT(metadata.st_mode):o}"
+        body = b""
+    return f"{mode}:{hashlib.sha256(body).hexdigest()}"
+
+
 def snapshot(run) -> dict[str, str]:
     """Fingerprint every path the working tree currently differs on.
 
@@ -99,9 +115,9 @@ def snapshot(run) -> dict[str, str]:
             path = fields[-1].strip()
             if is_frozen_evaluator(path, run.cfg):
                 target = Path(run.repo_root) / path
-                body = hashlib.sha256(target.read_bytes()).hexdigest() \
-                    if target.is_file() else "absent"
-                fingerprints[path] = f"content:{body}"
+                identity = _repository_identity(target) \
+                    if target.exists() or target.is_symlink() else "absent"
+                fingerprints[path] = f"content:{identity}"
             else:
                 fingerprints[path] = f"{fields[0]},{fields[1]}"
     for path in _git(["ls-files", "--others", "--exclude-standard"],
@@ -109,9 +125,8 @@ def snapshot(run) -> dict[str, str]:
         if path.strip():
             path = path.strip()
             if is_frozen_evaluator(path, run.cfg):
-                body = hashlib.sha256(
-                    (Path(run.repo_root) / path).read_bytes()).hexdigest()
-                fingerprints[path] = f"untracked:{body}"
+                identity = _repository_identity(Path(run.repo_root) / path)
+                fingerprints[path] = f"untracked:{identity}"
             else:
                 fingerprints[path] = "untracked"
     return fingerprints
@@ -264,13 +279,16 @@ def evaluator_generation(run) -> str | None:
     if listing is None:
         return None
     digest, members = hashlib.sha256(), 0
+    declarations = sorted(set(frozen_evaluator_paths(run.cfg)))
+    for declaration in declarations:
+        digest.update(f"declaration\0{declaration}\0".encode())
     for path in sorted(p for p in listing.split("\0") if p):
         if not is_frozen_evaluator(path, run.cfg):
             continue
         target = Path(run.repo_root) / path
         try:
-            body = (hashlib.sha256(target.read_bytes()).hexdigest()
-                    if target.is_file() else "absent")
+            body = (_repository_identity(target)
+                    if target.exists() or target.is_symlink() else "absent")
         except OSError:
             return None                  # a member we could not read is not a state
         digest.update(f"{path}\0{body}\0".encode())
