@@ -33,10 +33,12 @@ REF-1 — execute and freeze the Reference Workload Baseline
         ↓
 Wayfinder / DSH / later architecture experiments
         ↓
-replay REF-1 when a later accepted generation makes a material value claim
+replay REF-1 after each significant accepted SSSF advancement
+        ↓
+FirstMate compares candidate result against the preserved reference generation
 ```
 
-REF-1 should not delay unrelated dependency-safe work. It becomes comparison-critical only before a later architecture claims improvement over the baseline factory.
+REF-1 should not delay unrelated dependency-safe work. It becomes comparison-critical before a significant accepted SSSF advancement is credited as an improvement over the prior accepted factory generation.
 
 If the reference workload can be run cleanly before the exact post-Docker/pre-DSH freeze without weakening that freeze, FirstMate may recommend the narrower sequencing that produces the strongest exact-generation comparison. The selected ordering must preserve an exact baseline SSSF generation and exact reference-run identity.
 
@@ -180,7 +182,48 @@ Required rules:
 5. **No single-metric optimization:** lower tokens or lower wall time do not override correctness, safety, provenance, maker/checker, cleanup, or acceptance regressions.
 6. **Comparable model policy:** if model/provider/profile changes materially, report the comparison as architecture+model/config change or run a controlled comparison where practical; do not attribute the entire delta to SSSF architecture.
 7. **Stable baseline preservation:** never overwrite the original run/evidence. Later replays append comparison generations.
-8. **No forced rerun cadence:** replay REF-1 when a material architecture change claims value, not after every trivial commit.
+8. **Significant-advancement replay:** after each significant accepted SSSF advancement, rerun REF-1 against the new exact factory generation before that advancement is credited as a material improvement. Trivial documentation, formatting, or otherwise non-behavioral changes do not trigger a replay.
+9. **FirstMate comparison obligation:** FirstMate must compare the new REF-1 result against the preserved baseline and the immediately prior accepted comparison generation, identify material deltas, distinguish architectural changes from model/config/runtime changes, and report regressions/CNO rather than smoothing them away.
+10. **No benchmark gate inflation:** REF-1 is a comparison/evidence obligation for significant advancements; it does not replace the increment's own correctness, safety, review, or landing gates.
+
+## Significant advancement trigger
+
+A change should be treated as significant for REF-1 replay when it materially alters one or more of:
+
+- ADW/workflow structure or workflow selection;
+- AgentBackend/harness integration;
+- DSH admission or materially different DSH capability;
+- serial versus parallel execution/fan-out/join behavior;
+- SandboxProvider/runtime execution path;
+- retry, repair, refinement, cancellation, recovery, or quiescence behavior;
+- verification/review/acceptance machinery;
+- model routing or configuration policy when intended as a factory improvement;
+- context/memory/compaction behavior that materially affects agent execution;
+- substantial observability/control-plane changes claimed to improve autonomy, correctness, latency, cost, or operator burden;
+- any other architecture change for which FirstMate or Browser Sol intends to claim material factory value.
+
+When classification is genuinely ambiguous, prefer a replay if the run cost/effort is low; otherwise record why the change is non-significant. Do not create a semantic-review bureaucracy around trivial changes.
+
+## Required FirstMate comparison report
+
+For each significant replay, FirstMate should produce a concise durable comparison containing at least:
+
+- baseline REF-1 generation and exact run identity;
+- immediately prior accepted comparison generation, if one exists;
+- candidate SSSF exact commit/tree and material runtime/model/config identities;
+- accepted/failed/CNO status;
+- token delta total and by phase where comparable;
+- wall-time delta total and by phase where comparable;
+- agent-call/retry/revision delta;
+- deterministic gate/test/review delta;
+- Captain/Browser-Sol intervention delta;
+- sandbox/concurrency/resource delta where comparable;
+- cleanup/quiescence result;
+- correctness/safety/provenance/maker-checker regressions or improvements;
+- changed comparison inputs that limit attribution;
+- conclusion using a small vocabulary such as `IMPROVED`, `REGRESSED`, `MIXED`, `NO_MATERIAL_CHANGE`, or `CNO`, with the underlying metrics retained rather than collapsed into an opaque score.
+
+`IMPROVED` must not be emitted when a required correctness, safety, provenance, maker/checker, acceptance, or quiescence property regressed merely because tokens or latency improved.
 
 ## Candidate scorecard
 
@@ -214,7 +257,8 @@ Before REF-1 is treated as a valid baseline, prove at least:
 - a deliberately changed task/evaluator/model/config is detected as non-equivalent or explicitly qualified;
 - failed/rejected runs do not become the reference PASS;
 - raw evidence and the human-readable metric report bind the same run identity;
-- rerunning does not overwrite the original evidence generation.
+- rerunning does not overwrite the original evidence generation;
+- a significant advancement cannot be labeled `IMPROVED` without a bound REF-1 replay/comparison or an explicit CNO/non-comparability record.
 
 ## FirstMate planning obligation
 
@@ -228,7 +272,9 @@ FirstMate should perform a plan-only assessment and recommend:
 6. which metrics are already available versus currently CNO;
 7. the narrowest sequencing point relative to `BASELINE-PR` and the post-Docker/pre-DSH freeze;
 8. the ordinary increment/activation needed to execute and freeze REF-1;
-9. how later DSH, parallel-ADW, orchestration, Agent Lightning, observability, or other material changes should invoke REF-1 comparison before claiming improvement.
+9. the exact significant-advancement classifier and the smallest reliable mechanism that causes FirstMate to request/perform a REF-1 replay at those checkpoints;
+10. the durable comparison-report location/format that reuses existing owners rather than creating a new benchmark state machine;
+11. how later DSH, parallel-ADW, orchestration, Agent Lightning, observability, or other material changes should invoke REF-1 comparison before claiming improvement.
 
 ## Simplification constraints
 
@@ -241,6 +287,7 @@ REF-1 must obey the SSSF simplification hierarchy:
 - no new workflow if an existing ADW is sufficient;
 - no external service merely to make the benchmark realistic;
 - no mandatory rerun for changes too small to make a material value claim;
-- prefer deterministic read-only projections over new stateful machinery.
+- prefer deterministic read-only projections over new stateful machinery;
+- prefer an existing increment/roadmap transition hook for significant-advancement replay over a new scheduler/monitor.
 
-**Default:** one frozen reference task, one exact starting project state, one accepted baseline Python ADW run, one existing trace/evidence spine, and append-only later comparisons.
+**Default:** one frozen reference task, one exact starting project state, one accepted baseline Python ADW run, one existing trace/evidence spine, and append-only later comparisons after significant accepted advancements.
