@@ -36,6 +36,14 @@ Never hand-edit session evidence.
 - `tests/test_validator_observation_boundary.py` — executable red/green over the
   validator and gate binaries, including the control that a real predicate
   failure still reports observed-bad
+- `tools/windows_host.py` — the Windows bootstrap and host doctor; owns the same
+  boundary for its own child tools, keeping an absent tool a doctor finding while
+  everything derived from a child that never ran is could-not-observe
+- `docs/increments/HD-10_HOST_DOCTOR_OBSERVATION_BOUNDARY.md` — the host-doctor
+  instance of the invariant and its proof
+- `tests/test_windows_host_observation_boundary.py` — executable red/green over
+  the host doctor, including the controls that a present-but-failing tool is
+  still FAIL and that a present tool is really executed
 
 ## Sandbox contract and orchestration
 
