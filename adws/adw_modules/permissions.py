@@ -24,13 +24,22 @@ A breach is NOT a gate violation. Gates are for work an agent can be asked to
 redo; a breach cannot be corrected by re-prompting, because the write already
 happened. It aborts the phase and names every offending path.
 
-Two keys drive it, both in sssf.config.yaml:
+Three keys drive it, all in sssf.config.yaml:
     defaults.protected_files   paths no agent may touch unless it names them itself
+    defaults.protected_evaluator_paths   the acceptance surface frozen for this
+                               task generation — the machinery that decides
+                               whether the work passed. Unlike protected_files,
+                               a broad prefix in an agent's own `writes` does
+                               not carry one of these along with it; only a
+                               declaration scoped inside the surface does, and
+                               that declaration is the explicit evaluator
+                               revision the law requires.
     agents[].writes      None = unrestricted · [] = read-only · [...] = only these
 """
 
 from __future__ import annotations
 
+import hashlib
 import re
 import subprocess
 from pathlib import Path
@@ -57,9 +66,20 @@ RECOVERED_LIMIT = 3
 PRESERVE_MAX_BYTES = 1 << 20
 
 
-def _git(args: list[str], cwd) -> str:
+def _git_out(args: list[str], cwd) -> str | None:
+    """git's answer, or None when git ran and refused to give one.
+
+    Deliberately does NOT swallow an unreachable git: a snapshot that quietly
+    came back empty because git was missing would report that no agent changed
+    anything, which is the one wrong answer this module must never give. The
+    caller that needs an unreachable git as a third value catches it itself.
+    """
     result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
-    return result.stdout if result.returncode == 0 else ""
+    return result.stdout if result.returncode == 0 else None
+
+
+def _git(args: list[str], cwd) -> str:
+    return _git_out(args, cwd) or ""
 
 
 def snapshot(run) -> dict[str, str]:
@@ -135,19 +155,124 @@ def always_writable(cfg: SSSFConfig) -> list[str]:
     is normally ignored, so it never even appears in a snapshot — but an agent's
     ability to record its work must not hang on a gitignore entry that someone
     can delete or that a changed `data_dir` can outgrow.
+
+    Scoped to `sessions/`, which is where the runtime actually lives —
+    `{data_dir}/sessions/{adw_id}/{agent_name}/`, built in adw_modules/runner.py.
+    `data_dir` also holds TRACKED surfaces that grade the work: every agent's
+    `prompt_engineering/` and the `harness_engineering/` extensions loaded into
+    the harness. Granting the whole directory handed every agent a write on
+    every other agent's prompt — and handed it first, ahead of every protection
+    below, which is exactly why the too-wide scope was invisible. The order is
+    deliberate and unchanged; only the scope was wrong.
     """
-    return [cfg.defaults.data_dir.rstrip("/") + "/"]
+    return [cfg.defaults.data_dir.rstrip("/") + "/sessions/"]
+
+
+def frozen_evaluator_paths(cfg: SSSFConfig) -> list[str]:
+    """The acceptance surface frozen for the active task generation.
+
+    Empty is a real answer, and it is not "nothing to protect": it is a roster
+    that has declared no evaluator surface, which `evaluator_generation` reports
+    as could-not-observe rather than as an intact one.
+    """
+    return list(cfg.defaults.protected_evaluator_paths)
+
+
+def is_frozen_evaluator(path: str, cfg: SSSFConfig) -> bool:
+    return any(_matches(path, p) for p in frozen_evaluator_paths(cfg))
+
+
+def _revises_evaluator(declaration: str, cfg: SSSFConfig) -> bool:
+    """True when a `writes` entry is itself inside the frozen surface.
+
+    Naming a path is what unlocks a protected one, and that stays true here —
+    but only for a declaration narrow enough to BE an evaluator revision.
+    `docs/` is a decision about documentation that happens to contain
+    `docs/validation/`; treating it as consent to rewrite the graders is how an
+    acceptance surface gets edited by an agent nobody meant to hand it to.
+    Since the roster is itself a protected file, a declaration inside the
+    surface can only arrive by a deliberate edit from outside the run — which
+    is what makes it the explicit revision transition.
+    """
+    return any(_matches(declaration, p) for p in frozen_evaluator_paths(cfg))
 
 
 def permitted(path: str, agent: AgentConfig, cfg: SSSFConfig) -> bool:
-    """Session runtime first, then the agent's own list, then what is protected."""
+    """Session runtime first, then the agent's own list, then what is protected.
+
+    The order is the original one. The frozen evaluator surface is consulted
+    after `protected_files`, never before the session runtime, because an agent
+    that cannot write its own report is an agent that cannot report a refusal.
+    """
     if any(_matches(path, p) for p in always_writable(cfg)):
         return True
-    if any(_matches(path, p) for p in (agent.writes or [])):
-        return True                      # naming a path is what unlocks a protected one
+    declarations = agent.writes or []
+    if any(_matches(path, p) for p in declarations):
+        # Naming a path is what unlocks a protected one. For the frozen
+        # evaluator surface the naming has to be an evaluator revision — a
+        # declaration inside the surface — and not a broad grant above it that
+        # would carry the grader along with the work it grades.
+        if not is_frozen_evaluator(path, cfg):
+            return True
+        return any(_matches(path, d) and _revises_evaluator(d, cfg)
+                   for d in declarations)
     if any(_matches(path, p) for p in cfg.defaults.protected_files):
         return False
+    if is_frozen_evaluator(path, cfg):
+        return False
     return agent.writes is None          # None = unrestricted, [] = no repo writes
+
+
+def evaluator_generation(run) -> str | None:
+    """The identity of the frozen evaluator surface as it stands right now.
+
+    Evidence is only ever evidence about a generation. A legitimate evaluator
+    change is explicit — declared in the roster, which no agent can edit — and
+    the moment those bytes move this digest moves with them, so evidence
+    recorded against the old digest describes an acceptance surface that no
+    longer exists.
+
+    Three-valued. `None` is could-not-observe, and it is returned whenever the
+    surface cannot be resolved: no surface declared, no git to enumerate the
+    tracked tree, a declaration that matches nothing, or a member that cannot be
+    read. An evaluator surface nobody could look at is never evidence that the
+    evaluator is intact.
+    """
+    if not frozen_evaluator_paths(run.cfg):
+        return None
+    try:
+        listing = _git_out(["ls-files", "-z"], run.repo_root)
+    except OSError:
+        return None                      # no git, or no tree to ask it about
+    if listing is None:
+        return None
+    digest, members = hashlib.sha256(), 0
+    for path in sorted(p for p in listing.split("\0") if p):
+        if not is_frozen_evaluator(path, run.cfg):
+            continue
+        target = Path(run.repo_root) / path
+        try:
+            body = (hashlib.sha256(target.read_bytes()).hexdigest()
+                    if target.is_file() else "absent")
+        except OSError:
+            return None                  # a member we could not read is not a state
+        digest.update(f"{path}\0{body}\0".encode())
+        members += 1
+    if not members:
+        return None                      # declared a surface, resolved nothing
+    return digest.hexdigest()
+
+
+def evidence_is_current(recorded: str | None, run) -> bool | None:
+    """Does evidence recorded against `recorded` still describe this surface?
+
+    `None` is could-not-observe — nothing recorded, or nothing observable now —
+    and never stands in for "yes".
+    """
+    current = evaluator_generation(run)
+    if recorded is None or current is None:
+        return None
+    return recorded == current
 
 
 def preserve(run, tree: dict[str, str]) -> dict[str, bytes]:
@@ -245,12 +370,22 @@ def enforce(run, phase, agent: AgentConfig, before: dict[str, str],
     # was put back and there were only a few, the tree is exactly what it would
     # have been had the agent stayed in scope — so the run continues, loudly.
     # A scratch file redirected into the repo should not kill a 13-phase run.
+    #
+    # The frozen evaluator surface is the exception, and it is why rollback is
+    # defense in depth here rather than the guard. "It was put back" answers the
+    # damage question; it does not make an attempt on the acceptance surface a
+    # slip, and a run that reached for its own grader has not earned the
+    # forgiving path.
     unrecovered = [p for p, outcome in outcomes.items() if outcome not in RECOVERED]
-    if not unrecovered and len(outcomes) <= RECOVERED_LIMIT:
+    frozen = [p for p in outcomes if is_frozen_evaluator(p, run.cfg)]
+    if not unrecovered and not frozen and len(outcomes) <= RECOVERED_LIMIT:
         run.console.note(
             f"permission: {agent.name} is {scope}; "
             f"{len(outcomes)} out-of-scope path(s) undone, continuing:\n{detail}")
         return [p for p in touched if p not in outcomes]
 
+    surface = (f"; {len(frozen)} of them frozen evaluator path(s): "
+               f"{', '.join(frozen)}" if frozen else "")
     raise PermissionBreach(
-        f"{agent.name} is {scope} but modified {len(breaches)} path(s):\n{detail}")
+        f"{agent.name} is {scope} but modified {len(breaches)} path(s)"
+        f"{surface}:\n{detail}")

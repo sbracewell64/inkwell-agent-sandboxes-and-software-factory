@@ -39,6 +39,29 @@ defaults:
     - adws/adw_modules/
     - adws/adw_sssf_config/
     - adws/adw_*.py
+  # The acceptance surface frozen for the ACTIVE task generation — the machinery
+  # that decides whether the work passed. `protected_files` guards the factory's
+  # own code; this guards the graders, wherever they live. Two differences carry
+  # the weight:
+  #   * property-scoped, never every test file forever. A path is frozen because
+  #     it is named here, not because it looks like a test — so the regression
+  #     established for this generation is frozen while its neighbours stay
+  #     ordinary work, refactorable like any other file.
+  #   * a broad `writes` prefix does not unlock one. `docs/` is a decision about
+  #     documentation, not consent to rewrite the validators underneath it. Only
+  #     a declaration scoped INSIDE this surface is — and since this file is
+  #     itself protected, making one is the explicit evaluator revision: it
+  #     starts a new generation and invalidates evidence bound to the old one.
+  # Enforced in adw_modules/permissions.py, pre-effect at the permission
+  # decision; the post-effect rollback beside it is defense in depth, not this.
+  protected_evaluator_paths:
+    - docs/validation/                     # the deterministic validators
+    - ci/checks.json                       # the check manifest ...
+    - tools/ci_gate.py                     # ... and the runner that pins its result
+    - adws/adw_data/prompt_engineering/    # every agent's prompt surface
+    - adws/adw_data/harness_engineering/   # the extensions loaded into the harness
+    - tests/fixtures/                      # the watched-red fixture corpus
+    - tests/test_protected_evaluator_surface.py   # this generation's regression
   data_dir: adws/adw_data          # runtime home: {data_dir}/sessions/{adw_id}/{agent_name}/
 
 observability:

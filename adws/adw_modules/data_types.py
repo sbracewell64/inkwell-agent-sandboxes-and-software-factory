@@ -458,6 +458,13 @@ class ConfigDefaults(BaseModel):
     protected_files: list[str] = Field(default_factory=lambda: [
         "adws/adw_modules/", "adws/adw_sssf_config/", "adws/adw_*.py",
     ])
+    # The acceptance surface frozen for the active task generation: the paths
+    # that decide whether the work passed. It is deliberately property-scoped
+    # and deliberately empty by default — a code default cannot know which
+    # regression grades a generation it has never seen, and a roster that
+    # declares nothing has declared nothing, which permissions.py reports as
+    # could-not-observe rather than as an intact evaluator.
+    protected_evaluator_paths: list[str] = Field(default_factory=list)
     data_dir: str = "adws/adw_data"
 
 

@@ -1,0 +1,193 @@
+# SDLC-L2 — Property-Scoped Frozen Evaluator Surface
+
+**Status:** IMPLEMENTED, AWAITING REVIEW
+**Starts from:** `c192693ec1f09156fd2ce8d1a9e6ce8470e9bd96`
+
+**Authority:** control #36, `STATE: AUTHORIZED_FOR_ROADMAP_INTEGRATION_AND_INCREMENTAL_IMPLEMENTATION`,
+`captain_required: false`. The SDLC-L2 law is registered on the canonical
+planning branch at `planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf`,
+`docs/development/ROADMAP.md` — "Evaluator immutability", whose `EXTEND_OWNER`
+disposition reads: *"the one new artifact is a list of protected evaluator paths
+inside a file that already exists."* Two boundaries from ruling
+`34/5429873101` govern the shape of the fix and are carried below.
+
+`SDLC-L2` has no blocking predecessor: `BOUND-1 → SDLC-L2` is `CONSTRAINS_DESIGN`,
+which the same document defines as *"`from` dictates a design choice in `to`
+without blocking `to`'s start."*
+
+## Problem
+
+`adws/adw_modules/permissions.py` decides what an agent may change. Four of the
+five gaps the law names were reproducible at `c192693`, and every one of them
+let an agent reach the machinery that decides whether its own work passed.
+
+1. **The regression that grades a generation is not frozen.** `tests/` appears
+   in no protected list, so the builder — `writes: None`, the one unrestricted
+   agent — could delete or relax the failing test it was asked to make pass.
+2. **The deterministic validators are writable by the builder and by the
+   documenter.** The documenter's `writes` grant is `docs/`, and
+   `docs/validation/check_*.py` sits underneath it. A documenter that can
+   rewrite a validator is not a documenter.
+3. **The check manifest and its pinning validator are writable by the same
+   agent.** `ci/checks.json` and `docs/validation/check_ci_contract.py` were
+   both reachable by one agent, so a coordinated two-file edit went uncaught.
+4. **Every agent could write every agent's prompt surface.**
+   `always_writable()` returned `{data_dir}/` — all of `adws/adw_data/` — and it
+   is consulted *first*, ahead of every protection below it. `data_dir` also
+   holds the tracked `prompt_engineering/` and `harness_engineering/` surfaces,
+   so a `writes: []` read-only agent could rewrite another agent's system
+   prompt and `protected_files` was never reached.
+5. **The control is post-effect detect-and-rollback rather than pre-effect
+   refusal.** `enforce()` forgives up to `RECOVERED_LIMIT = 3` out-of-scope
+   writes when the rollback succeeded, which is right for a redirected scratch
+   file and wrong for the acceptance surface.
+
+## Desired outcome
+
+The acceptance surface established for a task generation cannot be silently
+weakened or rewritten by the maker or the optimizer trying to satisfy it. A
+legitimate evaluator change is an explicit revision: it is declared in the
+roster — itself a protected file — and it creates a new generation that
+invalidates evidence bound to the old one.
+
+## Non-goals
+
+- **No blanket reversal of the legacy precedence.** Ruling `34/5429873101`
+  `F6_permissions_precedence`: *"Do not blanket-reverse the legacy precedence
+  under this ruling."* The `always_writable`-before-`protected_files` ordering
+  is deliberate for session reportability and is unchanged. Only the *scope* of
+  the first rule moved, from all of `data_dir` to the `sessions/` runtime it
+  always meant.
+- **Rollback is not presented as the protection.** Same ruling: *"Post-effect
+  snapshot/rollback can remain defense in depth; it is not the load-bearing
+  security guard."* `RECOVERED_LIMIT` keeps its existing job for ordinary slips
+  and is explicitly no longer available for the frozen surface.
+- **No held-out/hidden-benchmark access control.** Preventing an optimizer from
+  *reading* a holdout is `AL-1`'s, deferred behind its `SBX-4..6` + `BOUND-1`
+  predicate. What is delivered here is the permission refusal on *writing* a
+  declared scorer path. No benchmark, holdout or scorer surface is created.
+- **No pre-tool projection into the coding harness.** SSSF ships none; that is
+  `SDLC-L1`'s `EXTEND_OWNER` row, not this one. The refusal here is the
+  permission decision itself, not a harness-side interception.
+- **No new framework, no second authority.** The roster/permissions owner is
+  extended in place. No validator, no manifest row, no gate runner is added —
+  registering a deterministic config eval for this surface belongs to
+  `SDLC-L3`, which owns `ci/checks.json`.
+- **No roadmap reconciliation.** `docs/development/ROADMAP.md` on `main` carries
+  a different item vocabulary from the planning branch and names no `SDLC-L*`
+  item. Reconciling the two is its own commissioned work and is not touched
+  here.
+
+## Design
+
+**The one new artifact** is `defaults.protected_evaluator_paths`, a list in each
+of the five shipped rosters under `adws/adw_sssf_config/`, typed on
+`ConfigDefaults`. It defaults to empty in code on purpose: a code default cannot
+know which regression grades a generation it has never seen, and a roster that
+declares nothing has declared nothing.
+
+It differs from `protected_files` in two ways, and both are the point.
+
+*Property-scoped, never every test file forever.* A path is frozen because it is
+named, not because it looks like a test. This generation's regression is frozen;
+its neighbours stay ordinary work. The shipped declaration is the durable
+grading machinery — `docs/validation/`, `ci/checks.json`, `tools/ci_gate.py`,
+`adws/adw_data/prompt_engineering/`, `adws/adw_data/harness_engineering/`,
+`tests/fixtures/` — plus the single regression established for this generation,
+`tests/test_protected_evaluator_surface.py`.
+
+*A broad `writes` prefix does not unlock one.* "Naming a path is what unlocks a
+protected one" still holds, but for the frozen surface the naming has to be an
+evaluator revision: `_revises_evaluator()` requires the declaration itself to
+match the frozen surface. `docs/` is a decision about documentation that happens
+to contain `docs/validation/`; `docs/validation/check_thing.py` is a decision
+about the grader. Because the roster is itself in `protected_files`, a
+declaration inside the surface can only arrive from outside the run — which is
+what makes it explicit.
+
+`permitted()` keeps its original order. Session runtime, then the agent's own
+declarations, then `protected_files`, then the frozen surface, then the default.
+The frozen check was appended, not inserted ahead of anything.
+
+`always_writable()` now returns `{data_dir}/sessions/`. That is where the
+runtime actually lives — `{data_dir}/sessions/{adw_id}/{agent_name}/`, built in
+`adw_modules/runner.py` — so every agent still writes its own
+`context_handoff/`, envelope, prompts and raw output, and the grant is still
+taken from configuration rather than from `.gitignore`.
+
+`evaluator_generation(run)` digests the tracked members of the declared surface
+into one identity, and `evidence_is_current(recorded, run)` compares evidence
+against it. Both are three-valued: `None` is could-not-observe and is returned
+for a surface that is undeclared, unresolvable, unreadable, or sitting in a tree
+git cannot enumerate. An evaluator surface nobody could look at is never
+evidence that the evaluator is intact.
+
+`enforce()` excludes frozen-surface paths from the recovered-slip continuation.
+The rollback still runs and still reports — "it was put back" answers the damage
+question — but it no longer decides whether the phase survives, and the breach
+message names the frozen paths separately.
+
+## Proof
+
+`tests/test_protected_evaluator_surface.py` — 12 cases, the law's four required
+fixtures plus the two boundary controls and the shipped-roster non-vacuity
+checks. Every case was observed red against `c192693` before the change, with
+the real failure shape (`permitted()` returning `True`, `DID NOT RAISE
+PermissionBreach`), and green after.
+
+| Required fixture | Case | Red at `c192693` |
+|---|---|---|
+| bug-fix agent attempting to delete or relax the failing test is refused | `test_bug_fix_agent_is_refused_the_regression_that_grades_it`, `test_deleting_the_frozen_regression_aborts_even_though_rollback_succeeded` | `permitted(...) is True`; `DID NOT RAISE PermissionBreach` |
+| an optimizer editing a scorer is refused | `test_optimizer_cannot_reach_a_scorer_through_a_broad_prefix` | `permitted('benchmarks/scorer/score.py', optimizer) is True` |
+| a defective evaluator produces an explicit revision, a new generation, and invalidates old evidence | `test_revising_a_defective_evaluator_creates_a_generation_and_voids_old_evidence` | `the permissions owner exposes no evaluator_generation()` |
+| an unrelated test file outside the frozen scope still changes freely | `test_an_unrelated_test_file_outside_the_frozen_scope_changes_freely` | green before and after — a property to preserve, controlled below |
+
+Boundary and non-vacuity controls in the same file: the session-runtime grant is
+still consulted first and still beats a path that is both protected and frozen;
+the prompt surface is no longer blanket-writable; an ordinary recovered slip
+outside the surface still continues the run; an undeclared, unresolvable, or
+unreachable surface is `could-not-observe`; every shipped roster declares the
+surface and freezes the four named graders while leaving
+`tests/test_gate_outcomes.py` and app source free.
+
+**Negative controls, run before trusting either preserved property.**
+
+- Over-freeze: adding `tests/` to the shipped declaration turns
+  `test_every_shipped_roster_declares_the_frozen_evaluator_surface` red on
+  `assert not frozen("tests/test_gate_outcomes.py", cfg)` — the property-scope
+  assertion is not vacuous, and the roster was restored.
+- Precedence reversal: moving the `protected_files` check ahead of
+  `always_writable()` turns `test_the_session_runtime_grant_is_still_consulted_first`
+  red on the scout's `context_handoff/findings.md` — the F6 control would
+  actually catch the reversal it forbids, and the module was restored.
+
+**Suite and gate at this head.**
+
+```
+PYTHONPATH=.:adws pytest -q tests/
+  before: 57 passed, 1 skipped        after: 69 passed, 1 skipped
+
+python3 tools/ci_gate.py run
+  before: 8 observed-good, 0 observed-bad, 2 could-not-observe, conclusion could-not-observe
+  after:  8 observed-good, 0 observed-bad, 2 could-not-observe, conclusion could-not-observe
+
+python3 docs/validation/check_adw_synchronization.py   PASS, before and after
+```
+
+Both `could-not-observe` rows are `just` being unavailable on this host —
+`sqlite-free-observability-validator` and `inkwell-unit-tests` — unchanged by
+this increment and recorded as unavailable evidence, not as a pass.
+
+## Known unresolved observations
+
+- The shipped rosters declare the surface; the installer template under
+  `.claude/skills/sssf/templates/` does not, so a freshly installed factory
+  starts with an empty declaration. That template is a different owner and is
+  out of this increment's write domain.
+- Nothing yet fails CI when a roster declares an empty surface. The deterministic
+  config eval that would catch it belongs to `SDLC-L3`, which owns
+  `ci/checks.json`.
+- Independent qualification of a *new* evaluator generation stays with the
+  review owner. What is mechanical here is that the revision is explicit, that
+  it produces a new generation identity, and that evidence bound to the previous
+  identity reports as not current.
