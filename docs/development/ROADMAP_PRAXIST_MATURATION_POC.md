@@ -49,6 +49,101 @@ Praxist is specifically interesting for properties that complement REF-1 and SSS
 
 The value proposition is **not** to import Praxist's autonomous research control plane into SSSF. The value proposition is to determine whether Praxist can make SSSF feature-admission decisions more transparent, reproducible, and evidence-based.
 
+## Standing roadmap-governance rule
+
+Praxist consideration is now a standing part of SSSF roadmap work.
+
+Whenever FirstMate performs material roadmap planning, evaluates a Captain-approved new idea, or closes a significant roadmap phase/increment, FirstMate must explicitly consider whether a Praxist-assisted experiment or Praxist-derived evaluation method would materially strengthen the evidence for the next decision.
+
+This obligation is a **consideration step**, not a requirement to run Praxist every time. The default question is:
+
+> **Would a bounded Praxist-backed comparison materially improve transparency, causal attribution, repeatability, negative-result preservation, or evidence quality for this roadmap decision beyond ordinary REF-1 + existing SSSF evidence?**
+
+FirstMate should record one of these dispositions in the relevant roadmap/phase/decision evidence when the question is material:
+
+- `PRAXIST_USEFUL_NOW` — a bounded Praxist experiment is justified and should be planned/executed when prerequisites permit;
+- `PRAXIST_METHODS_ONLY` — borrow/elevate specific Praxist evaluation principles, but running Praxist would add unnecessary machinery;
+- `PRAXIST_NOT_NEEDED` — existing REF-1/SSSF evidence is already sufficient and simpler;
+- `PRAXIST_CNO` — the value of Praxist cannot yet be determined from available evidence.
+
+The disposition must be concise and evidence-linked; do not create a separate bureaucracy or mandatory report for trivial roadmap edits.
+
+### Trigger A — Captain-approved idea enters the roadmap
+
+When the Captain approves a material new SSSF feature, architectural experiment, optimizer, orchestration change, runtime/provider change, memory/context change, parallelism change, verification/review change, or other capability intended to improve the factory, FirstMate should consider whether Praxist can help test the feature against the accepted baseline before the feature is treated as valuable.
+
+Preferred experimental framing where appropriate:
+
+```text
+accepted baseline generation
+        vs
+same baseline + one approved feature difference
+        ↓
+frozen REF-1 / fixed evaluator / controlled material variables
+        ↓
+Praxist-assisted repeated comparison if it adds evidence value
+        ↓
+FirstMate interpretation
+        ↓
+normal SSSF governance
+```
+
+Praxist must never become the reason an idea is authorized. Captain/Browser Sol/normal planning authority decides whether the experiment is allowed; Praxist may only strengthen the evidence about whether the idea is worth retaining.
+
+### Trigger B — significant roadmap phase/increment completes
+
+At completion of a significant accepted SSSF roadmap phase/increment, FirstMate should consider Praxist as part of the post-phase evidence review.
+
+Where REF-1 replay is already required, FirstMate should ask whether Praxist adds useful replication, variance handling, attribution, negative-result retention, or multi-metric analysis beyond the standard replay. If yes, use the narrowest Praxist configuration that provides that value. If no, record `PRAXIST_NOT_NEEDED` or `PRAXIST_METHODS_ONLY` and keep the simpler path.
+
+The phase cannot receive stronger improvement credit merely because Praxist was used. Praxist evidence supplements; it does not replace the phase's own gates, REF-1 comparison, exact-head proof, maker/checker, provenance, quiescence, or acceptance requirements.
+
+### Trigger C — material roadmap review or reprioritization
+
+When FirstMate reviews the roadmap holistically, it should use the longitudinal evidence accumulated so far to identify:
+
+- features that produced repeatable improvement;
+- features that produced mixed or workload-specific value;
+- features that increased complexity without sufficient value;
+- prior negative experiments that should prevent repeated investment;
+- metrics whose trends suggest a new hypothesis worth testing;
+- evidence gaps where a Praxist experiment could reduce uncertainty.
+
+This is evidence-guided prioritization, not autonomous roadmap authority. FirstMate may recommend; existing authority owners decide activation and material architecture changes.
+
+## Longitudinal maturation tracking — Captain authorized
+
+The longitudinal tracking concept is explicitly authorized as a durable transparency objective for SSSF maturation.
+
+The preferred form is a **read-only projection over accepted evidence**, not a new canonical database, ledger owner, scheduler, or state machine.
+
+For every significant accepted SSSF generation after REF-1 exists, preserve enough evidence to reconstruct a row such as:
+
+| SSSF generation | Change tested | Exact baseline | REF-1 | Tokens | Wall time | Agent calls/retries | Human interventions | Reliability/safety | Praxist disposition | Conclusion |
+|---|---|---|---|---:|---:|---:|---:|---|---|---|
+| baseline | none | — | PASS | observed | observed | observed | observed | PASS | baseline | BASELINE |
+| candidate N | feature X | baseline SHA | PASS | delta | delta | delta | delta | PASS/CNO/FAIL | useful/methods/not-needed/CNO | IMPROVED/MIXED/REGRESSED/... |
+
+Where comparable and useful, the projection should also surface:
+
+- exact SSSF commit/tree;
+- exact ADW/workflow identity;
+- exact model/runtime/config generations;
+- sandbox/resource/concurrency facts;
+- review/gate findings;
+- CNO counts;
+- provenance/maker-checker status;
+- cleanup/quiescence;
+- repeated-trial variance;
+- evidence links and Praxist run identity when Praxist was used;
+- the specific reason a feature was retained, revised, deferred, or rejected.
+
+The longitudinal record should make it easy for the Captain and FirstMate to answer:
+
+> **What has actually made SSSF better over time, what did it cost, what tradeoffs appeared, and what evidence supports that conclusion?**
+
+Do not collapse the history into one opaque score. Correctness, safety, autonomy, cost, latency, complexity, and reliability remain visible dimensions.
+
 ## Initial question
 
 The first POC should answer:
@@ -176,7 +271,9 @@ FirstMate should produce a comprehensive plan-only assessment before any Praxist
 11. identify which Praxist ideas should be copied as principles versus which require Praxist runtime use;
 12. estimate recurring operational complexity, runtime, token/cost burden, maintenance burden, and license implications;
 13. recommend `USE_SANDBOXED_PRAXIST`, `BORROW_METHODS_ONLY`, or `REJECT_AS_NET_COMPLEXITY`, with evidence;
-14. identify the exact normal SSSF increment/prerequisites required before a runtime POC may execute.
+14. identify the exact normal SSSF increment/prerequisites required before a runtime POC may execute;
+15. define how the standing roadmap-governance triggers above will be surfaced in ordinary FirstMate roadmap work without adding a second scheduler or state machine;
+16. define the smallest read-only longitudinal projection that makes historical SSSF improvements/regressions transparent and evidence-linked.
 
 FirstMate should explicitly weigh the Captain's objective: **SSSF maturation should become more transparent and evidence-driven, not merely more sophisticated.**
 
@@ -196,17 +293,6 @@ If Praxist is retained, its principal success criterion is not autonomous experi
 - how the conclusion compares with prior SSSF generations.
 
 Prefer compact longitudinal views over additional orchestration complexity.
-
-## Candidate maturation ledger view
-
-A future read-only projection may summarize significant generations conceptually as:
-
-| SSSF generation | Feature | REF-1 result | Tokens | Wall time | Interventions | Reliability/safety | Conclusion |
-|---|---|---|---:|---:|---:|---|---|
-| baseline | none | PASS | observed | observed | observed | PASS | BASELINE |
-| candidate N | feature X | PASS | delta | delta | delta | PASS/CNO/FAIL | IMPROVED/MIXED/... |
-
-This must be generated from accepted evidence and must not become a competing state owner. Prefer extending an existing report/projection surface over introducing a new ledger/database.
 
 ## Kill criteria
 
@@ -242,7 +328,7 @@ REF-1 remains the canonical longitudinal workload contract. Praxist does not own
 
 Before REF-1's first baseline run, the existing REF-1 design-review obligation may use Praxist research findings as one input when evaluating benchmark methodology. Praxist is not itself required for REF-1 to exist.
 
-After significant SSSF advancements, the default remains REF-1 replay + FirstMate comparison. A Praxist-assisted comparison is justified only where it provides additional evidence value commensurate with its cost/complexity, or where the accepted maturation policy later explicitly promotes it.
+After significant SSSF advancements, REF-1 replay + FirstMate comparison remains mandatory under the REF-1 amendment. At each such checkpoint, FirstMate additionally evaluates the standing Praxist disposition above. Praxist use is required only when the evidence shows that it adds material value commensurate with cost/complexity or when a later accepted maturation policy explicitly promotes it.
 
 ## Simplification law
 
