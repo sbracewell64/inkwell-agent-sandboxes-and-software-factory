@@ -66,6 +66,10 @@ class EvaluatorSurfaceUndeclared(PermissionBreach):
     """No evaluator surface is declared, so none can be observed as intact."""
 
 
+class EvaluatorSurfaceUnobservable(PermissionBreach):
+    """A declared evaluator surface cannot be observed in full."""
+
+
 # The `_roll_back` outcomes that leave the repo byte-for-byte as it was. The
 # docstring's reason for aborting — "the write already happened" — is true of a
 # destroyed file and false of these: an agent-created file that was unlinked, or
@@ -201,7 +205,8 @@ def _refuse_hidden_evaluators(run, paths: dict[str, str]) -> None:
             )
 
 
-def _snapshot_against(run, base_commit: str, base_tree: str) -> TreeSnapshot:
+def _snapshot_against(run, base_commit: str, base_tree: str,
+                      require_observable: bool = False) -> TreeSnapshot:
     """Fingerprint every path the working tree currently differs on.
 
     Tracked files ordinarily carry their numstat counts. Frozen evaluator files
@@ -214,6 +219,8 @@ def _snapshot_against(run, base_commit: str, base_tree: str) -> TreeSnapshot:
     fingerprints: dict[str, str] = {}
     repository_paths = _repository_paths(run)
     _refuse_hidden_evaluators(run, repository_paths)
+    if require_observable:
+        _require_observable_surface(run, repository_paths)
     for path in repository_paths:
         if not is_frozen_evaluator(path, run.cfg):
             continue
@@ -233,6 +240,35 @@ def _snapshot_against(run, base_commit: str, base_tree: str) -> TreeSnapshot:
         if tag == "?" and not is_frozen_evaluator(path, run.cfg):
             fingerprints[path] = "untracked"
     return TreeSnapshot(fingerprints, base_commit, base_tree)
+
+
+def _surface_observation(run, paths: dict[str, str]) -> tuple[list[str], list[str]]:
+    declarations = sorted(set(frozen_evaluator_paths(run.cfg)))
+    unresolved = [declaration for declaration in declarations
+                  if not any(_matches(path, declaration) for path in paths)]
+    absent = []
+    for path in sorted(paths):
+        if not is_frozen_evaluator(path, run.cfg):
+            continue
+        target = Path(run.repo_root) / path
+        if not target.exists() and not target.is_symlink():
+            absent.append(path)
+    return unresolved, absent
+
+
+def _require_observable_surface(run, paths: dict[str, str]) -> None:
+    unresolved, absent = _surface_observation(run, paths)
+    if not unresolved and not absent:
+        return
+    details = []
+    if unresolved:
+        details.append(f"unresolved declaration(s): {', '.join(unresolved)}")
+    if absent:
+        details.append(f"absent member(s): {', '.join(absent)}")
+    raise EvaluatorSurfaceUnobservable(
+        "permission could-not-observe protected evaluator surface; "
+        + "; ".join(details)
+    )
 
 
 def _require_declared_surface(run) -> None:
@@ -256,7 +292,7 @@ def _require_declared_surface(run) -> None:
 def snapshot(run) -> TreeSnapshot:
     _require_declared_surface(run)
     base_commit, base_tree = _head_identity(run)
-    return _snapshot_against(run, base_commit, base_tree)
+    return _snapshot_against(run, base_commit, base_tree, require_observable=True)
 
 
 def changed_paths(before: dict[str, str], after: dict[str, str]) -> list[str]:
@@ -399,6 +435,7 @@ def evaluator_generation(run) -> str | None:
     try:
         paths = _repository_paths(run)
         _refuse_hidden_evaluators(run, paths)
+        _require_observable_surface(run, paths)
     except (OSError, PermissionBreach):
         return None                      # no git, or no tree to ask it about
     digest, members = hashlib.sha256(), 0
@@ -417,7 +454,7 @@ def evaluator_generation(run) -> str | None:
         digest.update(f"{path}\0{body}\0".encode())
         members += 1
     if not members:
-        return None                      # declared a surface, resolved nothing
+        return None
     return digest.hexdigest()
 
 

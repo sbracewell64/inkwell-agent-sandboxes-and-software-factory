@@ -345,6 +345,42 @@ def test_an_unobservable_evaluator_surface_is_could_not_observe(tmp_path):
     assert current(None, _Run(root, _cfg(frozen=["app/"]))) is None   # nothing recorded
 
 
+def test_one_valid_and_one_unresolved_declaration_refuses_and_names_it(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    missing = "tests/evaluator_typo.py"
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py", missing]))
+
+    assert _owner("evaluator_generation")(run) is None
+    with pytest.raises(permissions.EvaluatorSurfaceUnobservable) as refused:
+        permissions.snapshot(run)
+    assert missing in str(refused.value)
+    assert "unresolved declaration" in str(refused.value)
+
+
+def test_tracked_evaluator_absent_before_phase_refuses(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    (root / "tests/evaluator.py").unlink()
+
+    assert _owner("evaluator_generation")(run) is None
+    with pytest.raises(permissions.EvaluatorSurfaceUnobservable) as refused:
+        permissions.snapshot(run)
+    assert "tests/evaluator.py" in str(refused.value)
+    assert "absent member" in str(refused.value)
+
+
+def test_corrected_roster_restores_an_observable_generation(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    cfg = _cfg(frozen=["tests/evaluator.py", "tests/evaluator_typo.py"])
+    run = _Run(root, cfg)
+    assert _owner("evaluator_generation")(run) is None
+
+    cfg.defaults.protected_evaluator_paths = ["tests/evaluator.py"]
+
+    assert _owner("evaluator_generation")(run) is not None
+    assert permissions.snapshot(run)["tests/evaluator.py"].startswith("frozen:")
+
+
 def test_an_unreachable_git_never_reads_as_an_intact_surface(tmp_path, monkeypatch):
     """The generation goes could-not-observe; the snapshot still refuses to lie.
 
