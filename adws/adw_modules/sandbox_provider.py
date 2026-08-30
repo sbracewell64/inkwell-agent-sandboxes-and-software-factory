@@ -12,17 +12,26 @@ subprocess supervisor rather than creating another process owner.
 
 from __future__ import annotations
 
+import argparse
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
+from datetime import datetime, timezone
 from enum import Enum
 import hashlib
 import hmac
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
+import subprocess
+import sys
+import tempfile
 import threading
-from typing import Iterable, Mapping, MutableMapping, Protocol, Sequence
+import time
+from typing import Iterable, Iterator, Mapping, MutableMapping, Protocol, Sequence
 
 from .subprocess_supervisor import Observation, SupervisorRequest
+from tools.ci_gate import CNO_REASON_PREFIX, COULD_NOT_OBSERVE_EXIT
 from tools.evidence_manifest import (
     Observation as EvidenceManifestObservation,
     ValidationContext as EvidenceManifestContext,
@@ -2257,43 +2266,1666 @@ class FakeSandboxProvider:
         return ReconciliationFacts(**self._base(operation, Observation.OBSERVED_GOOD, "resource is present and uniquely reconciled", prior=target.state, state=target.state, resource_id=identity.provider_resource_id), status=ReconciliationStatus.PRESENT, resource_ids=(identity.provider_resource_id or "",))
 
 
+# ---------------------------------------------------------------------------
+# SDLC-L1 — head-bound one-use authority for the three live SSSF effect seams
+#
+# Three host recipes perform an irreversible, spending, or exposing effect:
+# ``just/sandbox/lifecycle/teardown.just`` destroys a VM,
+# ``just/sandbox/lifecycle/create.just`` mints a spending runtime key, and
+# ``just/sandbox/lifecycle/observe.just`` publishes a sandbox anonymously.
+# Before this section they consumed ORDERING — "the harvest step ran", "the
+# provisioning key is in the environment", "control reached this line" — and
+# never a typed authority.
+#
+# control #36 LAW_1: *repository landing authorization must not be reused as
+# configuration-mutation authority*.  That is enforced structurally rather than
+# by convention.  An effect authority is signed over bytes that begin with
+# ``EFFECT_AUTHORITY_DOMAIN`` and carries that domain in its own document.  A
+# repository landing authorization belongs to a different purpose domain, so it
+# can neither be parsed as an effect authority nor produce a verifying
+# authenticator for one, and no code path widens one into the other.
+#
+# The trust boundary is stated plainly: the host owns the signing material, so
+# this is not a defence against a compromised host.  What it does own are the
+# four properties the law names — authority is derived only from positively
+# observed obligations, bound to an exact repository/head/target, spendable
+# once, and completed only after the terminal state is authoritatively
+# observed.  Absence of a token, an environment marker, a flag, or a prose
+# marker is never approval.
+
+
+EFFECT_AUTHORITY_DOMAIN = "sssf-sandbox-effect-authority/v1"
+
+# The maximum spend ceiling a runtime-key mint may be authorized for.  A
+# requested ceiling above this is an observed contradiction, not a CNO.
+RUNTIME_KEY_SPEND_CEILING_USD = 500.0
+
+
+class EffectClass(str, Enum):
+    """The closed set of live seam effects that require typed authority.
+
+    Repository landing and publication are deliberately absent: they are a
+    different purpose domain and LAW_1 forbids reusing one as the other.
+    """
+
+    DESTROY = "destroy-only"
+    RUNTIME_KEY_MINT = "runtime-key-mint-only"
+    PUBLIC_EXPOSURE = "public-exposure-only"
+
+
+class EffectNotAuthorized(RuntimeError):
+    """A positively observed refusal: the effect must not run."""
+
+
+class EffectStateUnobservable(RuntimeError):
+    """The authority state could not be observed; this is CNO, never a pass."""
+
+
+def _parameter(value: str, label: str) -> None:
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > 256
+        or "\x00" in value
+        or "\n" in value
+        or "\r" in value
+    ):
+        raise ValueError(f"{label} must be a bounded single-line value")
+
+
+@dataclass(frozen=True, slots=True)
+class EffectSubject:
+    """The exact repository, head, and target one effect is authorized against.
+
+    ``repository`` and ``head_commit`` are the SSSF head the effect is
+    authorized at; ``resource_id`` and ``parameters`` are the concrete target
+    and its bounded configuration.  All four are compared exactly at the
+    pre-effect gate, so a stale head, a foreign repository, another VM, or a
+    widened spend ceiling can never satisfy an authority minted for this one.
+    """
+
+    run_id: str
+    effect_class: EffectClass
+    repository: str
+    head_commit: str
+    resource_id: str
+    parameters: tuple[tuple[str, str], ...] = ()
+
+    def __post_init__(self) -> None:
+        _token(self.run_id, "effect subject run_id")
+        if not isinstance(self.effect_class, EffectClass):
+            raise ValueError("effect class must be a closed EffectClass member")
+        if not isinstance(self.repository, str) or not self.repository.startswith("https://"):
+            raise ValueError("effect subject repository must be an HTTPS URL")
+        _nonempty(self.repository, "effect subject repository")
+        _sha(self.head_commit, "effect subject head_commit")
+        _token(self.resource_id, "effect subject resource_id")
+        parameters = tuple((str(name), str(value)) for name, value in self.parameters)
+        names = tuple(name for name, _ in parameters)
+        if len(set(names)) != len(names):
+            raise ValueError("effect subject parameters must be duplicate-free")
+        if names != tuple(sorted(names)):
+            raise ValueError("effect subject parameters must be sorted")
+        for name, value in parameters:
+            _token(name, "effect parameter name")
+            _parameter(value, f"effect parameter {name}")
+        object.__setattr__(self, "parameters", parameters)
+
+    def to_document(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "effect_class": self.effect_class.value,
+            "repository": self.repository,
+            "head_commit": self.head_commit,
+            "resource_id": self.resource_id,
+            "parameters": [list(pair) for pair in self.parameters],
+        }
+
+    @classmethod
+    def from_document(cls, document: Mapping[str, object]) -> "EffectSubject":
+        try:
+            effect_class = EffectClass(str(document["effect_class"]))
+            parameters = tuple(
+                (str(pair[0]), str(pair[1])) for pair in document.get("parameters") or ()
+            )
+            return cls(
+                run_id=str(document["run_id"]),
+                effect_class=effect_class,
+                repository=str(document["repository"]),
+                head_commit=str(document["head_commit"]),
+                resource_id=str(document["resource_id"]),
+                parameters=parameters,
+            )
+        except (KeyError, TypeError, IndexError, ValueError) as exc:
+            raise EffectNotAuthorized(f"effect subject is not a closed subject: {exc}") from exc
+
+    @property
+    def digest(self) -> str:
+        raw = json.dumps(self.to_document(), sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(raw).hexdigest()
+
+    def mismatch(self, observed: "EffectSubject") -> str:
+        """Name the first field that differs, or an empty string when bound."""
+        for field_name in ("run_id", "effect_class", "repository", "head_commit", "resource_id"):
+            mine = getattr(self, field_name)
+            theirs = getattr(observed, field_name)
+            if mine != theirs:
+                return f"{field_name}: authorized {mine!r}, observed {theirs!r}"
+        if self.parameters != observed.parameters:
+            return f"parameters: authorized {self.parameters!r}, observed {observed.parameters!r}"
+        return ""
+
+
+@dataclass(frozen=True, slots=True)
+class EffectAuthorization:
+    """A one-use capability for exactly one effect at exactly one head."""
+
+    authorization_id: str
+    subject: EffectSubject
+    obligations_digest: str
+    issued_at: str
+    authenticator: str
+    purpose_domain: str = EFFECT_AUTHORITY_DOMAIN
+
+    def __post_init__(self) -> None:
+        _digest(self.authorization_id, "effect authorization_id")
+        if not isinstance(self.subject, EffectSubject):
+            raise ValueError("effect authorization subject is required")
+        _digest(self.obligations_digest, "effect obligations_digest")
+        _timestamp(self.issued_at, "effect authorization issued_at")
+        _digest(self.authenticator, "effect authorization authenticator")
+        # LAW_1, enforced in the type: only this purpose domain exists here, so a
+        # repository landing authorization cannot be presented as effect
+        # authority even when its other fields would otherwise line up.
+        if self.purpose_domain != EFFECT_AUTHORITY_DOMAIN:
+            raise ValueError(
+                "effect authority purpose domain is closed; a repository landing "
+                "authorization is never configuration-mutation authority"
+            )
+
+    def to_document(self) -> dict[str, object]:
+        return {
+            "purpose_domain": self.purpose_domain,
+            "authorization_id": self.authorization_id,
+            "subject": self.subject.to_document(),
+            "obligations_digest": self.obligations_digest,
+            "issued_at": self.issued_at,
+            "authenticator": self.authenticator,
+        }
+
+    @classmethod
+    def from_document(cls, document: Mapping[str, object]) -> "EffectAuthorization":
+        if not isinstance(document, Mapping):
+            raise EffectNotAuthorized("effect authorization document is not an object")
+        domain = document.get("purpose_domain")
+        if domain != EFFECT_AUTHORITY_DOMAIN:
+            raise EffectNotAuthorized(
+                f"purpose domain {domain!r} is not {EFFECT_AUTHORITY_DOMAIN!r}: a repository "
+                "landing authorization is never configuration-mutation authority"
+            )
+        subject_document = document.get("subject")
+        if not isinstance(subject_document, Mapping):
+            raise EffectNotAuthorized("effect authorization has no closed subject")
+        try:
+            return cls(
+                authorization_id=str(document["authorization_id"]),
+                subject=EffectSubject.from_document(subject_document),
+                obligations_digest=str(document["obligations_digest"]),
+                issued_at=str(document["issued_at"]),
+                authenticator=str(document["authenticator"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise EffectNotAuthorized(f"effect authorization is malformed: {exc}") from exc
+
+
+def _effect_authorization_payload(authorization: EffectAuthorization) -> bytes:
+    document = {
+        "purpose_domain": authorization.purpose_domain,
+        "authorization_id": authorization.authorization_id,
+        "subject": authorization.subject.to_document(),
+        "obligations_digest": authorization.obligations_digest,
+        "issued_at": authorization.issued_at,
+    }
+    # The domain prefix is inside the signed bytes, so an authenticator minted
+    # for any other purpose domain cannot verify here.
+    return (
+        EFFECT_AUTHORITY_DOMAIN.encode()
+        + b"|"
+        + json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    )
+
+
+def _effect_authorization_fingerprint(authorization: EffectAuthorization) -> str:
+    return hashlib.sha256(
+        _effect_authorization_payload(authorization) + b"|" + authorization.authenticator.encode()
+    ).hexdigest()
+
+
+class JsonFileAuthorizationStateStore:
+    """Durable one-use authorization state for the host effect seams.
+
+    This is a host state file beside the existing per-run records, never a
+    second lifecycle or trace database: it holds only authorization identity,
+    provenance fingerprint, and ``issued``/``reserved``/``completed`` status.
+    Every read that cannot reach the predicate raises
+    :class:`EffectStateUnobservable`, which the callers report as
+    could-not-observe rather than narrowing into a pass.
+    """
+
+    _STATUSES = ("issued", "reserved", "completed")
+
+    def __init__(self, path: "Path | str", *, lock_timeout_seconds: float = 10.0) -> None:
+        self._path = Path(path)
+        self._lock_path = self._path.with_name(self._path.name + ".lock")
+        self._lock_timeout = float(lock_timeout_seconds)
+        self._thread_lock = threading.Lock()
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def _acquire(self) -> None:
+        deadline = time.monotonic() + self._lock_timeout
+        while True:
+            try:
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                handle = os.open(self._lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            except FileExistsError:
+                if time.monotonic() >= deadline:
+                    try:
+                        age = time.time() - os.stat(self._lock_path).st_mtime
+                    except OSError as exc:
+                        raise EffectStateUnobservable(f"authority lock unreadable: {exc}") from exc
+                    if age > max(60.0, self._lock_timeout * 6):
+                        # A lock older than any legitimate critical section is
+                        # a crashed writer, not a live one.
+                        try:
+                            os.unlink(self._lock_path)
+                        except OSError as exc:
+                            raise EffectStateUnobservable(
+                                f"stale authority lock could not be cleared: {exc}"
+                            ) from exc
+                        deadline = time.monotonic() + self._lock_timeout
+                        continue
+                    raise EffectStateUnobservable(
+                        f"authority state lock held for more than {self._lock_timeout}s"
+                    )
+                time.sleep(0.02)
+                continue
+            except OSError as exc:
+                raise EffectStateUnobservable(f"authority lock unavailable: {exc}") from exc
+            os.close(handle)
+            return
+
+    def _release(self) -> None:
+        try:
+            os.unlink(self._lock_path)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            raise EffectStateUnobservable(f"authority lock could not be released: {exc}") from exc
+
+    @contextmanager
+    def _exclusive(self) -> "Iterator[MutableMapping[str, MutableMapping[str, str]]]":
+        with self._thread_lock:
+            self._acquire()
+            try:
+                state = self._read()
+                yield state
+            finally:
+                self._release()
+
+    def _read(self) -> MutableMapping[str, MutableMapping[str, str]]:
+        try:
+            raw = self._path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return {}
+        except (OSError, UnicodeError) as exc:
+            raise EffectStateUnobservable(f"authority state unreadable: {exc}") from exc
+        try:
+            document = json.loads(raw)
+        except ValueError as exc:
+            raise EffectStateUnobservable(f"authority state is not readable JSON: {exc}") from exc
+        if not isinstance(document, dict):
+            raise EffectStateUnobservable("authority state is not an object")
+        state: MutableMapping[str, MutableMapping[str, str]] = {}
+        for authorization_id, item in document.items():
+            if (
+                not isinstance(item, dict)
+                or item.get("status") not in self._STATUSES
+                or not isinstance(item.get("fingerprint"), str)
+            ):
+                raise EffectStateUnobservable(
+                    f"authority state entry {authorization_id!r} is not a closed record"
+                )
+            state[str(authorization_id)] = {
+                "fingerprint": str(item["fingerprint"]),
+                "status": str(item["status"]),
+            }
+        return state
+
+    def _write(self, state: Mapping[str, Mapping[str, str]]) -> None:
+        rendered = json.dumps(state, sort_keys=True, indent=2) + "\n"
+        temporary = self._path.with_name(self._path.name + ".tmp")
+        try:
+            handle = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(handle, "w", encoding="utf-8") as stream:
+                stream.write(rendered)
+            os.replace(temporary, self._path)
+        except OSError as exc:
+            raise EffectStateUnobservable(f"authority state could not be written: {exc}") from exc
+
+    def record_issuance(self, authorization_id: str, fingerprint: str) -> None:
+        _digest(authorization_id, "authorization_id")
+        _digest(fingerprint, "authorization fingerprint")
+        with self._exclusive() as state:
+            existing = state.get(authorization_id)
+            if existing is not None and existing["fingerprint"] != fingerprint:
+                raise EffectNotAuthorized(
+                    "authorization identity was reissued with different provenance"
+                )
+            if existing is None:
+                state[authorization_id] = {"fingerprint": fingerprint, "status": "issued"}
+                self._write(state)
+
+    def verifies(self, authorization_id: str, fingerprint: str) -> bool:
+        with self._exclusive() as state:
+            item = state.get(authorization_id)
+            return item is not None and hmac.compare_digest(item["fingerprint"], fingerprint)
+
+    def reserved(self, authorization_id: str) -> bool:
+        with self._exclusive() as state:
+            item = state.get(authorization_id)
+            return item is not None and item["status"] == "reserved"
+
+    def completed(self, authorization_id: str) -> bool:
+        with self._exclusive() as state:
+            item = state.get(authorization_id)
+            return item is not None and item["status"] == "completed"
+
+    def compare_and_swap_reserved(self, authorization_id: str, fingerprint: str) -> bool:
+        with self._exclusive() as state:
+            item = state.get(authorization_id)
+            if (
+                item is None
+                or item["status"] == "completed"
+                or not hmac.compare_digest(item["fingerprint"], fingerprint)
+            ):
+                return False
+            item["status"] = "reserved"
+            self._write(state)
+            return True
+
+    def compare_and_swap_completed(self, authorization_id: str, fingerprint: str) -> bool:
+        with self._exclusive() as state:
+            item = state.get(authorization_id)
+            if (
+                item is None
+                or item["status"] != "reserved"
+                or not hmac.compare_digest(item["fingerprint"], fingerprint)
+            ):
+                return False
+            item["status"] = "completed"
+            self._write(state)
+            return True
+
+
+class EffectAuthorizationIssuer:
+    """SSSF-only signing capability for effect authority.
+
+    It is never a landing authority and never crosses to a provider or a guest.
+    """
+
+    def __init__(self, signing_key: bytes, state_store: DestroyAuthorizationStateStore) -> None:
+        if not isinstance(signing_key, bytes) or len(signing_key) < 32:
+            raise ValueError("effect authority signing key must contain at least 32 bytes")
+        self.__signing_key = signing_key
+        self.__state_store = state_store
+
+    def _mint(self, authorization: EffectAuthorization) -> EffectAuthorization:
+        authenticator = hmac.new(
+            self.__signing_key,
+            _effect_authorization_payload(authorization),
+            hashlib.sha256,
+        ).hexdigest()
+        minted = replace(authorization, authenticator=authenticator)
+        self.__state_store.record_issuance(
+            minted.authorization_id,
+            _effect_authorization_fingerprint(minted),
+        )
+        return minted
+
+
+class EffectAuthorizationVerifier:
+    """Gate-facing verification, reservation, and completion capability."""
+
+    def __init__(self, state_store: DestroyAuthorizationStateStore) -> None:
+        self.__state_store = state_store
+
+    def verifies(self, authorization: EffectAuthorization) -> bool:
+        return self.__state_store.verifies(
+            authorization.authorization_id,
+            _effect_authorization_fingerprint(authorization),
+        )
+
+    def reserved(self, authorization: EffectAuthorization) -> bool:
+        return self.__state_store.reserved(authorization.authorization_id)
+
+    def completed(self, authorization: EffectAuthorization) -> bool:
+        return self.__state_store.completed(authorization.authorization_id)
+
+    def reserve(self, authorization: EffectAuthorization) -> bool:
+        return self.__state_store.compare_and_swap_reserved(
+            authorization.authorization_id,
+            _effect_authorization_fingerprint(authorization),
+        )
+
+    def complete(self, authorization: EffectAuthorization) -> bool:
+        return self.__state_store.compare_and_swap_completed(
+            authorization.authorization_id,
+            _effect_authorization_fingerprint(authorization),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EffectGateResult:
+    """A closed three-valued gate answer; never a boolean."""
+
+    observation: Observation
+    reason: str
+    authorization_id: str = ""
+
+    @property
+    def permitted(self) -> bool:
+        return self.observation is Observation.OBSERVED_GOOD
+
+
+def issue_effect_authorization(
+    subject: EffectSubject,
+    *,
+    obligations: Sequence[OutcomeCheck],
+    authorization_issuer: EffectAuthorizationIssuer,
+    issued_at: str,
+) -> EffectAuthorization:
+    """Mint one-use effect authority only from positively observed obligations.
+
+    A zero-observation fold is CNO, so an empty obligation list — the shape an
+    environment marker or a prose flag reduces to — can never mint authority.
+    """
+    if not isinstance(authorization_issuer, EffectAuthorizationIssuer):
+        raise EffectNotAuthorized("effect authority requires the SSSF-only issuer")
+    if not isinstance(subject, EffectSubject):
+        raise EffectNotAuthorized("effect authority requires a closed subject")
+    checks = tuple(obligations)
+    folded = fold_aggregate(evidence=checks)
+    if folded.status is not Observation.OBSERVED_GOOD:
+        raise EffectNotAuthorized(
+            f"effect obligations are not observed-good ({folded.status.value}): {folded.reason}"
+        )
+    if subject.effect_class is EffectClass.RUNTIME_KEY_MINT:
+        ceiling = dict(subject.parameters).get("spend_limit_usd", "")
+        try:
+            requested = float(ceiling)
+        except (TypeError, ValueError) as exc:
+            raise EffectNotAuthorized(
+                "runtime-key mint authority requires a numeric spend_limit_usd parameter"
+            ) from exc
+        if not 0 < requested <= RUNTIME_KEY_SPEND_CEILING_USD:
+            raise EffectNotAuthorized(
+                f"requested spend ceiling {requested} is outside "
+                f"(0, {RUNTIME_KEY_SPEND_CEILING_USD}]"
+            )
+    obligations_digest = _obligation_digest(checks)
+    raw = "|".join(
+        (
+            EFFECT_AUTHORITY_DOMAIN,
+            subject.digest,
+            obligations_digest,
+            issued_at,
+        )
+    )
+    authorization = EffectAuthorization(
+        authorization_id=hashlib.sha256(raw.encode()).hexdigest(),
+        subject=subject,
+        obligations_digest=obligations_digest,
+        issued_at=issued_at,
+        authenticator="0" * 64,
+    )
+    return authorization_issuer._mint(authorization)
+
+
+def authorize_effect(
+    presented: EffectAuthorization,
+    observed_subject: EffectSubject,
+    verifier: EffectAuthorizationVerifier,
+) -> EffectGateResult:
+    """The pre-effect gate.  Observed-good is the only value that permits.
+
+    It reserves the capability, so the same authority cannot be spent twice.  A
+    reservation that has not completed stays retryable, because a failure that
+    precedes the side effect must not burn the capability.
+    """
+    if not isinstance(presented, EffectAuthorization):
+        return EffectGateResult(Observation.OBSERVED_BAD, "no effect authority was presented")
+    mismatch = presented.subject.mismatch(observed_subject)
+    if mismatch:
+        return EffectGateResult(
+            Observation.OBSERVED_BAD,
+            f"authority is bound to a different subject — {mismatch}",
+            presented.authorization_id,
+        )
+    try:
+        if not verifier.verifies(presented):
+            return EffectGateResult(
+                Observation.OBSERVED_BAD,
+                "authority is fabricated, tampered, or unknown to the durable state store",
+                presented.authorization_id,
+            )
+        if verifier.completed(presented):
+            return EffectGateResult(
+                Observation.OBSERVED_BAD,
+                "one-use authority was already consumed",
+                presented.authorization_id,
+            )
+        if not verifier.reserve(presented):
+            return EffectGateResult(
+                Observation.OBSERVED_BAD,
+                "authority could not be reserved for this effect",
+                presented.authorization_id,
+            )
+    except EffectStateUnobservable as exc:
+        return EffectGateResult(
+            Observation.COULD_NOT_OBSERVE, str(exc), presented.authorization_id
+        )
+    return EffectGateResult(
+        Observation.OBSERVED_GOOD,
+        "authority is authentic, exactly bound, and reserved for this effect",
+        presented.authorization_id,
+    )
+
+
+def complete_effect(
+    authorization: EffectAuthorization,
+    post_effect: OutcomeCheck,
+    verifier: EffectAuthorizationVerifier,
+) -> EffectGateResult:
+    """The post-effect gate.  Success is observed, never inferred.
+
+    Only a positively observed terminal state consumes the capability.  A CNO
+    or a contradiction leaves it reserved so the seam reconciles and retries
+    instead of recording a destruction, a mint, or a publication it never saw.
+    """
+    folded = fold_aggregate(work=(post_effect,))
+    if folded.status is not Observation.OBSERVED_GOOD:
+        return EffectGateResult(
+            folded.status,
+            f"post-effect state was not authoritatively observed: {folded.reason}",
+            authorization.authorization_id,
+        )
+    try:
+        if not verifier.complete(authorization):
+            return EffectGateResult(
+                Observation.OBSERVED_BAD,
+                "authority could not be completed; it was not reserved by this effect",
+                authorization.authorization_id,
+            )
+    except EffectStateUnobservable as exc:
+        return EffectGateResult(
+            Observation.COULD_NOT_OBSERVE, str(exc), authorization.authorization_id
+        )
+    return EffectGateResult(
+        Observation.OBSERVED_GOOD,
+        "terminal state observed; one-use authority consumed",
+        authorization.authorization_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# The three live seams, their observed head, and the host CLI the recipes call
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_AUTHORITY_STATE = Path(".sandbox/effect-authority.state.json")
+DEFAULT_AUTHORITY_SIGNING_KEY = Path(".sandbox/effect-authority.key")
+GIT_TIMEOUT_SECONDS = float(os.environ.get("SSSF_CHILD_TIMEOUT_SECONDS", "30"))
+
+
+@dataclass(frozen=True, slots=True)
+class LiveEffectSeam:
+    """One recipe whose effect line must sit inside the authority sandwich."""
+
+    path: str
+    effect_class: EffectClass
+    effect_marker: str
+    description: str
+
+    @property
+    def mint_marker(self) -> str:
+        return f"sandbox_provider mint --effect {self.effect_class.value}"
+
+    @property
+    def gate_marker(self) -> str:
+        return f"sandbox_provider gate --effect {self.effect_class.value}"
+
+    @property
+    def complete_marker(self) -> str:
+        return "sandbox_provider complete"
+
+
+LIVE_EFFECT_SEAMS: tuple[LiveEffectSeam, ...] = (
+    LiveEffectSeam(
+        path="just/sandbox/lifecycle/teardown.just",
+        effect_class=EffectClass.DESTROY,
+        effect_marker='ssh "${SSH_OPTS[@]}" exe.dev rm "$VM"',
+        description="irreversible VM destruction",
+    ),
+    LiveEffectSeam(
+        path="just/sandbox/lifecycle/create.just",
+        effect_class=EffectClass.RUNTIME_KEY_MINT,
+        effect_marker="https://openrouter.ai/api/v1/keys",
+        description="spending runtime-key mint",
+    ),
+    LiveEffectSeam(
+        path="just/sandbox/lifecycle/observe.just",
+        effect_class=EffectClass.PUBLIC_EXPOSURE,
+        effect_marker='ssh exe.dev share set-public "$VM"',
+        description="anonymous public exposure",
+    ),
+)
+
+
+def _normalized_repository(remote: str) -> str:
+    """Project a Git remote onto the canonical HTTPS repository identity."""
+    value = remote.strip()
+    if value.startswith("https://"):
+        return value
+    if value.startswith("ssh://git@"):
+        rest = value[len("ssh://git@"):]
+        return "https://" + rest
+    if value.startswith("git@") and ":" in value:
+        host, _, path = value[len("git@"):].partition(":")
+        return f"https://{host}/{path}"
+    raise EffectStateUnobservable(f"repository remote {remote!r} has no HTTPS projection")
+
+
+def observed_repository_head(root: "Path | None" = None) -> tuple[str, str]:
+    """Observe the exact repository and head this effect is authorized at.
+
+    A missing, unspawnable, or wedged ``git`` is could-not-observe, never a
+    silently accepted authority (ruling 36/5421223592, the same observation
+    boundary ``docs/validation/check_obs_query.py`` landed).
+    """
+    workdir = Path(root) if root is not None else REPOSITORY_ROOT
+
+    def git(*args: str) -> str:
+        try:
+            completed = subprocess.run(
+                ("git", *args),
+                cwd=workdir,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=GIT_TIMEOUT_SECONDS,
+            )
+        except OSError as exc:
+            raise EffectStateUnobservable(f"git is unavailable: {exc}") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise EffectStateUnobservable(f"git timed out: git {' '.join(args)}") from exc
+        if completed.returncode != 0:
+            raise EffectStateUnobservable(
+                f"git {' '.join(args)} exited {completed.returncode}: "
+                f"{completed.stderr.strip() or 'no output'}"
+            )
+        return completed.stdout.strip()
+
+    repository = _normalized_repository(git("config", "--get", "remote.origin.url"))
+    head = git("rev-parse", "HEAD")
+    if _SHA1.fullmatch(head) is None:
+        raise EffectStateUnobservable(f"git HEAD {head!r} is not a full commit sha")
+    return repository, head
+
+
+def load_or_create_signing_key(path: "Path | str") -> bytes:
+    """Read the host-owned effect signing material, creating it once if absent.
+
+    Verification never needs this material — the durable store keeps the
+    provenance fingerprint — so rotating or losing it cannot resurrect or
+    invalidate an already reserved capability.
+    """
+    target = Path(path)
+    try:
+        material = target.read_bytes()
+    except FileNotFoundError:
+        material = b""
+    except OSError as exc:
+        raise EffectStateUnobservable(f"effect signing material unreadable: {exc}") from exc
+    if len(material) >= 32:
+        return material
+    if material:
+        raise EffectStateUnobservable("effect signing material is present but too short")
+    minted = os.urandom(32)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        handle = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(minted)
+    except FileExistsError:
+        return load_or_create_signing_key(target)
+    except OSError as exc:
+        raise EffectStateUnobservable(f"effect signing material unwritable: {exc}") from exc
+    return minted
+
+
+def _parse_parameters(values: Sequence[str]) -> tuple[tuple[str, str], ...]:
+    parsed: list[tuple[str, str]] = []
+    for item in values:
+        name, separator, value = item.partition("=")
+        if not separator:
+            raise EffectNotAuthorized(f"--param must be name=value, got {item!r}")
+        parsed.append((name, value))
+    return tuple(sorted(parsed))
+
+
+def _parse_obligations(values: Sequence[str]) -> tuple[OutcomeCheck, ...]:
+    """Parse ``NAME|observation|reason`` triples into typed observations.
+
+    There is no shorthand that means "approved": every obligation carries one of
+    the three closed observation values, and only observed-good contributes to
+    a mint.
+    """
+    checks: list[OutcomeCheck] = []
+    for item in values:
+        parts = item.split("|", 2)
+        if len(parts) < 2:
+            raise EffectNotAuthorized(
+                f"--obligation must be NAME|observation|reason, got {item!r}"
+            )
+        name, raw_observation = parts[0], parts[1]
+        reason = parts[2] if len(parts) == 3 else "no reason supplied"
+        try:
+            observation = Observation(raw_observation)
+        except ValueError as exc:
+            raise EffectNotAuthorized(
+                f"obligation {name!r} observation must be one of "
+                f"{[value.value for value in Observation]}, got {raw_observation!r}"
+            ) from exc
+        checks.append(OutcomeCheck(name, observation, reason=reason))
+    return tuple(checks)
+
+
+def _subject_from_arguments(arguments: object) -> EffectSubject:
+    repository = getattr(arguments, "repository", None)
+    head = getattr(arguments, "head", None)
+    if not repository or not head:
+        observed_repository, observed_head = observed_repository_head(
+            getattr(arguments, "root", None)
+        )
+        repository = repository or observed_repository
+        head = head or observed_head
+    return EffectSubject(
+        run_id=arguments.run_id,
+        effect_class=EffectClass(arguments.effect),
+        repository=repository,
+        head_commit=head,
+        resource_id=arguments.resource,
+        parameters=_parse_parameters(arguments.param),
+    )
+
+
+def _read_authorization(path: "Path | str") -> EffectAuthorization:
+    try:
+        raw = Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise EffectNotAuthorized(
+            f"no effect authority at {path}: absence is never approval"
+        ) from exc
+    except (OSError, UnicodeError) as exc:
+        raise EffectStateUnobservable(f"effect authority unreadable: {exc}") from exc
+    try:
+        document = json.loads(raw)
+    except ValueError as exc:
+        raise EffectNotAuthorized(f"effect authority is not readable JSON: {exc}") from exc
+    return EffectAuthorization.from_document(document)
+
+
+# ---------------------------------------------------------------------------
+# Watched-red controls for the four LAW_1 acceptance properties
+#
+# Each control positively manufactures the defect the law names and asserts a
+# typed refusal, and each is paired with a non-vacuity case proving the same
+# gate still admits the correct input.  A control that cannot reach its subject
+# reports could-not-observe; it never reports a pass by absence.
+
+
+_CONTROL_REPOSITORY = "https://example.invalid/sssf-effect-controls.git"
+_CONTROL_HEAD = "a" * 40
+_CONTROL_OTHER_HEAD = "b" * 40
+_CONTROL_ISSUED_AT = "1970-01-01T00:00:00Z"
+_CONTROL_ENVIRONMENT_MARKERS = {
+    "SBX_EFFECT_APPROVED": "1",
+    "SSSF_EFFECT_AUTHORIZED": "yes",
+    "TEARDOWN_APPROVED": "true",
+}
+
+
+def _control_check(condition: bool, message: str, errors: list[str]) -> None:
+    if not condition:
+        errors.append(message)
+
+
+def _control_subject(
+    effect_class: EffectClass = EffectClass.DESTROY,
+    **overrides: object,
+) -> EffectSubject:
+    fields: dict[str, object] = {
+        "run_id": "ctl-run-1",
+        "effect_class": effect_class,
+        "repository": _CONTROL_REPOSITORY,
+        "head_commit": _CONTROL_HEAD,
+        "resource_id": "ctl-vm-1",
+        "parameters": (),
+    }
+    fields.update(overrides)
+    return EffectSubject(**fields)  # type: ignore[arg-type]
+
+
+def _control_obligations() -> tuple[OutcomeCheck, ...]:
+    return (
+        OutcomeCheck("commits-harvested", Observation.OBSERVED_GOOD, reason="bundle written"),
+        OutcomeCheck("runtime-key-retired", Observation.OBSERVED_GOOD, reason="DELETE returned 200"),
+    )
+
+
+def _control_authority(directory: Path, name: str = "state.json") -> tuple[
+    JsonFileAuthorizationStateStore, EffectAuthorizationIssuer, EffectAuthorizationVerifier
+]:
+    store = JsonFileAuthorizationStateStore(directory / name)
+    issuer = EffectAuthorizationIssuer(b"control-signing-material-32-bytes", store)
+    return store, issuer, EffectAuthorizationVerifier(store)
+
+
+def marker_is_not_approval_controls(errors: list[str], executed: list[str]) -> None:
+    """Watched red: an env var or prose marker treated as approval for a head-bound effect."""
+    with tempfile.TemporaryDirectory() as raw:
+        directory = Path(raw)
+        _store, issuer, verifier = _control_authority(directory)
+        subject = _control_subject()
+
+        executed.append("marker/empty-obligation-set-cannot-mint")
+        try:
+            issue_effect_authorization(
+                subject, obligations=(), authorization_issuer=issuer, issued_at=_CONTROL_ISSUED_AT
+            )
+        except EffectNotAuthorized:
+            pass
+        else:
+            errors.append("an empty obligation set minted effect authority")
+
+        executed.append("marker/could-not-observe-obligation-cannot-mint")
+        try:
+            issue_effect_authorization(
+                subject,
+                obligations=(
+                    OutcomeCheck("commits-harvested", Observation.OBSERVED_GOOD, reason="ok"),
+                    OutcomeCheck(
+                        "runtime-key-retired",
+                        Observation.COULD_NOT_OBSERVE,
+                        reason="provisioning list unreadable",
+                    ),
+                ),
+                authorization_issuer=issuer,
+                issued_at=_CONTROL_ISSUED_AT,
+            )
+        except EffectNotAuthorized:
+            pass
+        else:
+            errors.append("a could-not-observe obligation minted effect authority")
+
+        executed.append("marker/absent-authority-is-not-approval")
+        try:
+            _read_authorization(directory / "does-not-exist.json")
+        except EffectNotAuthorized:
+            pass
+        except EffectStateUnobservable:
+            errors.append("an absent effect authority was reported as unobservable, not refused")
+        else:
+            errors.append("an absent effect authority was accepted")
+
+        executed.append("marker/prose-marker-file-is-not-approval")
+        prose = directory / "approved.txt"
+        prose.write_text("APPROVED BY THE OPERATOR — destroy is fine\n", encoding="utf-8")
+        try:
+            _read_authorization(prose)
+        except EffectNotAuthorized:
+            pass
+        else:
+            errors.append("a prose approval marker was accepted as effect authority")
+
+        executed.append("marker/hand-written-unsigned-token-is-refused")
+        forged = EffectAuthorization(
+            authorization_id="c" * 64,
+            subject=subject,
+            obligations_digest="d" * 64,
+            issued_at=_CONTROL_ISSUED_AT,
+            authenticator="0" * 64,
+        )
+        forged_result = authorize_effect(forged, subject, verifier)
+        _control_check(
+            forged_result.observation is Observation.OBSERVED_BAD,
+            "a hand-written unsigned effect authority was not refused",
+            errors,
+        )
+
+        executed.append("marker/environment-markers-do-not-approve")
+        preserved = {name: os.environ.get(name) for name in _CONTROL_ENVIRONMENT_MARKERS}
+        try:
+            os.environ.update(_CONTROL_ENVIRONMENT_MARKERS)
+            still_refused = authorize_effect(forged, subject, verifier)
+            _control_check(
+                still_refused.observation is Observation.OBSERVED_BAD,
+                "environment approval markers admitted an unsigned effect authority",
+                errors,
+            )
+            # Non-vacuity, with the same markers still set: a properly minted
+            # authority is admitted, so the refusal above is the token's doing
+            # and not an unconditional deny.
+            executed.append("marker/non-vacuity-minted-authority-is-admitted")
+            minted = issue_effect_authorization(
+                subject,
+                obligations=_control_obligations(),
+                authorization_issuer=issuer,
+                issued_at=_CONTROL_ISSUED_AT,
+            )
+            admitted = authorize_effect(minted, subject, verifier)
+            _control_check(
+                admitted.observation is Observation.OBSERVED_GOOD,
+                f"a correctly minted effect authority was refused: {admitted.reason}",
+                errors,
+            )
+        finally:
+            for name, value in preserved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+
+def landing_authority_is_not_effect_authority_controls(
+    errors: list[str], executed: list[str]
+) -> None:
+    """LAW_1: repository landing authority is never configuration-mutation authority."""
+    with tempfile.TemporaryDirectory() as raw:
+        directory = Path(raw)
+        _store, issuer, verifier = _control_authority(directory)
+        subject = _control_subject()
+        minted = issue_effect_authorization(
+            subject,
+            obligations=_control_obligations(),
+            authorization_issuer=issuer,
+            issued_at=_CONTROL_ISSUED_AT,
+        )
+
+        executed.append("law1/foreign-purpose-domain-is-refused")
+        landing_document = minted.to_document()
+        landing_document["purpose_domain"] = "repository-landing/example"
+        try:
+            EffectAuthorization.from_document(landing_document)
+        except EffectNotAuthorized as exc:
+            _control_check(
+                "repository landing authorization is never configuration-mutation authority"
+                in str(exc),
+                "the foreign purpose domain refusal did not name LAW_1",
+                errors,
+            )
+        else:
+            errors.append("a repository landing purpose domain was parsed as effect authority")
+
+        executed.append("law1/domain-separated-signature-does-not-verify")
+        payload = _effect_authorization_payload(minted)
+        _control_check(
+            payload.startswith(EFFECT_AUTHORITY_DOMAIN.encode() + b"|"),
+            "the effect authority payload is not domain separated",
+            errors,
+        )
+        landing_authenticator = hmac.new(
+            b"control-signing-material-32-bytes",
+            b"repository-landing/example|" + payload.split(b"|", 1)[1],
+            hashlib.sha256,
+        ).hexdigest()
+        _control_check(
+            landing_authenticator != minted.authenticator,
+            "a landing-domain signature collided with the effect-domain signature",
+            errors,
+        )
+        landing_signed = replace(minted, authenticator=landing_authenticator)
+        _control_check(
+            not verifier.verifies(landing_signed),
+            "an authenticator minted under a landing domain verified as effect authority",
+            errors,
+        )
+
+        executed.append("law1/effect-class-vocabulary-excludes-landing")
+        _control_check(
+            {member.value for member in EffectClass}
+            == {"destroy-only", "runtime-key-mint-only", "public-exposure-only"},
+            "the effect class vocabulary is not the closed three-effect set",
+            errors,
+        )
+
+
+def stale_subject_controls(errors: list[str], executed: list[str]) -> None:
+    """Watched red: a stale or wrong repository/head/target authority admitted."""
+    with tempfile.TemporaryDirectory() as raw:
+        directory = Path(raw)
+        _store, issuer, verifier = _control_authority(directory)
+        subject = _control_subject(
+            effect_class=EffectClass.RUNTIME_KEY_MINT,
+            resource_id="sbx-ctl-run-1",
+            parameters=(("spend_limit_usd", "50.00"),),
+        )
+        minted = issue_effect_authorization(
+            subject,
+            obligations=_control_obligations(),
+            authorization_issuer=issuer,
+            issued_at=_CONTROL_ISSUED_AT,
+        )
+        wrong_subjects = (
+            (replace(subject, head_commit=_CONTROL_OTHER_HEAD), "head_commit", "stale head"),
+            (
+                replace(subject, repository="https://example.invalid/other.git"),
+                "repository",
+                "foreign repository",
+            ),
+            (replace(subject, resource_id="sbx-other-run"), "resource_id", "another target"),
+            (replace(subject, run_id="ctl-run-2"), "run_id", "another run"),
+            (
+                replace(subject, parameters=(("spend_limit_usd", "500.00"),)),
+                "parameters",
+                "a widened spend ceiling",
+            ),
+        )
+        for observed, field_name, label in wrong_subjects:
+            executed.append(f"stale/{field_name}")
+            result = authorize_effect(minted, observed, verifier)
+            _control_check(
+                result.observation is Observation.OBSERVED_BAD,
+                f"the pre-effect gate admitted {label}",
+                errors,
+            )
+            _control_check(
+                field_name in result.reason,
+                f"the refusal for {label} did not name {field_name}",
+                errors,
+            )
+
+        executed.append("stale/non-vacuity-exact-subject-is-admitted")
+        exact = authorize_effect(minted, subject, verifier)
+        _control_check(
+            exact.observation is Observation.OBSERVED_GOOD,
+            f"the exactly bound subject was refused: {exact.reason}",
+            errors,
+        )
+
+        executed.append("stale/spend-ceiling-above-the-bound-cannot-mint")
+        try:
+            issue_effect_authorization(
+                replace(
+                    subject,
+                    parameters=(("spend_limit_usd", str(RUNTIME_KEY_SPEND_CEILING_USD + 1)),),
+                ),
+                obligations=_control_obligations(),
+                authorization_issuer=issuer,
+                issued_at=_CONTROL_ISSUED_AT,
+            )
+        except EffectNotAuthorized:
+            pass
+        else:
+            errors.append("a spend ceiling above the authorized bound minted authority")
+
+
+def one_use_controls(errors: list[str], executed: list[str]) -> None:
+    """Watched red: a one-use authority reused after consumption."""
+    with tempfile.TemporaryDirectory() as raw:
+        directory = Path(raw)
+        _store, issuer, verifier = _control_authority(directory)
+        subject = _control_subject()
+        minted = issue_effect_authorization(
+            subject,
+            obligations=_control_obligations(),
+            authorization_issuer=issuer,
+            issued_at=_CONTROL_ISSUED_AT,
+        )
+
+        executed.append("one-use/first-reservation-is-admitted")
+        first = authorize_effect(minted, subject, verifier)
+        _control_check(
+            first.observation is Observation.OBSERVED_GOOD,
+            f"the first use of a one-use authority was refused: {first.reason}",
+            errors,
+        )
+
+        executed.append("one-use/reservation-is-retryable-before-the-effect")
+        retry = authorize_effect(minted, subject, verifier)
+        _control_check(
+            retry.observation is Observation.OBSERVED_GOOD,
+            "a reservation that never reached its effect was not retryable",
+            errors,
+        )
+
+        executed.append("one-use/consumed-authority-is-refused")
+        consumed = complete_effect(
+            minted,
+            OutcomeCheck("vm-absent", Observation.OBSERVED_GOOD, reason="control plane lists no VM"),
+            verifier,
+        )
+        _control_check(
+            consumed.observation is Observation.OBSERVED_GOOD,
+            f"an authoritatively observed terminal state did not consume the authority: {consumed.reason}",
+            errors,
+        )
+        replayed = authorize_effect(minted, subject, verifier)
+        _control_check(
+            replayed.observation is Observation.OBSERVED_BAD,
+            "a one-use authority was admitted again after consumption",
+            errors,
+        )
+        _control_check(
+            "already consumed" in replayed.reason,
+            "the replay refusal did not name prior consumption",
+            errors,
+        )
+
+        executed.append("one-use/non-vacuity-a-fresh-authority-still-mints")
+        fresh = issue_effect_authorization(
+            subject,
+            obligations=_control_obligations(),
+            authorization_issuer=issuer,
+            issued_at="1970-01-01T00:00:01Z",
+        )
+        _control_check(
+            fresh.authorization_id != minted.authorization_id,
+            "a second mint reused the consumed authorization identity",
+            errors,
+        )
+        _control_check(
+            authorize_effect(fresh, subject, verifier).observation is Observation.OBSERVED_GOOD,
+            "a freshly minted authority was refused after an earlier one was consumed",
+            errors,
+        )
+
+
+def post_effect_observation_controls(errors: list[str], executed: list[str]) -> None:
+    """Watched red: post-effect success inferred without authoritative observation."""
+    with tempfile.TemporaryDirectory() as raw:
+        directory = Path(raw)
+        _store, issuer, verifier = _control_authority(directory)
+        subject = _control_subject()
+
+        for observation, label in (
+            (Observation.COULD_NOT_OBSERVE, "an unreadable control-plane listing"),
+            (Observation.OBSERVED_BAD, "an observed residual resource"),
+        ):
+            executed.append(f"post-effect/{observation.value}-does-not-complete")
+            minted = issue_effect_authorization(
+                subject,
+                obligations=_control_obligations(),
+                authorization_issuer=issuer,
+                issued_at=f"1970-01-01T00:00:0{2 if observation is Observation.OBSERVED_BAD else 3}Z",
+            )
+            authorize_effect(minted, subject, verifier)
+            result = complete_effect(
+                minted,
+                OutcomeCheck("vm-absent", observation, reason=label),
+                verifier,
+            )
+            _control_check(
+                result.observation is observation,
+                f"{label} did not preserve its own observation value",
+                errors,
+            )
+            _control_check(
+                not verifier.completed(minted),
+                f"{label} was inferred as post-effect success",
+                errors,
+            )
+            _control_check(
+                verifier.reserved(minted),
+                f"{label} lost the reservation instead of preserving it for reconciliation",
+                errors,
+            )
+
+        executed.append("post-effect/non-vacuity-observed-absence-completes")
+        good = issue_effect_authorization(
+            subject,
+            obligations=_control_obligations(),
+            authorization_issuer=issuer,
+            issued_at="1970-01-01T00:00:04Z",
+        )
+        authorize_effect(good, subject, verifier)
+        completed = complete_effect(
+            good,
+            OutcomeCheck("vm-absent", Observation.OBSERVED_GOOD, reason="control plane lists no VM"),
+            verifier,
+        )
+        _control_check(
+            completed.observation is Observation.OBSERVED_GOOD and verifier.completed(good),
+            f"an authoritatively observed terminal state did not complete: {completed.reason}",
+            errors,
+        )
+
+
+def pre_effect_gate_blocks_controls(errors: list[str], executed: list[str]) -> None:
+    """ROADMAP.md:980 — a fixture pre-effect gate proves stale/wrong/missing authority blocks."""
+    with tempfile.TemporaryDirectory() as raw:
+        directory = Path(raw)
+        _store, issuer, verifier = _control_authority(directory)
+        subject = _control_subject(
+            effect_class=EffectClass.PUBLIC_EXPOSURE,
+            parameters=(("port", "4501"), ("visibility", "public")),
+        )
+        ran: list[str] = []
+
+        def guarded_effect(
+            presented: EffectAuthorization | None, observed: EffectSubject
+        ) -> EffectGateResult:
+            if presented is None:
+                return EffectGateResult(Observation.OBSERVED_BAD, "no authority was presented")
+            gate = authorize_effect(presented, observed, verifier)
+            if not gate.permitted:
+                return gate
+            ran.append(observed.resource_id)
+            return gate
+
+        minted = issue_effect_authorization(
+            subject,
+            obligations=(
+                OutcomeCheck("app-port-listening", Observation.OBSERVED_GOOD, reason=":4501 bound"),
+                OutcomeCheck(
+                    "single-anonymous-port", Observation.OBSERVED_GOOD, reason="only 4501 is public"
+                ),
+            ),
+            authorization_issuer=issuer,
+            issued_at=_CONTROL_ISSUED_AT,
+        )
+        blocked_cases = (
+            (None, subject, "missing authority"),
+            (minted, replace(subject, head_commit=_CONTROL_OTHER_HEAD), "stale head"),
+            (minted, replace(subject, resource_id="ctl-vm-2"), "wrong target"),
+            (
+                minted,
+                replace(subject, parameters=(("port", "9999"), ("visibility", "public"))),
+                "wrong exposure parameters",
+            ),
+        )
+        for presented, observed, label in blocked_cases:
+            executed.append(f"pre-effect/{label.replace(' ', '-')}-blocks-before-effect")
+            result = guarded_effect(presented, observed)
+            _control_check(
+                result.observation is Observation.OBSERVED_BAD,
+                f"the fixture gate did not refuse {label}",
+                errors,
+            )
+        _control_check(
+            ran == [],
+            f"the effect ran behind a refused gate: {ran}",
+            errors,
+        )
+
+        executed.append("pre-effect/non-vacuity-bound-authority-runs-the-effect")
+        permitted = guarded_effect(minted, subject)
+        _control_check(
+            permitted.observation is Observation.OBSERVED_GOOD and ran == [subject.resource_id],
+            "the fixture gate blocked an exactly bound authority",
+            errors,
+        )
+
+
+def seam_binding_controls(
+    errors: list[str], executed: list[str], root: "Path | None" = None
+) -> None:
+    """Every live effect line sits between its mint/gate and its completion.
+
+    An unreadable seam, or a seam whose named effect line is no longer present,
+    is could-not-observe: the control refuses to report a pass it did not reach.
+    """
+    base = Path(root) if root is not None else REPOSITORY_ROOT
+    for seam in LIVE_EFFECT_SEAMS:
+        executed.append(f"seam/{seam.effect_class.value}")
+        try:
+            text = (base / seam.path).read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            errors.append(f"could-not-observe: {seam.path} is unreadable: {exc}")
+            continue
+        effect_at = text.find(seam.effect_marker)
+        if effect_at < 0:
+            errors.append(
+                f"could-not-observe: {seam.path} no longer contains the named "
+                f"{seam.description} line {seam.effect_marker!r}"
+            )
+            continue
+        mint_at = text.find(seam.mint_marker)
+        gate_at = text.find(seam.gate_marker)
+        complete_at = text.find(seam.complete_marker)
+        _control_check(
+            0 <= mint_at < effect_at,
+            f"{seam.path}: {seam.description} is not preceded by a typed authority mint",
+            errors,
+        )
+        _control_check(
+            0 <= gate_at < effect_at,
+            f"{seam.path}: {seam.description} is not preceded by the pre-effect authority gate",
+            errors,
+        )
+        _control_check(
+            0 <= mint_at < gate_at,
+            f"{seam.path}: the authority gate does not follow its mint",
+            errors,
+        )
+        _control_check(
+            complete_at > effect_at,
+            f"{seam.path}: {seam.description} does not complete its one-use authority "
+            "on an authoritative post-effect observation",
+            errors,
+        )
+
+
+def effect_authority_controls(root: "Path | None" = None) -> tuple[list[str], list[str]]:
+    """Run every LAW_1 watched red; return (errors, executed control names)."""
+    errors: list[str] = []
+    executed: list[str] = []
+    marker_is_not_approval_controls(errors, executed)
+    landing_authority_is_not_effect_authority_controls(errors, executed)
+    stale_subject_controls(errors, executed)
+    one_use_controls(errors, executed)
+    post_effect_observation_controls(errors, executed)
+    pre_effect_gate_blocks_controls(errors, executed)
+    seam_binding_controls(errors, executed, root)
+    return errors, executed
+
+
+# ---------------------------------------------------------------------------
+# Host CLI — the seam-facing entry point the three recipes call
+#
+#   python3 -m adws.adw_modules.sandbox_provider mint     --effect ... --out ...
+#   python3 -m adws.adw_modules.sandbox_provider gate     --effect ... --authorization ...
+#   python3 -m adws.adw_modules.sandbox_provider complete --authorization ... --observed ...
+#   python3 -m adws.adw_modules.sandbox_provider controls
+#
+# Exit codes are the landed three-valued vocabulary from tools/ci_gate.py:
+# 0 observed-good, 1 observed-bad, COULD_NOT_OBSERVE_EXIT could-not-observe.
+# A caller must never read a nonzero exit as "the effect is fine to run".
+
+
+def _observation_exit(observation: Observation) -> int:
+    if observation is Observation.OBSERVED_GOOD:
+        return 0
+    if observation is Observation.COULD_NOT_OBSERVE:
+        return COULD_NOT_OBSERVE_EXIT
+    return 1
+
+
+def _add_subject_arguments(parser: "argparse.ArgumentParser") -> None:
+    parser.add_argument(
+        "--effect",
+        required=True,
+        choices=[member.value for member in EffectClass],
+        help="the closed effect class this authority is for",
+    )
+    parser.add_argument("--run-id", required=True, help="the run this effect belongs to")
+    parser.add_argument(
+        "--resource", required=True, help="the exact effect target (VM name, key name)"
+    )
+    parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="a bounded configuration binding compared exactly at the gate",
+    )
+    parser.add_argument(
+        "--repository",
+        default="",
+        help="override the observed repository identity (fixtures and controls only)",
+    )
+    parser.add_argument(
+        "--head",
+        default="",
+        help="override the observed head commit (fixtures and controls only)",
+    )
+    parser.add_argument("--root", default=None, help="repository root to observe the head in")
+
+
+def _add_state_arguments(parser: "argparse.ArgumentParser") -> None:
+    parser.add_argument(
+        "--state",
+        default=str(DEFAULT_AUTHORITY_STATE),
+        help="durable one-use authorization state file",
+    )
+
+
+def _effect_parser() -> "argparse.ArgumentParser":
+    parser = argparse.ArgumentParser(
+        prog="python3 -m adws.adw_modules.sandbox_provider",
+        description=(
+            "Head-bound one-use authority for the live SSSF effect seams. "
+            "Repository landing authorization is never configuration-mutation authority."
+        ),
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    mint = subparsers.add_parser("mint", help="mint one-use authority from observed obligations")
+    _add_subject_arguments(mint)
+    _add_state_arguments(mint)
+    mint.add_argument(
+        "--obligation",
+        action="append",
+        default=[],
+        metavar="NAME|OBSERVATION|REASON",
+        help="a typed pre-effect observation; only observed-good contributes",
+    )
+    mint.add_argument("--out", required=True, help="where to write the minted authority")
+    mint.add_argument(
+        "--signing-key",
+        default=str(DEFAULT_AUTHORITY_SIGNING_KEY),
+        help="host-owned effect signing material",
+    )
+    mint.add_argument("--issued-at", default="", help="issuance timestamp (defaults to now, UTC)")
+
+    gate = subparsers.add_parser("gate", help="the pre-effect gate; reserves the capability")
+    _add_subject_arguments(gate)
+    _add_state_arguments(gate)
+    gate.add_argument("--authorization", required=True, help="the authority to present")
+
+    complete = subparsers.add_parser(
+        "complete", help="consume the capability on an authoritative post-effect observation"
+    )
+    _add_state_arguments(complete)
+    complete.add_argument("--authorization", required=True)
+    complete.add_argument(
+        "--observed",
+        required=True,
+        choices=[member.value for member in Observation],
+        help="the post-effect terminal-state observation",
+    )
+    complete.add_argument("--name", default="post-effect-state")
+    complete.add_argument("--reason", default="no reason supplied")
+
+    controls = subparsers.add_parser(
+        "controls", help="run the LAW_1 watched-red controls over the live seams"
+    )
+    controls.add_argument("--root", default=None, help="repository root to inspect")
+
+    return parser
+
+
+def _write_authorization(path: "Path | str", authorization: EffectAuthorization) -> None:
+    target = Path(path)
+    rendered = json.dumps(authorization.to_document(), sort_keys=True, indent=2) + "\n"
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        handle = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(rendered)
+    except OSError as exc:
+        raise EffectStateUnobservable(f"effect authority could not be written: {exc}") from exc
+
+
+def _run_controls_command(root: "str | None") -> int:
+    errors, executed = effect_authority_controls(Path(root) if root else None)
+    unobservable = [error for error in errors if error.startswith(CNO_REASON_PREFIX)]
+    if unobservable:
+        print("SDLC-L1 effect-seam authority controls: COULD-NOT-OBSERVE")
+        for error in errors:
+            print(f"- {error}")
+        return COULD_NOT_OBSERVE_EXIT
+    if errors:
+        print("SDLC-L1 effect-seam authority controls: FAIL")
+        for error in errors:
+            print(f"- {error}")
+        return 1
+    print("SDLC-L1 effect-seam authority controls: PASS")
+    print(
+        "law: control #36 LAW_1 — repository landing authorization is never "
+        "configuration-mutation authority"
+    )
+    print(
+        "bound seams: "
+        + ", ".join(f"{seam.path} ({seam.description})" for seam in LIVE_EFFECT_SEAMS)
+    )
+    print("provider-calls: 0 (in-process controls; no exe.dev, OpenRouter, ssh, or network call)")
+    print("watched-red: an environment or prose marker treated as approval for a head-bound effect")
+    print("watched-red: a stale or wrong repository/head/target authority admitted")
+    print("watched-red: a one-use authority reused after consumption")
+    print("watched-red: post-effect success inferred without authoritative observation")
+    print("positive control: an exactly bound, authentic, unconsumed authority is admitted")
+    print(f"watched-red controls executed: {len(executed)}")
+    return 0
+
+
+def effect_cli(argv: "Sequence[str] | None" = None) -> int:
+    """Seam-facing entry point.  Every answer is one of the three values."""
+    arguments = _effect_parser().parse_args(list(argv) if argv is not None else None)
+
+    if arguments.command == "controls":
+        return _run_controls_command(arguments.root)
+
+    try:
+        if arguments.command == "mint":
+            subject = _subject_from_arguments(arguments)
+            issued_at = arguments.issued_at or datetime.now(timezone.utc).isoformat(
+                timespec="microseconds"
+            ).replace("+00:00", "Z")
+            store = JsonFileAuthorizationStateStore(arguments.state)
+            issuer = EffectAuthorizationIssuer(
+                load_or_create_signing_key(arguments.signing_key), store
+            )
+            authorization = issue_effect_authorization(
+                subject,
+                obligations=_parse_obligations(arguments.obligation),
+                authorization_issuer=issuer,
+                issued_at=issued_at,
+            )
+            _write_authorization(arguments.out, authorization)
+            print(
+                f"authority: {subject.effect_class.value} for {subject.resource_id} "
+                f"at {subject.head_commit[:12]} (id {authorization.authorization_id[:12]})"
+            )
+            return 0
+
+        if arguments.command == "gate":
+            authorization = _read_authorization(arguments.authorization)
+            observed = _subject_from_arguments(arguments)
+            store = JsonFileAuthorizationStateStore(arguments.state)
+            result = authorize_effect(
+                authorization, observed, EffectAuthorizationVerifier(store)
+            )
+        else:
+            authorization = _read_authorization(arguments.authorization)
+            store = JsonFileAuthorizationStateStore(arguments.state)
+            result = complete_effect(
+                authorization,
+                OutcomeCheck(
+                    arguments.name, Observation(arguments.observed), reason=arguments.reason
+                ),
+                EffectAuthorizationVerifier(store),
+            )
+    except EffectStateUnobservable as exc:
+        print(f"{CNO_REASON_PREFIX}{exc}", file=sys.stderr)
+        return COULD_NOT_OBSERVE_EXIT
+    except (EffectNotAuthorized, ValueError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 1
+
+    stream = sys.stdout if result.observation is Observation.OBSERVED_GOOD else sys.stderr
+    label = (
+        "permitted"
+        if result.observation is Observation.OBSERVED_GOOD
+        else (
+            CNO_REASON_PREFIX.rstrip()
+            if result.observation is Observation.COULD_NOT_OBSERVE
+            else "refused:"
+        )
+    )
+    print(f"{label} {result.reason}", file=stream)
+    return _observation_exit(result.observation)
+
+
 __all__ = [
     "AggregateResult",
     "ArtifactExportFacts",
     "ArtifactInventoryItem",
-    "CapabilityDisposition",
-    "CapabilityFact",
     "ArtifactSpec",
+    "authorize_effect",
     "CapabilityDisposition",
     "CapabilityFact",
     "CommandSpec",
+    "complete_effect",
     "CopyFacts",
     "CopySpec",
     "CreateFacts",
+    "DeferredCapability",
     "DestroyAuthorization",
     "DestroyAuthorizationIssuer",
     "DestroyAuthorizationStateStore",
     "DestroyAuthorizationVerifier",
     "DestroyFacts",
     "DestroyNotAuthorized",
-    "DeferredCapability",
+    "effect_authority_controls",
+    "EFFECT_AUTHORITY_DOMAIN",
+    "effect_cli",
+    "EffectAuthorization",
+    "EffectAuthorizationIssuer",
+    "EffectAuthorizationVerifier",
+    "EffectClass",
+    "EffectGateResult",
+    "EffectNotAuthorized",
+    "EffectStateUnobservable",
+    "EffectSubject",
     "ExecFacts",
     "FactBase",
     "FakeControl",
     "FakeSandboxProvider",
+    "fold_aggregate",
     "GitExportFacts",
     "GitExportSpec",
-    "InMemoryLifecycleRecordStore",
     "InMemoryDestroyAuthorizationStateStore",
+    "InMemoryLifecycleRecordStore",
     "InputCopySpec",
     "InspectFacts",
     "InterruptTiming",
+    "issue_destroy_authorization",
+    "issue_effect_authorization",
+    "JsonFileAuthorizationStateStore",
     "LifecycleBoundary",
     "LifecycleOperationRecord",
     "LifecycleRecordStore",
     "LifecycleState",
+    "LIVE_EFFECT_SEAMS",
+    "LiveEffectSeam",
+    "load_or_create_signing_key",
     "Observation",
     "ObservationSummary",
+    "observed_repository_head",
     "OperationFacts",
     "OperationKey",
     "OperationKind",
@@ -2305,6 +3937,7 @@ __all__ = [
     "ReconciliationFacts",
     "ReconciliationStatus",
     "ResourceBounds",
+    "RUNTIME_KEY_SPEND_CEILING_USD",
     "SandboxIdentity",
     "SandboxProvider",
     "SandboxSpec",
@@ -2315,9 +3948,11 @@ __all__ = [
     "StdinPolicy",
     "StopFacts",
     "TimeoutClock",
-    "WorkspaceMode",
-    "fold_aggregate",
-    "issue_destroy_authorization",
     "validate_artifact_export",
     "validate_git_export",
+    "WorkspaceMode",
 ]
+
+
+if __name__ == "__main__":  # pragma: no cover - host entry point
+    raise SystemExit(effect_cli())

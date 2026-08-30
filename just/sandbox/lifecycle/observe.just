@@ -13,6 +13,14 @@
 # NEVER destroys the VM. Every failure below reports and exits non-zero with the
 # box still up, because the evidence you need lives on it. `just sbx lifecycle teardown` stays
 # an explicit, separate decision.
+#
+# SDLC-L1 / control #36 LAW_1. Publishing a sandbox anonymously is an exposure
+# effect, so `share set-public` runs behind a one-use `public-exposure-only`
+# capability bound to this exact repository, head, VM and port. Retargeting the
+# proxy is not the publication and is only an obligation; reaching this phase is
+# not approval; a repository landing authorization belongs to a different
+# purpose domain and can never be presented here. The exposure is not believed
+# until an unauthenticated request is authoritatively observed returning 200.
 
 # Phase 5 · start both servers if down, expose 4501 anonymously, print the URLs
 observe RUN_ID:
@@ -20,6 +28,8 @@ observe RUN_ID:
     set -euo pipefail
 
     RR="sandbox_mount/host/run_record.py"
+    RUN_ID="{{RUN_ID}}"
+    AUTH_FILE=".sandbox/runs/${RUN_ID}.public-exposure.auth.json"
 
     # The run record is the ONLY state shared across the six phases; nothing
     # else survives between them.
@@ -74,6 +84,7 @@ observe RUN_ID:
     # Idempotent: observe is safe to re-run, and `just sbx mount` ends here, so a
     # second call must not stack a second bun on the same port.
     echo "[2/6] app  :$APP_PORT"
+    WHY_APP="ss reports :$APP_PORT already bound on $HOST"
     if listening "$APP_PORT"; then
         echo "       already listening — leaving it alone"
     else
@@ -87,6 +98,7 @@ observe RUN_ID:
             ssh "$HOST" 'tail -n 40 $HOME/inkwell-app.log' >&2 || true
             exit 1
         fi
+        WHY_APP="ss reports :$APP_PORT bound on $HOST after this phase started it"
         echo "       up"
     fi
 
@@ -128,33 +140,77 @@ observe RUN_ID:
     # applies to the primary port only — see the note printed at the end.
     echo "[4/6] proxy -> :$APP_PORT, public"
     ssh exe.dev share port "$VM" "$APP_PORT"
-    ssh exe.dev share set-public "$VM"
 
-    # ── 4. record ────────────────────────────────────────────────────────────
-    echo "[5/6] recording ports"
-    "$RR" set {{RUN_ID}} "ports={\"app\":$APP_PORT,\"obs\":$OBS_PORT}"
-
-    # ── 5. verify ────────────────────────────────────────────────────────────
     # curl with no auth of any kind — that is the whole point of the app check.
     # No -L: a redirect is a result here, not something to follow.
-    echo "[6/6] verifying"
     code_of() {
         curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$1" || echo 000
     }
 
-    # The public flag can lag the API call by a beat; retry before failing.
+    # Typed pre-effect observations for the exposure. Retargeting the proxy is
+    # an obligation, not the publication; the publication is the next line and
+    # it needs its own one-use authority.
+    mkdir -p .sandbox/runs
+    MINT_RC=0
+    python3 -m adws.adw_modules.sandbox_provider mint --effect public-exposure-only \
+        --run-id "$RUN_ID" --resource "$VM" \
+        --param "port=$APP_PORT" --param "visibility=public" \
+        --out "$AUTH_FILE" \
+        --obligation "run-record-vm|observed-good|the run record names vm $VM" \
+        --obligation "app-port-listening|observed-good|$WHY_APP" \
+        --obligation "single-anonymous-port|observed-good|$APP_PORT is the only port that can ever be anonymous" \
+        --obligation "proxy-retargeted|observed-good|ssh exe.dev share port $VM $APP_PORT returned 0" || MINT_RC=$?
+    if [ "$MINT_RC" -ne 0 ]; then
+        echo "observe: public-exposure authority was NOT minted (exit $MINT_RC) — $VM stays private." >&2
+        exit 1
+    fi
+
+    GATE_RC=0
+    python3 -m adws.adw_modules.sandbox_provider gate --effect public-exposure-only \
+        --run-id "$RUN_ID" --resource "$VM" \
+        --param "port=$APP_PORT" --param "visibility=public" \
+        --authorization "$AUTH_FILE" || GATE_RC=$?
+    if [ "$GATE_RC" -ne 0 ]; then
+        echo "observe: pre-effect exposure gate refused (exit $GATE_RC) — $VM stays private." >&2
+        exit 1
+    fi
+
+    ssh exe.dev share set-public "$VM"
+
+    # Post-effect: the control-plane call returning 0 is not the publication.
+    # An unauthenticated 200 from outside is. The public flag can lag the API
+    # call by a beat, so retry before concluding.
     APP_CODE=000
     for _ in 1 2 3 4 5 6; do
         APP_CODE=$(code_of "https://$HOST/")
         [ "$APP_CODE" = "200" ] && break
         sleep 2
     done
-    if [ "$APP_CODE" != "200" ]; then
-        echo "observe: app returned $APP_CODE anonymously at https://$HOST/ (want 200)" >&2
-        echo "         VM left up. Check: ssh exe.dev share show $VM" >&2
+    if [ "$APP_CODE" = "200" ]; then
+        POST="observed-good"; WHY_POST="an unauthenticated request to https://$HOST/ returned 200"
+    elif [ "$APP_CODE" = "000" ]; then
+        POST="could-not-observe"; WHY_POST="https://$HOST/ did not answer at all, so exposure is unobserved"
+    else
+        POST="observed-bad"; WHY_POST="https://$HOST/ returned $APP_CODE anonymously, not 200"
+    fi
+    COMPLETE_RC=0
+    python3 -m adws.adw_modules.sandbox_provider complete \
+        --authorization "$AUTH_FILE" --name anonymous-app-reachable \
+        --observed "$POST" --reason "$WHY_POST" || COMPLETE_RC=$?
+    if [ "$COMPLETE_RC" -ne 0 ]; then
+        echo "observe: exposure is UNPROVEN: $WHY_POST" >&2
+        echo "         VM left up and the capability stays reserved. Check: ssh exe.dev share show $VM" >&2
         exit 1
     fi
+    rm -f "$AUTH_FILE"
     echo "       app  200 anonymous"
+
+    # ── 4. record ────────────────────────────────────────────────────────────
+    echo "[5/6] recording ports"
+    "$RR" set {{RUN_ID}} "ports={\"app\":$APP_PORT,\"obs\":$OBS_PORT}"
+
+    # ── 5. verify ────────────────────────────────────────────────────────────
+    echo "[6/6] verifying"
 
     # 307/401 anonymously is CORRECT for the obs port: alternate ports stay
     # auth-gated to users with VM access. Only a dead proxy (000) or a 5xx is a
