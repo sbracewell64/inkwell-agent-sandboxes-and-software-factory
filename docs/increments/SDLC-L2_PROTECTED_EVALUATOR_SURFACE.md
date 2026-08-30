@@ -308,6 +308,11 @@ import in place of modules that are gone. They were removed, not excused.
   `.claude/skills/sssf/templates/` does not, so a freshly installed factory
   starts with an empty declaration. That template is a different owner and is
   out of this increment's write domain.
+- `adws/adw_modules/agents.py` does not guarantee post-effect enforcement when
+  agent execution, output parsing, or gate correction raises before the
+  `permissions.enforce()` call. Arm-time closed-world observation bounds this
+  damage by refusing an incomplete surface at the next phase, but closing these
+  phase-seam exception paths remains a follow-on for the agents owner.
 - Independent qualification of a *new* evaluator generation stays with the
   review owner. What is mechanical here is that the revision is explicit, that
   it produces a new generation identity, and that evidence bound to the previous

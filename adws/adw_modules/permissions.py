@@ -13,8 +13,8 @@ unenforceable on its own:
 Ordinary write boundaries are verified the way every other claim in this system
 is — after the fact, against the repo itself. `snapshot()` fingerprints the
 working tree's change-set before an agent runs; `enforce()` compares it
-afterwards and fails the phase if the agent touched anything outside its
-allowlist. Frozen evaluator paths additionally refuse at the `permitted()`
+afterwards, rolls back out-of-scope effects where possible, and refuses
+unrecovered or patterned breaches. Frozen evaluator paths additionally refuse at the `permitted()`
 decision unless the agent carries an explicit declaration scoped inside that
 surface. Their post-effect snapshot and rollback are damage containment, not
 the authority that makes the evaluator writable.
@@ -24,9 +24,11 @@ Comparing change-sets, rather than watching for writes, is what catches the
 afterwards has been reverted, and a reversion is a modification. Appearing,
 disappearing, and changing all count.
 
-A breach is NOT a gate violation. Gates are for work an agent can be asked to
-redo; a breach cannot be corrected by re-prompting, because the write already
-happened. It aborts the phase and names every offending path.
+A permission violation is NOT a gate violation. Gates are for work an agent can
+be asked to redo; permission effects are handled after all sends, not by
+re-prompting. A small, fully recovered ordinary slip may continue; a frozen,
+unrecovered, or patterned breach aborts the phase and names every offending
+path.
 
 Three keys drive it, all in sssf.config.yaml:
     defaults.protected_files   paths no agent may touch unless it names them itself

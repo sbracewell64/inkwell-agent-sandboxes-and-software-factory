@@ -150,7 +150,9 @@ redo; a write has already happened, so re-prompting fixes nothing. Instead:
 2. restorable state for paths that were **already dirty** before the agent ran
    is preserved and restored, including regular-file mode and symlink target;
    state that cannot be preserved remains an unrecovered breach;
-3. the phase fails and names every path with what happened to it.
+3. a small, fully recovered ordinary slip may continue; frozen, unrecovered,
+   or patterned breaches fail the phase and name every path with what happened
+   to it.
 
 ```yaml
 defaults:
