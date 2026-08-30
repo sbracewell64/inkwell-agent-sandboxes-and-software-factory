@@ -448,6 +448,33 @@ def test_skip_worktree_frozen_rewrite_is_refused(tmp_path):
     )
 
 
+def test_an_undeclared_evaluator_surface_refuses_the_phase(tmp_path):
+    """A freshly installed factory fails loudly rather than running unprotected.
+
+    An empty declaration is not a small surface, it is no surface: every check
+    of it would agree vacuously. So it is could-not-observe, and enforcement
+    refuses at the phase boundary rather than reporting a clean phase it never
+    actually judged.
+    """
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    undeclared = _Run(root, _cfg(frozen=[]))
+
+    with pytest.raises(permissions.EvaluatorSurfaceUndeclared) as refused:
+        permissions.snapshot(undeclared)
+    assert "protected_evaluator_paths" in str(refused.value)
+
+    # It refuses at enforcement too, so a snapshot armed elsewhere cannot carry
+    # an undeclared surface past the guard.
+    declared = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    armed = permissions.snapshot(declared)
+    with pytest.raises(permissions.EvaluatorSurfaceUndeclared):
+        permissions.enforce(undeclared, None, _agent("builder", None), armed, {})
+
+    # Non-vacuity: declaring a surface makes the very same phase judgeable.
+    assert permissions.enforce(
+        declared, None, _agent("builder", None), armed, {}) == []
+
+
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────
 
 def test_an_unrelated_test_file_outside_the_frozen_scope_changes_freely(tmp_path):

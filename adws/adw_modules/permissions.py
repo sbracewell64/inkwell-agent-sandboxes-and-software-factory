@@ -62,6 +62,10 @@ class IndexVisibilityBreach(PermissionBreach):
     """A protected evaluator has hidden index state."""
 
 
+class EvaluatorSurfaceUndeclared(PermissionBreach):
+    """No evaluator surface is declared, so none can be observed as intact."""
+
+
 # The `_roll_back` outcomes that leave the repo byte-for-byte as it was. The
 # docstring's reason for aborting — "the write already happened" — is true of a
 # destroyed file and false of these: an agent-created file that was unlinked, or
@@ -231,7 +235,26 @@ def _snapshot_against(run, base_commit: str, base_tree: str) -> TreeSnapshot:
     return TreeSnapshot(fingerprints, base_commit, base_tree)
 
 
+def _require_declared_surface(run) -> None:
+    """An undeclared evaluator surface is could-not-observe, so it refuses.
+
+    A roster that names no protected evaluator path has not declared a small
+    surface — it has declared nothing, and nothing is what every check of it
+    would then vacuously agree with. That is the fail-open shape this module
+    exists to refuse, and it is exactly the state a freshly installed factory
+    starts in, so it fails loudly at the phase boundary instead of running
+    unprotected and reporting success.
+    """
+    if not frozen_evaluator_paths(run.cfg):
+        raise EvaluatorSurfaceUndeclared(
+            "permission could-not-observe: defaults.protected_evaluator_paths "
+            "declares no evaluator surface, so no phase can be judged against "
+            "one — declare the acceptance surface for this task generation"
+        )
+
+
 def snapshot(run) -> TreeSnapshot:
+    _require_declared_surface(run)
     base_commit, base_tree = _head_identity(run)
     return _snapshot_against(run, base_commit, base_tree)
 
@@ -508,6 +531,7 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
     reporting a failure, so anything the agent introduced outside its allowlist
     is rolled back before the phase dies. What it cannot undo, it names.
     """
+    _require_declared_surface(run)
     if not isinstance(before, TreeSnapshot):
         raise SnapshotUnobservable(
             "permission snapshot could-not-observe: missing armed base identity"

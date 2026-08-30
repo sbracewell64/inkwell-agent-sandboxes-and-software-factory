@@ -170,6 +170,34 @@ surface and freezes the four named graders while leaving
   red on the scout's `context_handoff/findings.md` — the F6 control would
   actually catch the reversal it forbids, and the module was restored.
 
+**Undeclared surface refuses.** `_require_declared_surface()` makes an absent or
+empty `defaults.protected_evaluator_paths` a could-not-observe refusal at both
+`snapshot()` and `enforce()`, so a freshly installed factory whose roster
+declares nothing fails loudly at the phase boundary instead of running
+unprotected. An empty declaration is not a small surface — it is no surface, and
+every check of it would agree vacuously.
+`test_an_undeclared_evaluator_surface_refuses_the_phase` carries it, with the
+non-vacuity half proving a declared surface still judges the same phase.
+
+**Red halves, executed rather than intended.** Each guard was reverted in a
+throwaway clone at `e6185d53` and its control watched go red, then green again
+with the guard restored:
+
+| Guard | Control | Observed red without it |
+|---|---|---|
+| unobservable git is could-not-observe | `test_corrupt_git_metadata_refuses_an_unobservable_frozen_rewrite` | raises `PermissionBreach` instead of `SnapshotUnobservable` — an observation failure reported as a judgement |
+| index-visibility flags refuse | `test_assume_unchanged_frozen_rewrite_is_refused`, `test_skip_worktree_frozen_rewrite_is_refused` | generic `PermissionBreach`, the flag never named |
+| declared surface required | `test_an_undeclared_evaluator_surface_refuses_the_phase` | `snapshot()` succeeds, the agent rewrites the grader to `assert False`, and `enforce()` ACCEPTS the phase |
+| pinned base identity | `test_committed_ordinary_edit_passes_against_the_pinned_base` | committed in-phase work vanishes from `touched` entirely |
+
+One honest correction to the attribution. The pinned base is **not** what
+refuses a committed frozen rewrite: `test_committed_frozen_rewrite_is_refused_against_the_pinned_base`
+stays green with the pin removed, because frozen members are enumerated and
+digested independently of the diff. That control only goes red when the pin and
+the independent enumeration are both removed. The independent enumeration is the
+load-bearing guard for that case and the pin is defense in depth behind it; the
+pin's own isolating control is the committed-ordinary-edit row above.
+
 Current-head suite and gate totals are intentionally left to the dedicated test
 phase that observes them after review fixes. Historical pre-review totals are
 not evidence for this head.
