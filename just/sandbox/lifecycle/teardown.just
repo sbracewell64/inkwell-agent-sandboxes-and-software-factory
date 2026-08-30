@@ -41,6 +41,7 @@ teardown RUN_ID *FLAGS:
     ART="$RUNS/$RUN_ID-artifacts"
     API="https://openrouter.ai/api/v1"
     AUTH_FILE="$RUNS/$RUN_ID.destroy.auth.json"
+    MINT_AUTH_FILE="$RUNS/$RUN_ID.runtime-key-mint.auth.json"
 
     # Through a variable, not straight into `for ... in`: interpolating an empty
     # variadic into the list is a syntax error, via a variable it is zero iterations.
@@ -94,6 +95,53 @@ teardown RUN_ID *FLAGS:
         OBL_VM="could-not-observe"; WHY_VM="ssh exe.dev ls --json did not answer"
     fi
     if [ "$VM_ALIVE" = 1 ]; then echo "   vm:  $VM (running)"; else echo "   vm:  ${VM:-<none>} ($WHY_VM)"; fi
+    if [ "$OBL_VM" = "could-not-observe" ]; then
+        echo "!! vm presence could not be observed — stopping before teardown mutations." >&2
+        exit 125
+    fi
+
+    if [ -e "$AUTH_FILE" ] && [ "$VM_ALIVE" = 0 ]; then
+        COMPLETE_RC=0
+        python3 -m adws.adw_modules.sandbox_provider complete \
+            --authorization "$AUTH_FILE" --name vm-absent \
+            --observed observed-good --reason "$WHY_VM" || COMPLETE_RC=$?
+        if [ "$COMPLETE_RC" -ne 0 ]; then
+            echo "!! reserved destroy authority could not be reconciled (exit $COMPLETE_RC)." >&2
+            exit "$COMPLETE_RC"
+        fi
+        rm -f "$AUTH_FILE"
+        echo "   vm: reserved destroy authority reconciled — $WHY_VM"
+    fi
+
+    if [ -e "$MINT_AUTH_FILE" ]; then
+        POST="could-not-observe"
+        WHY_POST="the provisioning key list did not answer during mint reconciliation"
+        if [ -z "$KEY_HASH" ]; then
+            POST="observed-bad"
+            WHY_POST="the run record has no key hash for the reserved mint authority"
+        elif [ -z "${OPENROUTER_PROVISIONING_KEY:-}" ]; then
+            WHY_POST="OPENROUTER_PROVISIONING_KEY is unavailable for mint reconciliation"
+        elif KEY_LIST=$(curl -sS --max-time 30 "$API/keys" \
+                -H "Authorization: Bearer $OPENROUTER_PROVISIONING_KEY" 2>/dev/null); then
+            case "$(printf '%s' "$KEY_LIST" | KH="$KEY_HASH" python3 -c \
+                'import json,os,sys; print("present" if os.environ["KH"] in {k.get("hash") for k in json.load(sys.stdin).get("data",[])} else "absent")' \
+                2>/dev/null || echo unreadable)" in
+                present) POST="observed-good"; WHY_POST="the provisioning list carries hash $KEY_HASH" ;;
+                absent)  POST="observed-bad"; WHY_POST="hash $KEY_HASH is absent during mint reconciliation" ;;
+                *)       WHY_POST="the provisioning key list was unreadable during mint reconciliation" ;;
+            esac
+        fi
+        COMPLETE_RC=0
+        python3 -m adws.adw_modules.sandbox_provider complete \
+            --authorization "$MINT_AUTH_FILE" --name runtime-key-listed \
+            --observed "$POST" --reason "$WHY_POST" || COMPLETE_RC=$?
+        if [ "$COMPLETE_RC" -ne 0 ]; then
+            echo "!! reserved runtime-key mint authority could not be reconciled: $WHY_POST" >&2
+            exit "$COMPLETE_RC"
+        fi
+        rm -f "$MINT_AUTH_FILE"
+        echo "   key: reserved mint authority reconciled — $WHY_POST"
+    fi
 
     # ── 1. spend, BEFORE the key dies -------------------------------------------
     # This is what makes best-of-N comparable: same prompt, N models, cost beside
@@ -215,19 +263,21 @@ teardown RUN_ID *FLAGS:
     # then spends it once. Nothing about reaching this line, and no flag or
     # environment variable, is approval.
     if [ "$VM_ALIVE" = 1 ]; then
-        MINT_RC=0
-        python3 -m adws.adw_modules.sandbox_provider mint --effect destroy-only \
-            --run-id "$RUN_ID" --resource "$VM" --out "$AUTH_FILE" \
-            --obligation "vm-presence|$OBL_VM|$WHY_VM" \
-            --obligation "spend-recorded|$OBL_SPEND|$WHY_SPEND" \
-            --obligation "artifacts-collected|$OBL_ART|$WHY_ART" \
-            --obligation "commits-harvested|$OBL_HARVEST|$WHY_HARVEST" \
-            --obligation "runtime-key-retired|$OBL_KEY|$WHY_KEY" || MINT_RC=$?
-        if [ "$MINT_RC" -ne 0 ]; then
-            echo "!! destroy authority was NOT minted (exit $MINT_RC) — $VM is left ALIVE." >&2
-            echo "!! An unobserved or contradicted obligation above is why. Resolve it and re-run:" >&2
-            echo "!!   just sbx manage harvest $RUN_ID  &&  just sbx lifecycle teardown $RUN_ID" >&2
-            exit 1
+        if [ ! -e "$AUTH_FILE" ]; then
+            MINT_RC=0
+            python3 -m adws.adw_modules.sandbox_provider mint --effect destroy-only \
+                --run-id "$RUN_ID" --resource "$VM" --out "$AUTH_FILE" \
+                --obligation "vm-presence|$OBL_VM|$WHY_VM" \
+                --obligation "spend-recorded|$OBL_SPEND|$WHY_SPEND" \
+                --obligation "artifacts-collected|$OBL_ART|$WHY_ART" \
+                --obligation "commits-harvested|$OBL_HARVEST|$WHY_HARVEST" \
+                --obligation "runtime-key-retired|$OBL_KEY|$WHY_KEY" || MINT_RC=$?
+            if [ "$MINT_RC" -ne 0 ]; then
+                echo "!! destroy authority was NOT minted (exit $MINT_RC) — $VM is left ALIVE." >&2
+                echo "!! An unobserved or contradicted obligation above is why. Resolve it and re-run:" >&2
+                echo "!!   just sbx manage harvest $RUN_ID  &&  just sbx lifecycle teardown $RUN_ID" >&2
+                exit 1
+            fi
         fi
 
         GATE_RC=0

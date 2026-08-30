@@ -3605,7 +3605,7 @@ def seam_binding_controls(
             continue
         mint_at = text.find(seam.mint_marker)
         gate_at = text.find(seam.gate_marker)
-        complete_at = text.find(seam.complete_marker)
+        complete_at = text.find(seam.complete_marker, effect_at)
         _control_check(
             0 <= mint_at < effect_at,
             f"{seam.path}: {seam.description} is not preceded by a typed authority mint",

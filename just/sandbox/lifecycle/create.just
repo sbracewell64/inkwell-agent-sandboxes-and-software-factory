@@ -78,10 +78,11 @@ create RUN_ID *FLAGS:
     # contains the secret key) so it is shredded on every exit path.
     BODY=""
     AUTH_FILE=".sandbox/runs/${RUN_ID}.runtime-key-mint.auth.json"
+    AUTH_RESERVED=0
     _on_exit() {
         rc=$?
         if [ -n "$BODY" ]; then rm -f "$BODY"; fi
-        rm -f "$AUTH_FILE"
+        if [ "$AUTH_RESERVED" != 1 ]; then rm -f "$AUTH_FILE"; fi
         if [ "$rc" -ne 0 ]; then
             printf '\ncreate FAILED (exit %s). Nothing was destroyed — inspect, then:\n  just sbx lifecycle teardown %s\n' "$rc" "$RUN_ID" >&2
         fi
@@ -182,6 +183,7 @@ create RUN_ID *FLAGS:
         echo "create: pre-effect runtime-key gate refused (exit $GATE_RC) — no key was created." >&2
         exit 1
     fi
+    AUTH_RESERVED=1
 
     BODY="$(mktemp)"   # 0600 by mktemp; holds the secret until it is on disk
     CODE="$(curl -sS -o "$BODY" -w '%{http_code}' https://openrouter.ai/api/v1/keys \
@@ -245,6 +247,7 @@ create RUN_ID *FLAGS:
         exit 1
     fi
     rm -f "$AUTH_FILE"
+    AUTH_RESERVED=0
 
     echo "key:     $KEY_NAME  limit \$$LIMIT  hash $KEY_HASH"
     echo "key:     $WHY_POST"
