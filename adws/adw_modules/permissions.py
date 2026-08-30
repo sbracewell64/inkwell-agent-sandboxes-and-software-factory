@@ -292,8 +292,9 @@ def _repository_paths(run) -> RepositoryPaths:
 # code that runs without ever being reviewable, which is the hiding vector the
 # surface exists to close, so it refuses and names itself.
 EXECUTABLE_SUFFIXES = frozenset({
-    ".py", ".pyc", ".pyo", ".pyd", ".so", ".dll", ".dylib",
-    ".sh", ".bash", ".ts", ".js", ".mjs",
+    ".py", ".pyc", ".pyo", ".pyd", ".so", ".dll", ".dylib", ".wasm",
+    ".exe", ".com", ".cmd", ".bat", ".ps1",
+    ".sh", ".bash", ".zsh", ".fish", ".ts", ".js", ".mjs",
 })
 
 
@@ -316,7 +317,11 @@ def _ignored_member_is_hidden(run, path: str, paths: dict[str, str]) -> bool:
         tag = paths.get(source)
         if tag is not None and tag != "?" and is_frozen_evaluator(source, run.cfg):
             return False                 # derived from a member review can see
-    return PurePosixPath(path).suffix in EXECUTABLE_SUFFIXES
+    try:
+        executable_mode = (Path(run.repo_root) / path).lstat().st_mode & 0o111
+    except OSError:
+        executable_mode = 0
+    return bool(executable_mode) or PurePosixPath(path).suffix.lower() in EXECUTABLE_SUFFIXES
 
 
 def _gitignore_observation(run, paths: dict[str, str]) \

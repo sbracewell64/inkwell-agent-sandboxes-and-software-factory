@@ -772,6 +772,42 @@ def test_a_sourceless_pyc_under_the_surface_is_refused(tmp_path):
     assert _owner("evaluator_generation")(run) is None
 
 
+def test_a_sourceless_extensionless_executable_is_refused(tmp_path):
+    run, root = _surface_with_bytecode(tmp_path, {
+        ".gitignore": "__pycache__/\npkg/hidden-evaluator\n",
+        "pkg/hidden-evaluator": "#!/bin/sh\nexit 0\n",
+    })
+    (root / "pkg/hidden-evaluator").chmod(0o755)
+
+    with pytest.raises(permissions.IndexVisibilityBreach) as refused:
+        permissions.snapshot(run)
+    assert "pkg/hidden-evaluator" in str(refused.value)
+
+
+@pytest.mark.parametrize("suffix", [".ps1", ".exe"])
+def test_a_sourceless_known_executable_format_is_refused(tmp_path, suffix):
+    path = f"pkg/hidden-evaluator{suffix}"
+    run, _ = _surface_with_bytecode(tmp_path, {
+        ".gitignore": f"__pycache__/\n{path}\n",
+        path: "hidden executable bytes\n",
+    })
+
+    with pytest.raises(permissions.IndexVisibilityBreach) as refused:
+        permissions.snapshot(run)
+    assert path in str(refused.value)
+
+
+def test_an_ordinary_ignored_non_executable_is_not_a_surface_member(tmp_path):
+    run, _ = _surface_with_bytecode(tmp_path, {
+        ".gitignore": "__pycache__/\npkg/notes.txt\n",
+        "pkg/notes.txt": "ordinary ignored data\n",
+    })
+
+    armed = permissions.snapshot(run)
+    assert "pkg/notes.txt" not in armed
+    assert _owner("evaluator_generation")(run) is not None
+
+
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────
 
 def test_an_unrelated_test_file_outside_the_frozen_scope_changes_freely(tmp_path):
