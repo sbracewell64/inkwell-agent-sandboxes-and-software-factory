@@ -220,6 +220,40 @@ def test_closure_gate_includes_unrelated_notimplementederror_regression() -> Non
     assert renamed_status != "observed-good"
 
 
+def test_closure_gate_counts_skipped_containment_as_cno(monkeypatch) -> None:
+    required = _VALIDATOR.CLOSURE_REQUIRED_TESTS
+    containment = _VALIDATOR.CONTAINMENT_CLOSURE_NODEIDS
+    assert len(required) == 18
+    assert set(containment).issubset(required)
+
+    skipped_reports = tuple(
+        (nodeid, "skipped" if nodeid in containment else "passed")
+        for nodeid in required
+    )
+    status, errors = _VALIDATOR.evaluate_test_closure(required, skipped_reports)
+    assert status == "could-not-observe"
+    assert _VALIDATOR._validator_exit_code(status) != 0
+    for nodeid in containment:
+        assert any(nodeid in error and "(skipped)" in error for error in errors)
+
+    passed_status, passed_errors = _VALIDATOR.evaluate_test_closure(
+        required,
+        tuple((nodeid, "passed") for nodeid in required),
+    )
+    assert passed_status == "observed-good"
+    assert passed_errors == []
+
+    monkeypatch.setattr(
+        _VALIDATOR,
+        "CLOSURE_REQUIRED_TESTS",
+        tuple(nodeid for nodeid in required if nodeid not in containment),
+    )
+    watched_failures = _VALIDATOR._watched_test_closure_controls()
+    assert {
+        "closure-containment-not-required:" + nodeid for nodeid in containment
+    }.issubset(watched_failures)
+
+
 def test_older_consistent_snapshot_cannot_replace_authoritative_generation() -> None:
     project = _VALIDATOR.load_project()
     stale = copy.deepcopy(project)

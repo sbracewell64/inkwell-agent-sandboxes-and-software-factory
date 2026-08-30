@@ -161,8 +161,14 @@ CLOSURE_REQUIRED_TESTS = (
     "tests/test_planning_foundation.py::test_closure_gate_includes_authority_omission_and_predecessor_regressions",
     "tests/test_planning_foundation.py::test_windows_symlink_privilege_cno_is_machine_readable_non_pass",
     "tests/test_planning_foundation.py::test_unrelated_notimplementederror_is_not_automatic_cno",
+    "tests/test_planning_foundation.py::test_active_authoritative_symlink_to_outside_root_is_rejected",
+    "tests/test_planning_foundation.py::test_every_retained_proven_evidence_symlink_to_outside_root_is_rejected",
 )
 CLOSURE_EXPECTED_OUTCOMES = {nodeid: "passed" for nodeid in CLOSURE_REQUIRED_TESTS}
+CONTAINMENT_CLOSURE_NODEIDS = (
+    "tests/test_planning_foundation.py::test_active_authoritative_symlink_to_outside_root_is_rejected",
+    "tests/test_planning_foundation.py::test_every_retained_proven_evidence_symlink_to_outside_root_is_rejected",
+)
 AUTHORITY_CLOSURE_NODEIDS = (
     "tests/test_planning_foundation.py::test_sbx2_state_is_observed_from_authority_not_candidate_expectation",
     "tests/test_planning_foundation.py::test_missing_governed_identity_or_bound1_predecessor_is_nonpass",
@@ -664,6 +670,36 @@ def _watched_test_closure_controls() -> list[str]:
             failures.append("closure-authority-regression-omitted:" + authority_nodeid)
         if renamed_status == "observed-good":
             failures.append("closure-authority-regression-renamed:" + authority_nodeid)
+
+    missing_containment = set(CONTAINMENT_CLOSURE_NODEIDS) - set(CLOSURE_REQUIRED_TESTS)
+    if missing_containment:
+        failures.extend(
+            "closure-containment-not-required:" + nodeid
+            for nodeid in sorted(missing_containment)
+        )
+    else:
+        skipped_reports = tuple(
+            (
+                nodeid,
+                "skipped" if nodeid in CONTAINMENT_CLOSURE_NODEIDS else "passed",
+            )
+            for nodeid in CLOSURE_REQUIRED_TESTS
+        )
+        skipped_status, skipped_errors = evaluate_test_closure(
+            CLOSURE_REQUIRED_TESTS,
+            skipped_reports,
+        )
+        if skipped_status != "could-not-observe":
+            failures.append("closure-containment-capability-absence-cno")
+        for nodeid in CONTAINMENT_CLOSURE_NODEIDS:
+            if not any(nodeid in error and "(skipped)" in error for error in skipped_errors):
+                failures.append("closure-containment-capability-absence-named:" + nodeid)
+        passed_status, passed_errors = evaluate_test_closure(
+            CLOSURE_REQUIRED_TESTS,
+            tuple((nodeid, "passed") for nodeid in CLOSURE_REQUIRED_TESTS),
+        )
+        if passed_status != "observed-good" or passed_errors:
+            failures.append("closure-containment-capable-host-pass")
     return failures
 
 
@@ -2867,6 +2903,7 @@ def main() -> int:
         "closure-zero-selection, closure-selector-typo, closure-nonexistent-identity, "
         "closure-required-identity-removed, closure-collection-failure, "
         "closure-required-pass, closure-required-fail, closure-fail-over-collection-cno, "
+        "closure-containment-capability-absence-cno, closure-containment-capable-host-pass, "
         "active-not-proven-runtime-or-landing-authority, duplicate-adr-identity, "
         "stale-roadmap-sbx-regression, competing-lifecycle-owner, "
         "broken-planning-cross-reference"
