@@ -142,6 +142,7 @@ DOCKER_FIRST_ORDER = """Docker SBX-2..8
 CLOSURE_REQUIRED_TESTS = (
     "tests/test_planning_foundation.py::test_stale_complete_projection_prose_is_nonpass_and_names_surface",
     "tests/test_planning_foundation.py::test_complete_projection_state_drift_is_nonpass_and_names_identity",
+    "tests/test_planning_foundation.py::test_duplicate_projection_state_is_nonpass_and_names_identity",
     "tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe",
     "tests/test_planning_foundation.py::test_closure_gate_includes_unrelated_notimplementederror_regression",
     "tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation",
@@ -1723,32 +1724,40 @@ def _validate_complete_projection_prose(
             errors.append(f"{path} complete governed FUT projection contradicts the register")
         if observed_lifecycle_ids != expected_lifecycle_ids:
             errors.append(f"{path} complete governed lifecycle projection contradicts the register")
-        declared_states = dict(
-            re.findall(
-                r"\b(FUT-[0-9]{3}|WAYFINDER-[0-9]+)\s+as\s+`([A-Z_]+)`",
-                paragraph,
+        admitted_ids = admitted_future_ids + admitted_lifecycle_ids
+        declared_states: dict[str, list[str]] = {
+            identity: [] for identity in admitted_ids
+        }
+        for identity, state in re.findall(
+            r"\b(FUT-[0-9]{3}|WAYFINDER-[0-9]+)\s+as\s+`([A-Z_]+)`",
+            paragraph,
+        ):
+            if identity in declared_states:
+                declared_states[identity].append(state)
+        for identity in admitted_ids:
+            expected_state = (
+                future_states.get(identity)
+                if identity in admitted_future_ids
+                else lifecycle_states.get(identity)
             )
-        )
-        for identity in admitted_future_ids:
-            expected_state = future_states.get(identity)
-            observed_state = declared_states.get(identity)
-            if observed_state != expected_state:
-                errors.append(
-                    f"{path} complete governed state contradicts the register: "
-                    f"{identity}={observed_state or 'MISSING'}, expected {expected_state}"
-                )
-        for identity in admitted_lifecycle_ids:
-            expected_state = lifecycle_states.get(identity)
-            if expected_state != EXPECTED_EXPLICIT_LIFECYCLE_STATES.get(identity):
+            if (
+                identity in admitted_lifecycle_ids
+                and expected_state != EXPECTED_EXPLICIT_LIFECYCLE_STATES.get(identity)
+            ):
                 errors.append(
                     f"{path} cannot derive governed state for {identity}: {expected_state}"
                 )
                 continue
-            observed_state = declared_states.get(identity)
-            if observed_state != expected_state:
+            declarations = declared_states[identity]
+            if len(declarations) != 1:
                 errors.append(
-                    f"{path} complete governed state contradicts the register: "
-                    f"{identity}={observed_state or 'MISSING'}, expected {expected_state}"
+                    f"{path} missing or duplicate state declaration for {identity}: "
+                    f"register={expected_state}, declared={declarations}"
+                )
+            elif declarations[0] != expected_state:
+                errors.append(
+                    f"{path} conflicting state declarations for {identity}: "
+                    f"register={expected_state}, declared={declarations[0]}"
                 )
         if not re.search(r"BOUND-1`?\s+as\s+`SEQUENCED`", paragraph):
             errors.append(f"{path} complete governed BOUND-1 projection is missing or demoted")
@@ -2247,7 +2256,25 @@ def _watched_red_controls(
         _expect_red(
             "stale-complete-projection-state",
             stale_projection_state,
-            "FUT-014=ACTIVE, expected SEQUENCED",
+            "FUT-014: register=SEQUENCED, declared=ACTIVE",
+            failures,
+        )
+
+    duplicate_projection_state = copy.deepcopy(project)
+    original_projection = duplicate_projection_state["surfaces"]["lifecycle"]
+    duplicate_projection_state["surfaces"]["lifecycle"] = re.sub(
+        r"FUT-014\s+as\s+`SEQUENCED`",
+        "FUT-014 as `ACTIVE` and FUT-014 as `SEQUENCED`",
+        original_projection,
+        count=1,
+    )
+    if duplicate_projection_state["surfaces"]["lifecycle"] == original_projection:
+        failures.append("duplicate-complete-projection-state-mutation-not-applied")
+    else:
+        _expect_red(
+            "duplicate-complete-projection-state",
+            duplicate_projection_state,
+            "duplicate state declaration for FUT-014: register=SEQUENCED",
             failures,
         )
 
@@ -2756,7 +2783,8 @@ def main() -> int:
     print(f"validation owner: {VALIDATION_OWNER}")
     print(
         "watched-red: stale-contradictory-adr-status, stale-complete-projection-prose, "
-        "stale-complete-projection-state, omitted-future-item-projection, "
+        "stale-complete-projection-state, duplicate-complete-projection-state, "
+        "omitted-future-item-projection, "
         "omitted-wayfinder-lifecycle-identity, demoted-sbx-lifecycle-identity, "
         "omitted-bound1-predecessor, out-of-scope-sbx2-readiness, "
         "candidate-authored-stale-generation-self-consistency, authority-sbx2-promotion, "

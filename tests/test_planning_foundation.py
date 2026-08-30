@@ -80,9 +80,40 @@ def test_complete_projection_state_drift_is_nonpass_and_names_identity() -> None
             status, errors = _VALIDATOR.validate_project(project, run_controls=False)
 
             path = _VALIDATOR.SURFACE_PATHS[key].as_posix()
-            contradiction = f"{identity}={after_state}"
             assert status == "observed-bad"
-            assert any(path in error and contradiction in error for error in errors)
+            assert any(
+                path in error
+                and identity in error
+                and f"register={before_state}" in error
+                and f"declared={after_state}" in error
+                for error in errors
+            )
+
+
+def test_duplicate_projection_state_is_nonpass_and_names_identity() -> None:
+    for key in ("lifecycle", "readme", "increment"):
+        project = _VALIDATOR.load_project()
+        original = project["surfaces"][key]
+        mutated = re.sub(
+            r"FUT-014\s+as\s+`SEQUENCED`",
+            "FUT-014 as `ACTIVE` and FUT-014 as `SEQUENCED`",
+            original,
+            count=1,
+        )
+        assert mutated != original
+        project["surfaces"][key] = mutated
+
+        status, errors = _VALIDATOR.validate_project(project, run_controls=False)
+
+        path = _VALIDATOR.SURFACE_PATHS[key].as_posix()
+        assert status == "observed-bad"
+        assert any(
+            path in error
+            and "duplicate state declaration for FUT-014" in error
+            and "register=SEQUENCED" in error
+            and "declared=['ACTIVE', 'SEQUENCED']" in error
+            for error in errors
+        )
 
 
 def test_closure_gate_requires_nonempty_exact_test_universe() -> None:
