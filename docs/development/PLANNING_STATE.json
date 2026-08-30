@@ -1,0 +1,224 @@
+{
+  "schema_version": "sssf.planning-state.v1",
+  "record_id": "sssf-planning-state",
+  "lifecycle_owner": "docs/development/PLANNING_LIFECYCLE.md",
+  "state_record_rule": "This JSON record is the durable current-state record; Git commit prose is not state.",
+  "authoritative_planning_source": {
+    "ref": "planning/future-sssf",
+    "tracking_ref": "refs/remotes/origin/planning/future-sssf",
+    "source_commit": "eab880656b4ef00174ea514cca128f6336632fcf",
+    "source_tree": "5328b8a437d894682f4ac1c5d7ae581694410c43",
+    "generation": "planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43",
+    "identity_rule": "The ref, tracking ref, observed source commit, observed source tree, and generation must match the current authority before planning state is accepted."
+  },
+  "current_sandbox_states": {
+    "SBX-2": "HELD"
+  },
+  "projection_scope": {
+    "schema": "sssf.planning-authority-projection.v1",
+    "state_basis": {
+      "ref": "planning/future-sssf",
+      "tracking_ref": "refs/remotes/origin/planning/future-sssf",
+      "source_commit": "eab880656b4ef00174ea514cca128f6336632fcf",
+      "source_tree": "5328b8a437d894682f4ac1c5d7ae581694410c43",
+      "generation": "planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43"
+    },
+    "answerable_queries": [
+      "future-item-state",
+      "named-lifecycle-state",
+      "boundedness-predecessor-order"
+    ],
+    "not_answerable_queries": [
+      "SBX-2 readiness",
+      "SBX-2 activation or promotion",
+      "implementation, landing, acceptance, certification, or live enablement"
+    ],
+    "scope_rule": "Only answerable_queries may be answered; every other query is CNO/non-PASS. This projection never answers SBX-2 readiness.",
+    "future_items": [
+      {"item_id": "FUT-001", "state": "SEQUENCED"},
+      {"item_id": "FUT-002", "state": "PRESERVE"},
+      {"item_id": "FUT-003", "state": "ACTIVE"},
+      {"item_id": "FUT-004", "state": "PRESERVE"},
+      {"item_id": "FUT-005", "state": "CANDIDATE"},
+      {"item_id": "FUT-006", "state": "CANDIDATE"},
+      {"item_id": "FUT-007", "state": "CANDIDATE"},
+      {"item_id": "FUT-008", "state": "CANDIDATE"},
+      {"item_id": "FUT-009", "state": "CANDIDATE"},
+      {"item_id": "FUT-010", "state": "CANDIDATE"},
+      {"item_id": "FUT-011", "state": "CANDIDATE"},
+      {"item_id": "FUT-012", "state": "CANDIDATE"},
+      {"item_id": "FUT-013", "state": "PRESERVE"},
+      {"item_id": "FUT-014", "state": "SEQUENCED"},
+      {"item_id": "FUT-015", "state": "SEQUENCED"},
+      {"item_id": "FUT-016", "state": "CANDIDATE"}
+    ],
+    "lifecycle_identities": [
+      {"identity": "LAUNCH-1", "state": "ACTIVE", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-0", "state": "ACTIVE", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-1", "state": "SEQUENCED", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-2", "state": "HELD", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-3", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-4", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-5", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-6", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-7", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "SBX-8", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "WAYFINDER-0", "state": "SEQUENCED", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "WAYFINDER-1", "state": "SEQUENCED", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-0A", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-0B", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-1", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-2", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-3", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-4", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-5", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-6", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-7", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "DSH-8", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "BOUND-1", "state": "SEQUENCED", "source_path": "docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md"}
+    ],
+    "mandatory_predecessors": [
+      {
+        "predecessor": "BOUND-1",
+        "predecessor_state": "SEQUENCED",
+        "successor": "SBX-2",
+        "successor_state": "HELD",
+        "rule": "BOUND-1 must complete and qualify before SBX-2 activation; SBX-2 can leave HELD only after that qualification.",
+        "authority_rule": "complete and qualify before `SBX-2` activation"
+      }
+    ]
+  },
+  "current_main_adr_inventory": {
+    "source_commit": "991d3a64f1b96a8b9637f97060d692af3518228f",
+    "files": [
+      "ADR-0001-PROVEN-INCREMENTS.md",
+      "ADR-0002-SANDBOX-PROVIDER-ABSTRACTION.md",
+      "ADR-0003-OFFLINE-EVIDENCE-MANIFEST.md",
+      "ADR-0003-OWNED-SUBPROCESS-SUPERVISION.md",
+      "ADR-0003-THREE_VALUED_GATE_OUTCOMES.md",
+      "ADR-0004-SSSF-FIRSTMATE-WINDOWS-FRONT-DOOR.md",
+      "ADR-0006-SANDBOX-PROVIDER-CONTRACT.md"
+    ]
+  },
+  "allocated_new_identities": {
+    "fut003": "ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md",
+    "dsh": "ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md"
+  },
+  "records": [
+    {
+      "item_id": "FUT-001",
+      "state": "SEQUENCED",
+      "initial_state": "DECIDED",
+      "authoritative_refs": [
+        "docs/development/PLANNING_LIFECYCLE.md",
+        "docs/development/FUTURE_CANDIDATES.md",
+        "docs/development/ROADMAP.md",
+        "docs/decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md"
+      ],
+      "transition_history": [
+        {
+          "from": "DECIDED",
+          "to": "SEQUENCED",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md",
+            "docs/development/ROADMAP.md",
+            "docs/decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md"
+          ],
+          "evidence_note": "DSH remains a long-range sequenced direction and is not active."
+        }
+      ],
+      "active_binding": null,
+      "activation_deferred": "No DSH implementation is authorized by this planning record."
+    },
+    {
+      "item_id": "FUT-002",
+      "state": "PRESERVE",
+      "initial_state": "EXPLORE",
+      "authoritative_refs": [
+        "docs/development/PLANNING_LIFECYCLE.md",
+        "docs/development/FUTURE_CANDIDATES.md"
+      ],
+      "transition_history": [
+        {
+          "from": "EXPLORE",
+          "to": "PRESERVE",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md"
+          ],
+          "evidence_note": "The catalog is a preserved research source, not an allowlist."
+        }
+      ],
+      "active_binding": null,
+      "activation_deferred": "Preserved references do not authorize implementation."
+    },
+    {
+      "item_id": "FUT-003",
+      "state": "ACTIVE",
+      "initial_state": "CANDIDATE",
+      "authoritative_refs": [
+        "docs/development/PLANNING_LIFECYCLE.md",
+        "docs/development/FUTURE_CANDIDATES.md",
+        "docs/development/ROADMAP.md",
+        "docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md"
+      ],
+      "transition_history": [
+        {
+          "from": "CANDIDATE",
+          "to": "DECIDED",
+          "source_commit": "2d078ca94f3f97dc85d7b17df6a13f45aa4ef2ba",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md",
+            "docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md"
+          ],
+          "evidence_note": "Immutable predecessor evidence records the architectural decision; it does not authorize implementation."
+        },
+        {
+          "from": "DECIDED",
+          "to": "SEQUENCED",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md",
+            "docs/development/ROADMAP.md",
+            "docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md"
+          ],
+          "evidence_note": "The durable sequencing edge remains part of the current history."
+        },
+        {
+          "from": "SEQUENCED",
+          "to": "ACTIVE",
+          "source_commit": "5f83760a6d71bb798b9f652f21267fad4b743f16",
+          "evidence_refs": [
+            "docs/development/FUTURE_CANDIDATES.md",
+            "docs/increments/FUT-003_PLANNING_FOUNDATION_REPAIR.md"
+          ],
+          "evidence_note": "The authoritative planning generation marks FUT-003 ACTIVE, not PROVEN; this is planning authorization only."
+        }
+      ],
+      "planned_increments": [
+        {
+          "increment_id": "FP-001",
+          "status": "active-not-proven"
+        },
+        {
+          "increment_id": "FM-FP-001",
+          "status": "active-not-proven"
+        }
+      ],
+      "active_binding": null,
+      "planning_authority_binding": {
+        "ref": "planning/future-sssf",
+        "source_commit": "eab880656b4ef00174ea514cca128f6336632fcf",
+        "source_tree": "5328b8a437d894682f4ac1c5d7ae581694410c43",
+        "generation": "planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43",
+        "increment_ids": [
+          "FP-001",
+          "FM-FP-001"
+        ],
+        "authoritative_refs": [
+          "docs/development/FUTURE_CANDIDATES.md",
+          "docs/increments/FUT-003_PLANNING_FOUNDATION_REPAIR.md"
+        ]
+      },
+      "activation_deferred": "ACTIVE is engineering authorization and intake eligibility only; it does not create a task, grant execution or landing authority, or establish acceptance, certification, live enablement, or PROVEN."
+    }
+  ]
+}

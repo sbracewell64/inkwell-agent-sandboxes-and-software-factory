@@ -78,6 +78,20 @@ Never hand-edit session evidence.
 - `tests/test_windows_front_door.py` — caller-cwd and visible-refusal behavior checks
 - `docs/operations/INSTALL_WINDOWS.md` — Windows installation and front-door runbook
 
+## Planning foundation
+
+authoritative planning source: planning/future-sssf; commit: eab880656b4ef00174ea514cca128f6336632fcf; tree: 5328b8a437d894682f4ac1c5d7ae581694410c43; generation: planning/future-sssf@eab880656b4ef00174ea514cca128f6336632fcf:5328b8a437d894682f4ac1c5d7ae581694410c43
+
+- `docs/development/PLANNING_LIFECYCLE.md` — sole closed transition-contract owner
+- `docs/development/PLANNING_STATE.json` — durable current state, projection scope, and transition evidence
+- `docs/development/INCREMENT_PROTOCOL.md` — boundedness-delta increment contract
+- `docs/development/BOUNDEDNESS_LAW.md` — current boundedness law
+- `docs/development/FUTURE_CANDIDATES.md` — complete current-authority future-item state projection
+- `docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md` — mandatory SEQUENCED pre-SBX-2 boundedness predecessor
+- `docs/decisions/ADR-0005-FIRSTMATE-PLANNING-TRANSITION-AWARENESS.md` — FUT-003 decision boundary
+- `docs/decisions/ADR-0007-SSSF-OUTER-AUTHORITY-DSH-INNER-AUTONOMY.md` — FUT-001 DSH decision boundary
+- `docs/validation/check_planning_foundation.py` — sole offline planning validator
+
 ## Durable local system documentation
 
 - `docs/`
