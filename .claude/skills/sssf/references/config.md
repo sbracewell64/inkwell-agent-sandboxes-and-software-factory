@@ -52,6 +52,12 @@ agents:
 | `protected_evaluator_paths` | list[string] | Property-scoped acceptance paths frozen for the active task generation. A broad parent in `writes` does not unlock them; an entry scoped inside the frozen surface is an explicit evaluator revision and changes the generation identity. Empty means the surface could not be observed, never that it was intact. |
 | `data_dir` | path | Runtime home. Sessions land at `{data_dir}/sessions/{adw_id}/{agent_name}/`. Default `adws/adw_data`. |
 
+`protected_evaluator_paths` is implemented by this repository's live factory.
+The installer template has not adopted this increment yet; factories generated
+from `.claude/skills/sssf/templates/` do not provide the frozen-evaluator
+contract. Track that separate owner gap in
+[`docs/increments/SDLC-L2_PROTECTED_EVALUATOR_SURFACE.md`](../../../../docs/increments/SDLC-L2_PROTECTED_EVALUATOR_SURFACE.md#known-unresolved-observations).
+
 ### `observability`
 
 | Field | Type | Meaning |
