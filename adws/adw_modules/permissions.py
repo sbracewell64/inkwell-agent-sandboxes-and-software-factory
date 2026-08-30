@@ -115,6 +115,13 @@ class TreeSnapshot(dict[str, str]):
         self.visibility_sources = visibility_sources or {}
 
 
+class RepositoryPaths(dict[str, str]):
+    def __init__(self, paths: dict[str, str],
+                 unreadable: list[str] | None = None) -> None:
+        super().__init__(paths)
+        self.unreadable = unreadable or []
+
+
 def _git_out(args: list[str], cwd) -> str | None:
     """git's answer, or None when git ran and refused to give one.
 
@@ -192,14 +199,72 @@ def _tagged_paths(listing: str) -> dict[str, str]:
     return tagged
 
 
-def _repository_paths(run) -> dict[str, str]:
+def _walk_root(root: Path, declaration: str) -> Path | None:
+    wildcard = min(
+        (position for marker in "*?"
+         if (position := declaration.find(marker)) >= 0),
+        default=-1,
+    )
+    if wildcard < 0:
+        if not declaration.endswith("/"):
+            return None
+        prefix = declaration.rstrip("/")
+    else:
+        prefix = declaration[:wildcard]
+        if not prefix.endswith("/"):
+            prefix = prefix.rpartition("/")[0]
+    candidate = root / prefix
+    try:
+        candidate.absolute().relative_to(root.absolute())
+    except ValueError:
+        return None
+    return candidate
+
+
+def _surface_walk_roots(root: Path, declarations: list[str]) -> list[Path]:
+    candidates = {
+        candidate
+        for declaration in declarations
+        if (candidate := _walk_root(root, declaration)) is not None
+    }
+    return sorted(
+        candidate for candidate in candidates
+        if not any(parent != candidate and parent in candidate.parents
+                   for parent in candidates)
+    )
+
+
+def _repository_paths(run) -> RepositoryPaths:
     paths = _tagged_paths(_git(
         ["ls-files", "-v", "-z", "--cached", "--others", "--exclude-standard"],
         run.repo_root,
     ))
     root = Path(run.repo_root)
-    try:
-        for current, directories, filenames in os.walk(root, followlinks=False):
+    declarations = sorted(set(frozen_evaluator_paths(run.cfg)))
+    unreadable: list[str] = []
+    for declaration in declarations:
+        if _walk_root(root, declaration) is not None:
+            continue
+        target = root / declaration
+        try:
+            target.absolute().relative_to(root.absolute())
+            if target.exists() or target.is_symlink():
+                paths.setdefault(declaration, "?")
+        except (OSError, ValueError):
+            continue
+
+    def record_unreadable(error: OSError) -> None:
+        location = Path(error.filename) if error.filename else root
+        try:
+            unreadable.append(location.relative_to(root).as_posix())
+        except ValueError:
+            unreadable.append(str(location))
+
+    for walk_root in _surface_walk_roots(root, declarations):
+        if not walk_root.exists() and not walk_root.is_symlink():
+            continue
+        for current, directories, filenames in os.walk(
+                walk_root, followlinks=False, onerror=record_unreadable):
             relative_dir = Path(current).relative_to(root)
             if relative_dir == Path("."):
                 directories[:] = [name for name in directories if name != ".git"]
@@ -213,11 +278,7 @@ def _repository_paths(run) -> dict[str, str]:
                     relative = (relative_dir / name).as_posix()
                     if is_frozen_evaluator(relative, run.cfg):
                         paths.setdefault(relative, "?")
-    except OSError as error:
-        raise SnapshotUnobservable(
-            "permission snapshot could-not-observe filesystem surface enumeration"
-        ) from error
-    return paths
+    return RepositoryPaths(paths, sorted(set(unreadable)))
 
 
 def _gitignore_observation(run, paths: dict[str, str]) \
@@ -350,7 +411,7 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
         visibility_sources = {}
         visibility_unobservable = str(error)
     unresolved, absent = _surface_observation(run, repository_paths)
-    unreadable = []
+    unreadable = list(repository_paths.unreadable)
     for path in repository_paths:
         if not is_frozen_evaluator(path, run.cfg):
             continue
@@ -584,6 +645,8 @@ def evaluator_generation(run) -> str | None:
         return None
     try:
         paths = _repository_paths(run)
+        if paths.unreadable:
+            return None
         _refuse_hidden_evaluators(run, paths)
         _require_observable_surface(run, paths)
     except (OSError, PermissionBreach):

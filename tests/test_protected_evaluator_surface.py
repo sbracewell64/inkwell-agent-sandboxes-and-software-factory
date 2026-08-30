@@ -355,17 +355,27 @@ def test_untracked_evaluator_revision_creates_a_generation(tmp_path):
     assert _owner("evidence_is_current")(first, run) is False
 
 
-def test_gitignored_declared_evaluator_refuses_and_names_visibility(tmp_path):
+def test_gitignored_declared_evaluator_refuses_and_names_visibility(
+        tmp_path, monkeypatch):
     root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
     run = _Run(root, _cfg(frozen=["tests/"]))
     (root / ".gitignore").write_text("tests/hidden_evaluator.py\n")
     (root / "tests/hidden_evaluator.py").write_text("assert False\n")
+    walked = []
+    real_walk = permissions.os.walk
+
+    def scoped_walk(top, *args, **kwargs):
+        walked.append(Path(top))
+        return real_walk(top, *args, **kwargs)
+
+    monkeypatch.setattr(permissions.os, "walk", scoped_walk)
 
     assert _owner("evaluator_generation")(run) is None
     with pytest.raises(permissions.IndexVisibilityBreach) as refused:
         permissions.snapshot(run)
     assert "gitignore" in str(refused.value)
     assert "tests/hidden_evaluator.py" in str(refused.value)
+    assert walked and set(walked) == {root / "tests"}
 
 
 def test_gitignore_visibility_change_invalidates_generation_and_rolls_back(tmp_path):
@@ -484,6 +494,38 @@ def test_unreadable_member_refuses_after_other_breaches_are_undone(tmp_path):
     assert "unreadable member(s): tests/evaluator.py" in str(refused.value)
     assert "app/widget.py" in str(refused.value)
     assert evaluator.read_text() == "assert True\n"
+    assert unauthorized.read_text() == "value = 1\n"
+
+
+def test_unreadable_declared_subtree_refuses_after_other_rollback(
+        tmp_path, monkeypatch):
+    root = _repo(tmp_path, {
+        "tests/readable/evaluator.py": "assert True\n",
+        "tests/blocked/evaluator.py": "assert True\n",
+        "app/widget.py": "value = 1\n",
+    })
+    run = _Run(root, _cfg(frozen=["tests/"]))
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+    unauthorized = root / "app/widget.py"
+    unauthorized.write_text("value = 2\n")
+    real_walk = permissions.os.walk
+
+    def unreadable_walk(top, *args, **kwargs):
+        kwargs["onerror"](PermissionError(
+            13, "Permission denied", str(root / "tests/blocked")
+        ))
+        return real_walk(top, *args, **kwargs)
+
+    monkeypatch.setattr(permissions.os, "walk", unreadable_walk)
+
+    assert _owner("evaluator_generation")(run) is None
+    with pytest.raises(permissions.EvaluatorSurfaceUnobservable) as refused:
+        permissions.enforce(
+            run, None, _agent("reviewer", []), before, preserved
+        )
+    assert "unreadable member(s): tests/blocked" in str(refused.value)
+    assert "app/widget.py" in str(refused.value)
     assert unauthorized.read_text() == "value = 1\n"
 
 

@@ -136,10 +136,14 @@ filesystem-enumerated identities of every declared member, independently of
 Git ignore rules, into one identity. Git metadata separately identifies ignored
 or index-hidden members, and `evidence_is_current(recorded, run)` compares
 evidence against it. Both are three-valued: `None` is could-not-observe and is
-returned
-for a surface that is undeclared, unresolvable, unreadable, or sitting in a tree
-git cannot enumerate. An evaluator surface nobody could look at is never
-evidence that the evaluator is intact.
+returned for a surface that is undeclared, unresolvable, unreadable, or sitting
+in a tree git cannot enumerate. An evaluator surface nobody could look at is
+never evidence that the evaluator is intact.
+
+Filesystem enumeration is scoped to each declaration's exact path or static
+pre-glob root. Directory scan failures are retained as unreadable members while
+enumeration continues, so other effects can still be observed and rolled back
+before the phase refuses.
 
 Working-tree snapshots apply the same rule: a missing Git executable or a
 nonzero Git enumeration result raises a named could-not-observe refusal, so an
@@ -155,9 +159,9 @@ message names the frozen paths separately.
 
 ## Proof
 
-`tests/test_protected_evaluator_surface.py` — 36 cases: the original 12 covering
+`tests/test_protected_evaluator_surface.py` — 37 cases: the original 12 covering
 the law's four required fixtures, boundary controls, and shipped-roster
-non-vacuity checks, plus 24 focused review regressions. The original acceptance
+non-vacuity checks, plus 25 focused review regressions. The original acceptance
 cases were observed red against `c192693` before the change, with
 the real failure shape (`permitted()` returning `True`, `DID NOT RAISE
 PermissionBreach`), and green at the original feature head.
