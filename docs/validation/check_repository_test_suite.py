@@ -103,7 +103,15 @@ def main() -> int:
             ["no interpreter carries the suite's declared dependencies "
              f"({', '.join(REQUIRED)})", *unmet])
 
-    environment = dict(os.environ, PYTHONPATH=PYTHONPATH)
+    # The protected evaluator surface includes docs/validation/.  Importing its
+    # modules during collection must not create ignored __pycache__ members
+    # inside that closed-world surface, or the suite makes its own later
+    # visibility control refuse.  Keep the checkout byte-stable while tests run.
+    environment = dict(
+        os.environ,
+        PYTHONPATH=PYTHONPATH,
+        PYTHONDONTWRITEBYTECODE="1",
+    )
     try:
         result = subprocess.run(
             [str(chosen), "-m", "pytest", "-q", SUITE],
