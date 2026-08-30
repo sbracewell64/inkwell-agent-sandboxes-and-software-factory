@@ -69,6 +69,18 @@ outranks a failure to observe, so a validator that judged anything reports FAIL
 even when part of its evidence was unavailable. `could-not-observe` is a real
 result and never a pass — the gate still exits red on it.
 
+`tools/windows_host.py` owns the same boundary outside the gate. The host doctor
+prints `CNO` rows beside `ok`/`FAIL`, exits `COULD_NOT_OBSERVE_EXIT` when it
+judged nothing false but left something unobserved, and exits 1 whenever it did
+judge something false. Its installed-tool predicate is deliberately untouched —
+an absent tool answers "is this tool installed" and stays a FAIL finding — while
+every predicate derived from a child that never ran is could-not-observe:
+version contracts, both `just` front doors, the `ssh config` probes, the
+canonical-origin probe, and any child that declared its own observation failure.
+`tests/test_windows_host_observation_boundary.py` holds those controls, with the
+non-vacuity half proving a present tool is really executed and a
+present-but-failing tool is still FAIL.
+
 The B4-002 provider-free process contract is
 `docs/validation/check_executor_supervisor.py`. Its deterministic fake Pi child
 covers successful typed evidence plus watched-red stdin inheritance,

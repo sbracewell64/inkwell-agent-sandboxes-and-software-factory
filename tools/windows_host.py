@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 from pathlib import Path
 import re
@@ -10,6 +11,17 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
+sys.path.insert(
+    0,
+    str(ROOT),
+)
+
+from tools.ci_gate import (  # noqa: E402
+    CNO_REASON_PREFIX,
+    COULD_NOT_OBSERVE_EXIT,
+    child_cno_reason,
+)
+
 CANONICAL_ORIGIN = (
     "https://github.com/"
     "sbracewell64/inkwell-agent-sandboxes-and-software-factory.git"
@@ -18,20 +30,115 @@ CANONICAL_ORIGIN = (
 MIN_PYTHON = (3, 11)
 MIN_JUST = (1, 56, 0)
 
+DEFAULT_CHILD_TIMEOUT_SECONDS = 30.0
+
+
+def child_timeout_seconds() -> float:
+    value = os.environ.get("SSSF_CHILD_TIMEOUT_SECONDS", "30")
+
+    try:
+        timeout = float(value)
+    except ValueError:
+        return DEFAULT_CHILD_TIMEOUT_SECONDS
+
+    if not math.isfinite(timeout) or timeout <= 0:
+        return DEFAULT_CHILD_TIMEOUT_SECONDS
+
+    return timeout
+
+
+# Bound every child so a wedged tool is a timed-out observation rather than a
+# doctor that never returns.
+CHILD_TIMEOUT_SECONDS = child_timeout_seconds()
+
+
+class ChildObservation:
+    """One child-tool spawn's three-valued result.
+
+    `returncode` is None exactly when this doctor never reached an
+    observation: the tool was absent or unspawnable, the working
+    environment was unreadable, the child stopped answering, or the
+    child reported its own failure to observe. A predicate that was
+    never evaluated is could-not-observe — neither `ok` nor `FAIL` is
+    honest about it.
+    """
+
+    def __init__(
+        self,
+        returncode: int | None,
+        stdout: str = "",
+        reason: str = "",
+    ) -> None:
+        self.returncode = returncode
+        self.stdout = stdout
+        self.reason = reason
+
+    @property
+    def observed(self) -> bool:
+        return self.returncode is not None
+
 
 def run(
     args: list[str],
     *,
-    check: bool = False,
     cwd: Path = ROOT,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        args,
-        cwd=cwd,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=check,
+    timeout: float = CHILD_TIMEOUT_SECONDS,
+) -> ChildObservation:
+    """Spawn one child tool and return its three-valued observation.
+
+    This never raises for a child that could not run. Letting the
+    spawn error escape reports nothing at all, and inventing a return
+    code for it would report a judgement no child ever made; both are
+    narrowings of could-not-observe.
+
+    `COULD_NOT_OBSERVE_EXIT` is repository-reserved for every child this
+    doctor spawns, not only validators. Any child exiting with that code is
+    therefore could-not-observe by convention; named reasons are carried
+    through, and a bare exit uses the shared fallback reason.
+    """
+    tool = args[0] if args else "<no command>"
+
+    try:
+        completed = subprocess.run(
+            args,
+            cwd=cwd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout,
+        )
+    except OSError as exc:
+        return ChildObservation(
+            None,
+            reason=(
+                f"tool unavailable: "
+                f"{tool}: {exc}"
+            ),
+        )
+    except subprocess.TimeoutExpired:
+        return ChildObservation(
+            None,
+            reason=(
+                f"{tool} did not answer "
+                f"within {timeout:g}s"
+            ),
+        )
+
+    output = completed.stdout or ""
+
+    if (
+        completed.returncode
+        == COULD_NOT_OBSERVE_EXIT
+    ):
+        return ChildObservation(
+            None,
+            output,
+            child_cno_reason(output),
+        )
+
+    return ChildObservation(
+        completed.returncode,
+        output,
     )
 
 
@@ -130,6 +237,7 @@ def build_bootstrap_path() -> str:
 class Doctor:
     def __init__(self) -> None:
         self.failed = False
+        self.could_not_observe = False
 
     def ok(
         self,
@@ -148,6 +256,27 @@ class Doctor:
         print(f"  FAIL  {label}{suffix}")
         self.failed = True
 
+    def cno(
+        self,
+        label: str,
+        detail: str = "",
+    ) -> None:
+        """Record a predicate this doctor could not evaluate.
+
+        Could-not-observe is a real result and never a pass: the row
+        stays visible and the doctor stays non-OK, without claiming
+        the predicate was judged.
+        """
+        reason = (
+            detail
+            or "no reason reported"
+        )
+        print(
+            f"  CNO   {label} — "
+            f"{CNO_REASON_PREFIX}{reason}"
+        )
+        self.could_not_observe = True
+
     def warn(
         self,
         label: str,
@@ -163,6 +292,73 @@ class Doctor:
     ) -> None:
         suffix = f" — {detail}" if detail else ""
         print(f"  info  {label}{suffix}")
+
+
+def terminal_disposition(
+    doctor: Doctor,
+) -> int:
+    """Print the doctor's verdict and return its exit code.
+
+    An observed defect outranks a failure to observe: a doctor that
+    judged anything false reports FAILED even when part of its
+    evidence was unavailable. Only a run that judged nothing false and
+    left something unobserved reports could-not-observe, and that exit
+    is red, never a pass.
+    """
+    if doctor.failed:
+        print(
+            "SSSF Windows host doctor: "
+            "FAILED"
+        )
+        return 1
+
+    if doctor.could_not_observe:
+        print(
+            "SSSF Windows host doctor: "
+            "COULD-NOT-OBSERVE"
+        )
+        return COULD_NOT_OBSERVE_EXIT
+
+    print(
+        "SSSF Windows host doctor: OK"
+    )
+
+    return 0
+
+
+def check_child_probe(
+    doctor: Doctor,
+    label: str,
+    args: list[str],
+    *,
+    success_detail: str,
+    cwd: Path = ROOT,
+) -> ChildObservation:
+    """Record one child-tool probe under the three-valued boundary.
+
+    A child that answered decides the row. A child this doctor could
+    not execute leaves the predicate unobserved, so the row is
+    could-not-observe rather than a FAIL the child never earned.
+    """
+    result = run(args, cwd=cwd)
+
+    if not result.observed:
+        doctor.cno(
+            label,
+            result.reason,
+        )
+    elif result.returncode != 0:
+        doctor.fail(
+            label,
+            result.stdout.strip(),
+        )
+    else:
+        doctor.ok(
+            label,
+            success_detail,
+        )
+
+    return result
 
 
 STRICT_LINE_ENDING_INVOCATION = (
@@ -194,16 +390,20 @@ def check_line_ending_contract(
     detail = line_endings.stdout.strip()
     success_marker = "B3-002 strict line-ending contract: PASS"
 
-    if line_endings.returncode != 0:
+    if not line_endings.observed:
+        doctor.cno(
+            "line-ending contract",
+            line_endings.reason,
+        )
+    elif line_endings.returncode != 0:
         doctor.fail(
             "line-ending contract",
             f"{STRICT_LINE_ENDING_INVOCATION}\n{detail}",
         )
     elif success_marker not in detail:
-        doctor.fail(
+        doctor.cno(
             "line-ending contract",
-            f"{STRICT_LINE_ENDING_INVOCATION}\n"
-            "could-not-observe: strict validator returned no "
+            "strict validator returned no "
             "positive success marker",
         )
     else:
@@ -216,17 +416,37 @@ def check_line_ending_contract(
 def executable_version(
     name: str,
     *args: str,
-) -> tuple[str | None, str]:
+) -> tuple[str | None, str, str]:
+    """Resolve one tool and read its version.
+
+    Returns the resolved path, the version text, and the reason the
+    version could not be read. An absent tool has no version to
+    observe, and a tool that could not be spawned reported none: both
+    are could-not-observe for the version, whatever the doctor decides
+    about the tool itself.
+    """
     resolved = shutil.which(name)
 
     if not resolved:
-        return None, ""
+        return (
+            None,
+            "",
+            f"{name} is not on PATH, so "
+            "no version was read",
+        )
 
     proc = run(
         [resolved, *args]
     )
 
-    return resolved, proc.stdout.strip()
+    if not proc.observed:
+        return resolved, "", proc.reason
+
+    return (
+        resolved,
+        proc.stdout.strip(),
+        "",
+    )
 
 
 def parse_version(
@@ -269,6 +489,13 @@ def check_ssh_config(
     proc = run(
         ["ssh", "-G", host]
     )
+
+    if not proc.observed:
+        doctor.cno(
+            f"ssh config {host}",
+            proc.reason,
+        )
+        return
 
     if proc.returncode != 0:
         doctor.fail(
@@ -328,8 +555,17 @@ def check_tool(
     doctor: Doctor,
     name: str,
     *version_args: str,
-) -> tuple[str | None, str]:
-    resolved, version = executable_version(
+) -> tuple[str | None, str, str]:
+    """Judge whether one tool is installed, and read its version.
+
+    The predicate on this row is "is this tool installed on the host",
+    and an absent tool answers it: the finding stays a FAIL. The
+    version it would have reported is a different predicate that was
+    never reached — the reason is returned so
+    `check_version_contract` can record that one as CNO instead of
+    inventing a verdict for it.
+    """
+    resolved, version, reason = executable_version(
         name,
         *version_args,
     )
@@ -339,7 +575,7 @@ def check_tool(
             name,
             "not found on PATH",
         )
-        return None, ""
+        return None, "", reason
 
     first_line = (
         version.splitlines()[0]
@@ -352,7 +588,54 @@ def check_tool(
         f"{resolved} [{first_line}]",
     )
 
-    return resolved, version
+    return resolved, version, reason
+
+
+def check_version_contract(
+    doctor: Doctor,
+    label: str,
+    version_text: str,
+    minimum: tuple[int, ...],
+    *,
+    unobserved_reason: str,
+) -> None:
+    """Judge one minimum-version contract, three-valued.
+
+    A tool that never ran reported no version to compare. Parsing its
+    empty output into "could not parse" would state a version defect
+    this doctor never observed, so an unreached reading is CNO. A tool
+    that did run and answered unparseably or too low still FAILs.
+    """
+    if unobserved_reason:
+        doctor.cno(
+            label,
+            unobserved_reason,
+        )
+        return
+
+    version = parse_version(
+        version_text
+    )
+
+    if version is None:
+        doctor.fail(
+            label,
+            "could not parse "
+            f"{version_text!r}",
+        )
+    elif version < minimum:
+        doctor.fail(
+            label,
+            f"{version} < required "
+            f"{minimum}",
+        )
+    else:
+        doctor.ok(
+            label,
+            ".".join(
+                map(str, version)
+            ),
+        )
 
 
 def doctor(
@@ -448,37 +731,45 @@ def doctor(
                     f"missing {required}",
                 )
 
-    _, _ = check_tool(
+    _, _, _ = check_tool(
         d,
         "git",
         "--version",
     )
 
-    sh_path, _ = check_tool(
+    sh_path, _, _ = check_tool(
         d,
         "sh",
         "--version",
     )
 
-    cygpath_path, _ = check_tool(
+    cygpath_path, _, _ = check_tool(
         d,
         "cygpath",
         "--version",
     )
 
-    ssh_path, _ = check_tool(
+    ssh_path, _, _ = check_tool(
         d,
         "ssh",
         "-V",
     )
 
-    _, python_version = check_tool(
+    (
+        _,
+        python_version,
+        python_reason,
+    ) = check_tool(
         d,
         "python",
         "--version",
     )
 
-    _, python3_version = check_tool(
+    (
+        _,
+        python3_version,
+        python3_reason,
+    ) = check_tool(
         d,
         "python3",
         "--version",
@@ -496,7 +787,11 @@ def doctor(
         "--version",
     )
 
-    _, just_version = check_tool(
+    (
+        _,
+        just_version,
+        just_reason,
+    ) = check_tool(
         d,
         "just",
         "--version",
@@ -602,60 +897,33 @@ def doctor(
                 ssh_path,
             )
 
-    for label, text in (
+    for label, text, reason in (
         (
             "python compatibility",
             python_version,
+            python_reason,
         ),
         (
             "python3 compatibility",
             python3_version,
+            python3_reason,
         ),
     ):
-        version = parse_version(text)
+        check_version_contract(
+            d,
+            label,
+            text,
+            MIN_PYTHON,
+            unobserved_reason=reason,
+        )
 
-        if version is None:
-            d.fail(
-                label,
-                f"could not parse {text!r}",
-            )
-        elif version < MIN_PYTHON:
-            d.fail(
-                label,
-                f"{version} < required "
-                f"{MIN_PYTHON}",
-            )
-        else:
-            d.ok(
-                label,
-                ".".join(
-                    map(str, version)
-                ),
-            )
-
-    parsed_just = parse_version(
-        just_version
+    check_version_contract(
+        d,
+        "just compatibility",
+        just_version,
+        MIN_JUST,
+        unobserved_reason=just_reason,
     )
-
-    if parsed_just is None:
-        d.fail(
-            "just compatibility",
-            "could not parse "
-            f"{just_version!r}",
-        )
-    elif parsed_just < MIN_JUST:
-        d.fail(
-            "just compatibility",
-            f"{parsed_just} < required "
-            f"{MIN_JUST}",
-        )
-    else:
-        d.ok(
-            "just compatibility",
-            ".".join(
-                map(str, parsed_just)
-            ),
-        )
 
     origin = run(
         [
@@ -666,7 +934,12 @@ def doctor(
         ]
     )
 
-    if origin.returncode != 0:
+    if not origin.observed:
+        d.cno(
+            "canonical origin",
+            origin.reason,
+        )
+    elif origin.returncode != 0:
         d.fail(
             "canonical origin",
             origin.stdout.strip(),
@@ -688,57 +961,39 @@ def doctor(
 
     check_line_ending_contract(d)
 
-    obs_query = run(
+    check_child_probe(
+        d,
+        "observability query contract",
         [
             sys.executable,
             "docs/validation/"
             "check_obs_query.py",
-        ]
+        ],
+        success_detail=(
+            "B3-004 validator PASS"
+        ),
     )
 
-    if obs_query.returncode != 0:
-        d.fail(
-            "observability query contract",
-            obs_query.stdout.strip(),
-        )
-    else:
-        d.ok(
-            "observability query contract",
-            "B3-004 validator PASS",
-        )
-
-    root_front = run(
-        ["just"]
+    check_child_probe(
+        d,
+        "root `just` front door",
+        ["just"],
+        success_detail=(
+            "default recipe runs"
+        ),
     )
 
-    if root_front.returncode != 0:
-        d.fail(
-            "root `just` front door",
-            root_front.stdout.strip(),
-        )
-    else:
-        d.ok(
-            "root `just` front door",
-            "default recipe runs",
-        )
-
-    local_front = run(
+    check_child_probe(
+        d,
+        "`just local` front door",
         [
             "just",
             "local",
-        ]
+        ],
+        success_detail=(
+            "default recipe runs"
+        ),
     )
-
-    if local_front.returncode != 0:
-        d.fail(
-            "`just local` front door",
-            local_front.stdout.strip(),
-        )
-    else:
-        d.ok(
-            "`just local` front door",
-            "default recipe runs",
-        )
 
     check_ssh_config(
         d,
@@ -806,41 +1061,21 @@ def doctor(
             )
 
     if sandbox:
-        sandbox_doctor = run(
+        check_child_probe(
+            d,
+            "sandbox doctor",
             [
                 "just",
                 "sbx",
                 "manage",
                 "doctor",
-            ]
+            ],
+            success_detail=(
+                "sbx doctor: OK"
+            ),
         )
 
-        if (
-            sandbox_doctor.returncode
-            != 0
-        ):
-            d.fail(
-                "sandbox doctor",
-                sandbox_doctor.stdout.strip(),
-            )
-        else:
-            d.ok(
-                "sandbox doctor",
-                "sbx doctor: OK",
-            )
-
-    if d.failed:
-        print(
-            "SSSF Windows host doctor: "
-            "FAILED"
-        )
-        return 1
-
-    print(
-        "SSSF Windows host doctor: OK"
-    )
-
-    return 0
+    return terminal_disposition(d)
 
 
 def main() -> int:
