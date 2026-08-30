@@ -64,8 +64,9 @@ DSH-4, DSH-5,
 DSH-6, DSH-7, and DSH-8 identity universe; and BOUND-1 as `SEQUENCED`. None of
 the newly admitted identities is `ACTIVE`. Immutable authority bytes require BOUND-1 to complete and qualify
 before SBX-2 activation, after which SBX-2 may leave `HELD`.
-The exact source identity/generation is observed from
-`refs/remotes/origin/planning/future-sssf` and bound in `PLANNING_STATE.json`.
+The exact source identity/generation is recorded in `PLANNING_STATE.json` and
+validated against that immutable Git generation. The local
+`refs/remotes/origin/planning/future-sssf` position is advisory only.
 This planning state is never task creation, execution, landing, acceptance,
 certification, live enablement, or runtime authority, and it cannot answer
 SBX-2 readiness.

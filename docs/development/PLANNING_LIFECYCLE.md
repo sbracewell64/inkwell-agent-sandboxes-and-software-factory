@@ -13,7 +13,7 @@ authoritative planning source: planning/future-sssf; commit: eab880656b4ef00174e
 ## Current-authority projection boundary
 
 The durable state record carries a bounded machine-readable projection observed
-from the fetched `refs/remotes/origin/planning/future-sssf` authority. It
+from the exact commit and tree recorded in `PLANNING_STATE.json`. It
 includes FUT-001 through FUT-016, with FUT-014 as `SEQUENCED`, FUT-015 as
 `SEQUENCED`, and FUT-016 as `CANDIDATE`; the complete governed LAUNCH-1, SBX-0,
 SBX-1, SBX-2, SBX-3, SBX-4, SBX-5, SBX-6, SBX-7, SBX-8, WAYFINDER-0 as
@@ -26,10 +26,11 @@ qualify before `SBX-2` activation; only then may `SBX-2` leave `HELD`.
 The projection answers only item state, governed lifecycle state, and
 predecessor order. It cannot answer SBX-2 readiness or activation,
 implementation, landing, acceptance, certification, or live enablement;
-out-of-scope answers are CNO/non-PASS. The validator observes the current Git
-authority ref and rejects stale self-consistent candidate projections and
+out-of-scope answers are CNO/non-PASS. The validator observes the recorded
+generation's immutable Git bytes and rejects stale self-consistent candidate projections and
 missing, unexpected, duplicate, malformed, or conflicting governed
-declarations.
+declarations. Movement of the local tracking ref is reported separately as an
+advisory and cannot change the recorded-generation result.
 
 ## Contract boundary
 

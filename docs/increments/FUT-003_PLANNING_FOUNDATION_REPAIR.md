@@ -93,8 +93,8 @@ of them can pass vacuously.
   evidence record; commit subjects are not state.
 - Candidate, roadmap, ADR, manifest, and increment surfaces point to the
   lifecycle owner rather than restating a competing graph.
-- `check_planning_foundation.py` is deterministic and side-effect-free; it
-  observes a pre-fetched current-authority Git ref read-only and owns the
+- `check_planning_foundation.py` is deterministic and leaves repository state
+  unchanged; it observes the recorded generation's Git bytes and owns the
   watched-red controls for this foundation.
 - `ACTIVE` is engineering authorization/intake eligibility only. The
   authoritative planning binding records FUT-003 as ACTIVE, not PROVEN, without
@@ -131,45 +131,29 @@ The projection is deliberately bounded. It answers only future-item state,
 named lifecycle state, and the BOUND-1 predecessor order. It cannot answer
 SBX-2 readiness or activation, implementation, landing, acceptance,
 certification, or live enablement; every such query is CNO/non-PASS. The
-validator observes the current authority ref/tree and rejects candidate-authored
+validator observes the recorded authority generation's Git bytes and rejects candidate-authored
 stale-generation self-consistency, omitted FUT items, omitted or demoted
 LAUNCH/SBX/Wayfinder/DSH identities, duplicate or conflicting authority
 headings/states, and omitted BOUND-1 predecessor bytes.
 
 The validator control refusing stale projection prose belongs in the g2 requalification because a passing validator over a false projection is the masked-applicability defect this repair series exists to remove.
 
-## Known limitation and follow-on
+## Recorded-generation authority follow-on
 
-`check_planning_foundation.py` currently accepts only the pre-fetched shared
-tracking ref `refs/remotes/origin/planning/future-sssf` as its authority input.
-A later bounded increment should add an explicit authority input argument—an
-exact commit or an explicit `GIT_DIR`—so qualification never requires a lane or
-CI job to write that shared tracking ref. This follow-on is not implemented by
-this increment.
+The validator now reads the exact generation declared by
+`PLANNING_STATE.json`, optionally from the evidence-side Git object store named
+by `SSSF_PLANNING_AUTHORITY_GIT_DIR`. If the object is absent locally, it asks
+the remote for that exact commit without writing a shared ref. The live
+tracking ref is an advisory observation only. The validator implementation is
+the authoritative owner of these input and observation mechanics.
 
-### Authority generation granularity is coarser than the authority it guards
+### Recorded generation is stable across live branch movement
 
-Inherited, and not introduced by this increment: the generation key is the commit
-and tree of the *whole* planning branch, so a commit touching nothing this
-projection reads still invalidates the binding. At the time of writing, live
-`origin/planning/future-sssf` is `8ab93cc9…`, twelve commits ahead of the ruled
-`eab88065…`, with a byte-identical diff across all five
-`AUTHORITATIVE_PLANNING_PATHS`; the documented acceptance command run in a
-normally fetched clone nevertheless reports `OBSERVED_BAD`, despite identical
-projected content.
-
-Relatedly, `_observe_authoritative_planning_source` is documented as observing the
-fetched ref rather than trusting candidate constants, but
-`.github/workflows/ci.yml` force-writes that tracking ref from a SHA pinned in the
-candidate's own workflow file, so in CI the observation is ultimately candidate
-controlled. The mechanism predates this increment, which only rebound the pinned
-SHA as ruled.
-
-A later bounded increment should key the binding on the content actually read —
-for example the blob identities of `AUTHORITATIVE_PLANNING_PATHS` — so that
-docs-only movement on the planning branch does not invalidate an otherwise exact
-projection, and should obtain the authority independently of the candidate. Not
-implemented here.
+The whole-branch commit and tree in `PLANNING_STATE.json` identify the ruled
+generation. Later movement of `planning/future-sssf`, including movement that
+does not alter projected paths, cannot invalidate that generation. The
+recorded-generation and tamper watched-red tests named by the validator own the
+deterministic regression contract.
 
 ### Governed identity families are narrower than the authority's identity space
 
