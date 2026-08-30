@@ -585,11 +585,14 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
     touched = changed_paths(before, after)
     unresolved, absent = after.unresolved, after.absent
     if unresolved or absent:
-        frozen_effects = [path for path in touched
-                          if is_frozen_evaluator(path, run.cfg)]
+        rollback_targets = sorted({
+            path for path in touched
+            if (not permitted(path, agent, run.cfg)
+                or is_frozen_evaluator(path, run.cfg))
+        })
         outcomes = {
             path: _roll_back(run, path, before, after, preserved or {})
-            for path in frozen_effects
+            for path in rollback_targets
         }
         details = []
         if unresolved:
@@ -597,8 +600,9 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
         if absent:
             details.append(f"absent member(s): {', '.join(absent)}")
         if outcomes:
-            details.append("effects: " + ", ".join(
-                f"{path} ({outcome})" for path, outcome in outcomes.items()
+            details.append("effects:\n" + "\n".join(
+                f"  - {path} — {outcome}"
+                for path, outcome in outcomes.items()
             ))
         raise EvaluatorSurfaceUnobservable(
             "permission could-not-observe protected evaluator surface; "

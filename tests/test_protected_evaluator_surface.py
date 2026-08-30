@@ -145,18 +145,25 @@ def test_deleting_the_frozen_regression_aborts_even_though_rollback_succeeded(tm
 
 
 def test_authorized_reviser_cannot_delete_a_still_declared_evaluator(tmp_path):
-    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        "app/widget.py": "value = 1\n",
+    })
     target = root / "tests/evaluator.py"
+    unauthorized = root / "app/widget.py"
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     reviser = _agent("reviser", ["tests/evaluator.py"])
     before = permissions.snapshot(run)
     preserved = permissions.preserve(run, before)
     target.unlink()
+    unauthorized.write_text("value = 2\n")
 
     with pytest.raises(permissions.EvaluatorSurfaceUnobservable) as refused:
         permissions.enforce(run, None, reviser, before, preserved)
     assert "tests/evaluator.py" in str(refused.value)
+    assert "app/widget.py" in str(refused.value)
     assert target.read_text() == "assert True\n"
+    assert unauthorized.read_text() == "value = 1\n"
 
 
 def test_authorized_reviser_can_edit_a_complete_evaluator_surface(tmp_path):
