@@ -454,6 +454,7 @@ def test_corrupt_git_metadata_refuses_an_unobservable_frozen_rewrite(tmp_path):
     with pytest.raises(permissions.SnapshotUnobservable) as unobservable:
         permissions.enforce(run, None, builder, before, {})
     assert "snapshot could-not-observe" in str(unobservable.value)
+    assert "rollback could not be attempted" in str(unobservable.value)
 
 
 def test_committed_frozen_rewrite_is_refused_against_the_pinned_base(tmp_path):
@@ -498,14 +499,21 @@ def _assert_index_visibility_flag_is_refused(tmp_path, option, expected):
     })
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
     subprocess.run(["git", "update-index", option, "tests/evaluator.py"],
                    cwd=root, check=True)
     (root / "tests/evaluator.py").write_text("assert False\n")
+    (root / "app/widget.py").write_text("value = 2\n")
 
     with pytest.raises(permissions.IndexVisibilityBreach) as breach:
-        permissions.enforce(run, None, _agent("builder", None), before, {})
+        permissions.enforce(
+            run, None, _agent("reviser", ["tests/evaluator.py"]),
+            before, preserved,
+        )
     assert expected in str(breach.value)
     assert "tests/evaluator.py" in str(breach.value)
+    assert "app/widget.py" in str(breach.value)
+    assert (root / "app/widget.py").read_text() == "value = 1\n"
 
 
 def test_assume_unchanged_frozen_rewrite_is_refused(tmp_path):
@@ -520,6 +528,12 @@ def test_skip_worktree_frozen_rewrite_is_refused(tmp_path):
     )
 
 
+def test_fsmonitor_valid_frozen_rewrite_is_refused(tmp_path):
+    _assert_index_visibility_flag_is_refused(
+        tmp_path, "--fsmonitor-valid", "fsmonitor-valid"
+    )
+
+
 def test_an_undeclared_evaluator_surface_refuses_the_phase(tmp_path):
     """A freshly installed factory fails loudly rather than running unprotected.
 
@@ -528,7 +542,10 @@ def test_an_undeclared_evaluator_surface_refuses_the_phase(tmp_path):
     refuses at the phase boundary rather than reporting a clean phase it never
     actually judged.
     """
-    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        "app/widget.py": "value = 1\n",
+    })
     undeclared = _Run(root, _cfg(frozen=[]))
 
     with pytest.raises(permissions.EvaluatorSurfaceUndeclared) as refused:
@@ -539,12 +556,29 @@ def test_an_undeclared_evaluator_surface_refuses_the_phase(tmp_path):
     # an undeclared surface past the guard.
     declared = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     armed = permissions.snapshot(declared)
-    with pytest.raises(permissions.EvaluatorSurfaceUndeclared):
-        permissions.enforce(undeclared, None, _agent("builder", None), armed, {})
+    (root / "app/widget.py").write_text("value = 2\n")
+    with pytest.raises(permissions.EvaluatorSurfaceUndeclared) as stopped:
+        permissions.enforce(undeclared, None, _agent("reviewer", []), armed, {})
+    assert "app/widget.py" in str(stopped.value)
+    assert (root / "app/widget.py").read_text() == "value = 1\n"
 
     # Non-vacuity: declaring a surface makes the very same phase judgeable.
     assert permissions.enforce(
         declared, None, _agent("builder", None), armed, {}) == []
+
+
+def test_missing_armed_identity_names_unavailable_rollback(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        "app/widget.py": "value = 1\n",
+    })
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    (root / "app/widget.py").write_text("value = 2\n")
+
+    with pytest.raises(permissions.SnapshotUnobservable) as refused:
+        permissions.enforce(run, None, _agent("reviewer", []), {}, {})
+    assert "missing armed base identity" in str(refused.value)
+    assert "rollback could not be attempted" in str(refused.value)
 
 
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────

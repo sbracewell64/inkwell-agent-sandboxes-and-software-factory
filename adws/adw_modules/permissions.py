@@ -95,12 +95,14 @@ class PreservedPath:
 class TreeSnapshot(dict[str, str]):
     def __init__(self, fingerprints: dict[str, str], base_commit: str,
                  base_tree: str, unresolved: list[str] | None = None,
-                 absent: list[str] | None = None) -> None:
+                 absent: list[str] | None = None,
+                 visibility: dict[str, list[str]] | None = None) -> None:
         super().__init__(fingerprints)
         self.base_commit = base_commit
         self.base_tree = base_tree
         self.unresolved = unresolved or []
         self.absent = absent or []
+        self.visibility = visibility or {}
 
 
 def _git_out(args: list[str], cwd) -> str | None:
@@ -187,10 +189,11 @@ def _repository_paths(run) -> dict[str, str]:
     ))
 
 
-def _refuse_hidden_evaluators(run, paths: dict[str, str]) -> None:
+def _visibility_violations(run, paths: dict[str, str]) -> dict[str, list[str]]:
     fsmonitor = _tagged_paths(_git(
         ["ls-files", "-f", "-z", "--cached"], run.repo_root
     ))
+    violations = {}
     for path, tag in paths.items():
         if not is_frozen_evaluator(path, run.cfg) or tag == "?":
             continue
@@ -202,10 +205,24 @@ def _refuse_hidden_evaluators(run, paths: dict[str, str]) -> None:
         if fsmonitor.get(path, "").islower():
             flags.append("fsmonitor-valid")
         if flags:
-            raise IndexVisibilityBreach(
-                f"permission: protected evaluator index visibility flag(s) "
-                f"{', '.join(flags)} on {path}"
-            )
+            violations[path] = flags
+    return violations
+
+
+def _visibility_detail(violations: dict[str, list[str]]) -> str:
+    return "; ".join(
+        f"{', '.join(flags)} on {path}"
+        for path, flags in violations.items()
+    )
+
+
+def _refuse_hidden_evaluators(run, paths: dict[str, str]) -> None:
+    violations = _visibility_violations(run, paths)
+    if violations:
+        raise IndexVisibilityBreach(
+            "permission: protected evaluator index visibility flag(s) "
+            + _visibility_detail(violations)
+        )
 
 
 def _snapshot_against(run, base_commit: str, base_tree: str,
@@ -221,14 +238,19 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
     """
     fingerprints: dict[str, str] = {}
     repository_paths = _repository_paths(run)
-    _refuse_hidden_evaluators(run, repository_paths)
+    visibility = _visibility_violations(run, repository_paths)
     unresolved, absent = _surface_observation(run, repository_paths)
     for path in repository_paths:
         if not is_frozen_evaluator(path, run.cfg):
             continue
         target = Path(run.repo_root) / path
-        identity = _repository_identity(target) \
-            if target.exists() or target.is_symlink() else "absent"
+        try:
+            identity = _repository_identity(target) \
+                if target.exists() or target.is_symlink() else "absent"
+        except OSError as error:
+            raise SnapshotUnobservable(
+                f"permission snapshot could-not-observe protected evaluator {path}"
+            ) from error
         fingerprints[path] = f"frozen:{identity}"
     for line in _git(
         ["diff", base_commit, "--numstat"], run.repo_root
@@ -242,9 +264,14 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
         if tag == "?" and not is_frozen_evaluator(path, run.cfg):
             fingerprints[path] = "untracked"
     tree = TreeSnapshot(
-        fingerprints, base_commit, base_tree, unresolved, absent
+        fingerprints, base_commit, base_tree, unresolved, absent, visibility
     )
     if require_observable:
+        if visibility:
+            raise IndexVisibilityBreach(
+                "permission: protected evaluator index visibility flag(s) "
+                + _visibility_detail(visibility)
+            )
         _require_observable_surface(run, repository_paths)
     return tree
 
@@ -559,9 +586,38 @@ def _roll_back(run, path: str, before: TreeSnapshot, after: dict[str, str],
             return "deleted"
         except OSError as error:
             return f"could not delete ({error})"
-    result = subprocess.run(["git", "checkout", before.base_commit, "--", path],
-                            cwd=run.repo_root, capture_output=True, text=True)
+    try:
+        result = subprocess.run(
+            ["git", "checkout", before.base_commit, "--", path],
+            cwd=run.repo_root, capture_output=True, text=True,
+        )
+    except OSError as error:
+        return f"could not roll back ({error})"
     return "rolled back" if result.returncode == 0 else "could not roll back"
+
+
+def _clear_visibility(run, path: str, flags: list[str]) -> str:
+    options = {
+        "assume-unchanged": "--no-assume-unchanged",
+        "skip-worktree": "--no-skip-worktree",
+        "fsmonitor-valid": "--no-fsmonitor-valid",
+    }
+    try:
+        result = subprocess.run(
+            ["git", "update-index", *(options[flag] for flag in flags), "--", path],
+            cwd=run.repo_root, capture_output=True, text=True,
+        )
+    except OSError as error:
+        return f"could not restore visibility ({error})"
+    return "visibility restored" if result.returncode == 0 \
+        else "could not restore visibility"
+
+
+def _rollback_unavailable(error: PermissionBreach) -> PermissionBreach:
+    return type(error)(
+        f"{error}; rollback could not be attempted because the tree was "
+        "unobservable"
+    )
 
 
 def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
@@ -575,39 +631,55 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
     reporting a failure, so anything the agent introduced outside its allowlist
     is rolled back before the phase dies. What it cannot undo, it names.
     """
-    _require_declared_surface(run)
     if not isinstance(before, TreeSnapshot):
         raise SnapshotUnobservable(
-            "permission snapshot could-not-observe: missing armed base identity"
+            "permission snapshot could-not-observe: missing armed base identity; "
+            "rollback could not be attempted because no trustworthy baseline "
+            "was armed"
         )
-    _require_pinned_identity(run, before)
-    after = _snapshot_against(run, before.base_commit, before.base_tree)
+    try:
+        _require_pinned_identity(run, before)
+        after = _snapshot_against(run, before.base_commit, before.base_tree)
+    except SnapshotUnobservable as error:
+        raise _rollback_unavailable(error) from error
     touched = changed_paths(before, after)
     unresolved, absent = after.unresolved, after.absent
-    if unresolved or absent:
+    undeclared = not frozen_evaluator_paths(run.cfg)
+    if undeclared or unresolved or absent or after.visibility:
         rollback_targets = sorted({
             path for path in touched
             if (not permitted(path, agent, run.cfg)
                 or is_frozen_evaluator(path, run.cfg))
-        })
+        } | set(after.visibility))
         outcomes = {
             path: _roll_back(run, path, before, after, preserved or {})
             for path in rollback_targets
         }
+        for path, flags in after.visibility.items():
+            restored = _clear_visibility(run, path, flags)
+            outcomes[path] = f"{outcomes.get(path, 'unchanged')}; {restored}"
         details = []
+        if undeclared:
+            details.append("defaults.protected_evaluator_paths declares no surface")
         if unresolved:
             details.append(f"unresolved declaration(s): {', '.join(unresolved)}")
         if absent:
             details.append(f"absent member(s): {', '.join(absent)}")
+        if after.visibility:
+            details.append(
+                "index visibility flag(s): "
+                + _visibility_detail(after.visibility)
+            )
         if outcomes:
             details.append("effects:\n" + "\n".join(
                 f"  - {path} — {outcome}"
                 for path, outcome in outcomes.items()
             ))
-        raise EvaluatorSurfaceUnobservable(
-            "permission could-not-observe protected evaluator surface; "
-            + "; ".join(details)
-        )
+        refusal = IndexVisibilityBreach if after.visibility \
+            else EvaluatorSurfaceUndeclared if undeclared \
+            else EvaluatorSurfaceUnobservable
+        raise refusal("permission could-not-observe protected evaluator surface; "
+                      + "; ".join(details))
     breaches = [p for p in touched if not permitted(p, agent, run.cfg)]
     if not breaches:
         return touched
