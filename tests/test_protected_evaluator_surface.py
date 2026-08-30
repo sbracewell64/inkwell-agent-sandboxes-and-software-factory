@@ -219,8 +219,13 @@ def test_frozen_snapshot_includes_repository_mode_and_symlink_target(tmp_path):
     link.symlink_to("c.txt")
     after = permissions.snapshot(run)
 
-    assert permissions.changed_paths(before, after) == [
-        "tests/check.py", "tests/evaluator"]
+    expected = ["tests/evaluator"]
+    # Native Windows does not expose the POSIX executable-bit transition made
+    # by chmod. The symlink identity remains observable there; Linux exercises
+    # both repository mode and symlink target in this same matrix test.
+    if os.name != "nt":
+        expected.insert(0, "tests/check.py")
+    assert permissions.changed_paths(before, after) == expected
 
 
 def test_dirty_evaluator_mode_and_symlink_are_restored_without_dereferencing(tmp_path):
@@ -477,6 +482,8 @@ def test_corrected_roster_restores_an_observable_generation(tmp_path):
 
 
 def test_unreadable_member_refuses_after_other_breaches_are_undone(tmp_path):
+    if os.name == "nt":
+        pytest.skip("could-not-observe: chmod(0) does not deny reads on Windows")
     root = _repo(tmp_path, {
         "tests/evaluator.py": "assert True\n",
         "app/widget.py": "value = 1\n",
