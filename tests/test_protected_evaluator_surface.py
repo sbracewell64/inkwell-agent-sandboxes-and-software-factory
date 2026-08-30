@@ -260,6 +260,35 @@ def test_dirty_frozen_pathnames_are_never_misclassified_clean(tmp_path, path):
     assert "left as-is" in str(refused.value)
 
 
+def test_new_untracked_frozen_evaluator_is_removed_and_refused(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    created = root / "tests/new_evaluator.py"
+    run = _Run(root, _cfg(frozen=["tests/"]))
+    before = permissions.snapshot(run)
+
+    created.write_text("assert False\n")
+
+    with pytest.raises(permissions.PermissionBreach) as refused:
+        permissions.enforce(run, None, _agent("builder", None), before, {})
+    assert "tests/new_evaluator.py" in str(refused.value)
+    assert not created.exists()
+
+
+def test_frozen_rename_destination_is_removed_and_source_restored(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    source = root / "tests/evaluator.py"
+    destination = root / "tests/renamed_evaluator.py"
+    run = _Run(root, _cfg(frozen=["tests/"]))
+    before = permissions.snapshot(run)
+
+    source.rename(destination)
+
+    with pytest.raises(permissions.PermissionBreach):
+        permissions.enforce(run, None, _agent("builder", None), before, {})
+    assert source.read_text() == "assert True\n"
+    assert not destination.exists()
+
+
 def test_frozen_snapshot_includes_repository_mode_and_symlink_target(tmp_path):
     root = _repo(tmp_path, {
         "tests/check.py": "assert True\n",

@@ -106,7 +106,9 @@ class TreeSnapshot(dict[str, str]):
                  unreadable: list[str] | None = None,
                  visibility_unobservable: str | None = None,
                  visibility_sources: dict[str, list[str]] | None = None,
-                 base_clean: set[str] | None = None) -> None:
+                 base_clean: set[str] | None = None,
+                 base_present: set[str] | None = None,
+                 tracked: set[str] | None = None) -> None:
         super().__init__(fingerprints)
         self.base_commit = base_commit
         self.base_tree = base_tree
@@ -117,6 +119,8 @@ class TreeSnapshot(dict[str, str]):
         self.visibility_unobservable = visibility_unobservable
         self.visibility_sources = visibility_sources or {}
         self.base_clean = base_clean or set()
+        self.base_present = base_present or set()
+        self.tracked = tracked or set()
 
 
 class RepositoryPaths(dict[str, str]):
@@ -539,6 +543,19 @@ def _numstat_records(numstat: bytes) -> list[tuple[str, str, str]]:
     return records
 
 
+def _base_paths(run, base_commit: str) -> set[str]:
+    listing = _git_bytes(
+        ["ls-tree", "-r", "-z", "--name-only", base_commit],
+        run.repo_root,
+    )
+    fields = listing.split(b"\0")
+    if fields[-1:] != [b""] or any(not field for field in fields[:-1]):
+        raise SnapshotUnobservable(
+            "permission snapshot could-not-observe: malformed git base tree"
+        )
+    return {os.fsdecode(field) for field in fields[:-1]}
+
+
 def _snapshot_against(run, base_commit: str, base_tree: str,
                       require_observable: bool = False) -> TreeSnapshot:
     """Fingerprint every path the working tree currently differs on.
@@ -589,9 +606,12 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
         if tag != "?" and is_frozen_evaluator(path, run.cfg)
         and path not in base_changed and path not in unreadable
     }
+    base_present = _base_paths(run, base_commit)
+    tracked = {path for path, tag in repository_paths.items() if tag != "?"}
     tree = TreeSnapshot(
         fingerprints, base_commit, base_tree, unresolved, absent, visibility,
         unreadable, visibility_unobservable, visibility_sources, base_clean,
+        base_present, tracked,
     )
     if require_observable:
         if visibility_unobservable:
@@ -898,7 +918,7 @@ def _restore(run, path: str, preserved: dict[str, PreservedPath]) -> bool:
         return False
 
 
-def _roll_back(run, path: str, before: TreeSnapshot, after: dict[str, str],
+def _roll_back(run, path: str, before: TreeSnapshot, after: TreeSnapshot,
                preserved: dict[str, PreservedPath]) -> str:
     """Undo one unauthorized change. Returns a word describing what happened.
 
@@ -926,12 +946,21 @@ def _roll_back(run, path: str, before: TreeSnapshot, after: dict[str, str],
             return "restored"
         return "REVERTED-BY-AGENT (uncommitted work lost, cannot restore)" \
             if path not in after else "left as-is (was already modified)"
-    if (after.get(path) or "").startswith("untracked"):
+    if path not in before.base_present and path not in after.tracked:
         try:
             (Path(run.repo_root) / path).unlink()
             return "deleted"
         except OSError as error:
             return f"could not delete ({error})"
+    if path not in before.base_present and path in after.tracked:
+        try:
+            result = subprocess.run(
+                ["git", "rm", "-f", "--", path],
+                cwd=run.repo_root, capture_output=True, text=True,
+            )
+        except OSError as error:
+            return f"could not delete ({error})"
+        return "deleted" if result.returncode == 0 else "could not delete"
     try:
         result = subprocess.run(
             ["git", "checkout", before.base_commit, "--", path],
