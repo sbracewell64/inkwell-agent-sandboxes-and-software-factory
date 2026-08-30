@@ -100,7 +100,7 @@ AUTHORITATIVE_PLANNING_PATHS = (
 )
 PROJECTION_SCHEMA = "sssf.planning-authority-projection.v1"
 EXPECTED_ITEM_STATES = {"FUT-001": "SEQUENCED", "FUT-002": "PRESERVE", "FUT-003": "ACTIVE"}
-GOVERNED_FUTURE_IDS = tuple(f"FUT-{index:03d}" for index in range(1, 14))
+GOVERNED_FUTURE_IDS = tuple(f"FUT-{index:03d}" for index in range(1, 17))
 GOVERNED_LIFECYCLE_IDENTITIES = (
     "LAUNCH-1",
     "SBX-0",
@@ -112,6 +112,7 @@ GOVERNED_LIFECYCLE_IDENTITIES = (
     "SBX-6",
     "SBX-7",
     "SBX-8",
+    "WAYFINDER-0",
     "WAYFINDER-1",
     "DSH-0A",
     "DSH-0B",
@@ -128,6 +129,7 @@ EXPECTED_EXPLICIT_LIFECYCLE_STATES = {
     "LAUNCH-1": "ACTIVE",
     "SBX-0": "ACTIVE",
     "SBX-1": "SEQUENCED",
+    "WAYFINDER-0": "SEQUENCED",
     "WAYFINDER-1": "SEQUENCED",
 }
 DOCKER_FIRST_ORDER = """Docker SBX-2..8
@@ -2246,7 +2248,7 @@ def _watched_red_controls(
             raise ValueError(f"cannot duplicate unique authority heading: {identity}")
         blobs[path] += "\n" + blocks[0]
 
-    for identity in ("LAUNCH-1", "SBX-3", "DSH-1"):
+    for identity in ("LAUNCH-1", "SBX-3", "DSH-1", "WAYFINDER-0"):
         _expect_authority_nonpass(
             "authority-duplicate-" + identity.lower() + "-heading",
             project,
@@ -2267,6 +2269,36 @@ def _watched_red_controls(
         "authority-duplicate-launch-state",
         project,
         duplicate_launch_state,
+        failures,
+    )
+
+    def change_wayfinder0_state(blobs: dict[str, str]) -> None:
+        path = "docs/development/ROADMAP.md"
+        block = _identity_heading_block(blobs[path], "WAYFINDER-0")
+        changed = block.replace(
+            "Planning state: `SEQUENCED`, not `ACTIVE`",
+            "Planning state: `ACTIVE`",
+            1,
+        )
+        if changed == block:
+            raise ValueError("WAYFINDER-0 state mutation did not apply")
+        blobs[path] = blobs[path].replace(block, changed, 1)
+
+    _expect_authority_nonpass(
+        "authority-wayfinder-0-state-change",
+        project,
+        change_wayfinder0_state,
+        failures,
+    )
+
+    def inject_ungoverned_lifecycle_identity(blobs: dict[str, str]) -> None:
+        path = "docs/development/ROADMAP.md"
+        blobs[path] += "\n## WAYFINDER-9 — ungoverned identity\n\nPlanning state: `SEQUENCED`\n"
+
+    _expect_authority_nonpass(
+        "authority-ungoverned-lifecycle-identity",
+        project,
+        inject_ungoverned_lifecycle_identity,
         failures,
     )
 
@@ -2606,6 +2638,7 @@ def main() -> int:
         "omitted-bound1-predecessor, out-of-scope-sbx2-readiness, "
         "candidate-authored-stale-generation-self-consistency, authority-sbx2-promotion, "
         "authority-omitted-governed-identities, authority-duplicate-headings-and-states, "
+        "authority-wayfinder-0-state-change, authority-ungoverned-lifecycle-identity, "
         "authority-removed-bound1-predecessor, authority-future-register-integrity, "
         "illegal-transition, unknown-transition, skipped-transition, missing-durable-sequenced-record, "
         "unbound-active-identity, partial-active-identity, "

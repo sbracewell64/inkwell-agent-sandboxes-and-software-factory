@@ -181,6 +181,7 @@ def _authority_blob_fixture() -> dict[str, str]:
         ("SBX-6", None),
         ("SBX-7", None),
         ("SBX-8", None),
+        ("WAYFINDER-0", "SEQUENCED"),
         ("WAYFINDER-1", "SEQUENCED"),
         ("DSH-0A", None),
         ("DSH-0B", None),
@@ -215,6 +216,9 @@ def _authority_blob_fixture() -> dict[str, str]:
         "CANDIDATE",
         "CANDIDATE",
         "PRESERVE",
+        "SEQUENCED",
+        "SEQUENCED",
+        "CANDIDATE",
     )
     future_rows = "\n".join(
         f"| FUT-{index:03d} | item | {state} |"

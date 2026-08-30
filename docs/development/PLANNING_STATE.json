@@ -47,7 +47,10 @@
       {"item_id": "FUT-010", "state": "CANDIDATE"},
       {"item_id": "FUT-011", "state": "CANDIDATE"},
       {"item_id": "FUT-012", "state": "CANDIDATE"},
-      {"item_id": "FUT-013", "state": "PRESERVE"}
+      {"item_id": "FUT-013", "state": "PRESERVE"},
+      {"item_id": "FUT-014", "state": "SEQUENCED"},
+      {"item_id": "FUT-015", "state": "SEQUENCED"},
+      {"item_id": "FUT-016", "state": "CANDIDATE"}
     ],
     "lifecycle_identities": [
       {"identity": "LAUNCH-1", "state": "ACTIVE", "source_path": "docs/development/ROADMAP.md"},
@@ -60,6 +63,7 @@
       {"identity": "SBX-6", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "SBX-7", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "SBX-8", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
+      {"identity": "WAYFINDER-0", "state": "SEQUENCED", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "WAYFINDER-1", "state": "SEQUENCED", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "DSH-0A", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},
       {"identity": "DSH-0B", "state": "ROADMAP_SUBSTEP", "source_path": "docs/development/ROADMAP.md"},

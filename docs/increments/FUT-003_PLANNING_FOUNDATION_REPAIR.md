@@ -47,37 +47,43 @@ was directly reproduced as follows:
 These observations remain adverse evidence for PR #24; they are not rewritten
 or treated as a pass after the correction.
 
-## Pending register-admission ruling — current validator state
+## Closed-set register admission — ruling g1+g2 on control 10
 
 The generation rebind to `eab880656b4ef00174ea514cca128f6336632fcf` /
 `5328b8a437d894682f4ac1c5d7ae581694410c43` is complete across every state-bearing
 surface, the manifest, `PLANNING_STATE.json`, the CI authority fetch, and the
 CI-contract validator.
 
-The canonical validator nevertheless returns `OBSERVED_BAD` at this head, by design
-and not by defect:
+The observed authority declares four identities that the earlier governed universe
+omitted. Ruling g1 authorized exact closed-set admission of `FUT-014`, `FUT-015`, and
+`FUT-016`; ruling g2 additionally authorized extending the closed lifecycle projection
+by exactly `WAYFINDER-0` = `SEQUENCED`. Both are recorded here:
 
-```
-current planning authority could-not-observe: authority future-item register is invalid
-at eab880656b4ef00174ea514cca128f6336632fcf: unexpected FUT identities: FUT-014, FUT-015, FUT-016
-```
+| Identity | Authority declaration | Projected state |
+|---|---|---|
+| `FUT-014` | Poker School Phase A Wayfinder product-commissioning POC | `SEQUENCED` |
+| `FUT-015` | Agent Lightning gated sandbox optimization POC | `SEQUENCED` |
+| `FUT-016` | Deterministic control-band maintenance loop | `CANDIDATE` |
+| `WAYFINDER-0` | Configure the Captain's existing Wayfinder transport | `SEQUENCED` |
 
-The observed authority declares four identities outside the currently governed
-universe — `FUT-014`, `FUT-015`, `FUT-016` (candidate register) and `WAYFINDER-0`
-(lifecycle roadmap). Admitting them widens what this validator asserts, which is a
-scope question held by Browser Sol (control issue 10). Until that ruling is relayed,
-the projection is **not** widened: the validator reports the gap as a non-PASS rather
-than projecting an incomplete universe as a pass, and rather than silently narrowing
-the observed authority to the older governed set.
+This repairs closed-set correspondence with the exact ruled generation; it does not
+loosen the closed-set invariant. A validator cannot establish applicability to
+`eab8806` while refusing an identity that generation lawfully contains. None of the
+four is `ACTIVE`: admission records planning position only and creates no task,
+execution, landing, acceptance, certification, commissioning, or live enablement.
+`WAYFINDER-0` in particular is not configured, commissioned, executed, or proven, and
+no Docker/Wayfinder/DSH prerequisite semantics change.
 
-All four authority declarations are `SEQUENCED` or `CANDIDATE`; none is `ACTIVE`.
-Admission would record planning position only and would not create a task, execution,
-landing, acceptance, certification, or live enablement.
-
-The single-root-cause nature of the failure is established: with the four identities
-admitted, the validator returns `OBSERVED_GOOD` / `PASS` with zero errors and zero
-unverified controls, and no further semantic gap appears. That result was reproduced
-before this record was written and then reverted, so the admission is not carried here.
+Per ruling g2 the negative closure controls are preserved and extended. The watched-red
+set now proves, causally, that each of these is non-PASS: `WAYFINDER-0` omitted from the
+authority roadmap (`authority-omitted-wayfinder-0`); `WAYFINDER-0` duplicated
+(`authority-duplicate-wayfinder-0-heading`); `WAYFINDER-0` promoted off `SEQUENCED`
+(`authority-wayfinder-0-state-change`); and an ungoverned lifecycle identity injected
+into the authority roadmap (`authority-ungoverned-lifecycle-identity`). The pre-existing
+stale-generation, missing, duplicate, and conflicting-identity controls are unchanged and
+still fire. Each new control was verified by neutering its mutation to a no-op and
+observing the validator report `watched-red controls did not go red: <control>`, so none
+of them can pass vacuously.
 
 ## Design and ownership
 

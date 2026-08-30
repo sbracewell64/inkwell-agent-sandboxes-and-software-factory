@@ -27,12 +27,15 @@ authoritative planning source: planning/future-sssf; commit: eab880656b4ef00174e
 | FUT-011 | Instruction-artifact governance | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | State-only projection; no instruction router or runtime is authorized. |
 | FUT-012 | Deterministic derived documentation | CANDIDATE | `AE_GOVERNANCE_RESEARCH.md`; unsequenced | State-only projection; no generated governance runtime is authorized. |
 | FUT-013 | Agent engineering skill repositories as research sources | PRESERVE | `AGENT_ENGINEERING_SKILLS_RESEARCH.md` | State-only projection; no competing skill router is authorized. |
+| FUT-014 | Poker School Phase A Wayfinder product-commissioning POC | SEQUENCED | control #33; `ROADMAP.md` `WAYFINDER-POC-1` | State-only projection; registration is not execution, admission, or commissioning. |
+| FUT-015 | Agent Lightning gated sandbox optimization POC | SEQUENCED | control #34; `ROADMAP.md` `AL-1` | State-only projection; not execution, admission, or spend authorization. |
+| FUT-016 | Deterministic control-band maintenance loop | CANDIDATE | control #36; `ROADMAP.md` `CB-1` | State-only projection; ROADMAP_CANDIDATE_ONLY, not sequenced for implementation. |
 
 ## Projection boundary
 
 This register is a current-authority state projection, not a complete research
 corpus. Its machine-readable scope is in `PLANNING_STATE.json`: all FUT-001
-through FUT-013 states are included, while detailed research prose for the
+through FUT-016 states are included, while detailed research prose for the
 preserved/candidate items is explicitly out of scope. The projection cannot
 answer SBX-2 readiness, activation, implementation, landing, acceptance,
 certification, or live enablement. BOUND-1 is separately projected as
