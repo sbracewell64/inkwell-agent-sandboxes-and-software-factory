@@ -172,7 +172,7 @@ create RUN_ID *FLAGS:
         --obligation "spend-ceiling-bounded|$OBL_LIMIT|$WHY_LIMIT" || MINT_RC=$?
     if [ "$MINT_RC" -ne 0 ]; then
         echo "create: runtime-key mint authority was NOT minted (exit $MINT_RC) — no key was created." >&2
-        exit 1
+        exit "$MINT_RC"
     fi
 
     GATE_RC=0
@@ -181,7 +181,7 @@ create RUN_ID *FLAGS:
         --authorization "$AUTH_FILE" || GATE_RC=$?
     if [ "$GATE_RC" -ne 0 ]; then
         echo "create: pre-effect runtime-key gate refused (exit $GATE_RC) — no key was created." >&2
-        exit 1
+        exit "$GATE_RC"
     fi
     AUTH_RESERVED=1
 
@@ -193,6 +193,7 @@ create RUN_ID *FLAGS:
     if [ "$CODE" != "200" ] && [ "$CODE" != "201" ]; then
         # Safe to show: a failed mint returned no key. A success is never printed.
         echo "create: OpenRouter key mint failed (HTTP $CODE): $(cat "$BODY")" >&2
+        AUTH_RESERVED=0
         rm -f "$BODY"; exit 1
     fi
 
@@ -244,7 +245,7 @@ create RUN_ID *FLAGS:
     if [ "$COMPLETE_RC" -ne 0 ]; then
         echo "create: the runtime key mint is UNPROVEN: $WHY_POST" >&2
         echo "create: the key may be live. Tear the run down: just sbx lifecycle teardown $RUN_ID" >&2
-        exit 1
+        exit "$COMPLETE_RC"
     fi
     rm -f "$AUTH_FILE"
     AUTH_RESERVED=0

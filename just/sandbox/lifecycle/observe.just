@@ -162,7 +162,7 @@ observe RUN_ID:
         --obligation "proxy-retargeted|observed-good|ssh exe.dev share port $VM $APP_PORT returned 0" || MINT_RC=$?
     if [ "$MINT_RC" -ne 0 ]; then
         echo "observe: public-exposure authority was NOT minted (exit $MINT_RC) — $VM stays private." >&2
-        exit 1
+        exit "$MINT_RC"
     fi
 
     GATE_RC=0
@@ -172,7 +172,7 @@ observe RUN_ID:
         --authorization "$AUTH_FILE" || GATE_RC=$?
     if [ "$GATE_RC" -ne 0 ]; then
         echo "observe: pre-effect exposure gate refused (exit $GATE_RC) — $VM stays private." >&2
-        exit 1
+        exit "$GATE_RC"
     fi
 
     ssh exe.dev share set-public "$VM"
@@ -200,7 +200,7 @@ observe RUN_ID:
     if [ "$COMPLETE_RC" -ne 0 ]; then
         echo "observe: exposure is UNPROVEN: $WHY_POST" >&2
         echo "         VM left up and the capability stays reserved. Check: ssh exe.dev share show $VM" >&2
-        exit 1
+        exit "$COMPLETE_RC"
     fi
     rm -f "$AUTH_FILE"
     echo "       app  200 anonymous"

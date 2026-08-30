@@ -276,7 +276,7 @@ teardown RUN_ID *FLAGS:
                 echo "!! destroy authority was NOT minted (exit $MINT_RC) — $VM is left ALIVE." >&2
                 echo "!! An unobserved or contradicted obligation above is why. Resolve it and re-run:" >&2
                 echo "!!   just sbx manage harvest $RUN_ID  &&  just sbx lifecycle teardown $RUN_ID" >&2
-                exit 1
+                exit "$MINT_RC"
             fi
         fi
 
@@ -285,7 +285,7 @@ teardown RUN_ID *FLAGS:
             --run-id "$RUN_ID" --resource "$VM" --authorization "$AUTH_FILE" || GATE_RC=$?
         if [ "$GATE_RC" -ne 0 ]; then
             echo "!! pre-effect destroy gate refused (exit $GATE_RC) — $VM is left ALIVE." >&2
-            exit 1
+            exit "$GATE_RC"
         fi
 
         DESTROY_RC=0
@@ -310,7 +310,7 @@ teardown RUN_ID *FLAGS:
             echo "!! destroy is UNPROVEN: $WHY_POST (rm exited $DESTROY_RC)." >&2
             echo "!! The record is left OPEN and the capability stays reserved for reconciliation." >&2
             echo "!! Re-run once the control plane answers: just sbx lifecycle teardown $RUN_ID" >&2
-            exit 1
+            exit "$COMPLETE_RC"
         fi
         rm -f "$AUTH_FILE"
         echo "   vm: destroyed ($VM) — $WHY_POST"
