@@ -845,6 +845,38 @@ def test_a_dangling_ignored_symlink_is_unobservable(tmp_path):
     assert "dangling or unreadable" in str(refused.value)
 
 
+def test_ignored_nonmembers_do_not_change_evaluator_generation(tmp_path):
+    root = _repo(tmp_path, {
+        ".gitignore": "pkg/__pycache__/\npkg/notes.txt\npkg/notes-link\n",
+        "pkg/evaluator.py": "assert True\n",
+    })
+    run = _Run(root, _cfg(frozen=["pkg/"]))
+    generation = _owner("evaluator_generation")
+    original = generation(run)
+
+    bytecode = root / "pkg/__pycache__/evaluator.cpython-314.pyc"
+    bytecode.parent.mkdir()
+    bytecode.write_text("derived bytes\n")
+    assert generation(run) == original
+
+    (root / "pkg/notes.txt").write_text("ordinary ignored data\n")
+    assert generation(run) == original
+
+    (root / "pkg/notes-link").symlink_to("notes.txt")
+    assert generation(run) == original
+
+
+def test_a_real_member_change_moves_evaluator_generation(tmp_path):
+    root = _repo(tmp_path, {"pkg/evaluator.py": "assert True\n"})
+    run = _Run(root, _cfg(frozen=["pkg/"]))
+    generation = _owner("evaluator_generation")
+    original = generation(run)
+
+    (root / "pkg/evaluator.py").write_text("assert False\n")
+
+    assert generation(run) != original
+
+
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────
 
 def test_an_unrelated_test_file_outside_the_frozen_scope_changes_freely(tmp_path):

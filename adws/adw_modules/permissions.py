@@ -419,8 +419,12 @@ def _visibility_observation(run, paths: dict[str, str]) \
     return violations, sources, nonmembers
 
 
-def _visibility_violations(run, paths: dict[str, str]) -> dict[str, list[str]]:
-    return _visibility_observation(run, paths)[0]
+def _filter_surface_nonmembers(run, paths: dict[str, str]) \
+        -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    violations, sources, nonmembers = _visibility_observation(run, paths)
+    for path in nonmembers:
+        paths.pop(path, None)
+    return violations, sources
 
 
 def _visibility_detail(violations: dict[str, list[str]]) -> str:
@@ -431,7 +435,7 @@ def _visibility_detail(violations: dict[str, list[str]]) -> str:
 
 
 def _refuse_hidden_evaluators(run, paths: dict[str, str]) -> None:
-    violations = _visibility_violations(run, paths)
+    violations, _ = _filter_surface_nonmembers(run, paths)
     if violations:
         raise IndexVisibilityBreach(
             "permission: protected evaluator index visibility flag(s) "
@@ -476,11 +480,9 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
     fingerprints: dict[str, str] = {}
     repository_paths = _repository_paths(run)
     try:
-        visibility, visibility_sources, nonmembers = _visibility_observation(
+        visibility, visibility_sources = _filter_surface_nonmembers(
             run, repository_paths
         )
-        for path in nonmembers:
-            repository_paths.pop(path, None)
         visibility_unobservable = None
     except SnapshotUnobservable as error:
         visibility = {}
