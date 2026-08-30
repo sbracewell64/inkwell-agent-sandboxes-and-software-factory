@@ -281,7 +281,8 @@ def test_dirty_evaluator_is_restored_without_writing_through_a_hard_link(tmp_pat
 
 def test_an_ordinary_recovered_slip_outside_the_surface_still_continues(tmp_path):
     """The negative half: the frozen surface is what stops being forgiven."""
-    root = _repo(tmp_path, {"app/widget.py": "value = 1\n"})
+    root = _repo(tmp_path, {"app/widget.py": "value = 1\n",
+                            "tests/test_widget_regression.py": "assert True\n"})
     run = _Run(root, _cfg(frozen=["tests/test_widget_regression.py"]))
     before = permissions.snapshot(run)
 
@@ -549,7 +550,33 @@ def test_skip_worktree_frozen_rewrite_is_refused(tmp_path):
     )
 
 
+def _fsmonitor_bit_is_settable(tmp_path) -> bool:
+    """Does git on this host actually record an fsmonitor-valid index bit?"""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    root = _repo(tmp_path, {"probe.py": "value = 1\n"})
+    subprocess.run(["git", "update-index", "--fsmonitor-valid", "probe.py"],
+                   cwd=root, check=False, capture_output=True)
+    listing = subprocess.run(["git", "ls-files", "-f"], cwd=root,
+                             check=True, capture_output=True, text=True).stdout
+    return any(line[:1].islower() for line in listing.splitlines() if line)
+
+
 def test_fsmonitor_valid_frozen_rewrite_is_refused(tmp_path):
+    """Refused where git will set the bit; could-not-observe where it will not.
+
+    Git honours the fsmonitor bit only when `core.fsmonitor` is configured. On
+    a host without it, `git update-index --fsmonitor-valid` is accepted and
+    then silently ignored, so asserting a refusal would be asserting something
+    git never did — a control that can only ever pass vacuously. That is
+    could-not-observe, named as such, and never a pass. The guard stays in
+    place for hosts that do set it, and the assume-unchanged and skip-worktree
+    cases beside this one execute for real on every host.
+    """
+    if not _fsmonitor_bit_is_settable(tmp_path / "probe"):
+        pytest.skip(
+            "could-not-observe: git does not record an fsmonitor-valid index "
+            "bit on this host, so the refusal cannot be observed here"
+        )
     _assert_index_visibility_flag_is_refused(
         tmp_path, "--fsmonitor-valid", "fsmonitor-valid"
     )

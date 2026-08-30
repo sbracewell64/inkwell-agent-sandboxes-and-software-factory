@@ -233,6 +233,29 @@ def _refuse_hidden_evaluators(run, paths: dict[str, str]) -> None:
         )
 
 
+def _numstat(run, base_commit: str, unreadable: list[str]) -> str:
+    """The tracked delta against the pinned base, around unreadable members.
+
+    An unreadable protected member makes git refuse the whole-tree diff, and
+    that refusal would otherwise abandon enumeration entirely — losing the
+    unrelated unauthorized changes this phase still has to roll back. The tree
+    is enumerable; one member is not. So the diff is retried excluding exactly
+    the members we already know we cannot read, and they keep their own
+    `unreadable` fingerprints either way. Only a diff that fails with nothing
+    left to exclude is a genuinely unobservable tree.
+    """
+    try:
+        return _git(["diff", base_commit, "--numstat"], run.repo_root)
+    except SnapshotUnobservable:
+        if not unreadable:
+            raise
+    return _git(
+        ["diff", base_commit, "--numstat", "--", "."]
+        + [f":(exclude){path}" for path in unreadable],
+        run.repo_root,
+    )
+
+
 def _snapshot_against(run, base_commit: str, base_tree: str,
                       require_observable: bool = False) -> TreeSnapshot:
     """Fingerprint every path the working tree currently differs on.
@@ -265,9 +288,7 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
             unreadable.append(path)
             identity = "unreadable"
         fingerprints[path] = f"frozen:{identity}"
-    for line in _git(
-        ["diff", base_commit, "--numstat"], run.repo_root
-    ).splitlines():
+    for line in _numstat(run, base_commit, unreadable).splitlines():
         fields = line.split("\t")
         if len(fields) >= 3:
             path = fields[-1].strip()

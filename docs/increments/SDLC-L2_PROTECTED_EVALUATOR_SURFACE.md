@@ -217,6 +217,47 @@ Current-head suite and gate totals are intentionally left to the dedicated test
 phase that observes them after review fixes. Historical pre-review totals are
 not evidence for this head.
 
+## The suite was outside the gate
+
+`ci/checks.json` drove ten validators and never ran `tests/`. That is how this
+candidate reached `checks-passed` on a head whose own suite was
+`3 failed, 112 passed`: CI was green because CI was not looking. The failures
+were found by executing the suite by hand at the pushed head, not by any gate.
+
+`docs/validation/check_repository_test_suite.py` closes it, registered as
+`repository-test-suite`. It is three-valued in the shape `tools/ci_gate.py`
+owns, because the suite needs dependencies the offline gate deliberately does
+not ship: a host that cannot run it reports `could-not-observe` naming the
+missing modules, never a FAIL manufactured from a failure to observe. A run
+that collects nothing is also `could-not-observe`, so un-collecting the suite
+can never be what makes the row green. `.github/workflows/ci.yml` installs the
+pinned dependencies so the row actually executes on both matrix legs rather
+than reporting could-not-observe forever, which would be the same vacuous
+non-answer in a different costume.
+
+All three states were executed, not asserted:
+
+| State | How it was produced | Result |
+|---|---|---|
+| observed-good | suite green at this head | row `observed-good`, 114 executed, 2 skipped |
+| observed-bad | one deliberately failing case added in a throwaway clone | row `observed-bad` naming the failing test, gate exit nonzero |
+| could-not-observe | the virtualenv hidden so no interpreter carries the dependencies | row `could-not-observe`, exit 125, naming `pydantic, dotenv` |
+
+Registering a row also required updating `docs/validation/check_ci_contract.py`,
+which pins the manifest by exact enumeration. That is the coordinated
+manifest-plus-pinning-validator edit this increment's own `Problem` section
+names as gap 3 — done here deliberately, by the operator, under explicit
+authority, and it is precisely the pair the frozen surface now refuses to an
+agent inside a run.
+
+Two skipped cases are `could-not-observe` for their own claims and are counted
+as neither pass nor failure: `test_fsmonitor_valid_frozen_rewrite_is_refused`,
+because git records no fsmonitor-valid index bit unless `core.fsmonitor` is
+configured and asserting a refusal git never performs would be a control that
+can only pass vacuously; and one pre-existing skip elsewhere in the suite. The
+fsmonitor guard itself stays in place for hosts that do set the bit, and the
+`assume-unchanged` and `skip-worktree` cases beside it execute on every host.
+
 ## Known unresolved observations
 
 - The shipped rosters declare the surface; the installer template under

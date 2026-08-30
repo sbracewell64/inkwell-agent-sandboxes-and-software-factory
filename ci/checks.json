@@ -3,47 +3,75 @@
   "checks": [
     {
       "id": "ci-contract-and-watched-red-controls",
-      "command": ["{python}", "docs/validation/check_ci_contract.py"],
+      "command": [
+        "{python}",
+        "docs/validation/check_ci_contract.py"
+      ],
       "timeout_seconds": 60
     },
     {
       "id": "agent-bootstrap-validator",
-      "command": ["{python}", "docs/validation/check_agent_bootstrap.py"],
+      "command": [
+        "{python}",
+        "docs/validation/check_agent_bootstrap.py"
+      ],
       "timeout_seconds": 60
     },
     {
       "id": "line-ending-validator",
-      "command": ["{python}", "docs/validation/check_line_endings.py", "--require-worktree-lf"],
+      "command": [
+        "{python}",
+        "docs/validation/check_line_endings.py",
+        "--require-worktree-lf"
+      ],
       "timeout_seconds": 60
     },
     {
       "id": "sqlite-free-observability-validator",
-      "command": ["{python}", "docs/validation/check_obs_query.py"],
+      "command": [
+        "{python}",
+        "docs/validation/check_obs_query.py"
+      ],
       "timeout_seconds": 60
     },
     {
       "id": "sandbox-source-contract-validator",
-      "command": ["{python}", "docs/validation/check_sandbox_source_contract.py"],
+      "command": [
+        "{python}",
+        "docs/validation/check_sandbox_source_contract.py"
+      ],
       "timeout_seconds": 60
     },
     {
       "id": "executor-supervisor-and-pi-adapter-validator",
-      "command": ["{python}", "docs/validation/check_executor_supervisor.py"],
+      "command": [
+        "{python}",
+        "docs/validation/check_executor_supervisor.py"
+      ],
       "timeout_seconds": 60
     },
     {
       "id": "production-extension-path-validator",
-      "command": ["{python}", "docs/validation/check_production_extension_path.py"],
+      "command": [
+        "{python}",
+        "docs/validation/check_production_extension_path.py"
+      ],
       "timeout_seconds": 60
     },
     {
       "id": "sbx0-semantics-inventory-validator",
-      "command": ["{python}", "docs/validation/check_sbx0_inventory.py"],
+      "command": [
+        "{python}",
+        "docs/validation/check_sbx0_inventory.py"
+      ],
       "timeout_seconds": 60
     },
     {
       "id": "sandbox-provider-contract-validator",
-      "command": ["{python}", "docs/validation/check_sandbox_provider.py"],
+      "command": [
+        "{python}",
+        "docs/validation/check_sandbox_provider.py"
+      ],
       "timeout_seconds": 120
     },
     {
@@ -52,8 +80,20 @@
       "timeout_seconds": 60
     },
     {
+      "id": "repository-test-suite",
+      "command": [
+        "{python}",
+        "docs/validation/check_repository_test_suite.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
       "id": "inkwell-unit-tests",
-      "command": ["just", "inkwell", "test"],
+      "command": [
+        "just",
+        "inkwell",
+        "test"
+      ],
       "timeout_seconds": 180
     }
   ]

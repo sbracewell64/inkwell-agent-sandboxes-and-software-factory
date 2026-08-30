@@ -53,6 +53,9 @@ EXPECTED_CHECKS = {
     "planning-foundation-validator": (
         "{python}", "docs/validation/check_planning_foundation.py"
     ),
+    "repository-test-suite": (
+        "{python}", "docs/validation/check_repository_test_suite.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
 
