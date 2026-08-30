@@ -80,6 +80,14 @@ class PreservedPath:
     mode: int
 
 
+class TreeSnapshot(dict[str, str]):
+    def __init__(self, fingerprints: dict[str, str], base_commit: str,
+                 base_tree: str) -> None:
+        super().__init__(fingerprints)
+        self.base_commit = base_commit
+        self.base_tree = base_tree
+
+
 def _git_out(args: list[str], cwd) -> str | None:
     """git's answer, or None when git ran and refused to give one.
 
@@ -120,7 +128,19 @@ def _repository_identity(target: Path) -> str:
     return f"{mode}:{hashlib.sha256(body).hexdigest()}"
 
 
-def snapshot(run) -> dict[str, str]:
+def _head_identity(run) -> tuple[str, str]:
+    resolved = [line.strip() for line in _git(
+        ["show", "-s", "--format=%H%n%T", "HEAD"],
+        run.repo_root,
+    ).splitlines() if line.strip()]
+    if len(resolved) != 2:
+        raise SnapshotUnobservable(
+            "permission snapshot could-not-observe: incomplete HEAD identity"
+        )
+    return resolved[0], resolved[1]
+
+
+def _snapshot_against(run, base_commit: str, base_tree: str) -> TreeSnapshot:
     """Fingerprint every path the working tree currently differs on.
 
     Tracked files ordinarily carry their numstat counts. Frozen evaluator files
@@ -131,7 +151,9 @@ def snapshot(run) -> dict[str, str]:
     `data_dir` — where handoff files legitimately land — needs no special case.
     """
     fingerprints: dict[str, str] = {}
-    for line in _git(["diff", "HEAD", "--numstat"], run.repo_root).splitlines():
+    for line in _git(
+        ["diff", base_commit, "--numstat"], run.repo_root
+    ).splitlines():
         fields = line.split("\t")
         if len(fields) >= 3:
             path = fields[-1].strip()
@@ -151,7 +173,12 @@ def snapshot(run) -> dict[str, str]:
                 fingerprints[path] = f"untracked:{identity}"
             else:
                 fingerprints[path] = "untracked"
-    return fingerprints
+    return TreeSnapshot(fingerprints, base_commit, base_tree)
+
+
+def snapshot(run) -> TreeSnapshot:
+    base_commit, base_tree = _head_identity(run)
+    return _snapshot_against(run, base_commit, base_tree)
 
 
 def changed_paths(before: dict[str, str], after: dict[str, str]) -> list[str]:
@@ -332,7 +359,7 @@ def evidence_is_current(recorded: str | None, run) -> bool | None:
     return recorded == current
 
 
-def preserve(run, tree: dict[str, str]) -> dict[str, PreservedPath]:
+def preserve(run, tree: TreeSnapshot) -> dict[str, PreservedPath]:
     """Capture every restorable already-dirty path before an agent runs.
 
     Without this, the module can only undo what an agent INTRODUCED — unlink a
@@ -419,7 +446,7 @@ def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str],
     return "rolled back" if result.returncode == 0 else "could not roll back"
 
 
-def enforce(run, phase, agent: AgentConfig, before: dict[str, str],
+def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
             preserved: dict[str, PreservedPath] | None = None) -> list[str]:
     """Compare the tree against `before`; undo and raise if the agent overstepped.
 
@@ -430,7 +457,18 @@ def enforce(run, phase, agent: AgentConfig, before: dict[str, str],
     reporting a failure, so anything the agent introduced outside its allowlist
     is rolled back before the phase dies. What it cannot undo, it names.
     """
-    after = snapshot(run)
+    if not isinstance(before, TreeSnapshot):
+        raise SnapshotUnobservable(
+            "permission snapshot could-not-observe: missing armed base identity"
+        )
+    current_commit, current_tree = _head_identity(run)
+    if (current_commit, current_tree) != (before.base_commit, before.base_tree):
+        raise SnapshotUnobservable(
+            "permission snapshot could-not-observe: armed base identity moved "
+            f"from {before.base_commit}:{before.base_tree} to "
+            f"{current_commit}:{current_tree}"
+        )
+    after = _snapshot_against(run, before.base_commit, before.base_tree)
     touched = changed_paths(before, after)
     breaches = [p for p in touched if not permitted(p, agent, run.cfg)]
     if not breaches:

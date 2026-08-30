@@ -125,7 +125,9 @@ evidence that the evaluator is intact.
 
 Working-tree snapshots apply the same rule: a missing Git executable or a
 nonzero Git enumeration result raises a named could-not-observe refusal, so an
-unobservable post-agent tree cannot be accepted as unchanged.
+unobservable post-agent tree cannot be accepted as unchanged. Each snapshot
+also pins the exact commit and tree it armed against; movement of either during
+the phase refuses enforcement instead of silently changing the comparison base.
 
 `enforce()` excludes frozen-surface paths from the recovered-slip continuation.
 The rollback still runs and still reports — "it was put back" answers the damage

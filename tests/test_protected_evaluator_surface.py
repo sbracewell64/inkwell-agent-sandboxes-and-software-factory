@@ -384,6 +384,37 @@ def test_corrupt_git_metadata_refuses_an_unobservable_frozen_rewrite(tmp_path):
     assert "snapshot could-not-observe" in str(unobservable.value)
 
 
+def test_moved_head_refuses_a_committed_frozen_rewrite(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        "app/widget.py": "value = 1\n",
+    })
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    before = permissions.snapshot(run)
+    (root / "tests/evaluator.py").write_text("assert False\n")
+    subprocess.run(["git", "add", "tests/evaluator.py"], cwd=root, check=True)
+    subprocess.run(["git", "-c", "user.email=t@example", "-c", "user.name=t",
+                    "commit", "-qm", "rewrite evaluator"], cwd=root, check=True)
+
+    with pytest.raises(permissions.SnapshotUnobservable) as moved:
+        permissions.enforce(run, None, _agent("builder", None), before, {})
+    assert "armed base identity moved" in str(moved.value)
+
+
+def test_unchanged_head_allows_an_ordinary_permitted_edit(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        "app/widget.py": "value = 1\n",
+    })
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    before = permissions.snapshot(run)
+    (root / "app/widget.py").write_text("value = 2\n")
+
+    assert permissions.enforce(
+        run, None, _agent("builder", None), before, {}
+    ) == ["app/widget.py"]
+
+
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────
 
 def test_an_unrelated_test_file_outside_the_frozen_scope_changes_freely(tmp_path):
