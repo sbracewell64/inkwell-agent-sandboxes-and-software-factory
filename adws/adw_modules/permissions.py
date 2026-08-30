@@ -152,6 +152,22 @@ def _git(args: list[str], cwd) -> str:
     return output
 
 
+def _git_bytes(args: list[str], cwd) -> bytes:
+    try:
+        result = subprocess.run(
+            ["git", *args], cwd=cwd, capture_output=True, text=False,
+        )
+    except OSError as error:
+        raise SnapshotUnobservable(
+            f"permission snapshot could-not-observe: git {' '.join(args)}"
+        ) from error
+    if result.returncode != 0:
+        raise SnapshotUnobservable(
+            f"permission snapshot could-not-observe: git {' '.join(args)}"
+        )
+    return result.stdout
+
+
 def _repository_identity(target: Path) -> str:
     metadata = target.lstat()
     if stat.S_ISLNK(metadata.st_mode):
@@ -456,7 +472,7 @@ def _refuse_hidden_evaluators(run, paths: dict[str, str]) -> None:
         )
 
 
-def _numstat(run, base_commit: str, unreadable: list[str]) -> str:
+def _numstat(run, base_commit: str, unreadable: list[str]) -> bytes:
     """The tracked delta against the pinned base, around unreadable members.
 
     An unreadable protected member makes git refuse the whole-tree diff, and
@@ -468,18 +484,59 @@ def _numstat(run, base_commit: str, unreadable: list[str]) -> str:
     left to exclude is a genuinely unobservable tree.
     """
     try:
-        return _git(
-            ["diff", "--no-renames", base_commit, "--numstat"],
+        return _git_bytes(
+            ["diff", base_commit, "--numstat", "-z"],
             run.repo_root,
         )
     except SnapshotUnobservable:
         if not unreadable:
             raise
-    return _git(
-        ["diff", "--no-renames", base_commit, "--numstat", "--", "."]
+    return _git_bytes(
+        ["diff", base_commit, "--numstat", "-z", "--", "."]
         + [f":(exclude){path}" for path in unreadable],
         run.repo_root,
     )
+
+
+def _numstat_records(numstat: bytes) -> list[tuple[str, str, str]]:
+    def count(value: bytes) -> str:
+        if value != b"-" and not value.isdigit():
+            raise SnapshotUnobservable(
+                "permission snapshot could-not-observe: malformed git numstat"
+            )
+        return value.decode("ascii")
+
+    fields = numstat.split(b"\0")
+    if fields[-1:] != [b""]:
+        raise SnapshotUnobservable(
+            "permission snapshot could-not-observe: malformed git numstat"
+        )
+    records: list[tuple[str, str, str]] = []
+    index = 0
+    while index < len(fields) - 1:
+        header = fields[index]
+        index += 1
+        parts = header.split(b"\t", 2)
+        if len(parts) != 3 or not parts[0] or not parts[1]:
+            raise SnapshotUnobservable(
+                "permission snapshot could-not-observe: malformed git numstat"
+            )
+        added, deleted, path = parts
+        added_count, deleted_count = count(added), count(deleted)
+        if path:
+            records.append((added_count, deleted_count, os.fsdecode(path)))
+            continue
+        if index + 1 >= len(fields) - 1 or not fields[index] \
+                or not fields[index + 1]:
+            raise SnapshotUnobservable(
+                "permission snapshot could-not-observe: malformed git numstat rename"
+            )
+        old_path = os.fsdecode(fields[index])
+        new_path = os.fsdecode(fields[index + 1])
+        index += 2
+        records.append((added_count, deleted_count, old_path))
+        records.append((added_count, deleted_count, new_path))
+    return records
 
 
 def _snapshot_against(run, base_commit: str, base_tree: str,
@@ -517,16 +574,13 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
             unreadable.append(path)
             identity = "unreadable"
         fingerprints[path] = f"frozen:{identity}"
-    numstat = _numstat(run, base_commit, unreadable)
     base_changed: set[str] = set()
-    for line in numstat.splitlines():
-        fields = line.split("\t")
-        if len(fields) >= 3:
-            path = fields[-1].strip()
-            if is_frozen_evaluator(path, run.cfg):
-                base_changed.add(path)
-            else:
-                fingerprints[path] = f"{fields[0]},{fields[1]}"
+    for added, deleted, path in _numstat_records(
+            _numstat(run, base_commit, unreadable)):
+        if is_frozen_evaluator(path, run.cfg):
+            base_changed.add(path)
+        else:
+            fingerprints[path] = f"{added},{deleted}"
     for path, tag in repository_paths.items():
         if tag == "?" and not is_frozen_evaluator(path, run.cfg):
             fingerprints[path] = "untracked"

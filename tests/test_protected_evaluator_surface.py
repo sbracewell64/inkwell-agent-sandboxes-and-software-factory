@@ -233,6 +233,33 @@ def test_oversized_dirty_frozen_evaluator_is_left_and_named(tmp_path):
     assert "left as-is" in str(refused.value)
 
 
+@pytest.mark.parametrize("path", [
+    "tests/ evaluator.py ",
+    "tests/eval\tuator.py",
+    "tests/eval\nuator.py",
+])
+def test_dirty_frozen_pathnames_are_never_misclassified_clean(tmp_path, path):
+    original = "a" * (permissions.PRESERVE_MAX_BYTES + 1)
+    dirty = "b" * len(original)
+    changed = "c" * len(original)
+    root = _repo(tmp_path, {path: original})
+    target = root / path
+    target.write_text(dirty)
+    run = _Run(root, _cfg(frozen=[path]))
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+    assert path not in before.base_clean
+    assert path not in preserved
+
+    target.write_text(changed)
+
+    with pytest.raises(permissions.PermissionBreach) as refused:
+        permissions.enforce(run, None, _agent("builder", None), before, preserved)
+    assert target.read_text() == changed
+    assert path in str(refused.value)
+    assert "left as-is" in str(refused.value)
+
+
 def test_frozen_snapshot_includes_repository_mode_and_symlink_target(tmp_path):
     root = _repo(tmp_path, {
         "tests/check.py": "assert True\n",
