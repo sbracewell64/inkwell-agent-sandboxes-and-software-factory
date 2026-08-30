@@ -419,6 +419,35 @@ def test_committed_ordinary_edit_passes_against_the_pinned_base(tmp_path):
     ) == ["app/widget.py"]
 
 
+def _assert_index_visibility_flag_is_refused(tmp_path, option, expected):
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        "app/widget.py": "value = 1\n",
+    })
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    before = permissions.snapshot(run)
+    subprocess.run(["git", "update-index", option, "tests/evaluator.py"],
+                   cwd=root, check=True)
+    (root / "tests/evaluator.py").write_text("assert False\n")
+
+    with pytest.raises(permissions.IndexVisibilityBreach) as breach:
+        permissions.enforce(run, None, _agent("builder", None), before, {})
+    assert expected in str(breach.value)
+    assert "tests/evaluator.py" in str(breach.value)
+
+
+def test_assume_unchanged_frozen_rewrite_is_refused(tmp_path):
+    _assert_index_visibility_flag_is_refused(
+        tmp_path, "--assume-unchanged", "assume-unchanged"
+    )
+
+
+def test_skip_worktree_frozen_rewrite_is_refused(tmp_path):
+    _assert_index_visibility_flag_is_refused(
+        tmp_path, "--skip-worktree", "skip-worktree"
+    )
+
+
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────
 
 def test_an_unrelated_test_file_outside_the_frozen_scope_changes_freely(tmp_path):

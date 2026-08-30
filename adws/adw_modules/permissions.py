@@ -58,6 +58,10 @@ class SnapshotUnobservable(PermissionBreach):
     """The repository change set could not be observed."""
 
 
+class IndexVisibilityBreach(PermissionBreach):
+    """A protected evaluator has hidden index state."""
+
+
 # The `_roll_back` outcomes that leave the repo byte-for-byte as it was. The
 # docstring's reason for aborting — "the write already happened" — is true of a
 # destroyed file and false of these: an agent-created file that was unlinked, or
@@ -157,6 +161,42 @@ def _require_pinned_identity(run, snapshot: TreeSnapshot) -> None:
         )
 
 
+def _tagged_paths(listing: str) -> dict[str, str]:
+    tagged: dict[str, str] = {}
+    for entry in listing.split("\0"):
+        if len(entry) >= 3 and entry[1] == " ":
+            tagged[entry[2:]] = entry[0]
+    return tagged
+
+
+def _repository_paths(run) -> dict[str, str]:
+    return _tagged_paths(_git(
+        ["ls-files", "-v", "-z", "--cached", "--others", "--exclude-standard"],
+        run.repo_root,
+    ))
+
+
+def _refuse_hidden_evaluators(run, paths: dict[str, str]) -> None:
+    fsmonitor = _tagged_paths(_git(
+        ["ls-files", "-f", "-z", "--cached"], run.repo_root
+    ))
+    for path, tag in paths.items():
+        if not is_frozen_evaluator(path, run.cfg) or tag == "?":
+            continue
+        flags: list[str] = []
+        if tag in {"S", "s"}:
+            flags.append("skip-worktree")
+        if tag.islower():
+            flags.append("assume-unchanged")
+        if fsmonitor.get(path, "").islower():
+            flags.append("fsmonitor-valid")
+        if flags:
+            raise IndexVisibilityBreach(
+                f"permission: protected evaluator index visibility flag(s) "
+                f"{', '.join(flags)} on {path}"
+            )
+
+
 def _snapshot_against(run, base_commit: str, base_tree: str) -> TreeSnapshot:
     """Fingerprint every path the working tree currently differs on.
 
@@ -168,28 +208,26 @@ def _snapshot_against(run, base_commit: str, base_tree: str) -> TreeSnapshot:
     `data_dir` — where handoff files legitimately land — needs no special case.
     """
     fingerprints: dict[str, str] = {}
+    repository_paths = _repository_paths(run)
+    _refuse_hidden_evaluators(run, repository_paths)
+    for path in repository_paths:
+        if not is_frozen_evaluator(path, run.cfg):
+            continue
+        target = Path(run.repo_root) / path
+        identity = _repository_identity(target) \
+            if target.exists() or target.is_symlink() else "absent"
+        fingerprints[path] = f"frozen:{identity}"
     for line in _git(
         ["diff", base_commit, "--numstat"], run.repo_root
     ).splitlines():
         fields = line.split("\t")
         if len(fields) >= 3:
             path = fields[-1].strip()
-            if is_frozen_evaluator(path, run.cfg):
-                target = Path(run.repo_root) / path
-                identity = _repository_identity(target) \
-                    if target.exists() or target.is_symlink() else "absent"
-                fingerprints[path] = f"content:{identity}"
-            else:
+            if not is_frozen_evaluator(path, run.cfg):
                 fingerprints[path] = f"{fields[0]},{fields[1]}"
-    for path in _git(["ls-files", "--others", "--exclude-standard"],
-                     run.repo_root).splitlines():
-        if path.strip():
-            path = path.strip()
-            if is_frozen_evaluator(path, run.cfg):
-                identity = _repository_identity(Path(run.repo_root) / path)
-                fingerprints[path] = f"untracked:{identity}"
-            else:
-                fingerprints[path] = "untracked"
+    for path, tag in repository_paths.items():
+        if tag == "?" and not is_frozen_evaluator(path, run.cfg):
+            fingerprints[path] = "untracked"
     return TreeSnapshot(fingerprints, base_commit, base_tree)
 
 
@@ -336,19 +374,15 @@ def evaluator_generation(run) -> str | None:
     if not frozen_evaluator_paths(run.cfg):
         return None
     try:
-        listing = _git_out(
-            ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-            run.repo_root,
-        )
-    except OSError:
+        paths = _repository_paths(run)
+        _refuse_hidden_evaluators(run, paths)
+    except (OSError, PermissionBreach):
         return None                      # no git, or no tree to ask it about
-    if listing is None:
-        return None
     digest, members = hashlib.sha256(), 0
     declarations = sorted(set(frozen_evaluator_paths(run.cfg)))
     for declaration in declarations:
         digest.update(f"declaration\0{declaration}\0".encode())
-    for path in sorted(p for p in listing.split("\0") if p):
+    for path in sorted(paths):
         if not is_frozen_evaluator(path, run.cfg):
             continue
         target = Path(run.repo_root) / path

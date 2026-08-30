@@ -115,6 +115,8 @@ enumeration refuses enforcement instead of representing an observed-clean tree.
 The snapshot pins its armed commit and tree. In-phase commits remain ordinary
 work, while committed and uncommitted deltas are both compared with that pin;
 an unavailable pin is a named refusal rather than an implicit new baseline.
+Every declared evaluator member is hashed independently of diff visibility;
+assume-unchanged, skip-worktree, and equivalent visibility flags are refusals.
 
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and

@@ -137,9 +137,9 @@ message names the frozen paths separately.
 
 ## Proof
 
-`tests/test_protected_evaluator_surface.py` — 22 cases: the original 12 covering
+`tests/test_protected_evaluator_surface.py` — 24 cases: the original 12 covering
 the law's four required fixtures, boundary controls, and shipped-roster
-non-vacuity checks, plus 10 focused review regressions. The original acceptance
+non-vacuity checks, plus 12 focused review regressions. The original acceptance
 cases were observed red against `c192693` before the change, with
 the real failure shape (`permitted()` returning `True`, `DID NOT RAISE
 PermissionBreach`), and green at the original feature head.
