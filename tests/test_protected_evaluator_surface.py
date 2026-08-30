@@ -808,6 +808,43 @@ def test_an_ordinary_ignored_non_executable_is_not_a_surface_member(tmp_path):
     assert _owner("evaluator_generation")(run) is not None
 
 
+def test_an_ignored_symlink_to_non_executable_content_is_not_a_member(tmp_path):
+    run, root = _surface_with_bytecode(tmp_path, {
+        ".gitignore": "__pycache__/\npkg/hidden-link\n",
+        "pkg/notes.txt": "ordinary tracked data\n",
+    })
+    (root / "pkg/hidden-link").symlink_to("notes.txt")
+
+    armed = permissions.snapshot(run)
+    assert "pkg/hidden-link" not in armed
+    assert _owner("evaluator_generation")(run) is not None
+
+
+def test_an_ignored_symlink_to_an_executable_target_is_refused(tmp_path):
+    run, root = _surface_with_bytecode(tmp_path, {
+        ".gitignore": "__pycache__/\npkg/hidden-link\n",
+        "pkg/evaluator-tool": "#!/bin/sh\nexit 0\n",
+    })
+    (root / "pkg/evaluator-tool").chmod(0o755)
+    (root / "pkg/hidden-link").symlink_to("evaluator-tool")
+
+    with pytest.raises(permissions.IndexVisibilityBreach) as refused:
+        permissions.snapshot(run)
+    assert "pkg/hidden-link" in str(refused.value)
+
+
+def test_a_dangling_ignored_symlink_is_unobservable(tmp_path):
+    run, root = _surface_with_bytecode(tmp_path, {
+        ".gitignore": "__pycache__/\npkg/hidden-link\n",
+    })
+    (root / "pkg/hidden-link").symlink_to("missing-target")
+
+    with pytest.raises(permissions.SnapshotUnobservable) as refused:
+        permissions.snapshot(run)
+    assert "pkg/hidden-link" in str(refused.value)
+    assert "dangling or unreadable" in str(refused.value)
+
+
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────
 
 def test_an_unrelated_test_file_outside_the_frozen_scope_changes_freely(tmp_path):

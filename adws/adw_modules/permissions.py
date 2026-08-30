@@ -317,11 +317,38 @@ def _ignored_member_is_hidden(run, path: str, paths: dict[str, str]) -> bool:
         tag = paths.get(source)
         if tag is not None and tag != "?" and is_frozen_evaluator(source, run.cfg):
             return False                 # derived from a member review can see
+    root = Path(run.repo_root).resolve()
+    target = root / path
     try:
-        executable_mode = (Path(run.repo_root) / path).lstat().st_mode & 0o111
-    except OSError:
-        executable_mode = 0
-    return bool(executable_mode) or PurePosixPath(path).suffix.lower() in EXECUTABLE_SUFFIXES
+        metadata = target.lstat()
+        target_suffix = ""
+        if stat.S_ISLNK(metadata.st_mode):
+            resolved = target.resolve(strict=True)
+            try:
+                resolved.relative_to(root)
+            except ValueError as error:
+                raise SnapshotUnobservable(
+                    "permission could-not-observe protected evaluator surface; "
+                    f"symlink target escapes repository: {path}"
+                ) from error
+            metadata = resolved.stat()
+            if not stat.S_ISREG(metadata.st_mode):
+                raise SnapshotUnobservable(
+                    "permission could-not-observe protected evaluator surface; "
+                    f"symlink target is not a regular file: {path}"
+                )
+            with resolved.open("rb") as stream:
+                stream.read(1)
+            target_suffix = resolved.suffix.lower()
+    except SnapshotUnobservable:
+        raise
+    except OSError as error:
+        raise SnapshotUnobservable(
+            "permission could-not-observe protected evaluator surface; "
+            f"symlink target is dangling or unreadable: {path}"
+        ) from error
+    suffixes = {PurePosixPath(path).suffix.lower(), target_suffix}
+    return bool(metadata.st_mode & 0o111) or bool(suffixes & EXECUTABLE_SUFFIXES)
 
 
 def _gitignore_observation(run, paths: dict[str, str]) \
@@ -363,19 +390,23 @@ def _gitignore_observation(run, paths: dict[str, str]) \
 
 
 def _visibility_observation(run, paths: dict[str, str]) \
-        -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+        -> tuple[dict[str, list[str]], dict[str, list[str]], set[str]]:
     fsmonitor = _tagged_paths(_git(
         ["ls-files", "-f", "-z", "--cached"], run.repo_root
     ))
     ignored, sources = _gitignore_observation(run, paths)
     violations = {}
+    nonmembers = set()
     for path, tag in paths.items():
         if not is_frozen_evaluator(path, run.cfg):
             continue
         flags: list[str] = []
         if tag == "?":
-            if path in ignored and _ignored_member_is_hidden(run, path, paths):
-                flags.append("gitignore")
+            if path in ignored:
+                if _ignored_member_is_hidden(run, path, paths):
+                    flags.append("gitignore")
+                else:
+                    nonmembers.add(path)
         else:
             if tag in {"S", "s"}:
                 flags.append("skip-worktree")
@@ -385,7 +416,7 @@ def _visibility_observation(run, paths: dict[str, str]) \
                 flags.append("fsmonitor-valid")
         if flags:
             violations[path] = flags
-    return violations, sources
+    return violations, sources, nonmembers
 
 
 def _visibility_violations(run, paths: dict[str, str]) -> dict[str, list[str]]:
@@ -445,9 +476,11 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
     fingerprints: dict[str, str] = {}
     repository_paths = _repository_paths(run)
     try:
-        visibility, visibility_sources = _visibility_observation(
+        visibility, visibility_sources, nonmembers = _visibility_observation(
             run, repository_paths
         )
+        for path in nonmembers:
+            repository_paths.pop(path, None)
         visibility_unobservable = None
     except SnapshotUnobservable as error:
         visibility = {}
