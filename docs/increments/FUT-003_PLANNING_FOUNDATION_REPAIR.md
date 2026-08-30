@@ -79,7 +79,8 @@ set now proves, causally, that each of these is non-PASS: `WAYFINDER-0` omitted 
 authority roadmap (`authority-omitted-wayfinder-0`); `WAYFINDER-0` duplicated
 (`authority-duplicate-wayfinder-0-heading`); `WAYFINDER-0` promoted off `SEQUENCED`
 (`authority-wayfinder-0-state-change`); and an ungoverned lifecycle identity injected
-into the authority roadmap (`authority-ungoverned-lifecycle-identity`). The pre-existing
+into the authority roadmap, within the governed name families
+(`authority-ungoverned-identity-in-governed-families`). The pre-existing
 stale-generation, missing, duplicate, and conflicting-identity controls are unchanged and
 still fire. Each new control was verified by neutering its mutation to a no-op and
 observing the validator report `watched-red controls did not go red: <control>`, so none
@@ -145,6 +146,44 @@ A later bounded increment should add an explicit authority input argument—an
 exact commit or an explicit `GIT_DIR`—so qualification never requires a lane or
 CI job to write that shared tracking ref. This follow-on is not implemented by
 this increment.
+
+### Authority generation granularity is coarser than the authority it guards
+
+Inherited, and not introduced by this increment: the generation key is the commit
+and tree of the *whole* planning branch, so a commit touching nothing this
+projection reads still invalidates the binding. At the time of writing, live
+`origin/planning/future-sssf` is `8ab93cc9…`, twelve commits ahead of the ruled
+`eab88065…`, with a byte-identical diff across all five
+`AUTHORITATIVE_PLANNING_PATHS`; the documented acceptance command run in a
+normally fetched clone nevertheless reports `OBSERVED_BAD`, despite identical
+projected content.
+
+Relatedly, `_observe_authoritative_planning_source` is documented as observing the
+fetched ref rather than trusting candidate constants, but
+`.github/workflows/ci.yml` force-writes that tracking ref from a SHA pinned in the
+candidate's own workflow file, so in CI the observation is ultimately candidate
+controlled. The mechanism predates this increment, which only rebound the pinned
+SHA as ruled.
+
+A later bounded increment should key the binding on the content actually read —
+for example the blob identities of `AUTHORITATIVE_PLANNING_PATHS` — so that
+docs-only movement on the planning branch does not invalidate an otherwise exact
+projection, and should obtain the authority independently of the candidate. Not
+implemented here.
+
+### Governed identity families are narrower than the authority's identity space
+
+`_extract_lifecycle_heading_ids` recognises only `LAUNCH-N`, `SBX-N`,
+`WAYFINDER-N`, and `DSH-{0A,0B,N}`. The observed authority additionally declares
+`AL-1`, `WAYFINDER-POC-1`, `CB-1`, and `SDLC-L1..L4`. Not projecting them is
+correct — ruling g1+g2 scoped the extension to `WAYFINDER-0` — and the proof
+record now bounds its completeness claim to the four recognised families
+accordingly. The consequence to carry: a future authority generation adding an
+identity in an unrecognised family, such as `AL-2`, is invisible to the
+closed-set check and leaves the validator `OBSERVED_GOOD` over a universe it has
+not actually closed. A later increment should either widen the extractor to any
+declared roadmap identity heading or make the unrecognised families an explicit
+enumerated exclusion. Not implemented here.
 
 ## Deterministic acceptance
 

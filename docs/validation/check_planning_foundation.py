@@ -132,6 +132,11 @@ EXPECTED_EXPLICIT_LIFECYCLE_STATES = {
     "WAYFINDER-0": "SEQUENCED",
     "WAYFINDER-1": "SEQUENCED",
 }
+# The exact closed set ruling g1+g2 on control 10 admits. Stated as literals, not
+# derived from GOVERNED_* positions: a later admission must not silently redefine
+# which identities these prose controls check.
+ADMITTED_FUTURE_IDS = ("FUT-014", "FUT-015", "FUT-016")
+ADMITTED_LIFECYCLE_IDENTITIES = ("WAYFINDER-0",)
 DOCKER_FIRST_ORDER = """Docker SBX-2..8
 -> Docker-backed ordinary PR
 -> immutable post-Docker/pre-DSH baseline
@@ -1469,6 +1474,12 @@ def _extract_register_state(text: str, item_id: str) -> str | None:
 
 
 def _extract_lifecycle_heading_ids(text: str) -> list[str]:
+    """Recognise only the governed LAUNCH/SBX/WAYFINDER/DSH name families.
+
+    Identities outside these families (AL-1, WAYFINDER-POC-1, CB-1, SDLC-L1..L4)
+    are deliberately not projected, and are therefore invisible to every check
+    built on this extractor. Completeness is claimed for these families only.
+    """
     pattern = re.compile(
         r"(?m)^#{2,3}\s+(?P<identity>"
         r"(?:LAUNCH-[0-9]+|SBX-[0-9]+|WAYFINDER-[0-9]+|DSH-(?:0A|0B|[0-9]+))"
@@ -1689,12 +1700,8 @@ def _validate_complete_projection_prose(
         for item in projection.get("lifecycle_identities", [])
         if isinstance(item, dict)
     }
-    admitted_future_ids = GOVERNED_FUTURE_IDS[-3:]
-    admitted_lifecycle_ids = tuple(
-        identity
-        for identity in GOVERNED_LIFECYCLE_IDENTITIES
-        if identity.startswith("WAYFINDER-") and identity.endswith("-0")
-    )
+    admitted_future_ids = ADMITTED_FUTURE_IDS
+    admitted_lifecycle_ids = ADMITTED_LIFECYCLE_IDENTITIES
     for key in ("lifecycle", "readme", "increment"):
         path = SURFACE_PATHS[key].as_posix()
         paragraphs = [
@@ -2473,11 +2480,20 @@ def _watched_red_controls(
     )
 
     def inject_ungoverned_lifecycle_identity(blobs: dict[str, str]) -> None:
+        """Inject an ungoverned identity inside a recognised name family.
+
+        Bounded on purpose: _extract_lifecycle_heading_ids only recognises the
+        LAUNCH-N / SBX-N / WAYFINDER-N / DSH-{0A,0B,N} families, so this proves
+        closure over those families and not over every heading the authority can
+        declare. An identity in an unrecognised family (AL-2, SDLC-L5,
+        WAYFINDER-POC-2) is invisible here; see the follow-on in
+        docs/increments/FUT-003_PLANNING_FOUNDATION_REPAIR.md.
+        """
         path = "docs/development/ROADMAP.md"
         blobs[path] += "\n## WAYFINDER-9 — ungoverned identity\n\nPlanning state: `SEQUENCED`\n"
 
     _expect_authority_nonpass(
-        "authority-ungoverned-lifecycle-identity",
+        "authority-ungoverned-identity-in-governed-families",
         project,
         inject_ungoverned_lifecycle_identity,
         failures,
@@ -2830,7 +2846,8 @@ def main() -> int:
         "omitted-bound1-predecessor, out-of-scope-sbx2-readiness, "
         "candidate-authored-stale-generation-self-consistency, authority-sbx2-promotion, "
         "authority-omitted-governed-identities, authority-duplicate-headings-and-states, "
-        "authority-wayfinder-0-state-change, authority-ungoverned-lifecycle-identity, "
+        "authority-wayfinder-0-state-change, "
+        "authority-ungoverned-identity-in-governed-families, "
         "authority-removed-bound1-predecessor, authority-future-register-integrity, "
         "illegal-transition, unknown-transition, skipped-transition, missing-durable-sequenced-record, "
         "unbound-active-identity, partial-active-identity, "
