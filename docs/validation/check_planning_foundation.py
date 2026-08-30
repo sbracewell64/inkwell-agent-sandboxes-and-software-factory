@@ -143,6 +143,8 @@ CLOSURE_REQUIRED_TESTS = (
     "tests/test_planning_foundation.py::test_stale_complete_projection_prose_is_nonpass_and_names_surface",
     "tests/test_planning_foundation.py::test_complete_projection_state_drift_is_nonpass_and_names_identity",
     "tests/test_planning_foundation.py::test_duplicate_projection_state_is_nonpass_and_names_identity",
+    "tests/test_planning_foundation.py::test_outside_projection_state_conflict_is_nonpass_and_names_identity",
+    "tests/test_planning_foundation.py::test_real_projection_surfaces_accept_agreeing_repetitions",
     "tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe",
     "tests/test_planning_foundation.py::test_closure_gate_includes_unrelated_notimplementederror_regression",
     "tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation",
@@ -1725,15 +1727,31 @@ def _validate_complete_projection_prose(
         if observed_lifecycle_ids != expected_lifecycle_ids:
             errors.append(f"{path} complete governed lifecycle projection contradicts the register")
         admitted_ids = admitted_future_ids + admitted_lifecycle_ids
-        declared_states: dict[str, list[str]] = {
+        canonical_states: dict[str, list[str]] = {
             identity: [] for identity in admitted_ids
         }
         for identity, state in re.findall(
             r"\b(FUT-[0-9]{3}|WAYFINDER-[0-9]+)\s+as\s+`([A-Z_]+)`",
             paragraph,
         ):
-            if identity in declared_states:
-                declared_states[identity].append(state)
+            if identity in canonical_states:
+                canonical_states[identity].append(state)
+        surface_states: dict[str, list[str]] = {
+            identity: [] for identity in admitted_ids
+        }
+        table_declarations = re.findall(
+            r"(?m)^\s*\|\s*`?(FUT-[0-9]{3}|WAYFINDER-[0-9]+)`?\s*\|"
+            r"[^\n|]*\|\s*`?([A-Z_]+)`?\s*\|\s*$",
+            project["surfaces"][key],
+        )
+        direct_declarations = re.findall(
+            r"(?m)^\s*`?(FUT-[0-9]{3}|WAYFINDER-[0-9]+)`?\s+"
+            r"(?:is|remains)\s+`?([A-Z_]+)`?[.!]?\s*$",
+            project["surfaces"][key],
+        )
+        for identity, state in table_declarations + direct_declarations:
+            if identity in surface_states:
+                surface_states[identity].append(state)
         for identity in admitted_ids:
             expected_state = (
                 future_states.get(identity)
@@ -1748,7 +1766,7 @@ def _validate_complete_projection_prose(
                     f"{path} cannot derive governed state for {identity}: {expected_state}"
                 )
                 continue
-            declarations = declared_states[identity]
+            declarations = canonical_states[identity]
             if len(declarations) != 1:
                 errors.append(
                     f"{path} missing or duplicate state declaration for {identity}: "
@@ -1759,6 +1777,13 @@ def _validate_complete_projection_prose(
                     f"{path} conflicting state declarations for {identity}: "
                     f"register={expected_state}, declared={declarations[0]}"
                 )
+            for declared_state in surface_states[identity]:
+                if declared_state != expected_state:
+                    errors.append(
+                        f"{path} conflicting state declaration outside complete governed "
+                        f"projection for {identity}: register={expected_state}, "
+                        f"declared={declared_state}"
+                    )
         if not re.search(r"BOUND-1`?\s+as\s+`SEQUENCED`", paragraph):
             errors.append(f"{path} complete governed BOUND-1 projection is missing or demoted")
 
@@ -2278,6 +2303,20 @@ def _watched_red_controls(
             failures,
         )
 
+    outside_projection_state = copy.deepcopy(project)
+    outside_projection_state["surfaces"]["lifecycle"] += "\nFUT-014 is `ACTIVE`.\n"
+    _expect_red(
+        "outside-complete-projection-state-conflict",
+        outside_projection_state,
+        "outside complete governed projection for FUT-014: register=SEQUENCED, declared=ACTIVE",
+        failures,
+    )
+
+    projection_repetition_errors: list[str] = []
+    _validate_complete_projection_prose(project, projection_repetition_errors)
+    if projection_repetition_errors:
+        failures.append("real-projection-agreeing-repetitions")
+
     omitted_future = copy.deepcopy(project)
     omitted_future["state"]["projection_scope"]["future_items"].pop()
     _expect_red(
@@ -2784,6 +2823,8 @@ def main() -> int:
     print(
         "watched-red: stale-contradictory-adr-status, stale-complete-projection-prose, "
         "stale-complete-projection-state, duplicate-complete-projection-state, "
+        "outside-complete-projection-state-conflict, "
+        "real-projection-agreeing-repetitions, "
         "omitted-future-item-projection, "
         "omitted-wayfinder-lifecycle-identity, demoted-sbx-lifecycle-identity, "
         "omitted-bound1-predecessor, out-of-scope-sbx2-readiness, "

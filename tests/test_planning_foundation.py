@@ -116,6 +116,34 @@ def test_duplicate_projection_state_is_nonpass_and_names_identity() -> None:
         )
 
 
+def test_outside_projection_state_conflict_is_nonpass_and_names_identity() -> None:
+    for key in ("lifecycle", "readme", "increment"):
+        project = _VALIDATOR.load_project()
+        project["surfaces"][key] += "\nFUT-014 is `ACTIVE`.\n"
+
+        status, errors = _VALIDATOR.validate_project(project, run_controls=False)
+
+        path = _VALIDATOR.SURFACE_PATHS[key].as_posix()
+        assert status == "observed-bad"
+        assert any(
+            path in error
+            and "outside complete governed projection for FUT-014" in error
+            and "register=SEQUENCED" in error
+            and "declared=ACTIVE" in error
+            for error in errors
+        )
+
+
+def test_real_projection_surfaces_accept_agreeing_repetitions() -> None:
+    project = _VALIDATOR.load_project()
+    errors: list[str] = []
+
+    _VALIDATOR._validate_complete_projection_prose(project, errors)
+
+    status = _VALIDATOR._fold_property_outcome(errors, [])
+    assert status == "observed-good", errors
+
+
 def test_closure_gate_requires_nonempty_exact_test_universe() -> None:
     failures = _VALIDATOR._watched_test_closure_controls()
     assert failures == []
