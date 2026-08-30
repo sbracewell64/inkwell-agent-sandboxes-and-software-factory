@@ -58,6 +58,33 @@ def test_stale_complete_projection_prose_is_nonpass_and_names_surface() -> None:
         assert any(_VALIDATOR.SURFACE_PATHS[key].as_posix() in error for error in errors)
 
 
+def test_complete_projection_state_drift_is_nonpass_and_names_identity() -> None:
+    mutations = (
+        ("FUT-014", "SEQUENCED", "ACTIVE"),
+        ("FUT-016", "CANDIDATE", "SEQUENCED"),
+        ("WAYFINDER-0", "SEQUENCED", "ACTIVE"),
+    )
+    for key in ("lifecycle", "readme", "increment"):
+        for identity, before_state, after_state in mutations:
+            project = _VALIDATOR.load_project()
+            original = project["surfaces"][key]
+            mutated = re.sub(
+                rf"{re.escape(identity)}\s+as\s+`{before_state}`",
+                f"{identity} as `{after_state}`",
+                original,
+                count=1,
+            )
+            assert mutated != original
+            project["surfaces"][key] = mutated
+
+            status, errors = _VALIDATOR.validate_project(project, run_controls=False)
+
+            path = _VALIDATOR.SURFACE_PATHS[key].as_posix()
+            contradiction = f"{identity}={after_state}"
+            assert status == "observed-bad"
+            assert any(path in error and contradiction in error for error in errors)
+
+
 def test_closure_gate_requires_nonempty_exact_test_universe() -> None:
     failures = _VALIDATOR._watched_test_closure_controls()
     assert failures == []

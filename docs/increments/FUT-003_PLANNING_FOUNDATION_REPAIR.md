@@ -119,7 +119,7 @@ real-provider-proven, and it does not unlock held SBX-2.
 `refs/remotes/origin/planning/future-sssf` ref. It projects all current FUT-001
 through FUT-016 states, with FUT-014 as `SEQUENCED`, FUT-015 as `SEQUENCED`,
 and FUT-016 as `CANDIDATE`; the complete governed LAUNCH-1, SBX-0, SBX-1,
-SBX-2, SBX-3, SBX-4, SBX-5, SBX-6, SBX-7, SBX-8, WAYFINDER-0, WAYFINDER-1,
+SBX-2, SBX-3, SBX-4, SBX-5, SBX-6, SBX-7, SBX-8, WAYFINDER-0 as `SEQUENCED`, WAYFINDER-1,
 DSH-0A, DSH-0B, DSH-1, DSH-2, DSH-3, DSH-4, DSH-5, DSH-6, DSH-7, and DSH-8
 roadmap identities, and BOUND-1 as `SEQUENCED`. None of the newly admitted
 identities is `ACTIVE`. The BOUND-1 predecessor rule is derived from the immutable
