@@ -139,18 +139,18 @@ teardown RUN_ID *FLAGS:
                 esac
             else
                 KEY_MATCH=$(printf '%s' "$KEY_LIST" | KN="$MINT_KEY_NAME" python3 -c '
-import json, os, sys
-data = json.load(sys.stdin).get("data", [])
-matches = [item for item in data if item.get("name") == os.environ["KN"]]
-if not matches:
-    print("absent")
-elif len(matches) != 1:
-    print("multiple")
-elif not matches[0].get("hash"):
-    print("unreadable")
-else:
-    print("present " + matches[0]["hash"])
-' 2>/dev/null || echo unreadable)
+    import json, os, sys
+    data = json.load(sys.stdin).get("data", [])
+    matches = [item for item in data if item.get("name") == os.environ["KN"]]
+    if not matches:
+        print("absent")
+    elif len(matches) != 1:
+        print("multiple")
+    elif not matches[0].get("hash"):
+        print("unreadable")
+    else:
+        print("present " + matches[0]["hash"])
+    ' 2>/dev/null || echo unreadable)
                 case "$KEY_MATCH" in
                     "present "*)
                         KEY_HASH="${KEY_MATCH#present }"
