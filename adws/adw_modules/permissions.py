@@ -49,7 +49,7 @@ import re
 import stat
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from .data_types import AgentConfig, SSSFConfig
 
@@ -281,6 +281,44 @@ def _repository_paths(run) -> RepositoryPaths:
     return RepositoryPaths(paths, sorted(set(unreadable)))
 
 
+# Membership under a directory declaration is TRACKED-ELIGIBLE content: what a
+# reviewer can see and freeze. Build output is not a second evaluator — a
+# `__pycache__` tree beside its tracked sources is the same code the reviewer
+# already read, and refusing it would make every phase on a machine that has
+# run the suite once refuse for no security reason.
+#
+# The exception is executable content with no tracked source under the surface:
+# a sourceless `.pyc`, a shadowing `.so`, an ignored `.py`. That is evaluator
+# code that runs without ever being reviewable, which is the hiding vector the
+# surface exists to close, so it refuses and names itself.
+EXECUTABLE_SUFFIXES = frozenset({
+    ".py", ".pyc", ".pyo", ".pyd", ".so", ".dll", ".dylib",
+    ".sh", ".bash", ".ts", ".js", ".mjs",
+})
+
+
+def _derived_source(path: str) -> str | None:
+    """The tracked source a derived artifact claims to come from, if any."""
+    candidate = PurePosixPath(path)
+    if candidate.suffix not in {".pyc", ".pyo"}:
+        return None
+    parent = candidate.parent
+    if parent.name == "__pycache__":
+        parent = parent.parent
+    # `x.cpython-314.pyc` -> `x.py`; a plain `x.pyc` -> `x.py` as well.
+    return (parent / f"{candidate.stem.split('.')[0]}.py").as_posix()
+
+
+def _ignored_member_is_hidden(run, path: str, paths: dict[str, str]) -> bool:
+    """Does this ignored path hide executable evaluator content from review?"""
+    source = _derived_source(path)
+    if source is not None:
+        tag = paths.get(source)
+        if tag is not None and tag != "?" and is_frozen_evaluator(source, run.cfg):
+            return False                 # derived from a member review can see
+    return PurePosixPath(path).suffix in EXECUTABLE_SUFFIXES
+
+
 def _gitignore_observation(run, paths: dict[str, str]) \
         -> tuple[set[str], dict[str, list[str]]]:
     candidates = sorted(path for path, tag in paths.items()
@@ -331,7 +369,7 @@ def _visibility_observation(run, paths: dict[str, str]) \
             continue
         flags: list[str] = []
         if tag == "?":
-            if path in ignored:
+            if path in ignored and _ignored_member_is_hidden(run, path, paths):
                 flags.append("gitignore")
         else:
             if tag in {"S", "s"}:

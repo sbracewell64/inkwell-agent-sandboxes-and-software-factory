@@ -265,6 +265,37 @@ can only pass vacuously; and one pre-existing skip elsewhere in the suite. The
 fsmonitor guard itself stays in place for hosts that do set the bit, and the
 `assume-unchanged` and `skip-worktree` cases beside it execute on every host.
 
+## What membership means under a directory declaration
+
+Enumerating the declared surface independently of git ignore rules closes a
+real hiding vector, and swept too wide on its first pass: a `__pycache__` tree
+beside its tracked sources was treated as hidden evaluator content, so every
+phase on a machine that had run the suite once would refuse. Clean CI never saw
+it, because a fresh checkout has no bytecode — a defect that is invisible
+exactly where it is checked and present exactly where people work.
+
+Membership under a directory declaration is **tracked-eligible content**: what a
+reviewer can see and freeze.
+
+- An ignored *derived* artifact whose tracked source is itself a member is a
+  **non-member**. It is the same code the reviewer already read, and refusing it
+  buys no security.
+- An ignored path that is *executable content with no tracked source* under the
+  surface — a sourceless `.pyc`, a shadowing `.so`, an ignored `.py` — is
+  **refused and named**. That is evaluator code which runs without ever being
+  reviewable, which is the vector the surface exists to close.
+
+This is not hypothetical. Applying the rule to this repository immediately
+refused two real files: `docs/validation/__pycache__/check_mutation_fact.cpython-314.pyc`
+and `check_planning_foundation.cpython-314.pyc` — stale bytecode left by a
+branch switch, whose sources do not exist at this head, and which Python would
+import in place of modules that are gone. They were removed, not excused.
+
+| Half | Control | Observed red without it |
+|---|---|---|
+| derived-with-source is a non-member | `test_bytecode_beside_its_tracked_source_is_not_a_surface_member` | `IndexVisibilityBreach ... gitignore on pkg/__pycache__/evaluator.cpython-314.pyc` — a used machine cannot run any phase |
+| sourceless executable is refused | `test_a_sourceless_pyc_under_the_surface_is_refused` | `DID NOT RAISE IndexVisibilityBreach` — the orphan `.pyc` passes unseen |
+
 ## Known unresolved observations
 
 - The shipped rosters declare the surface; the installer template under

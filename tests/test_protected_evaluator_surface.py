@@ -727,6 +727,51 @@ def test_missing_armed_identity_refuses_after_enumerable_rollback(tmp_path):
     assert (root / "app/widget.py").read_text() == "value = 1\n"
 
 
+def _surface_with_bytecode(tmp_path, extra: dict[str, str]):
+    """A declared directory carrying tracked sources and ignored bytecode."""
+    files = {
+        ".gitignore": "__pycache__/\n",
+        "pkg/evaluator.py": "assert True\n",
+        "pkg/__pycache__/evaluator.cpython-314.pyc": "derived bytes\n",
+    }
+    files.update(extra)
+    root = _repo(tmp_path, files)
+    return _Run(root, _cfg(frozen=["pkg/"])), root
+
+
+def test_bytecode_beside_its_tracked_source_is_not_a_surface_member(tmp_path):
+    """A used machine still runs phases: build output is not a second evaluator.
+
+    Membership under a directory declaration is tracked-eligible content — what
+    a reviewer can see and freeze. `__pycache__` beside its tracked sources is
+    the same code the reviewer already read, so refusing it would strand every
+    machine that has run the suite once, for no security gain.
+    """
+    run, _ = _surface_with_bytecode(tmp_path, {})
+
+    armed = permissions.snapshot(run)                  # does not refuse
+    assert armed.base_commit
+    assert _owner("evaluator_generation")(run) is not None
+
+
+def test_a_sourceless_pyc_under_the_surface_is_refused(tmp_path):
+    """Executable evaluator content review cannot see, named in the refusal.
+
+    A `.pyc` with no tracked source is importable code that never passed
+    review — including the stale bytecode a branch switch leaves behind, which
+    python will happily import in place of a module that no longer exists.
+    """
+    run, _ = _surface_with_bytecode(
+        tmp_path, {"pkg/__pycache__/ghost.cpython-314.pyc": "orphan bytes\n"})
+
+    with pytest.raises(permissions.IndexVisibilityBreach) as refused:
+        permissions.snapshot(run)
+    assert "pkg/__pycache__/ghost.cpython-314.pyc" in str(refused.value)
+    assert "gitignore" in str(refused.value)
+    # And it is could-not-observe for the generation, never a quiet identity.
+    assert _owner("evaluator_generation")(run) is None
+
+
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────
 
 def test_an_unrelated_test_file_outside_the_frozen_scope_changes_freely(tmp_path):
