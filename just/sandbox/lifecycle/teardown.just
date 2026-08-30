@@ -129,11 +129,12 @@ teardown RUN_ID *FLAGS:
         elif KEY_LIST=$(curl -sS --max-time 30 "$API/keys" \
                 -H "Authorization: Bearer $OPENROUTER_PROVISIONING_KEY" 2>/dev/null); then
             if [ -n "$KEY_HASH" ]; then
-                case "$(printf '%s' "$KEY_LIST" | KH="$KEY_HASH" python3 -c \
-                    'import json,os,sys; print("present" if os.environ["KH"] in {k.get("hash") for k in json.load(sys.stdin).get("data",[])} else "absent")' \
+                case "$(printf '%s' "$KEY_LIST" | KH="$KEY_HASH" KN="$MINT_KEY_NAME" python3 -c \
+                    'import json,os,sys; matches=[k for k in json.load(sys.stdin).get("data",[]) if k.get("hash")==os.environ["KH"] and k.get("name")==os.environ["KN"]]; print("present" if len(matches)==1 else ("absent" if not matches else "multiple"))' \
                     2>/dev/null || echo unreadable)" in
-                    present) POST="observed-good"; WHY_POST="the provisioning list carries hash $KEY_HASH" ;;
-                    absent)  POST="observed-bad"; WHY_POST="hash $KEY_HASH is absent during mint reconciliation" ;;
+                    present) POST="observed-good"; WHY_POST="the provisioning list uniquely binds $MINT_KEY_NAME to hash $KEY_HASH" ;;
+                    absent)  WHY_POST="the provisioning list has no entry binding $MINT_KEY_NAME to hash $KEY_HASH" ;;
+                    multiple) WHY_POST="the provisioning list has multiple entries binding $MINT_KEY_NAME to hash $KEY_HASH" ;;
                     *)       WHY_POST="the provisioning key list was unreadable during mint reconciliation" ;;
                 esac
             else
