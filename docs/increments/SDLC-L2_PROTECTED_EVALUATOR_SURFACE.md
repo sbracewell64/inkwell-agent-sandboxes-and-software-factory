@@ -159,10 +159,14 @@ message names the frozen paths separately.
 
 ## Proof
 
-`tests/test_protected_evaluator_surface.py` — 37 cases: the original 12 covering
-the law's four required fixtures, boundary controls, and shipped-roster
-non-vacuity checks, plus 25 focused review regressions. The original acceptance
-cases were observed red against `c192693` before the change, with
+`tests/test_protected_evaluator_surface.py` — 48 cases collected: the original
+12 covering the law's four required fixtures, boundary controls, and
+shipped-roster non-vacuity checks, plus focused review regressions covering
+closed-world observation, executable-format classification, symlink target
+classification, and generation membership filtering. Of those cases, 46
+execute and two skip as could-not-observe for the claims they name; neither skip
+is counted as a pass. The original acceptance cases were observed red against
+`c192693` before the change, with
 the real failure shape (`permitted()` returning `True`, `DID NOT RAISE
 PermissionBreach`), and green at the original feature head.
 
@@ -261,9 +265,11 @@ Two skipped cases are `could-not-observe` for their own claims and are counted
 as neither pass nor failure: `test_fsmonitor_valid_frozen_rewrite_is_refused`,
 because git records no fsmonitor-valid index bit unless `core.fsmonitor` is
 configured and asserting a refusal git never performs would be a control that
-can only pass vacuously; and one pre-existing skip elsewhere in the suite. The
-fsmonitor guard itself stays in place for hosts that do set the bit, and the
-`assume-unchanged` and `skip-worktree` cases beside it execute on every host.
+can only pass vacuously; and
+`test_unreadable_member_refuses_after_other_breaches_are_undone`, when the host
+cannot make a member unreadable with its permission model. The fsmonitor guard
+itself stays in place for hosts that do set the bit, and the `assume-unchanged`
+and `skip-worktree` cases beside it execute on every host.
 
 ## What membership means under a directory declaration
 
