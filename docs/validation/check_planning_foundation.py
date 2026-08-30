@@ -140,6 +140,7 @@ DOCKER_FIRST_ORDER = """Docker SBX-2..8
 -> DSH-0B
 -> DSH-1..."""
 CLOSURE_REQUIRED_TESTS = (
+    "tests/test_planning_foundation.py::test_stale_complete_projection_prose_is_nonpass_and_names_surface",
     "tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe",
     "tests/test_planning_foundation.py::test_closure_gate_includes_unrelated_notimplementederror_regression",
     "tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation",
@@ -1668,6 +1669,46 @@ def _validate_router_and_authority(project: dict[str, Any], errors: list[str]) -
             errors.append(f"ACTIVE/proven/runtime boundary is unsafe: {fragment}")
 
 
+def _validate_complete_projection_prose(
+    project: dict[str, Any], errors: list[str]
+) -> None:
+    expected_future_ids = list(GOVERNED_FUTURE_IDS)
+    expected_lifecycle_ids = list(GOVERNED_LIFECYCLE_IDENTITIES)
+    for key in ("lifecycle", "readme", "increment"):
+        path = SURFACE_PATHS[key].as_posix()
+        paragraphs = [
+            paragraph
+            for paragraph in re.split(r"\n\s*\n", project["surfaces"][key])
+            if "complete governed" in paragraph
+        ]
+        if len(paragraphs) != 1:
+            errors.append(f"{path} complete governed projection is missing or duplicated")
+            continue
+        paragraph = paragraphs[0]
+        range_match = re.search(r"FUT-(\d{3})\s+through\s+FUT-(\d{3})", paragraph)
+        if range_match:
+            start, end = (int(value) for value in range_match.groups())
+            observed_future_ids = [f"FUT-{index:03d}" for index in range(start, end + 1)]
+        else:
+            observed_future_ids = []
+        lifecycle_segment_match = re.search(
+            r"complete governed\s+(.*?)(?:roadmap identities|roadmap identity universe|identity universe)",
+            paragraph,
+            re.DOTALL,
+        )
+        lifecycle_segment = lifecycle_segment_match.group(1) if lifecycle_segment_match else ""
+        observed_lifecycle_ids = re.findall(
+            r"\b(?:LAUNCH-[0-9]+|SBX-[0-9]+|WAYFINDER-[0-9]+|DSH-(?:0A|0B|[0-9]+))\b",
+            lifecycle_segment,
+        )
+        if observed_future_ids != expected_future_ids:
+            errors.append(f"{path} complete governed FUT projection contradicts the register")
+        if observed_lifecycle_ids != expected_lifecycle_ids:
+            errors.append(f"{path} complete governed lifecycle projection contradicts the register")
+        if not re.search(r"BOUND-1`?\s+as\s+`SEQUENCED`", paragraph):
+            errors.append(f"{path} complete governed BOUND-1 projection is missing or demoted")
+
+
 def _validate_adr_identities(project: dict[str, Any], errors: list[str]) -> None:
     documents = project.get("adr_documents", {})
     identity_to_files: dict[str, list[str]] = {}
@@ -2136,6 +2177,17 @@ def _watched_red_controls(
     )
     _expect_red("stale-contradictory-adr-status", stale_adr, "stale contradictory status", failures)
 
+    stale_projection = copy.deepcopy(project)
+    stale_projection["surfaces"]["lifecycle"] = stale_projection["surfaces"]["lifecycle"].replace(
+        "FUT-001 through FUT-016", "FUT-001 through FUT-013", 1
+    )
+    _expect_red(
+        "stale-complete-projection-prose",
+        stale_projection,
+        SURFACE_PATHS["lifecycle"].as_posix(),
+        failures,
+    )
+
     omitted_future = copy.deepcopy(project)
     omitted_future["state"]["projection_scope"]["future_items"].pop()
     _expect_red(
@@ -2571,6 +2623,12 @@ def validate_project(
     red_failures: list[str] = []
     _check_required_files(project, errors, cno)
     if cno:
+        _validate_complete_projection_prose(project, errors)
+        if errors:
+            errors.extend(cno)
+            if control_cno is not None:
+                control_cno.extend(cno)
+            return "observed-bad", errors
         errors.extend(cno)
         if control_cno is not None:
             control_cno.extend(cno)
@@ -2579,6 +2637,7 @@ def validate_project(
     _validate_lifecycle(project, errors)
     _validate_state(project, errors)
     _validate_document_states(project, errors)
+    _validate_complete_projection_prose(project, errors)
     _validate_router_and_authority(project, errors)
     _validate_adr_identities(project, errors)
     _validate_roadmap_sbx_hold(project, errors)
@@ -2633,7 +2692,7 @@ def main() -> int:
     print(f"lifecycle owner: {LIFECYCLE_OWNER}")
     print(f"validation owner: {VALIDATION_OWNER}")
     print(
-        "watched-red: stale-contradictory-adr-status, omitted-future-item-projection, "
+        "watched-red: stale-contradictory-adr-status, stale-complete-projection-prose, omitted-future-item-projection, "
         "omitted-wayfinder-lifecycle-identity, demoted-sbx-lifecycle-identity, "
         "omitted-bound1-predecessor, out-of-scope-sbx2-readiness, "
         "candidate-authored-stale-generation-self-consistency, authority-sbx2-promotion, "

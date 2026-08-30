@@ -56,9 +56,12 @@ runtime, landing, acceptance, certification, or live-enable authority.
 
 The authoritative planning generation records FUT-001/DSH as `SEQUENCED`,
 FUT-003 as `ACTIVE` but not `PROVEN`, and SBX-2 as `HELD`. The machine-readable
-projection also retains FUT-004..013; the complete governed LAUNCH-1, SBX-0..8,
-WAYFINDER-1, and DSH-0A/0B through DSH-8 identity universe; and BOUND-1 as
-`SEQUENCED`. Immutable authority bytes require BOUND-1 to complete and qualify
+projection includes FUT-001 through FUT-016, with FUT-014 as `SEQUENCED`,
+FUT-015 as `SEQUENCED`, and FUT-016 as `CANDIDATE`; the complete governed
+LAUNCH-1, SBX-0, SBX-1, SBX-2, SBX-3, SBX-4, SBX-5, SBX-6, SBX-7, SBX-8,
+WAYFINDER-0, WAYFINDER-1, DSH-0A, DSH-0B, DSH-1, DSH-2, DSH-3, DSH-4, DSH-5,
+DSH-6, DSH-7, and DSH-8 identity universe; and BOUND-1 as `SEQUENCED`. None of
+the newly admitted identities is `ACTIVE`. Immutable authority bytes require BOUND-1 to complete and qualify
 before SBX-2 activation, after which SBX-2 may leave `HELD`.
 The exact source identity/generation is observed from
 `refs/remotes/origin/planning/future-sssf` and bound in `PLANNING_STATE.json`.

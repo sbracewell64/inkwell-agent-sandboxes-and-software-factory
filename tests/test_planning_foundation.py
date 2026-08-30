@@ -44,6 +44,20 @@ def test_canonical_foundation_and_all_watched_red_controls_pass() -> None:
         assert all("symlink-escape-" in item for item in control_cno)
 
 
+def test_stale_complete_projection_prose_is_nonpass_and_names_surface() -> None:
+    for key in ("lifecycle", "readme", "increment"):
+        project = _VALIDATOR.load_project()
+        original = project["surfaces"][key]
+        mutated = original.replace("through FUT-016", "through FUT-013", 1)
+        assert mutated != original
+        project["surfaces"][key] = mutated
+
+        status, errors = _VALIDATOR.validate_project(project, run_controls=False)
+
+        assert status == "observed-bad"
+        assert any(_VALIDATOR.SURFACE_PATHS[key].as_posix() in error for error in errors)
+
+
 def test_closure_gate_requires_nonempty_exact_test_universe() -> None:
     failures = _VALIDATOR._watched_test_closure_controls()
     assert failures == []

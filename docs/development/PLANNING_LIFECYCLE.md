@@ -14,9 +14,12 @@ authoritative planning source: planning/future-sssf; commit: eab880656b4ef00174e
 
 The durable state record carries a bounded machine-readable projection observed
 from the fetched `refs/remotes/origin/planning/future-sssf` authority. It
-includes FUT-001 through FUT-013; the complete governed LAUNCH-1, SBX-0..8,
-WAYFINDER-1, and DSH-0A/0B through DSH-8 roadmap identity universe; and
-`BOUND-1` as `SEQUENCED`. The authority requires `BOUND-1` to complete and
+includes FUT-001 through FUT-016, with FUT-014 as `SEQUENCED`, FUT-015 as
+`SEQUENCED`, and FUT-016 as `CANDIDATE`; the complete governed LAUNCH-1, SBX-0,
+SBX-1, SBX-2, SBX-3, SBX-4, SBX-5, SBX-6, SBX-7, SBX-8, WAYFINDER-0,
+WAYFINDER-1, DSH-0A, DSH-0B, DSH-1, DSH-2, DSH-3, DSH-4, DSH-5, DSH-6, DSH-7,
+and DSH-8 roadmap identity universe; and `BOUND-1` as `SEQUENCED`. None of the
+newly admitted identities is `ACTIVE`. The authority requires `BOUND-1` to complete and
 qualify before `SBX-2` activation; only then may `SBX-2` leave `HELD`.
 
 The projection answers only item state, governed lifecycle state, and

@@ -117,9 +117,12 @@ real-provider-proven, and it does not unlock held SBX-2.
 `PLANNING_STATE.json` contains the machine-readable
 `sssf.planning-authority-projection.v1` projection observed from the fetched
 `refs/remotes/origin/planning/future-sssf` ref. It projects all current FUT-001
-through FUT-013 states, the complete governed LAUNCH-1, SBX-0..8,
-WAYFINDER-1, and DSH-0A/0B through DSH-8 roadmap identities, and BOUND-1 as
-`SEQUENCED`. The BOUND-1 predecessor rule is derived from the immutable
+through FUT-016 states, with FUT-014 as `SEQUENCED`, FUT-015 as `SEQUENCED`,
+and FUT-016 as `CANDIDATE`; the complete governed LAUNCH-1, SBX-0, SBX-1,
+SBX-2, SBX-3, SBX-4, SBX-5, SBX-6, SBX-7, SBX-8, WAYFINDER-0, WAYFINDER-1,
+DSH-0A, DSH-0B, DSH-1, DSH-2, DSH-3, DSH-4, DSH-5, DSH-6, DSH-7, and DSH-8
+roadmap identities, and BOUND-1 as `SEQUENCED`. None of the newly admitted
+identities is `ACTIVE`. The BOUND-1 predecessor rule is derived from the immutable
 authority bytes: it must complete and qualify before SBX-2 activation, and SBX-2
 can leave `HELD` only after that qualification.
 
@@ -131,6 +134,8 @@ validator observes the current authority ref/tree and rejects candidate-authored
 stale-generation self-consistency, omitted FUT items, omitted or demoted
 LAUNCH/SBX/Wayfinder/DSH identities, duplicate or conflicting authority
 headings/states, and omitted BOUND-1 predecessor bytes.
+
+The validator control refusing stale projection prose belongs in the g2 requalification because a passing validator over a false projection is the masked-applicability defect this repair series exists to remove.
 
 ## Deterministic acceptance
 
