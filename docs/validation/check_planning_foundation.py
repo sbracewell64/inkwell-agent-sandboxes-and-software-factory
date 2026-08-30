@@ -243,7 +243,7 @@ def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str
 AUTHORITY_FETCH_TIMEOUT_SECONDS = 30
 
 
-def _git_succeeded(root: Path, *arguments: str) -> bool:
+def _git_succeeded(root: Path, *arguments: str, git_dir: Path | None = None) -> bool:
     """Run git for its effect. A silent success is not a could-not-observe.
 
     Bounded and non-interactive: an unreachable or credential-gated remote must
@@ -251,8 +251,9 @@ def _git_succeeded(root: Path, *arguments: str) -> bool:
     """
     environment = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="", GCM_INTERACTIVE="never")
     try:
+        prefix = ["--git-dir", str(git_dir)] if git_dir is not None else []
         subprocess.run(
-            ["git", *arguments],
+            ["git", *prefix, *arguments],
             cwd=root,
             check=True,
             capture_output=True,
@@ -339,33 +340,12 @@ def _resolve_recorded_authority_commit(
         return None, (
             f"recorded authority commit is absent from {AUTHORITY_GIT_DIR_ENV}: {commit}"
         )
-    # The object is immutable and named by SHA, so asking the remote for that
-    # one object cannot change what is observed - only whether it can be
-    # observed at all. No shared ref is written.
-    _git_succeeded(
-        root,
-        "fetch",
-        "--no-tags",
-        "--no-write-fetch-head",
-        "--depth=1",
-        AUTHORITY_FETCH_REMOTE,
-        commit,
-    )
-    resolved = _git_output(root, "rev-parse", "--verify", f"{commit}^{{commit}}")
-    if resolved is None:
-        return None, f"recorded authority commit is unavailable locally and unfetchable: {commit}"
-    return resolved, None
+    return None, f"recorded authority commit is unavailable locally: {commit}"
 
 
-def _observe_authoritative_planning_source(
-    root: Path, declaration: dict[str, str]
+def _observe_authority_from_git_dir(
+    root: Path, declaration: dict[str, str], git_dir: Path | None
 ) -> tuple[dict[str, Any] | None, str | None, str | None]:
-    """Observe the authority bytes at the recorded generation.
-
-    Returns the observation, a could-not-observe reason, and an observed-defect
-    reason, in that order. Exactly one of the three is ever populated.
-    """
-    git_dir = _authority_git_dir()
     commit, unavailable = _resolve_recorded_authority_commit(
         root, declaration["source_commit"], git_dir
     )
@@ -375,9 +355,6 @@ def _observe_authoritative_planning_source(
     if tree is None:
         return None, f"authority tree unavailable for recorded commit: {commit}", None
     if tree != declaration["source_tree"]:
-        # Git, not the candidate, computed this tree. A recorded tree that does
-        # not belong to the recorded commit is a defect we observed, not a
-        # missing observation.
         return None, None, (
             "recorded authoritative planning tree does not belong to the recorded commit: "
             f"{commit} has tree {tree}, record declares {declaration['source_tree']}"
@@ -390,6 +367,44 @@ def _observe_authoritative_planning_source(
         blobs[relative] = blob
     observation, observation_error = _project_authoritative_planning_blobs(commit, tree, blobs)
     return observation, observation_error, None
+
+
+def _observe_authoritative_planning_source(
+    root: Path, declaration: dict[str, str]
+) -> tuple[dict[str, Any] | None, str | None, str | None]:
+    """Observe the authority bytes at the recorded generation.
+
+    Returns the observation, a could-not-observe reason, and an observed-defect
+    reason, in that order. Exactly one of the three is ever populated.
+    """
+    git_dir = _authority_git_dir()
+    observation = _observe_authority_from_git_dir(root, declaration, git_dir)
+    if observation[0] is not None or observation[2] is not None or git_dir is not None:
+        return observation
+
+    remote_url = _git_output(root, "remote", "get-url", AUTHORITY_FETCH_REMOTE)
+    if remote_url is None:
+        return None, "recorded authority remote is unavailable", None
+    with tempfile.TemporaryDirectory(prefix="sssf-planning-authority-") as temporary:
+        evidence_git_dir = Path(temporary)
+        if not _git_succeeded(root, "init", "--bare", str(evidence_git_dir)):
+            return None, "recorded authority evidence store could not be initialized", None
+        fetched = _git_succeeded(
+            root,
+            "fetch",
+            "--no-tags",
+            "--no-write-fetch-head",
+            "--depth=1",
+            remote_url,
+            declaration["source_commit"],
+            git_dir=evidence_git_dir,
+        )
+        if not fetched:
+            return None, (
+                "recorded authority commit is unavailable locally and unfetchable: "
+                + declaration["source_commit"]
+            ), None
+        return _observe_authority_from_git_dir(root, declaration, evidence_git_dir)
 
 
 def _observe_live_planning_ref(root: Path, declaration: dict[str, str]) -> dict[str, Any]:

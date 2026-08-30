@@ -513,8 +513,13 @@ def test_tampered_recorded_generation_is_nonpass() -> None:
 
     # A recorded commit that no reachable object store can supply is
     # could-not-observe: never a pass, and never mistaken for a defect.
-    def refuse_fetch(root_argument, *arguments):
-        return False
+    fetch_git_dirs = []
+
+    def refuse_fetch(root_argument, *arguments, git_dir=None):
+        if arguments and arguments[0] == "fetch":
+            fetch_git_dirs.append(git_dir)
+            return False
+        return True
 
     original_fetch = _VALIDATOR._git_succeeded
     _VALIDATOR._git_succeeded = refuse_fetch
@@ -536,6 +541,9 @@ def test_tampered_recorded_generation_is_nonpass() -> None:
     assert observation is None
     assert defect is None
     assert isinstance(unobservable, str) and unobservable.strip()
+    assert len(fetch_git_dirs) == 1
+    assert fetch_git_dirs[0] is not None
+    assert fetch_git_dirs[0] != root
 
     # A whole-record repoint at a different generation carrying byte-identical
     # authority content is still refused, by the authority identity every other
