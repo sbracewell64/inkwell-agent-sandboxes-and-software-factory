@@ -3750,6 +3750,14 @@ def _effect_parser() -> "argparse.ArgumentParser":
     complete.add_argument("--name", default="post-effect-state")
     complete.add_argument("--reason", default="no reason supplied")
 
+    inspect = subparsers.add_parser("inspect", help="read a verified reserved subject")
+    _add_state_arguments(inspect)
+    inspect.add_argument("--authorization", required=True)
+    inspect.add_argument("--run-id", required=True)
+    inspect.add_argument(
+        "--effect", required=True, choices=[member.value for member in EffectClass]
+    )
+
     controls = subparsers.add_parser(
         "controls", help="run the LAW_1 watched-red controls over the live seams"
     )
@@ -3830,6 +3838,23 @@ def effect_cli(argv: "Sequence[str] | None" = None) -> int:
                 f"authority: {subject.effect_class.value} for {subject.resource_id} "
                 f"at {subject.head_commit[:12]} (id {authorization.authorization_id[:12]})"
             )
+            return 0
+
+        if arguments.command == "inspect":
+            authorization = _read_authorization(arguments.authorization)
+            store = JsonFileAuthorizationStateStore(arguments.state)
+            verifier = EffectAuthorizationVerifier(store)
+            if not verifier.verifies(authorization):
+                raise EffectNotAuthorized(
+                    "effect authority is fabricated, tampered, or unknown"
+                )
+            if not verifier.reserved(authorization):
+                raise EffectNotAuthorized("effect authority is not reserved")
+            if authorization.subject.run_id != arguments.run_id:
+                raise EffectNotAuthorized("effect authority is bound to a different run")
+            if authorization.subject.effect_class is not EffectClass(arguments.effect):
+                raise EffectNotAuthorized("effect authority is bound to a different effect")
+            print(authorization.subject.resource_id)
             return 0
 
         if arguments.command == "gate":

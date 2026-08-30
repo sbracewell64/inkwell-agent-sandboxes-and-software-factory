@@ -42,7 +42,6 @@ teardown RUN_ID *FLAGS:
     API="https://openrouter.ai/api/v1"
     AUTH_FILE="$RUNS/$RUN_ID.destroy.auth.json"
     MINT_AUTH_FILE="$RUNS/$RUN_ID.runtime-key-mint.auth.json"
-    MINT_KEY_NAME="sbx-$RUN_ID"
 
     # Through a variable, not straight into `for ... in`: interpolating an empty
     # variadic into the list is a syntax error, via a variable it is zero iterations.
@@ -115,6 +114,14 @@ teardown RUN_ID *FLAGS:
     fi
 
     if [ -e "$MINT_AUTH_FILE" ]; then
+        INSPECT_RC=0
+        MINT_KEY_NAME=$(python3 -m adws.adw_modules.sandbox_provider inspect \
+            --authorization "$MINT_AUTH_FILE" --run-id "$RUN_ID" \
+            --effect runtime-key-mint-only) || INSPECT_RC=$?
+        if [ "$INSPECT_RC" -ne 0 ]; then
+            echo "!! reserved runtime-key mint authority has no verified subject (exit $INSPECT_RC)." >&2
+            exit "$INSPECT_RC"
+        fi
         POST="could-not-observe"
         WHY_POST="the provisioning key list did not answer during mint reconciliation"
         if [ -z "${OPENROUTER_PROVISIONING_KEY:-}" ]; then
