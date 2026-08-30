@@ -1,4 +1,4 @@
-"""What an agent may CHANGE, enforced in code after the fact.
+"""What an agent may CHANGE, enforced in code.
 
 `tools:` is a capability list, not a sandbox, and two holes make it
 unenforceable on its own:
@@ -10,10 +10,14 @@ unenforceable on its own:
     it for. A reviewer configured with "no edit, so it cannot quietly fix"
     could still rewrite the code it was reviewing.
 
-So permission is verified the way every other claim in this system is —
-after the fact, against the repo itself. `snapshot()` fingerprints the working
-tree's change-set before an agent runs; `enforce()` compares it afterwards and
-fails the phase if the agent touched anything outside its allowlist.
+Ordinary write boundaries are verified the way every other claim in this system
+is — after the fact, against the repo itself. `snapshot()` fingerprints the
+working tree's change-set before an agent runs; `enforce()` compares it
+afterwards and fails the phase if the agent touched anything outside its
+allowlist. Frozen evaluator paths additionally refuse at the `permitted()`
+decision unless the agent carries an explicit declaration scoped inside that
+surface. Their post-effect snapshot and rollback are damage containment, not
+the authority that makes the evaluator writable.
 
 Comparing change-sets, rather than watching for writes, is what catches the
 `git checkout` case: a path that was modified before the agent ran and is clean
