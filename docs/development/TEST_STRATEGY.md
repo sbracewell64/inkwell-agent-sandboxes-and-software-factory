@@ -110,7 +110,8 @@ its own negative controls, because two of its claims are properties to
 *preserve*: over-freezing the declaration turns the property-scope assertion
 red, and reversing the session-runtime-first precedence turns the reportability
 assertion red. An undeclared, unresolvable or unreadable surface is
-`could-not-observe`, never an intact evaluator.
+`could-not-observe`, never an intact evaluator, and failed Git snapshot
+enumeration refuses enforcement instead of representing an observed-clean tree.
 
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and

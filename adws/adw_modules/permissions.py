@@ -54,6 +54,10 @@ class PermissionBreach(RuntimeError):
     """An agent modified a path it was not permitted to modify."""
 
 
+class SnapshotUnobservable(PermissionBreach):
+    """The repository change set could not be observed."""
+
+
 # The `_roll_back` outcomes that leave the repo byte-for-byte as it was. The
 # docstring's reason for aborting — "the write already happened" — is true of a
 # destroyed file and false of these: an agent-created file that was unlinked, or
@@ -89,7 +93,17 @@ def _git_out(args: list[str], cwd) -> str | None:
 
 
 def _git(args: list[str], cwd) -> str:
-    return _git_out(args, cwd) or ""
+    try:
+        output = _git_out(args, cwd)
+    except OSError as error:
+        raise SnapshotUnobservable(
+            f"permission snapshot could-not-observe: git {' '.join(args)}"
+        ) from error
+    if output is None:
+        raise SnapshotUnobservable(
+            f"permission snapshot could-not-observe: git {' '.join(args)}"
+        )
+    return output
 
 
 def _repository_identity(target: Path) -> str:

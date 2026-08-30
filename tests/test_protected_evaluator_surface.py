@@ -358,8 +358,30 @@ def test_an_unreachable_git_never_reads_as_an_intact_surface(tmp_path, monkeypat
 
     monkeypatch.setenv("PATH", str(tmp_path / "empty-path"))
     assert _owner("evaluator_generation")(run) is None
-    with pytest.raises(OSError):
+    with pytest.raises(permissions.SnapshotUnobservable):
         permissions.snapshot(run)
+
+
+def test_corrupt_git_metadata_refuses_an_unobservable_frozen_rewrite(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    target = root / "tests/evaluator.py"
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    builder = _agent("builder", None)
+
+    before = permissions.snapshot(run)
+    target.write_text("assert False\n")
+    with pytest.raises(permissions.PermissionBreach) as observed:
+        permissions.enforce(run, None, builder, before, {})
+    assert "tests/evaluator.py" in str(observed.value)
+
+    before = permissions.snapshot(run)
+    (root / ".git").rename(root / ".git-real")
+    (root / ".git").write_text("gitdir: missing\n")
+    target.write_text("assert False\n")
+
+    with pytest.raises(permissions.SnapshotUnobservable) as unobservable:
+        permissions.enforce(run, None, builder, before, {})
+    assert "snapshot could-not-observe" in str(unobservable.value)
 
 
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────

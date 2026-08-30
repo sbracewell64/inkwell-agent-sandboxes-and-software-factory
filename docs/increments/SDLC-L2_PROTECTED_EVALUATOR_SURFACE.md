@@ -123,6 +123,10 @@ for a surface that is undeclared, unresolvable, unreadable, or sitting in a tree
 git cannot enumerate. An evaluator surface nobody could look at is never
 evidence that the evaluator is intact.
 
+Working-tree snapshots apply the same rule: a missing Git executable or a
+nonzero Git enumeration result raises a named could-not-observe refusal, so an
+unobservable post-agent tree cannot be accepted as unchanged.
+
 `enforce()` excludes frozen-surface paths from the recovered-slip continuation.
 The rollback still runs and still reports — "it was put back" answers the damage
 question — but it no longer decides whether the phase survives, and the breach
