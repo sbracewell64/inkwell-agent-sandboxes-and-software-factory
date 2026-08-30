@@ -171,6 +171,26 @@ def test_watched_red_child_declared_cno_is_not_narrowed_to_fail(
 
 
 @POSIX_ONLY
+def test_watched_red_bare_reserved_exit_is_could_not_observe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workdir = empty_dir(tmp_path, "workdir")
+    binaries = empty_dir(tmp_path, "bin")
+    install_stub(
+        binaries,
+        "just",
+        f"raise SystemExit({COULD_NOT_OBSERVE_EXIT})\n",
+    )
+    only_path(monkeypatch, binaries)
+
+    result = run(["just"], cwd=workdir)
+
+    assert result.observed is False
+    assert result.reason == "validator could not observe (exit 125)"
+
+
+@POSIX_ONLY
 def test_watched_red_unreadable_working_directory_is_could_not_observe(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -222,7 +242,7 @@ def test_front_door_tool_that_contradicts_the_predicate_is_still_fail(
     install_stub(
         binaries,
         "just",
-        "print('error: recipe is broken')\nraise SystemExit(1)\n",
+        "print('error: recipe is broken')\nraise SystemExit(2)\n",
     )
     only_path(monkeypatch, binaries)
 
@@ -238,6 +258,35 @@ def test_front_door_tool_that_contradicts_the_predicate_is_still_fail(
     assert doctor.could_not_observe is False
     assert "FAIL" in printed
     assert "recipe is broken" in printed
+
+
+@pytest.mark.parametrize(
+    "configured",
+    ["not-a-number", "nan", "inf", "-inf", "0", "-1"],
+)
+def test_invalid_child_timeout_configuration_uses_default(
+    configured: str,
+) -> None:
+    environment = dict(os.environ)
+    environment["SSSF_CHILD_TIMEOUT_SECONDS"] = configured
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from tools.windows_host import CHILD_TIMEOUT_SECONDS; "
+            "print(CHILD_TIMEOUT_SECONDS)",
+        ],
+        cwd=ROOT,
+        env=environment,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=30,
+    )
+
+    assert completed.returncode == 0, completed.stdout
+    assert completed.stdout.strip() == "30.0"
 
 
 @POSIX_ONLY

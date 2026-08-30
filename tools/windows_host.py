@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 from pathlib import Path
 import re
@@ -29,14 +30,26 @@ CANONICAL_ORIGIN = (
 MIN_PYTHON = (3, 11)
 MIN_JUST = (1, 56, 0)
 
+DEFAULT_CHILD_TIMEOUT_SECONDS = 30.0
+
+
+def child_timeout_seconds() -> float:
+    value = os.environ.get("SSSF_CHILD_TIMEOUT_SECONDS", "30")
+
+    try:
+        timeout = float(value)
+    except ValueError:
+        return DEFAULT_CHILD_TIMEOUT_SECONDS
+
+    if not math.isfinite(timeout) or timeout <= 0:
+        return DEFAULT_CHILD_TIMEOUT_SECONDS
+
+    return timeout
+
+
 # Bound every child so a wedged tool is a timed-out observation rather than a
 # doctor that never returns.
-CHILD_TIMEOUT_SECONDS = float(
-    os.environ.get(
-        "SSSF_CHILD_TIMEOUT_SECONDS",
-        "30",
-    )
-)
+CHILD_TIMEOUT_SECONDS = child_timeout_seconds()
 
 
 class ChildObservation:
@@ -78,9 +91,10 @@ def run(
     code for it would report a judgement no child ever made; both are
     narrowings of could-not-observe.
 
-    A child that exits `COULD_NOT_OBSERVE_EXIT` declared its own
-    observation failure, so its named reasons are carried through
-    rather than read as a verdict it did not reach.
+    `COULD_NOT_OBSERVE_EXIT` is repository-reserved for every child this
+    doctor spawns, not only validators. Any child exiting with that code is
+    therefore could-not-observe by convention; named reasons are carried
+    through, and a bare exit uses the shared fallback reason.
     """
     tool = args[0] if args else "<no command>"
 

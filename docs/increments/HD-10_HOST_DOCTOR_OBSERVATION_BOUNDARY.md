@@ -61,8 +61,11 @@ and reclassifying one as the other never upgrades a property to a pass.
 - `run()` returns one instead of raising. An unspawnable tool and an unreadable
   working directory (`OSError`) are could-not-observe; so is a child that stops
   answering, bounded by `SSSF_CHILD_TIMEOUT_SECONDS` (default 30); so is a child
-  that exits `COULD_NOT_OBSERVE_EXIT`, whose own named reasons are carried
-  through rather than re-read as a verdict.
+  that exits `COULD_NOT_OBSERVE_EXIT`. That code is repository-reserved for
+  every child the doctor spawns, not only validators; named reasons are carried
+  through and a bare reserved exit uses the shared fallback reason. A malformed,
+  non-finite or non-positive timeout setting deterministically falls back to 30
+  seconds so configuration cannot prevent the doctor from reporting a result.
 - `Doctor` gains `cno()` alongside `ok`/`fail`/`warn`/`info`, printing the
   `could-not-observe: <reason>` shape the repository already uses.
 - `check_child_probe()` is the single seam every returncode-only probe now runs
@@ -101,6 +104,10 @@ real executable:
 - an unreadable working directory is could-not-observe;
 - a child that declared `could-not-observe: <reason>` and exited 125 is believed,
   not re-read as a FAIL;
+- a bare reserved exit 125 is also could-not-observe with the shared fallback,
+  while a present child exiting another nonzero code remains a doctor FAIL;
+- invalid, non-finite and non-positive child timeout settings keep the module
+  importable and use the 30-second default;
 - an absent front-door tool is a CNO row and not a doctor FAIL;
 - an absent `ssh` makes the `ssh config` probe CNO;
 - an absent tool stays a doctor finding — `FAIL <tool> — not found on PATH`;
