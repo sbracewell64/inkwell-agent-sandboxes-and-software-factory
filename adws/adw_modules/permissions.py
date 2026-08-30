@@ -105,7 +105,8 @@ class TreeSnapshot(dict[str, str]):
                  visibility: dict[str, list[str]] | None = None,
                  unreadable: list[str] | None = None,
                  visibility_unobservable: str | None = None,
-                 visibility_sources: dict[str, list[str]] | None = None) -> None:
+                 visibility_sources: dict[str, list[str]] | None = None,
+                 base_clean: set[str] | None = None) -> None:
         super().__init__(fingerprints)
         self.base_commit = base_commit
         self.base_tree = base_tree
@@ -115,6 +116,7 @@ class TreeSnapshot(dict[str, str]):
         self.unreadable = unreadable or []
         self.visibility_unobservable = visibility_unobservable
         self.visibility_sources = visibility_sources or {}
+        self.base_clean = base_clean or set()
 
 
 class RepositoryPaths(dict[str, str]):
@@ -466,12 +468,15 @@ def _numstat(run, base_commit: str, unreadable: list[str]) -> str:
     left to exclude is a genuinely unobservable tree.
     """
     try:
-        return _git(["diff", base_commit, "--numstat"], run.repo_root)
+        return _git(
+            ["diff", "--no-renames", base_commit, "--numstat"],
+            run.repo_root,
+        )
     except SnapshotUnobservable:
         if not unreadable:
             raise
     return _git(
-        ["diff", base_commit, "--numstat", "--", "."]
+        ["diff", "--no-renames", base_commit, "--numstat", "--", "."]
         + [f":(exclude){path}" for path in unreadable],
         run.repo_root,
     )
@@ -512,18 +517,27 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
             unreadable.append(path)
             identity = "unreadable"
         fingerprints[path] = f"frozen:{identity}"
-    for line in _numstat(run, base_commit, unreadable).splitlines():
+    numstat = _numstat(run, base_commit, unreadable)
+    base_changed: set[str] = set()
+    for line in numstat.splitlines():
         fields = line.split("\t")
         if len(fields) >= 3:
             path = fields[-1].strip()
-            if not is_frozen_evaluator(path, run.cfg):
+            if is_frozen_evaluator(path, run.cfg):
+                base_changed.add(path)
+            else:
                 fingerprints[path] = f"{fields[0]},{fields[1]}"
     for path, tag in repository_paths.items():
         if tag == "?" and not is_frozen_evaluator(path, run.cfg):
             fingerprints[path] = "untracked"
+    base_clean = {
+        path for path, tag in repository_paths.items()
+        if tag != "?" and is_frozen_evaluator(path, run.cfg)
+        and path not in base_changed and path not in unreadable
+    }
     tree = TreeSnapshot(
         fingerprints, base_commit, base_tree, unresolved, absent, visibility,
-        unreadable, visibility_unobservable, visibility_sources,
+        unreadable, visibility_unobservable, visibility_sources, base_clean,
     )
     if require_observable:
         if visibility_unobservable:
@@ -842,6 +856,16 @@ def _roll_back(run, path: str, before: TreeSnapshot, after: dict[str, str],
     prevent, committed by the cleanup instead of the agent.
     """
     if path in before:
+        if path in before.base_clean:
+            try:
+                result = subprocess.run(
+                    ["git", "checkout", before.base_commit, "--", path],
+                    cwd=run.repo_root, capture_output=True, text=True,
+                )
+            except OSError as error:
+                return f"could not roll back ({error})"
+            return "rolled back" if result.returncode == 0 \
+                else "could not roll back"
         # Already dirty beforehand — the agent either reverted it or edited it
         # again. Either way the version that belongs here is the operator's.
         if _restore(run, path, preserved):

@@ -195,6 +195,44 @@ def test_same_numstat_rewrite_of_dirty_frozen_regression_is_refused(tmp_path):
     assert target.read_text() == "assert 0 == 1\n"
 
 
+def test_oversized_clean_frozen_evaluator_rolls_back_to_pinned_base(tmp_path):
+    original = "a" * (permissions.PRESERVE_MAX_BYTES + 1)
+    root = _repo(tmp_path, {"tests/evaluator.py": original})
+    target = root / "tests/evaluator.py"
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+    assert "tests/evaluator.py" not in preserved
+
+    target.write_text("b" * len(original))
+
+    with pytest.raises(permissions.PermissionBreach):
+        permissions.enforce(run, None, _agent("builder", None), before, preserved)
+    assert target.read_text() == original
+
+
+def test_oversized_dirty_frozen_evaluator_is_left_and_named(tmp_path):
+    original = "a" * (permissions.PRESERVE_MAX_BYTES + 1)
+    dirty = "b" * len(original)
+    changed = "c" * len(original)
+    root = _repo(tmp_path, {"tests/evaluator.py": original})
+    target = root / "tests/evaluator.py"
+    target.write_text(dirty)
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+    assert "tests/evaluator.py" not in before.base_clean
+    assert "tests/evaluator.py" not in preserved
+
+    target.write_text(changed)
+
+    with pytest.raises(permissions.PermissionBreach) as refused:
+        permissions.enforce(run, None, _agent("builder", None), before, preserved)
+    assert target.read_text() == changed
+    assert "tests/evaluator.py" in str(refused.value)
+    assert "left as-is" in str(refused.value)
+
+
 def test_frozen_snapshot_includes_repository_mode_and_symlink_target(tmp_path):
     root = _repo(tmp_path, {
         "tests/check.py": "assert True\n",
