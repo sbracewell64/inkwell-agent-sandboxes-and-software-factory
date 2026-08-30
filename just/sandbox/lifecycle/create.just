@@ -12,6 +12,15 @@
 #                 spends money invisibly.
 # Nothing here ever destroys a VM. Failures stop and print the teardown command;
 # the box stays alive so it can be inspected.
+#
+# SDLC-L1 / control #36 LAW_1. Minting a spending runtime key is a
+# configuration mutation, so it runs behind a one-use `runtime-key-mint-only`
+# capability bound to this exact repository, head, key name and spend ceiling.
+# OPENROUTER_PROVISIONING_KEY being in the environment is the ability to CALL
+# the provisioning API; it is deliberately NOT an obligation and never an
+# approval. A repository landing authorization belongs to a different purpose
+# domain and can never be presented here. The mint is not believed until the
+# authoritative provisioning LIST shows the new key hash.
 
 # mint a runtime key + boot a VM for one run: just sbx lifecycle create <task-or-run-id> [--limit 200]
 create RUN_ID *FLAGS:
@@ -68,9 +77,12 @@ create RUN_ID *FLAGS:
     # report, stop, and say how to clean up. BODY holds the mint response (which
     # contains the secret key) so it is shredded on every exit path.
     BODY=""
+    AUTH_FILE=".sandbox/runs/${RUN_ID}.runtime-key-mint.auth.json"
+    AUTH_RESERVED=0
     _on_exit() {
         rc=$?
         if [ -n "$BODY" ]; then rm -f "$BODY"; fi
+        if [ "$AUTH_RESERVED" != 1 ]; then rm -f "$AUTH_FILE"; fi
         if [ "$rc" -ne 0 ]; then
             printf '\ncreate FAILED (exit %s). Nothing was destroyed — inspect, then:\n  just sbx lifecycle teardown %s\n' "$rc" "$RUN_ID" >&2
         fi
@@ -130,15 +142,58 @@ create RUN_ID *FLAGS:
     # The 'sbx-' prefix is load-bearing: it is how `reap` tells managed keys from
     # the engineer's personal ones. Never mint without it.
     KEY_FILE=".sandbox/runs/${RUN_ID}.key"
+    KEY_NAME="sbx-$RUN_ID"
     mkdir -p .sandbox/runs
+
+    # Typed pre-effect observations. Each is a positive read of an authoritative
+    # surface — never "the env var is set", never "we got this far".
+    OBL_RECORD="observed-good"
+    WHY_RECORD="run record $RECORD was created by this run"
+    OBL_VM="observed-good"
+    WHY_VM="the control plane named vm $VM_NAME for $RUN_ID"
+    OBL_LIMIT="observed-good"
+    WHY_LIMIT="--limit parsed as a positive dollar amount: $LIMIT"
+    PRIOR_HASH=$("$RR" get "$RUN_ID" key_hash)
+    if [ -n "$PRIOR_HASH" ] || [ -e "$KEY_FILE" ]; then
+        OBL_PRIOR="observed-bad"
+        WHY_PRIOR="run $RUN_ID already holds a runtime key; a second mint would double the spend capability"
+    else
+        OBL_PRIOR="observed-good"
+        WHY_PRIOR="the authoritative record carries no key_hash and no key file exists"
+    fi
+
+    MINT_RC=0
+    python3 -m adws.adw_modules.sandbox_provider mint --effect runtime-key-mint-only \
+        --run-id "$RUN_ID" --resource "$KEY_NAME" --param "spend_limit_usd=$LIMIT" \
+        --out "$AUTH_FILE" \
+        --obligation "run-record-open|$OBL_RECORD|$WHY_RECORD" \
+        --obligation "provider-resource-observed|$OBL_VM|$WHY_VM" \
+        --obligation "no-prior-runtime-key|$OBL_PRIOR|$WHY_PRIOR" \
+        --obligation "spend-ceiling-bounded|$OBL_LIMIT|$WHY_LIMIT" || MINT_RC=$?
+    if [ "$MINT_RC" -ne 0 ]; then
+        echo "create: runtime-key mint authority was NOT minted (exit $MINT_RC) — no key was created." >&2
+        exit "$MINT_RC"
+    fi
+
+    GATE_RC=0
+    python3 -m adws.adw_modules.sandbox_provider gate --effect runtime-key-mint-only \
+        --run-id "$RUN_ID" --resource "$KEY_NAME" --param "spend_limit_usd=$LIMIT" \
+        --authorization "$AUTH_FILE" || GATE_RC=$?
+    if [ "$GATE_RC" -ne 0 ]; then
+        echo "create: pre-effect runtime-key gate refused (exit $GATE_RC) — no key was created." >&2
+        exit "$GATE_RC"
+    fi
+    AUTH_RESERVED=1
+
     BODY="$(mktemp)"   # 0600 by mktemp; holds the secret until it is on disk
     CODE="$(curl -sS -o "$BODY" -w '%{http_code}' https://openrouter.ai/api/v1/keys \
         -H "Authorization: Bearer $OPENROUTER_PROVISIONING_KEY" \
         -H "Content-Type: application/json" \
-        -d "$(printf '{"name": "sbx-%s", "limit": %s}' "$RUN_ID" "$LIMIT")")"
+        -d "$(printf '{"name": "%s", "limit": %s}' "$KEY_NAME" "$LIMIT")")"
     if [ "$CODE" != "200" ] && [ "$CODE" != "201" ]; then
         # Safe to show: a failed mint returned no key. A success is never printed.
         echo "create: OpenRouter key mint failed (HTTP $CODE): $(cat "$BODY")" >&2
+        AUTH_RESERVED=0
         rm -f "$BODY"; exit 1
     fi
 
@@ -167,7 +222,36 @@ create RUN_ID *FLAGS:
     rm -f "$BODY"
     chmod 600 "$KEY_FILE"
     "$RR" set "$RUN_ID" key_hash="$KEY_HASH" limit="$LIMIT"
-    echo "key:     sbx-$RUN_ID  limit \$$LIMIT  hash $KEY_HASH"
+
+    # Post-effect: an HTTP 200 and a parsed body are the provider's word for it.
+    # The provisioning LIST is the authoritative view — the same measured reason
+    # teardown gates revocation on the list and never on GET /key.
+    POST="could-not-observe"
+    WHY_POST="the provisioning key list did not answer after the mint"
+    if KEY_LIST=$(curl -sS --max-time 30 https://openrouter.ai/api/v1/keys \
+            -H "Authorization: Bearer $OPENROUTER_PROVISIONING_KEY" 2>/dev/null); then
+        case "$(printf '%s' "$KEY_LIST" | KH="$KEY_HASH" python3 -c \
+            'import json,os,sys; print("present" if os.environ["KH"] in {k.get("hash") for k in json.load(sys.stdin).get("data",[])} else "absent")' \
+            2>/dev/null || echo unreadable)" in
+            present) POST="observed-good"; WHY_POST="the provisioning list carries hash $KEY_HASH" ;;
+            absent)  POST="observed-bad";  WHY_POST="hash $KEY_HASH is not in the provisioning list after a 2xx mint" ;;
+            *)       POST="could-not-observe"; WHY_POST="the provisioning key list was unreadable" ;;
+        esac
+    fi
+    COMPLETE_RC=0
+    python3 -m adws.adw_modules.sandbox_provider complete \
+        --authorization "$AUTH_FILE" --name runtime-key-listed \
+        --observed "$POST" --reason "$WHY_POST" || COMPLETE_RC=$?
+    if [ "$COMPLETE_RC" -ne 0 ]; then
+        echo "create: the runtime key mint is UNPROVEN: $WHY_POST" >&2
+        echo "create: the key may be live. Tear the run down: just sbx lifecycle teardown $RUN_ID" >&2
+        exit "$COMPLETE_RC"
+    fi
+    rm -f "$AUTH_FILE"
+    AUTH_RESERVED=0
+
+    echo "key:     $KEY_NAME  limit \$$LIMIT  hash $KEY_HASH"
+    echo "key:     $WHY_POST"
     echo "key:     secret written to $KEY_FILE (0600) — FILL injects it"
 
     # ── 5. wait for ssh ────────────────────────────────────────────────────────

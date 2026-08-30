@@ -189,6 +189,34 @@ are rejected, while issued provenance and completion status remain valid across
 serialization and supervisor restart. Residual or ambiguous state is preserved
 for later reconciliation.
 
+## Live host effect-seam authority
+
+The three live exe.dev lifecycle effects use the same closed authority family:
+
+- `create` mints a spending key only under `runtime-key-mint-only` authority
+  bound to the repository, exact head, run, `sbx-<run-id>` key name, and spend
+  ceiling;
+- `observe` enables anonymous access only under `public-exposure-only`
+  authority bound to the repository, exact head, run, VM, port, and public
+  visibility; and
+- `teardown` destroys a VM only under `destroy-only` authority bound to the
+  repository, exact head, run, and VM.
+
+Each capability is issued only from named `observed-good` obligations, reserved
+atomically before its effect, and completed only after the authoritative
+post-effect surface observes the intended state. A contradiction exits 1;
+unavailable or ambiguous observation exits 125 and leaves a reserved capability
+for reconciliation. The JSON file and durable state are host-only, one-use
+records, not a second lifecycle database.
+
+The effect document carries `sssf-sandbox-effect-authority/v1`, and that domain
+is included in its signed bytes. Repository landing authorization has a
+different purpose and cannot parse or verify as configuration-mutation
+authority. Possession of a credential, an environment or prose marker, a flag,
+or arrival at a recipe step is never approval. `just sbx lifecycle authority`
+runs the provider-free watched-red controls for these bindings without making a
+network or provider call.
+
 ## Aggregate fold
 
 `fold_aggregate` is non-vacuous and deterministic. It folds separately named

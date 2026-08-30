@@ -8,6 +8,9 @@ The current design intentionally keeps these on the host:
 - `OPENROUTER_PROVISIONING_KEY`
 
 The provisioning key can mint/revoke runtime keys and must never enter a sandbox.
+Its presence permits authentication to OpenRouter; it does not authorize a
+mint. The mint additionally requires the head- and target-bound, one-use effect
+authority defined in [`../reference/SANDBOX_PROVIDER.md`](../reference/SANDBOX_PROVIDER.md#live-host-effect-seam-authority).
 
 ## Disposable sandbox inference key
 
@@ -19,6 +22,8 @@ Each sandbox receives a minted OpenRouter runtime key:
 - revoked during teardown.
 
 A spend limit is a ceiling, not prepaid credit.
+The runtime-key mint is complete only when the authoritative provisioning list
+observes the minted key hash.
 
 ## Why the sandbox cannot recursively orchestrate sandboxes
 
