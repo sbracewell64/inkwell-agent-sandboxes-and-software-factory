@@ -417,6 +417,27 @@ def test_corrected_roster_restores_an_observable_generation(tmp_path):
     assert permissions.snapshot(run)["tests/evaluator.py"].startswith("frozen:")
 
 
+def test_unreadable_member_refuses_after_other_breaches_are_undone(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        "app/widget.py": "value = 1\n",
+    })
+    evaluator = root / "tests/evaluator.py"
+    unauthorized = root / "app/widget.py"
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+    evaluator.chmod(0)
+    unauthorized.write_text("value = 2\n")
+
+    with pytest.raises(permissions.EvaluatorSurfaceUnobservable) as refused:
+        permissions.enforce(run, None, _agent("reviewer", []), before, preserved)
+    assert "unreadable member(s): tests/evaluator.py" in str(refused.value)
+    assert "app/widget.py" in str(refused.value)
+    assert evaluator.read_text() == "assert True\n"
+    assert unauthorized.read_text() == "value = 1\n"
+
+
 def test_an_unreachable_git_never_reads_as_an_intact_surface(tmp_path, monkeypatch):
     """The generation goes could-not-observe; the snapshot still refuses to lie.
 
@@ -567,7 +588,7 @@ def test_an_undeclared_evaluator_surface_refuses_the_phase(tmp_path):
         declared, None, _agent("builder", None), armed, {}) == []
 
 
-def test_missing_armed_identity_names_unavailable_rollback(tmp_path):
+def test_missing_armed_identity_refuses_after_enumerable_rollback(tmp_path):
     root = _repo(tmp_path, {
         "tests/evaluator.py": "assert True\n",
         "app/widget.py": "value = 1\n",
@@ -578,7 +599,8 @@ def test_missing_armed_identity_names_unavailable_rollback(tmp_path):
     with pytest.raises(permissions.SnapshotUnobservable) as refused:
         permissions.enforce(run, None, _agent("reviewer", []), {}, {})
     assert "missing armed base identity" in str(refused.value)
-    assert "rollback could not be attempted" in str(refused.value)
+    assert "app/widget.py" in str(refused.value)
+    assert (root / "app/widget.py").read_text() == "value = 1\n"
 
 
 # ── 4. outside the frozen property scope, work stays ordinary ────────────────

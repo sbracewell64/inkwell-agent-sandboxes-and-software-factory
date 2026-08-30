@@ -96,13 +96,17 @@ class TreeSnapshot(dict[str, str]):
     def __init__(self, fingerprints: dict[str, str], base_commit: str,
                  base_tree: str, unresolved: list[str] | None = None,
                  absent: list[str] | None = None,
-                 visibility: dict[str, list[str]] | None = None) -> None:
+                 visibility: dict[str, list[str]] | None = None,
+                 unreadable: list[str] | None = None,
+                 visibility_unobservable: str | None = None) -> None:
         super().__init__(fingerprints)
         self.base_commit = base_commit
         self.base_tree = base_tree
         self.unresolved = unresolved or []
         self.absent = absent or []
         self.visibility = visibility or {}
+        self.unreadable = unreadable or []
+        self.visibility_unobservable = visibility_unobservable
 
 
 def _git_out(args: list[str], cwd) -> str | None:
@@ -238,8 +242,14 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
     """
     fingerprints: dict[str, str] = {}
     repository_paths = _repository_paths(run)
-    visibility = _visibility_violations(run, repository_paths)
+    try:
+        visibility = _visibility_violations(run, repository_paths)
+        visibility_unobservable = None
+    except SnapshotUnobservable as error:
+        visibility = {}
+        visibility_unobservable = str(error)
     unresolved, absent = _surface_observation(run, repository_paths)
+    unreadable = []
     for path in repository_paths:
         if not is_frozen_evaluator(path, run.cfg):
             continue
@@ -247,10 +257,9 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
         try:
             identity = _repository_identity(target) \
                 if target.exists() or target.is_symlink() else "absent"
-        except OSError as error:
-            raise SnapshotUnobservable(
-                f"permission snapshot could-not-observe protected evaluator {path}"
-            ) from error
+        except OSError:
+            unreadable.append(path)
+            identity = "unreadable"
         fingerprints[path] = f"frozen:{identity}"
     for line in _git(
         ["diff", base_commit, "--numstat"], run.repo_root
@@ -264,15 +273,23 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
         if tag == "?" and not is_frozen_evaluator(path, run.cfg):
             fingerprints[path] = "untracked"
     tree = TreeSnapshot(
-        fingerprints, base_commit, base_tree, unresolved, absent, visibility
+        fingerprints, base_commit, base_tree, unresolved, absent, visibility,
+        unreadable, visibility_unobservable,
     )
     if require_observable:
+        if visibility_unobservable:
+            raise SnapshotUnobservable(visibility_unobservable)
         if visibility:
             raise IndexVisibilityBreach(
                 "permission: protected evaluator index visibility flag(s) "
                 + _visibility_detail(visibility)
             )
         _require_observable_surface(run, repository_paths)
+        if unreadable:
+            raise EvaluatorSurfaceUnobservable(
+                "permission could-not-observe protected evaluator surface; "
+                f"unreadable member(s): {', '.join(unreadable)}"
+            )
     return tree
 
 
@@ -631,21 +648,32 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
     reporting a failure, so anything the agent introduced outside its allowlist
     is rolled back before the phase dies. What it cannot undo, it names.
     """
-    if not isinstance(before, TreeSnapshot):
-        raise SnapshotUnobservable(
-            "permission snapshot could-not-observe: missing armed base identity; "
-            "rollback could not be attempted because no trustworthy baseline "
-            "was armed"
-        )
+    identity_refusal = None
     try:
-        _require_pinned_identity(run, before)
-        after = _snapshot_against(run, before.base_commit, before.base_tree)
+        if not isinstance(before, TreeSnapshot):
+            base_commit, base_tree = _head_identity(run)
+            before = TreeSnapshot(dict(before), base_commit, base_tree)
+            identity_refusal = SnapshotUnobservable(
+                "permission snapshot could-not-observe: missing armed base identity"
+            )
+        else:
+            try:
+                _require_pinned_identity(run, before)
+            except SnapshotUnobservable as error:
+                identity_refusal = error
+        if identity_refusal:
+            current_commit, current_tree = _head_identity(run)
+            after = _snapshot_against(run, current_commit, current_tree)
+        else:
+            after = _snapshot_against(run, before.base_commit, before.base_tree)
     except SnapshotUnobservable as error:
         raise _rollback_unavailable(error) from error
     touched = changed_paths(before, after)
     unresolved, absent = after.unresolved, after.absent
     undeclared = not frozen_evaluator_paths(run.cfg)
-    if undeclared or unresolved or absent or after.visibility:
+    if (undeclared or unresolved or absent or after.visibility
+            or after.unreadable or after.visibility_unobservable
+            or identity_refusal):
         rollback_targets = sorted({
             path for path in touched
             if (not permitted(path, agent, run.cfg)
@@ -665,17 +693,27 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
             details.append(f"unresolved declaration(s): {', '.join(unresolved)}")
         if absent:
             details.append(f"absent member(s): {', '.join(absent)}")
+        if after.unreadable:
+            details.append(
+                f"unreadable member(s): {', '.join(after.unreadable)}"
+            )
         if after.visibility:
             details.append(
                 "index visibility flag(s): "
                 + _visibility_detail(after.visibility)
             )
+        if after.visibility_unobservable:
+            details.append(after.visibility_unobservable)
+        if identity_refusal:
+            details.append(str(identity_refusal))
         if outcomes:
             details.append("effects:\n" + "\n".join(
                 f"  - {path} — {outcome}"
                 for path, outcome in outcomes.items()
             ))
-        refusal = IndexVisibilityBreach if after.visibility \
+        refusal = SnapshotUnobservable \
+            if after.visibility_unobservable or identity_refusal \
+            else IndexVisibilityBreach if after.visibility \
             else EvaluatorSurfaceUndeclared if undeclared \
             else EvaluatorSurfaceUnobservable
         raise refusal("permission could-not-observe protected evaluator surface; "
