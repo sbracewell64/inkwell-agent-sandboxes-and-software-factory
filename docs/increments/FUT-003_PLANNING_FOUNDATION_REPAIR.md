@@ -137,6 +137,15 @@ headings/states, and omitted BOUND-1 predecessor bytes.
 
 The validator control refusing stale projection prose belongs in the g2 requalification because a passing validator over a false projection is the masked-applicability defect this repair series exists to remove.
 
+## Known limitation and follow-on
+
+`check_planning_foundation.py` currently accepts only the pre-fetched shared
+tracking ref `refs/remotes/origin/planning/future-sssf` as its authority input.
+A later bounded increment should add an explicit authority input argument—an
+exact commit or an explicit `GIT_DIR`—so qualification never requires a lane or
+CI job to write that shared tracking ref. This follow-on is not implemented by
+this increment.
+
 ## Deterministic acceptance
 
 Run:
