@@ -1010,7 +1010,10 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
     try:
         if not isinstance(before, TreeSnapshot):
             base_commit, base_tree = _head_identity(run)
-            before = TreeSnapshot(dict(before), base_commit, base_tree)
+            before = TreeSnapshot(
+                dict(before), base_commit, base_tree,
+                base_present=_base_paths(run, base_commit),
+            )
             identity_refusal = SnapshotUnobservable(
                 "permission snapshot could-not-observe: missing armed base identity"
             )
