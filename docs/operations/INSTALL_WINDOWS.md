@@ -57,6 +57,13 @@ The bootstrap invokes the host doctor, which invokes the exact strict LF
 command above and does not print the session-ready message when that check is
 non-passing.
 
+The doctor reports each predicate as observed-good (`ok`), observed-bad
+(`FAIL`), or could-not-observe (`CNO`). A missing required tool remains a
+`FAIL` finding for the installed-tool predicate, while checks that depend on a
+child tool that could not run are `CNO`, not manufactured failures. Either
+result keeps bootstrap red: an observed defect takes precedence and exits 1;
+otherwise any unobserved predicate exits 125.
+
 ## FirstMate double-click front door
 
 After the tracked launcher is installed in the canonical checkout, double-click
