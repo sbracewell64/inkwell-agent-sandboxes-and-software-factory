@@ -88,6 +88,21 @@ declares nothing has declared nothing.
 
 It differs from `protected_files` in two ways, and both are the point.
 
+### Surface state law
+
+The declared protected evaluator surface is a CLOSED-WORLD claim, and it is
+evaluated at EVERY evaluation point — arm time and post-effect delta evaluation
+alike, not admission only. At any evaluation point, a surface that is incomplete
+(any enumerated member absent), unresolvable (any exact declaration resolving to
+nothing), or visibility-manipulated (assume-unchanged, skip-worktree, or
+equivalent index state on a protected member) is could-not-observe, and THAT
+phase refuses — including the phase that created the incompleteness.
+
+An authorized revision can never delete a declared evaluator within one phase,
+because the roster naming it is itself protected. Removing an evaluator is two
+deliberate reviewed acts — first a roster change through the ordinary review
+path, then the deletion — never a side effect of a run.
+
 *Property-scoped, never every test file forever.* A path is frozen because it is
 named, not because it looks like a test. This generation's regression is frozen;
 its neighbours stay ordinary work. The shipped declaration is the durable

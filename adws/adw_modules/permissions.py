@@ -94,10 +94,13 @@ class PreservedPath:
 
 class TreeSnapshot(dict[str, str]):
     def __init__(self, fingerprints: dict[str, str], base_commit: str,
-                 base_tree: str) -> None:
+                 base_tree: str, unresolved: list[str] | None = None,
+                 absent: list[str] | None = None) -> None:
         super().__init__(fingerprints)
         self.base_commit = base_commit
         self.base_tree = base_tree
+        self.unresolved = unresolved or []
+        self.absent = absent or []
 
 
 def _git_out(args: list[str], cwd) -> str | None:
@@ -219,8 +222,7 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
     fingerprints: dict[str, str] = {}
     repository_paths = _repository_paths(run)
     _refuse_hidden_evaluators(run, repository_paths)
-    if require_observable:
-        _require_observable_surface(run, repository_paths)
+    unresolved, absent = _surface_observation(run, repository_paths)
     for path in repository_paths:
         if not is_frozen_evaluator(path, run.cfg):
             continue
@@ -239,7 +241,12 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
     for path, tag in repository_paths.items():
         if tag == "?" and not is_frozen_evaluator(path, run.cfg):
             fingerprints[path] = "untracked"
-    return TreeSnapshot(fingerprints, base_commit, base_tree)
+    tree = TreeSnapshot(
+        fingerprints, base_commit, base_tree, unresolved, absent
+    )
+    if require_observable:
+        _require_observable_surface(run, repository_paths)
+    return tree
 
 
 def _surface_observation(run, paths: dict[str, str]) -> tuple[list[str], list[str]]:
@@ -576,6 +583,27 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
     _require_pinned_identity(run, before)
     after = _snapshot_against(run, before.base_commit, before.base_tree)
     touched = changed_paths(before, after)
+    unresolved, absent = after.unresolved, after.absent
+    if unresolved or absent:
+        frozen_effects = [path for path in touched
+                          if is_frozen_evaluator(path, run.cfg)]
+        outcomes = {
+            path: _roll_back(run, path, before, after, preserved or {})
+            for path in frozen_effects
+        }
+        details = []
+        if unresolved:
+            details.append(f"unresolved declaration(s): {', '.join(unresolved)}")
+        if absent:
+            details.append(f"absent member(s): {', '.join(absent)}")
+        if outcomes:
+            details.append("effects: " + ", ".join(
+                f"{path} ({outcome})" for path, outcome in outcomes.items()
+            ))
+        raise EvaluatorSurfaceUnobservable(
+            "permission could-not-observe protected evaluator surface; "
+            + "; ".join(details)
+        )
     breaches = [p for p in touched if not permitted(p, agent, run.cfg)]
     if not breaches:
         return touched

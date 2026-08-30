@@ -144,6 +144,35 @@ def test_deleting_the_frozen_regression_aborts_even_though_rollback_succeeded(tm
     assert (root / "tests/test_widget_regression.py").read_text() == "assert False\n"
 
 
+def test_authorized_reviser_cannot_delete_a_still_declared_evaluator(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    target = root / "tests/evaluator.py"
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    reviser = _agent("reviser", ["tests/evaluator.py"])
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+    target.unlink()
+
+    with pytest.raises(permissions.EvaluatorSurfaceUnobservable) as refused:
+        permissions.enforce(run, None, reviser, before, preserved)
+    assert "tests/evaluator.py" in str(refused.value)
+    assert target.read_text() == "assert True\n"
+
+
+def test_authorized_reviser_can_edit_a_complete_evaluator_surface(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    target = root / "tests/evaluator.py"
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    reviser = _agent("reviser", ["tests/evaluator.py"])
+    before = permissions.snapshot(run)
+    target.write_text("assert 1 == 1\n")
+
+    assert permissions.enforce(run, None, reviser, before, {}) == [
+        "tests/evaluator.py"
+    ]
+    assert target.read_text() == "assert 1 == 1\n"
+
+
 def test_same_numstat_rewrite_of_dirty_frozen_regression_is_refused(tmp_path):
     root = _repo(tmp_path, {"tests/test_widget_regression.py": "assert False\n"})
     target = root / "tests/test_widget_regression.py"
