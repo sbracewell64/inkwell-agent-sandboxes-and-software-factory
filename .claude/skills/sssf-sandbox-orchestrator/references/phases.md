@@ -111,9 +111,12 @@ teardown can find.
 2. **VM before key.** A failed mint orphans a VM — cheap, and visible in `ssh exe.dev ls`. A
    failed VM after a successful mint orphans a **key**, which spends money invisibly. Trade the
    visible failure for the invisible one, every time.
-3. **Key last**, named `sbx-<run-id>`, `limit` default `50.00`. The secret is written straight to
+3. **Key last**, named `sbx-<run-id>`, `limit` default `50.00`. Before the API call, CREATE mints
+   and reserves a one-use authority bound to the exact repository HEAD, run, key name, and limit;
+   the provisioning credential is authentication, not approval. The secret is written straight to
    `.sandbox/runs/<id>.key` at mode 600 by a python heredoc that prints only the hash — the key
-   never reaches stdout, a log, a shell variable, or the JSON record.
+   never reaches stdout, a log, a shell variable, or the JSON record. CREATE completes the
+   authority only after the provisioning list observes the new hash.
 
 Nothing in CREATE ever destroys a VM. Every failure path prints the teardown command and leaves
 the box up. The mint response tempfile holds the secret and is shredded on every exit path via
@@ -137,9 +140,9 @@ the box runs before anything that destroys it:
 | VM liveness | asked of the control plane (`ssh exe.dev ls --json`), not probed over ssh. Authoritative, and it is the same answer `reap` uses |
 | 1. spend | read **before** the key dies — after `DELETE` the number is unrecoverable. Prefers the runtime key's own `GET /api/v1/key`; on a re-run where the `.key` file was already shredded it falls back to the provisioning **LIST**, which still carries `usage` per hash |
 | 2. artifacts | skipped if no VM. `ls -d` filters to what exists, so a run that died before writing `app_docs/` is not an error. Empty result removes the dir rather than implying something was pulled |
-| 3. harvest | delegates to `just sbx manage harvest`, **default on**, so nobody loses a run's commits by forgetting. Skipped if no VM, or deliberately with `--no-harvest` when you already harvested. A failure **ABORTS the teardown before revoke and destroy** — destroying a VM whose commits were never pulled is the one irreversible mistake this file can make |
+| 3. harvest | delegates to `just sbx manage harvest`, **default on**, so nobody loses a run's commits by forgetting. `--no-harvest` permits destruction only when the run record positively shows FILL never completed; otherwise it is could-not-observe and no destroy authority is minted. A harvest failure **ABORTS the teardown before revoke and destroy** |
 | 4. revoke | no `key_hash` → nothing to revoke. `2xx` → revoked. `404` → already gone (the idempotent re-run path). Anything else → stop, leave the VM alone. A live `key_hash` with no provisioning key in `.env` is a hard stop, not a warning |
-| 5. destroy | only if the VM is actually alive |
+| 5. destroy | only if the VM is authoritatively present and all required teardown obligations mint a one-use `destroy-only` authority bound to the exact repository HEAD, run, and VM. The capability is reserved before `ssh exe.dev rm` and completed only after the control plane observes absence |
 | 6. close | `close()` is idempotent and **first close wins** — the moment that matters is when the key actually died. Key file shredded (`shred -u`, `rm -P` on macOS), `-f` last so a re-run never fails on an already-removed file |
 | 7. gate | short-circuits to success when no key was ever minted |
 

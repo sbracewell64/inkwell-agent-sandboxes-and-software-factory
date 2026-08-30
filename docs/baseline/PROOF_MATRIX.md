@@ -85,6 +85,10 @@
 | HD-03 qualifying nonempty gate evidence | exact nonempty artifact fixture across existence/content/claim gates | PASS |
 | HD-03 malformed/legacy gate outcome | parser, adapter, migration, console, and trace controls | CNO/REFUSED; NEVER BOOLEAN PASS |
 | B3 portability complete | fresh clone/bootstrap/doctor/mount/teardown without manual intervention | NOT PROVEN |
+| SDLC-L1 effect authority LAW_1 | effect documents carry `sssf-sandbox-effect-authority/v1` in their signed bytes; repository landing authority cannot parse or verify as effect authority | PASS — PROVIDER-FREE WATCHED RED |
+| SDLC-L1 live effect seams | create key mint, observe anonymous exposure, and teardown VM destroy are each preceded by exact-head/target mint and reservation and followed by authoritative completion observation | PASS — STATIC SEAM CONTROL |
+| SDLC-L1 three-valued refusal controls | marker-as-approval, stale/wrong/missing authority, one-use replay, and missing post-effect observation remain FAIL or CNO (exit 1/125), never PASS | PASS — PROVIDER-FREE WATCHED RED |
+| SDLC-L1 default-branch landing | candidate `14a048d533406efa226b9ad5ef68f4cf6a52cf3a` observed on `main` | COULD NOT OBSERVE |
 | B4-001 offline check discovery | run `31907345967` at `29819d98ea2b046bc432bde2a3e9cd42be7640a4`: each OS discovered and executed 6/6 checks | PASS |
 | B4-001 non-vacuous projection | each job retained 6 observed-good, 0 observed-bad, and 0 could-not-observe results | PASS |
 | B4-001 watched-red controls | empty checks/matrix, validator failure, missing tool, cancellation/timeout, workflow path/trigger drift, and exact-head ref drift each observed red | PASS |

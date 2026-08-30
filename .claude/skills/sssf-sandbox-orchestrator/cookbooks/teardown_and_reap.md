@@ -51,6 +51,13 @@ git log --oneline --graph sandbox/<run-id>/main
 in `ssh exe.dev ls`, cheap, obvious. The reverse leaves a live key nobody can find — invisible, and it
 spends. Order the failure modes, not the happy path.
 
+**5 — typed destroy authority.** Destruction requires named teardown obligations to be
+`observed-good`. Teardown mints and reserves a one-use `destroy-only` capability bound to the exact
+repository HEAD, run, and VM before `ssh exe.dev rm`, then completes it only after the authoritative
+VM list observes absence. A landing authorization, environment/prose marker, flag, or recipe ordering
+cannot substitute for this capability. Control-plane ambiguity exits 125 and retains the reservation
+for reconciliation.
+
 **6 — close the record, shred the key file.** `closed_at` non-null is what `reap` reads as "this run
 is over." The key file gets `shred -u` where available, `rm -P` on macOS.
 
@@ -86,6 +93,7 @@ Two places it stops on purpose:
 |---|---|---|
 | `key_hash` is set but `OPENROUTER_PROVISIONING_KEY` is unset | reports and exits 1, **VM left alone** | a live key keeps spending; that is the bigger problem, and destroying the VM would not fix it |
 | `DELETE` returns anything but 2xx or 404 | reports and exits 1, **VM left alone** | the key may still be live. Do not compound an unknown state by destroying the evidence |
+| `--no-harvest` is used after FILL recorded `commit_sha` | reports could-not-observe and exits 125, **VM left alone** | skipping the read is not proof that commits are safe; harvest them and rerun teardown |
 
 `404` on the DELETE is treated as success — it means a previous run already revoked it.
 
