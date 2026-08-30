@@ -3,16 +3,31 @@
 
 This is the single deterministic validation owner for the planning/lifecycle
 foundation. It reads the canonical lifecycle contract, the durable planning
-state record, linked planning surfaces, and a pre-fetched Git tracking ref for
-current planning authority. It performs no fetch, network, feed, watcher,
-FirstMate, provider, or runtime action. Watched-red controls mutate only
-in-memory copies; Git observation is read-only.
+state record, linked planning surfaces, and the authority bytes at the
+generation the planning documents themselves record.
+
+The authority input is the RECORDED generation, never the moving
+``planning/future-sssf`` branch ref. A binding that is exact against its ruled
+generation stays exact when the planning branch advances, so planning-branch
+movement cannot redden this validation. Where the recorded commit is already in
+an object store - the worktree's own, or an evidence-side store named by
+``SSSF_PLANNING_AUTHORITY_GIT_DIR`` - observation is entirely offline. Only when
+that immutable object is absent does this validator ask the remote for that one
+object by SHA, writing no shared ref; a fetch that cannot supply it is
+could-not-observe, never a pass.
+
+Where the local tracking ref points is reported as a separate advisory
+observation. It never contributes an error.
+
+It performs no feed, watcher, FirstMate, provider, or runtime action.
+Watched-red controls mutate only in-memory copies; Git observation is read-only.
 """
 
 from __future__ import annotations
 
 import copy
 import json
+import os
 import posixpath
 import re
 import subprocess
@@ -91,6 +106,11 @@ EXPECTED_CURRENT_MAIN_ADRS = [
 ]
 AUTHORITATIVE_PLANNING_REF = "planning/future-sssf"
 AUTHORITATIVE_PLANNING_TRACKING_REF = "refs/remotes/origin/planning/future-sssf"
+# The recorded generation names one immutable commit, so the object can be asked
+# for by SHA. Qualification therefore never requires a lane or CI job to
+# force-write the shared tracking ref above; that ref is only ever advisory here.
+AUTHORITY_FETCH_REMOTE = "origin"
+AUTHORITY_GIT_DIR_ENV = "SSSF_PLANNING_AUTHORITY_GIT_DIR"
 AUTHORITATIVE_PLANNING_PATHS = (
     "docs/development/FUTURE_CANDIDATES.md",
     "docs/development/ROADMAP.md",
@@ -153,6 +173,8 @@ CLOSURE_REQUIRED_TESTS = (
     "tests/test_planning_foundation.py::test_closure_gate_requires_nonempty_exact_test_universe",
     "tests/test_planning_foundation.py::test_closure_gate_includes_unrelated_notimplementederror_regression",
     "tests/test_planning_foundation.py::test_older_consistent_snapshot_cannot_replace_authoritative_generation",
+    "tests/test_planning_foundation.py::test_recorded_generation_rules_and_live_ref_movement_is_advisory_only",
+    "tests/test_planning_foundation.py::test_tampered_recorded_generation_is_nonpass",
     "tests/test_planning_foundation.py::test_authority_projection_preserves_sbx2_state_and_rejects_missing_identity",
     "tests/test_planning_foundation.py::test_authority_projection_derives_bound1_predecessor_markers",
     "tests/test_planning_foundation.py::test_sbx2_state_is_observed_from_authority_not_candidate_expectation",
@@ -170,6 +192,8 @@ CONTAINMENT_CLOSURE_NODEIDS = (
     "tests/test_planning_foundation.py::test_every_retained_proven_evidence_symlink_to_outside_root_is_rejected",
 )
 AUTHORITY_CLOSURE_NODEIDS = (
+    "tests/test_planning_foundation.py::test_recorded_generation_rules_and_live_ref_movement_is_advisory_only",
+    "tests/test_planning_foundation.py::test_tampered_recorded_generation_is_nonpass",
     "tests/test_planning_foundation.py::test_sbx2_state_is_observed_from_authority_not_candidate_expectation",
     "tests/test_planning_foundation.py::test_missing_governed_identity_or_bound1_predecessor_is_nonpass",
     "tests/test_planning_foundation.py::test_authority_projection_rejects_missing_duplicate_or_conflicting_governed_identities",
@@ -200,10 +224,11 @@ class _DuplicateKey(ValueError):
     pass
 
 
-def _git_output(root: Path, *arguments: str) -> str | None:
+def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str | None:
+    prefix = ["--git-dir", str(git_dir)] if git_dir is not None else []
     try:
         result = subprocess.run(
-            ["git", *arguments],
+            ["git", *prefix, *arguments],
             cwd=root,
             check=True,
             capture_output=True,
@@ -213,6 +238,39 @@ def _git_output(root: Path, *arguments: str) -> str | None:
         return None
     value = result.stdout.strip()
     return value or None
+
+
+AUTHORITY_FETCH_TIMEOUT_SECONDS = 30
+
+
+def _git_succeeded(root: Path, *arguments: str) -> bool:
+    """Run git for its effect. A silent success is not a could-not-observe.
+
+    Bounded and non-interactive: an unreachable or credential-gated remote must
+    return could-not-observe promptly, never block the gate on a prompt.
+    """
+    environment = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="", GCM_INTERACTIVE="never")
+    try:
+        subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=AUTHORITY_FETCH_TIMEOUT_SECONDS,
+        )
+    except (OSError, UnicodeError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return False
+    return True
+
+
+def _authority_git_dir() -> Path | None:
+    """An evidence-side object store holding the recorded authority commit."""
+    raw = os.environ.get(AUTHORITY_GIT_DIR_ENV, "").strip()
+    if not raw:
+        return None
+    return Path(raw)
 
 
 def _authority_generation(commit: str, tree: str) -> str:
@@ -228,26 +286,149 @@ def _authority_identity_line(observation: dict[str, Any]) -> str:
     )
 
 
-def _observe_authoritative_planning_source(root: Path) -> tuple[dict[str, Any] | None, str | None]:
-    """Observe the fetched authority ref rather than trusting candidate constants."""
-    commit = _git_output(
+def _recorded_authority_declaration(
+    state: Any,
+) -> tuple[dict[str, str] | None, str | None]:
+    """Read the authority generation the planning documents themselves record.
+
+    This declaration - not the moving branch ref - is the authority input. A
+    shape defect here is an observed defect in the candidate's own record, so
+    it is returned as an error rather than an unobservability.
+    """
+    source = state.get("authoritative_planning_source") if isinstance(state, dict) else None
+    if not isinstance(source, dict):
+        return None, "recorded authoritative planning source is missing or malformed"
+    fields = {}
+    for key in ("ref", "tracking_ref", "source_commit", "source_tree", "generation"):
+        value = source.get(key)
+        if not isinstance(value, str) or not value:
+            return None, f"recorded authoritative planning source lacks {key}"
+        fields[key] = value
+    if fields["ref"] != AUTHORITATIVE_PLANNING_REF:
+        return None, (
+            "recorded authoritative planning ref is not the governed ref: " + fields["ref"]
+        )
+    if fields["tracking_ref"] != AUTHORITATIVE_PLANNING_TRACKING_REF:
+        return None, (
+            "recorded authoritative planning tracking ref is not the governed tracking ref: "
+            + fields["tracking_ref"]
+        )
+    for key in ("source_commit", "source_tree"):
+        if not FULL_SHA.fullmatch(fields[key]):
+            return None, (
+                f"recorded authoritative planning {key} is not a full object identity: "
+                + fields[key]
+            )
+    expected_generation = _authority_generation(fields["source_commit"], fields["source_tree"])
+    if fields["generation"] != expected_generation:
+        return None, (
+            "recorded authoritative planning generation does not name its own recorded "
+            f"commit and tree: {fields['generation']}"
+        )
+    return fields, None
+
+
+def _resolve_recorded_authority_commit(
+    root: Path, commit: str, git_dir: Path | None
+) -> tuple[str | None, str | None]:
+    """Resolve exactly the recorded commit, never a ref that can move under it."""
+    resolved = _git_output(root, "rev-parse", "--verify", f"{commit}^{{commit}}", git_dir=git_dir)
+    if resolved is not None:
+        return resolved, None
+    if git_dir is not None:
+        return None, (
+            f"recorded authority commit is absent from {AUTHORITY_GIT_DIR_ENV}: {commit}"
+        )
+    # The object is immutable and named by SHA, so asking the remote for that
+    # one object cannot change what is observed - only whether it can be
+    # observed at all. No shared ref is written.
+    _git_succeeded(
         root,
-        "rev-parse",
-        "--verify",
-        f"{AUTHORITATIVE_PLANNING_TRACKING_REF}^{{commit}}",
+        "fetch",
+        "--no-tags",
+        "--no-write-fetch-head",
+        "--depth=1",
+        AUTHORITY_FETCH_REMOTE,
+        commit,
+    )
+    resolved = _git_output(root, "rev-parse", "--verify", f"{commit}^{{commit}}")
+    if resolved is None:
+        return None, f"recorded authority commit is unavailable locally and unfetchable: {commit}"
+    return resolved, None
+
+
+def _observe_authoritative_planning_source(
+    root: Path, declaration: dict[str, str]
+) -> tuple[dict[str, Any] | None, str | None, str | None]:
+    """Observe the authority bytes at the recorded generation.
+
+    Returns the observation, a could-not-observe reason, and an observed-defect
+    reason, in that order. Exactly one of the three is ever populated.
+    """
+    git_dir = _authority_git_dir()
+    commit, unavailable = _resolve_recorded_authority_commit(
+        root, declaration["source_commit"], git_dir
     )
     if commit is None:
-        return None, f"authority tracking ref unavailable: {AUTHORITATIVE_PLANNING_TRACKING_REF}"
-    tree = _git_output(root, "rev-parse", "--verify", f"{commit}^{{tree}}")
+        return None, unavailable, None
+    tree = _git_output(root, "rev-parse", "--verify", f"{commit}^{{tree}}", git_dir=git_dir)
     if tree is None:
-        return None, f"authority tree unavailable for observed commit: {commit}"
+        return None, f"authority tree unavailable for recorded commit: {commit}", None
+    if tree != declaration["source_tree"]:
+        # Git, not the candidate, computed this tree. A recorded tree that does
+        # not belong to the recorded commit is a defect we observed, not a
+        # missing observation.
+        return None, None, (
+            "recorded authoritative planning tree does not belong to the recorded commit: "
+            f"{commit} has tree {tree}, record declares {declaration['source_tree']}"
+        )
     blobs: dict[str, str] = {}
     for relative in AUTHORITATIVE_PLANNING_PATHS:
-        blob = _git_output(root, "show", f"{commit}:{relative}")
+        blob = _git_output(root, "show", f"{commit}:{relative}", git_dir=git_dir)
         if blob is None:
-            return None, f"authority source path unavailable at {commit}: {relative}"
+            return None, f"authority source path unavailable at {commit}: {relative}", None
         blobs[relative] = blob
-    return _project_authoritative_planning_blobs(commit, tree, blobs)
+    observation, observation_error = _project_authoritative_planning_blobs(commit, tree, blobs)
+    return observation, observation_error, None
+
+
+def _observe_live_planning_ref(root: Path, declaration: dict[str, str]) -> dict[str, Any]:
+    """Report where the local tracking ref points. Advisory only, never an error.
+
+    The recorded generation rules this validation, so a moved planning branch is
+    a distinct observation to surface - not a failure of a binding that is still
+    exact against the generation it was ruled at.
+    """
+    tracking_ref = declaration["tracking_ref"]
+    recorded = declaration["source_commit"]
+    commit = _git_output(root, "rev-parse", "--verify", f"{tracking_ref}^{{commit}}")
+    if commit is None:
+        agreement = "could-not-observe"
+        advisory = (
+            f"local tracking ref {tracking_ref} is unavailable, so planning-branch movement "
+            f"could not be observed; the recorded authority generation {declaration['generation']} "
+            "rules this validation either way"
+        )
+    elif commit == recorded:
+        agreement = "same"
+        advisory = (
+            f"local tracking ref {tracking_ref} points at the recorded authority commit "
+            f"{recorded}; note this is the local ref, which a pre-fetch may have pinned"
+        )
+    else:
+        agreement = "moved"
+        advisory = (
+            f"planning authority has moved: local tracking ref {tracking_ref} points at "
+            f"{commit}, while the recorded authority generation is {declaration['generation']}; "
+            "this validation is bound to the recorded generation and is not failed by the move"
+        )
+    return {
+        "tracking_ref": tracking_ref,
+        "recorded_commit": recorded,
+        "local_tracking_commit": commit,
+        "agreement": agreement,
+        "advisory": advisory,
+    }
 
 
 def _project_authoritative_planning_blobs(
@@ -403,6 +584,7 @@ def _machine_result(
     *,
     errors: list[str] | tuple[str, ...] = (),
     cno: list[str] | tuple[str, ...] = (),
+    advisories: list[str] | tuple[str, ...] = (),
 ) -> dict[str, Any]:
     if status == "observed-good":
         outcome, result_status = "PASS", "OBSERVED_GOOD"
@@ -416,6 +598,8 @@ def _machine_result(
         "status": result_status,
         "errors": list(errors),
         "unverified_controls": list(cno),
+        # Reported, never folded: an advisory carries no outcome of its own.
+        "advisories": list(advisories),
     }
 
 
@@ -783,17 +967,39 @@ def load_project(root: Path = ROOT) -> dict[str, Any]:
     else:
         ci_error = "CI manifest is empty or unreadable"
 
-    authority_observation, authority_observation_error = _observe_authoritative_planning_source(root)
+    declaration, declaration_error = _recorded_authority_declaration(state)
+    authority_declaration_errors: list[str] = []
+    authority_observation: dict[str, Any] | None = None
+    authority_observation_error: str | None = None
+    authority_live_ref: dict[str, Any] | None = None
+    if declaration is None:
+        assert declaration_error is not None
+        authority_declaration_errors.append(declaration_error)
+    else:
+        (
+            authority_observation,
+            authority_observation_error,
+            observed_defect,
+        ) = _observe_authoritative_planning_source(root, declaration)
+        if observed_defect is not None:
+            authority_declaration_errors.append(observed_defect)
+        authority_live_ref = _observe_live_planning_ref(root, declaration)
     return {
         "root": root,
+        # Where the authority objects were actually read from. Fixtures may
+        # repoint "root" at a scratch tree; the object store must not follow.
+        "authority_root": root,
         "surfaces": surfaces,
         "adr_documents": adr_documents,
         "state": state,
         "state_error": state_error,
         "ci_manifest": ci_manifest,
         "ci_error": ci_error,
+        "authority_declaration": declaration,
+        "authority_declaration_errors": authority_declaration_errors,
         "authority_observation": authority_observation,
         "authority_observation_error": authority_observation_error,
+        "authority_live_ref": authority_live_ref,
         "unreadable": unreadable,
     }
 
@@ -961,6 +1167,9 @@ def _validate_authoritative_planning_source(
     project: dict[str, Any], errors: list[str]
 ) -> None:
     state = project.get("state")
+    # A malformed or self-contradictory recorded generation is an observed
+    # defect in the record this validator is bound to, never advice.
+    errors.extend(project.get("authority_declaration_errors", []))
     observation = project.get("authority_observation")
     if not isinstance(observation, dict):
         errors.append("current planning authority observation is missing")
@@ -2148,6 +2357,137 @@ def _expect_authority_nonpass(
         failures.append(name)
 
 
+def _expect_recorded_generation_tamper_nonpass(
+    project: dict[str, Any], failures: list[str], could_not_observe: list[str]
+) -> None:
+    """Prove the recorded generation is checked against Git, not merely echoed.
+
+    Binding the observation to the record would be vacuous if the record could
+    name whatever it liked, so tamper each recorded field and re-run the real
+    observation against the real object store.
+    """
+    declaration = project.get("authority_declaration")
+    root = project.get("authority_root")
+    if not isinstance(declaration, dict) or not isinstance(root, Path):
+        failures.append("recorded-generation-tamper-input-missing")
+        return
+
+    desynced = dict(
+        declaration, generation=_authority_generation("0" * 40, "1" * 40)
+    )
+    parsed, shape_error = _recorded_authority_declaration(
+        {"authoritative_planning_source": desynced}
+    )
+    if parsed is not None or not shape_error:
+        failures.append("recorded-generation-desynced-declaration")
+
+    for key in ("source_commit", "source_tree"):
+        malformed = dict(declaration, **{key: "not-an-object-identity"})
+        # Keep the generation string agreeing with the malformed field, so only
+        # the object-identity shape check can refuse it.
+        malformed["generation"] = _authority_generation(
+            malformed["source_commit"], malformed["source_tree"]
+        )
+        parsed, shape_error = _recorded_authority_declaration(
+            {"authoritative_planning_source": malformed}
+        )
+        if parsed is not None or not shape_error:
+            failures.append(f"recorded-generation-malformed-{key.replace('_', '-')}")
+
+    # Git, not the record, computes the tree for the recorded commit. A recorded
+    # tree that does not belong to it must be an observed defect.
+    foreign_tree = "0" * 40
+    tampered_tree = dict(
+        declaration,
+        source_tree=foreign_tree,
+        generation=_authority_generation(declaration["source_commit"], foreign_tree),
+    )
+    observation, _, defect = _observe_authoritative_planning_source(root, tampered_tree)
+    if observation is not None or defect is None:
+        failures.append("recorded-generation-tree-tamper")
+
+    # The hard case no object store can catch on its own: a repoint at a
+    # different generation carrying byte-identical authority content, with the
+    # record rewritten to agree with itself. Only the authority identity every
+    # other planning surface records can still refuse it. Build it from the
+    # observed blobs so the control is exact, offline, and needs no second commit.
+    observed = project.get("authority_observation")
+    if not isinstance(observed, dict) or not isinstance(observed.get("source_blobs"), dict):
+        could_not_observe.append(
+            "recorded-generation-commit-tamper: authority blobs could not be observed"
+        )
+        return
+    foreign_commit, foreign_tree = "a" * 40, "b" * 40
+    repointed = dict(
+        declaration,
+        source_commit=foreign_commit,
+        source_tree=foreign_tree,
+        generation=_authority_generation(foreign_commit, foreign_tree),
+    )
+    replacement, replacement_error = _project_authoritative_planning_blobs(
+        foreign_commit, foreign_tree, copy.deepcopy(observed["source_blobs"])
+    )
+    if replacement is None:
+        could_not_observe.append(
+            "recorded-generation-commit-tamper: identical-content repoint could not be "
+            f"projected: {replacement_error}"
+        )
+        return
+    mutated = copy.deepcopy(project)
+    mutated["authority_declaration"] = repointed
+    mutated["authority_observation"] = replacement
+    mutated["authority_observation_error"] = None
+    recorded_source = mutated["state"]["authoritative_planning_source"]
+    identity_rule = (
+        recorded_source.get("identity_rule") if isinstance(recorded_source, dict) else None
+    )
+    mutated["state"]["authoritative_planning_source"] = dict(
+        repointed,
+        identity_rule=identity_rule if isinstance(identity_rule, str) else "",
+    )
+    status, _ = validate_project(mutated, run_controls=False)
+    if status == "observed-good":
+        failures.append("recorded-generation-commit-tamper")
+
+
+def _expect_live_ref_movement_advisory_only(
+    project: dict[str, Any], failures: list[str]
+) -> None:
+    """Prove planning-branch movement stays advisory.
+
+    The recorded generation rules the result, so every possible reading of the
+    live tracking ref - agreeing, moved, or unobservable - must leave the
+    validation byte-identical.
+    """
+    baseline_status, baseline_errors = validate_project(project, run_controls=False)
+    recorded = project.get("authority_declaration")
+    recorded_commit = (
+        recorded.get("source_commit") if isinstance(recorded, dict) else "0" * 40
+    )
+    readings = (
+        ("same", recorded_commit),
+        ("moved", "9" * 40),
+        ("could-not-observe", None),
+    )
+    for agreement, commit in readings:
+        variant = copy.deepcopy(project)
+        variant["authority_live_ref"] = {
+            "tracking_ref": AUTHORITATIVE_PLANNING_TRACKING_REF,
+            "recorded_commit": recorded_commit,
+            "local_tracking_commit": commit,
+            "agreement": agreement,
+            "advisory": f"control reading: {agreement}",
+        }
+        advisories: list[str] = []
+        status, errors = validate_project(
+            variant, run_controls=False, advisories=advisories
+        )
+        if (status, errors) != (baseline_status, baseline_errors):
+            failures.append(f"live-ref-{agreement}-changed-the-result")
+        if advisories != [f"control reading: {agreement}"]:
+            failures.append(f"live-ref-{agreement}-was-not-reported-as-advisory")
+
+
 def _remove_authority_heading(blobs: dict[str, str], identity: str) -> None:
     path = "docs/development/ROADMAP.md"
     blocks = _identity_heading_blocks(blobs[path], identity)
@@ -2441,6 +2781,9 @@ def _watched_red_controls(
         "stale, missing, or mismatched",
         failures,
     )
+
+    _expect_recorded_generation_tamper_nonpass(project, failures, control_cno)
+    _expect_live_ref_movement_advisory_only(project, failures)
 
     def promote_sbx2_authority(blobs: dict[str, str]) -> None:
         path = "docs/development/ROADMAP.md"
@@ -2792,16 +3135,28 @@ def _watched_red_controls(
     return failures
 
 
+def _collect_advisories(project: dict[str, Any], advisories: list[str] | None) -> None:
+    """Advisory observations are reported beside the result, never folded into it."""
+    if advisories is None:
+        return
+    live = project.get("authority_live_ref")
+    if isinstance(live, dict) and isinstance(live.get("advisory"), str):
+        if live["advisory"] not in advisories:
+            advisories.append(live["advisory"])
+
+
 def validate_project(
     project: dict[str, Any],
     *,
     run_controls: bool = True,
     control_cno: list[str] | None = None,
     control_failures: list[str] | None = None,
+    advisories: list[str] | None = None,
 ) -> tuple[str, list[str]]:
     errors: list[str] = []
     cno: list[str] = []
     red_failures: list[str] = []
+    _collect_advisories(project, advisories)
     _check_required_files(project, errors, cno)
     if cno:
         _validate_complete_projection_prose(project, errors)
@@ -2842,19 +3197,28 @@ def validate_project(
 
 
 def validate_path(
-    root: Path = ROOT, *, control_cno: list[str] | None = None
+    root: Path = ROOT,
+    *,
+    control_cno: list[str] | None = None,
+    advisories: list[str] | None = None,
 ) -> tuple[str, list[str], list[str]]:
     project = load_project(root)
     red_failures: list[str] = []
     status, errors = validate_project(
-        project, control_cno=control_cno, control_failures=red_failures
+        project,
+        control_cno=control_cno,
+        control_failures=red_failures,
+        advisories=advisories,
     )
     return status, errors, red_failures
 
 
 def main() -> int:
     control_cno: list[str] = []
-    status, errors, red_failures = validate_path(ROOT, control_cno=control_cno)
+    advisories: list[str] = []
+    status, errors, red_failures = validate_path(
+        ROOT, control_cno=control_cno, advisories=advisories
+    )
     closure_status, closure_errors = run_test_closure()
     if closure_status == "observed-bad":
         status = "observed-bad"
@@ -2867,11 +3231,16 @@ def main() -> int:
             for error in closure_errors
             if "test-closure: " + error not in control_cno
         )
-    result = _machine_result(status, errors=errors, cno=control_cno)
+    result = _machine_result(
+        status, errors=errors, cno=control_cno, advisories=advisories
+    )
     print(f"planning foundation validation: {status}")
     print(json.dumps(result, sort_keys=True))
     print(f"lifecycle owner: {LIFECYCLE_OWNER}")
     print(f"validation owner: {VALIDATION_OWNER}")
+    print(f"authority input: recorded generation in {SURFACE_PATHS['state'].as_posix()}")
+    for advisory in advisories:
+        print(f"advisory: {advisory}")
     print(
         "watched-red: stale-contradictory-adr-status, stale-complete-projection-prose, "
         "stale-complete-projection-state, duplicate-complete-projection-state, "
@@ -2880,7 +3249,12 @@ def main() -> int:
         "omitted-future-item-projection, "
         "omitted-wayfinder-lifecycle-identity, demoted-sbx-lifecycle-identity, "
         "omitted-bound1-predecessor, out-of-scope-sbx2-readiness, "
-        "candidate-authored-stale-generation-self-consistency, authority-sbx2-promotion, "
+        "candidate-authored-stale-generation-self-consistency, "
+        "recorded-generation-desynced-declaration, "
+        "recorded-generation-malformed-source-commit, "
+        "recorded-generation-malformed-source-tree, "
+        "recorded-generation-tree-tamper, recorded-generation-commit-tamper, "
+        "live-ref-movement-is-advisory-only, authority-sbx2-promotion, "
         "authority-omitted-governed-identities, authority-duplicate-headings-and-states, "
         "authority-wayfinder-0-state-change, "
         "authority-ungoverned-identity-in-governed-families, "

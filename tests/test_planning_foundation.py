@@ -223,7 +223,8 @@ def test_closure_gate_includes_unrelated_notimplementederror_regression() -> Non
 def test_closure_gate_counts_skipped_containment_as_cno(monkeypatch) -> None:
     required = _VALIDATOR.CLOSURE_REQUIRED_TESTS
     containment = _VALIDATOR.CONTAINMENT_CLOSURE_NODEIDS
-    assert len(required) == 18
+    assert len(required) == 20
+    assert len(set(required)) == len(required)
     assert set(containment).issubset(required)
 
     skipped_reports = tuple(
@@ -380,6 +381,197 @@ def _authority_blob_fixture() -> dict[str, str]:
             "Planning state:** `SEQUENCED`\ncomplete and qualify before `SBX-2` activation"
         ),
     }
+
+
+def test_recorded_generation_rules_and_live_ref_movement_is_advisory_only() -> None:
+    """Movement of the planning branch must not redden a binding ruled elsewhere."""
+    project = _VALIDATOR.load_project()
+    recorded = project["state"]["authoritative_planning_source"]
+    declaration = project["authority_declaration"]
+    observation = project["authority_observation"]
+
+    if observation is None:
+        # The authority bytes at the recorded generation could not be read at
+        # all. That is a real third result, not a pass and not a defect.
+        assert project["authority_observation_error"]
+        status, _ = _VALIDATOR.validate_project(project, run_controls=False)
+        assert status == "could-not-observe"
+        return
+
+    # The authority input is the recorded generation, read from the planning
+    # documents themselves - not whatever the branch ref happens to point at.
+    assert declaration["source_commit"] == recorded["source_commit"]
+    assert declaration["source_tree"] == recorded["source_tree"]
+    assert observation["source_commit"] == recorded["source_commit"]
+    assert observation["source_tree"] == recorded["source_tree"]
+    assert observation["generation"] == recorded["generation"]
+
+    live = project["authority_live_ref"]
+    assert live["tracking_ref"] == _VALIDATOR.AUTHORITATIVE_PLANNING_TRACKING_REF
+    assert live["agreement"] in {"same", "moved", "could-not-observe"}
+    assert live["recorded_commit"] == recorded["source_commit"]
+
+    baseline_status, baseline_errors = _VALIDATOR.validate_project(
+        project, run_controls=False
+    )
+    assert baseline_status == "observed-good", baseline_errors
+
+    # Every reading of the live ref - agreeing, moved, unobservable - must leave
+    # the recorded-generation validation byte-identical, and appear only as advice.
+    for agreement, commit in (
+        ("same", recorded["source_commit"]),
+        ("moved", "9" * 40),
+        ("could-not-observe", None),
+    ):
+        variant = copy.deepcopy(project)
+        variant["authority_live_ref"] = {
+            "tracking_ref": _VALIDATOR.AUTHORITATIVE_PLANNING_TRACKING_REF,
+            "recorded_commit": recorded["source_commit"],
+            "local_tracking_commit": commit,
+            "agreement": agreement,
+            "advisory": f"test reading: {agreement}",
+        }
+        advisories: list[str] = []
+        status, errors = _VALIDATOR.validate_project(
+            variant, run_controls=False, advisories=advisories
+        )
+        assert (status, errors) == (baseline_status, baseline_errors)
+        assert advisories == [f"test reading: {agreement}"]
+
+    # A real moved ref produces an advisory naming both generations and saying
+    # plainly that it does not fail the validation.
+    moved_advisory = _VALIDATOR._observe_live_planning_ref(
+        _VALIDATOR.ROOT,
+        dict(declaration, source_commit="9" * 40, source_tree="8" * 40,
+             generation=_VALIDATOR._authority_generation("9" * 40, "8" * 40)),
+    )
+    assert moved_advisory["agreement"] in {"moved", "could-not-observe"}
+    if moved_advisory["agreement"] == "moved":
+        assert moved_advisory["local_tracking_commit"] in moved_advisory["advisory"]
+        assert "9" * 40 in moved_advisory["advisory"]
+        assert "not failed by the move" in moved_advisory["advisory"]
+
+    result = _VALIDATOR._machine_result(
+        baseline_status, errors=baseline_errors, cno=[], advisories=["moved"]
+    )
+    assert result["outcome"] == "PASS"
+    assert result["advisories"] == ["moved"]
+
+
+def test_tampered_recorded_generation_is_nonpass() -> None:
+    """Binding to the record must not make the record self-certifying."""
+    project = _VALIDATOR.load_project()
+    declaration = project["authority_declaration"]
+    root = project["authority_root"]
+
+    if project["authority_observation"] is None:
+        assert project["authority_observation_error"]
+        status, _ = _VALIDATOR.validate_project(project, run_controls=False)
+        assert status == "could-not-observe"
+        return
+
+    # Git computes the tree for the recorded commit; a recorded tree that does
+    # not belong to it is an observed defect, not a missing observation.
+    foreign_tree = "0" * 40
+    observation, unobservable, defect = _VALIDATOR._observe_authoritative_planning_source(
+        root,
+        dict(
+            declaration,
+            source_tree=foreign_tree,
+            generation=_VALIDATOR._authority_generation(
+                declaration["source_commit"], foreign_tree
+            ),
+        ),
+    )
+    assert observation is None
+    assert unobservable is None
+    assert defect and "does not belong to the recorded commit" in defect
+
+    # A generation string desynced from its own recorded commit and tree.
+    parsed, error = _VALIDATOR._recorded_authority_declaration(
+        {
+            "authoritative_planning_source": dict(
+                declaration,
+                generation=_VALIDATOR._authority_generation("0" * 40, "1" * 40),
+            )
+        }
+    )
+    assert parsed is None
+    assert error and "does not name its own recorded" in error
+
+    # Object identities that are not object identities at all.
+    for key in ("source_commit", "source_tree"):
+        malformed = dict(declaration, **{key: "not-an-object-identity"})
+        malformed["generation"] = _VALIDATOR._authority_generation(
+            malformed["source_commit"], malformed["source_tree"]
+        )
+        parsed, error = _VALIDATOR._recorded_authority_declaration(
+            {"authoritative_planning_source": malformed}
+        )
+        assert parsed is None
+        assert error and "not a full object identity" in error
+
+    # A recorded commit that no reachable object store can supply is
+    # could-not-observe: never a pass, and never mistaken for a defect.
+    def refuse_fetch(root_argument, *arguments):
+        return False
+
+    original_fetch = _VALIDATOR._git_succeeded
+    _VALIDATOR._git_succeeded = refuse_fetch
+    try:
+        observation, unobservable, defect = (
+            _VALIDATOR._observe_authoritative_planning_source(
+                root,
+                dict(
+                    declaration,
+                    source_commit="0" * 40,
+                    generation=_VALIDATOR._authority_generation(
+                        "0" * 40, declaration["source_tree"]
+                    ),
+                ),
+            )
+        )
+    finally:
+        _VALIDATOR._git_succeeded = original_fetch
+    assert observation is None
+    assert defect is None
+    assert isinstance(unobservable, str) and unobservable.strip()
+
+    # A whole-record repoint at a different generation carrying byte-identical
+    # authority content is still refused, by the authority identity every other
+    # planning surface records.
+    foreign_commit, foreign_tree = "a" * 40, "b" * 40
+    repointed = dict(
+        declaration,
+        source_commit=foreign_commit,
+        source_tree=foreign_tree,
+        generation=_VALIDATOR._authority_generation(foreign_commit, foreign_tree),
+    )
+    replacement, replacement_error = _VALIDATOR._project_authoritative_planning_blobs(
+        foreign_commit,
+        foreign_tree,
+        copy.deepcopy(project["authority_observation"]["source_blobs"]),
+    )
+    assert replacement_error is None and replacement is not None
+    tampered = copy.deepcopy(project)
+    tampered["authority_declaration"] = repointed
+    tampered["authority_observation"] = replacement
+    tampered["authority_observation_error"] = None
+    tampered["state"]["authoritative_planning_source"] = dict(
+        repointed,
+        identity_rule=project["state"]["authoritative_planning_source"]["identity_rule"],
+    )
+    status, errors = _VALIDATOR.validate_project(tampered, run_controls=False)
+    assert status == "observed-bad"
+    assert any("not bound to observed authoritative planning generation" in e for e in errors)
+
+    # And a malformed record cannot slip through as advice.
+    unrecorded = copy.deepcopy(project)
+    unrecorded["authority_declaration_errors"] = ["recorded generation is unusable"]
+    unrecorded["authority_observation"] = None
+    status, errors = _VALIDATOR.validate_project(unrecorded, run_controls=False)
+    assert status == "observed-bad"
+    assert "recorded generation is unusable" in errors
 
 
 def test_authority_projection_preserves_sbx2_state_and_rejects_missing_identity() -> None:
