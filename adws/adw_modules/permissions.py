@@ -324,6 +324,7 @@ def _ignored_member_is_hidden(run, path: str, paths: dict[str, str]) -> bool:
     try:
         metadata = target.lstat()
         target_suffix = ""
+        executable_prefix = b""
         if stat.S_ISLNK(metadata.st_mode):
             resolved = target.resolve(strict=True)
             try:
@@ -339,9 +340,13 @@ def _ignored_member_is_hidden(run, path: str, paths: dict[str, str]) -> bool:
                     "permission could-not-observe protected evaluator surface; "
                     f"symlink target is not a regular file: {path}"
                 )
-            with resolved.open("rb") as stream:
-                stream.read(1)
             target_suffix = resolved.suffix.lower()
+            content = resolved
+        else:
+            content = target
+        if stat.S_ISREG(metadata.st_mode):
+            with content.open("rb") as stream:
+                executable_prefix = stream.read(2)
     except SnapshotUnobservable:
         raise
     except OSError as error:
@@ -350,7 +355,11 @@ def _ignored_member_is_hidden(run, path: str, paths: dict[str, str]) -> bool:
             f"symlink target is dangling or unreadable: {path}"
         ) from error
     suffixes = {PurePosixPath(path).suffix.lower(), target_suffix}
-    return bool(metadata.st_mode & 0o111) or bool(suffixes & EXECUTABLE_SUFFIXES)
+    return (
+        bool(metadata.st_mode & 0o111)
+        or bool(suffixes & EXECUTABLE_SUFFIXES)
+        or executable_prefix == b"#!"
+    )
 
 
 def _gitignore_observation(run, paths: dict[str, str]) \
