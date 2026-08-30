@@ -235,8 +235,18 @@ def test_oversized_dirty_frozen_evaluator_is_left_and_named(tmp_path):
 
 @pytest.mark.parametrize("path", [
     "tests/ evaluator.py ",
-    "tests/eval\tuator.py",
-    "tests/eval\nuator.py",
+    pytest.param(
+        "tests/eval\tuator.py",
+        marks=pytest.mark.skipif(
+            os.name == "nt", reason="Windows forbids tabs in filenames"
+        ),
+    ),
+    pytest.param(
+        "tests/eval\nuator.py",
+        marks=pytest.mark.skipif(
+            os.name == "nt", reason="Windows forbids newlines in filenames"
+        ),
+    ),
 ])
 def test_dirty_frozen_pathnames_are_never_misclassified_clean(tmp_path, path):
     original = "a" * (permissions.PRESERVE_MAX_BYTES + 1)
