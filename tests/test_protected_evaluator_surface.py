@@ -355,6 +355,54 @@ def test_untracked_evaluator_revision_creates_a_generation(tmp_path):
     assert _owner("evidence_is_current")(first, run) is False
 
 
+def test_gitignored_declared_evaluator_refuses_and_names_visibility(tmp_path):
+    root = _repo(tmp_path, {"tests/evaluator.py": "assert True\n"})
+    run = _Run(root, _cfg(frozen=["tests/"]))
+    (root / ".gitignore").write_text("tests/hidden_evaluator.py\n")
+    (root / "tests/hidden_evaluator.py").write_text("assert False\n")
+
+    assert _owner("evaluator_generation")(run) is None
+    with pytest.raises(permissions.IndexVisibilityBreach) as refused:
+        permissions.snapshot(run)
+    assert "gitignore" in str(refused.value)
+    assert "tests/hidden_evaluator.py" in str(refused.value)
+
+
+def test_gitignore_visibility_change_invalidates_generation_and_rolls_back(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        ".gitignore": "",
+    })
+    (root / "tests/hidden_evaluator.py").write_text("assert True\n")
+    run = _Run(root, _cfg(frozen=["tests/"]))
+    generation = _owner("evaluator_generation")
+    before_generation = generation(run)
+    before = permissions.snapshot(run)
+    preserved = permissions.preserve(run, before)
+    (root / ".gitignore").write_text("tests/hidden_evaluator.py\n")
+
+    assert before_generation is not None and generation(run) is None
+    with pytest.raises(permissions.IndexVisibilityBreach) as refused:
+        permissions.enforce(run, None, _agent("builder", None), before, preserved)
+    assert "gitignore" in str(refused.value)
+    assert (root / ".gitignore").read_text() == ""
+
+
+def test_ignored_runtime_outside_declaration_does_not_enter_generation(tmp_path):
+    root = _repo(tmp_path, {
+        "tests/evaluator.py": "assert True\n",
+        ".gitignore": "adws/adw_data/sessions/\n",
+    })
+    run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
+    generation = _owner("evaluator_generation")
+    before = generation(run)
+    runtime = root / "adws/adw_data/sessions/run/output.json"
+    runtime.parent.mkdir(parents=True)
+    runtime.write_text("{}\n")
+
+    assert before is not None and generation(run) == before
+
+
 def test_evaluator_declaration_revision_creates_a_generation(tmp_path):
     root = _repo(tmp_path, {"docs/validation/check_thing.py": "print('v1')\n"})
     cfg = _cfg(frozen=["docs/validation/"])

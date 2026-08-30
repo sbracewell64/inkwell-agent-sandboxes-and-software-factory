@@ -94,7 +94,8 @@ The declared protected evaluator surface is a CLOSED-WORLD claim, and it is
 evaluated at EVERY evaluation point — arm time and post-effect delta evaluation
 alike, not admission only. At any evaluation point, a surface that is incomplete
 (any enumerated member absent), unresolvable (any exact declaration resolving to
-nothing), or visibility-manipulated (assume-unchanged, skip-worktree, or
+nothing), or visibility-manipulated (Git ignore, assume-unchanged,
+skip-worktree, or
 equivalent index state on a protected member) is could-not-observe, and THAT
 phase refuses — including the phase that created the incompleteness.
 
@@ -131,9 +132,11 @@ runtime actually lives — `{data_dir}/sessions/{adw_id}/{agent_name}/`, built i
 taken from configuration rather than from `.gitignore`.
 
 `evaluator_generation(run)` digests the normalized surface declarations and the
-repository-visible identities of tracked and visible untracked members
-into one identity, and `evidence_is_current(recorded, run)` compares evidence
-against it. Both are three-valued: `None` is could-not-observe and is returned
+filesystem-enumerated identities of every declared member, independently of
+Git ignore rules, into one identity. Git metadata separately identifies ignored
+or index-hidden members, and `evidence_is_current(recorded, run)` compares
+evidence against it. Both are three-valued: `None` is could-not-observe and is
+returned
 for a surface that is undeclared, unresolvable, unreadable, or sitting in a tree
 git cannot enumerate. An evaluator surface nobody could look at is never
 evidence that the evaluator is intact.
@@ -152,9 +155,9 @@ message names the frozen paths separately.
 
 ## Proof
 
-`tests/test_protected_evaluator_surface.py` — 33 cases: the original 12 covering
+`tests/test_protected_evaluator_surface.py` — 36 cases: the original 12 covering
 the law's four required fixtures, boundary controls, and shipped-roster
-non-vacuity checks, plus 21 focused review regressions. The original acceptance
+non-vacuity checks, plus 24 focused review regressions. The original acceptance
 cases were observed red against `c192693` before the change, with
 the real failure shape (`permitted()` returning `True`, `DID NOT RAISE
 PermissionBreach`), and green at the original feature head.

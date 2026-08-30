@@ -102,7 +102,8 @@ class TreeSnapshot(dict[str, str]):
                  absent: list[str] | None = None,
                  visibility: dict[str, list[str]] | None = None,
                  unreadable: list[str] | None = None,
-                 visibility_unobservable: str | None = None) -> None:
+                 visibility_unobservable: str | None = None,
+                 visibility_sources: dict[str, list[str]] | None = None) -> None:
         super().__init__(fingerprints)
         self.base_commit = base_commit
         self.base_tree = base_tree
@@ -111,6 +112,7 @@ class TreeSnapshot(dict[str, str]):
         self.visibility = visibility or {}
         self.unreadable = unreadable or []
         self.visibility_unobservable = visibility_unobservable
+        self.visibility_sources = visibility_sources or {}
 
 
 def _git_out(args: list[str], cwd) -> str | None:
@@ -191,30 +193,99 @@ def _tagged_paths(listing: str) -> dict[str, str]:
 
 
 def _repository_paths(run) -> dict[str, str]:
-    return _tagged_paths(_git(
+    paths = _tagged_paths(_git(
         ["ls-files", "-v", "-z", "--cached", "--others", "--exclude-standard"],
         run.repo_root,
     ))
+    root = Path(run.repo_root)
+    try:
+        for current, directories, filenames in os.walk(root, followlinks=False):
+            relative_dir = Path(current).relative_to(root)
+            if relative_dir == Path("."):
+                directories[:] = [name for name in directories if name != ".git"]
+            for name in filenames:
+                relative = (relative_dir / name).as_posix()
+                if is_frozen_evaluator(relative, run.cfg):
+                    paths.setdefault(relative, "?")
+            for name in list(directories):
+                candidate = Path(current) / name
+                if candidate.is_symlink():
+                    relative = (relative_dir / name).as_posix()
+                    if is_frozen_evaluator(relative, run.cfg):
+                        paths.setdefault(relative, "?")
+    except OSError as error:
+        raise SnapshotUnobservable(
+            "permission snapshot could-not-observe filesystem surface enumeration"
+        ) from error
+    return paths
 
 
-def _visibility_violations(run, paths: dict[str, str]) -> dict[str, list[str]]:
+def _gitignore_observation(run, paths: dict[str, str]) \
+        -> tuple[set[str], dict[str, list[str]]]:
+    candidates = sorted(path for path, tag in paths.items()
+                        if tag == "?" and is_frozen_evaluator(path, run.cfg))
+    if not candidates:
+        return set(), {}
+    try:
+        result = subprocess.run(
+            ["git", "check-ignore", "--no-index", "-v", "-z", "--stdin"],
+            cwd=run.repo_root, input="\0".join(candidates) + "\0",
+            capture_output=True, text=True,
+        )
+    except OSError as error:
+        raise SnapshotUnobservable(
+            "permission snapshot could-not-observe gitignore visibility"
+        ) from error
+    if result.returncode not in {0, 1}:
+        raise SnapshotUnobservable(
+            "permission snapshot could-not-observe gitignore visibility"
+        )
+    fields = result.stdout.split("\0")
+    ignored, sources = set(), {}
+    for offset in range(0, len(fields) - 3, 4):
+        source, path = fields[offset], fields[offset + 3]
+        if not path:
+            continue
+        ignored.add(path)
+        source_path = Path(source)
+        if source_path.is_absolute():
+            try:
+                source = source_path.relative_to(run.repo_root).as_posix()
+            except ValueError:
+                continue
+        if source and source != ".git/info/exclude":
+            sources.setdefault(path, []).append(source)
+    return ignored, sources
+
+
+def _visibility_observation(run, paths: dict[str, str]) \
+        -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     fsmonitor = _tagged_paths(_git(
         ["ls-files", "-f", "-z", "--cached"], run.repo_root
     ))
+    ignored, sources = _gitignore_observation(run, paths)
     violations = {}
     for path, tag in paths.items():
-        if not is_frozen_evaluator(path, run.cfg) or tag == "?":
+        if not is_frozen_evaluator(path, run.cfg):
             continue
         flags: list[str] = []
-        if tag in {"S", "s"}:
-            flags.append("skip-worktree")
-        if tag.islower():
-            flags.append("assume-unchanged")
-        if fsmonitor.get(path, "").islower():
-            flags.append("fsmonitor-valid")
+        if tag == "?":
+            if path in ignored:
+                flags.append("gitignore")
+        else:
+            if tag in {"S", "s"}:
+                flags.append("skip-worktree")
+            if tag.islower():
+                flags.append("assume-unchanged")
+            if fsmonitor.get(path, "").islower():
+                flags.append("fsmonitor-valid")
         if flags:
             violations[path] = flags
-    return violations
+    return violations, sources
+
+
+def _visibility_violations(run, paths: dict[str, str]) -> dict[str, list[str]]:
+    return _visibility_observation(run, paths)[0]
 
 
 def _visibility_detail(violations: dict[str, list[str]]) -> str:
@@ -263,17 +334,20 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
     Tracked files ordinarily carry their numstat counts. Frozen evaluator files
     carry content digests, so a same-numstat rewrite of an already-dirty grader
     still registers as a change. Untracked frozen evaluators are also digested.
-    Other untracked files are listed by name.
-    Gitignored paths never appear, which is why the session runtime under
-    `data_dir` — where handoff files legitimately land — needs no special case.
+    Other visible untracked files are listed by name. Frozen members are
+    enumerated independently from the filesystem, including ignored members;
+    ignored runtime outside the declaration remains outside the snapshot.
     """
     fingerprints: dict[str, str] = {}
     repository_paths = _repository_paths(run)
     try:
-        visibility = _visibility_violations(run, repository_paths)
+        visibility, visibility_sources = _visibility_observation(
+            run, repository_paths
+        )
         visibility_unobservable = None
     except SnapshotUnobservable as error:
         visibility = {}
+        visibility_sources = {}
         visibility_unobservable = str(error)
     unresolved, absent = _surface_observation(run, repository_paths)
     unreadable = []
@@ -299,7 +373,7 @@ def _snapshot_against(run, base_commit: str, base_tree: str,
             fingerprints[path] = "untracked"
     tree = TreeSnapshot(
         fingerprints, base_commit, base_tree, unresolved, absent, visibility,
-        unreadable, visibility_unobservable,
+        unreadable, visibility_unobservable, visibility_sources,
     )
     if require_observable:
         if visibility_unobservable:
@@ -703,14 +777,21 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
             path for path in touched
             if (not permitted(path, agent, run.cfg)
                 or is_frozen_evaluator(path, run.cfg))
-        } | set(after.visibility))
+        } | set(after.visibility) | {
+            source
+            for sources in after.visibility_sources.values()
+            for source in sources
+            if source in touched
+        })
         outcomes = {
             path: _roll_back(run, path, before, after, preserved or {})
             for path in rollback_targets
         }
         for path, flags in after.visibility.items():
-            restored = _clear_visibility(run, path, flags)
-            outcomes[path] = f"{outcomes.get(path, 'unchanged')}; {restored}"
+            index_flags = [flag for flag in flags if flag != "gitignore"]
+            if index_flags:
+                restored = _clear_visibility(run, path, index_flags)
+                outcomes[path] = f"{outcomes.get(path, 'unchanged')}; {restored}"
         details = []
         if undeclared:
             details.append("defaults.protected_evaluator_paths declares no surface")
