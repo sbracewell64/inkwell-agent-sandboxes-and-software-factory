@@ -140,6 +140,23 @@ def _head_identity(run) -> tuple[str, str]:
     return resolved[0], resolved[1]
 
 
+def _require_pinned_identity(run, snapshot: TreeSnapshot) -> None:
+    identity = f"{snapshot.base_commit}:{snapshot.base_tree}"
+    try:
+        resolved = [line.strip() for line in _git(
+            ["show", "-s", "--format=%H%n%T", snapshot.base_commit],
+            run.repo_root,
+        ).splitlines() if line.strip()]
+    except SnapshotUnobservable as error:
+        raise SnapshotUnobservable(
+            f"permission snapshot could-not-observe pinned base {identity}"
+        ) from error
+    if resolved != [snapshot.base_commit, snapshot.base_tree]:
+        raise SnapshotUnobservable(
+            f"permission snapshot could-not-observe pinned base {identity}"
+        )
+
+
 def _snapshot_against(run, base_commit: str, base_tree: str) -> TreeSnapshot:
     """Fingerprint every path the working tree currently differs on.
 
@@ -417,7 +434,7 @@ def _restore(run, path: str, preserved: dict[str, PreservedPath]) -> bool:
         return False
 
 
-def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str],
+def _roll_back(run, path: str, before: TreeSnapshot, after: dict[str, str],
                preserved: dict[str, PreservedPath]) -> str:
     """Undo one unauthorized change. Returns a word describing what happened.
 
@@ -441,7 +458,7 @@ def _roll_back(run, path: str, before: dict[str, str], after: dict[str, str],
             return "deleted"
         except OSError as error:
             return f"could not delete ({error})"
-    result = subprocess.run(["git", "checkout", "--", path],
+    result = subprocess.run(["git", "checkout", before.base_commit, "--", path],
                             cwd=run.repo_root, capture_output=True, text=True)
     return "rolled back" if result.returncode == 0 else "could not roll back"
 
@@ -461,13 +478,7 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
         raise SnapshotUnobservable(
             "permission snapshot could-not-observe: missing armed base identity"
         )
-    current_commit, current_tree = _head_identity(run)
-    if (current_commit, current_tree) != (before.base_commit, before.base_tree):
-        raise SnapshotUnobservable(
-            "permission snapshot could-not-observe: armed base identity moved "
-            f"from {before.base_commit}:{before.base_tree} to "
-            f"{current_commit}:{current_tree}"
-        )
+    _require_pinned_identity(run, before)
     after = _snapshot_against(run, before.base_commit, before.base_tree)
     touched = changed_paths(before, after)
     breaches = [p for p in touched if not permitted(p, agent, run.cfg)]
@@ -499,7 +510,8 @@ def enforce(run, phase, agent: AgentConfig, before: TreeSnapshot,
             f"{len(outcomes)} out-of-scope path(s) undone, continuing:\n{detail}")
         return [p for p in touched if p not in outcomes]
 
-    surface = (f"; {len(frozen)} of them frozen evaluator path(s): "
+    surface = (f"; {len(frozen)} of them frozen evaluator path(s) against "
+               f"pinned base {before.base_commit}:{before.base_tree}: "
                f"{', '.join(frozen)}" if frozen else "")
     raise PermissionBreach(
         f"{agent.name} is {scope} but modified {len(breaches)} path(s)"

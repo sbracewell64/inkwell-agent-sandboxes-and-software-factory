@@ -384,7 +384,7 @@ def test_corrupt_git_metadata_refuses_an_unobservable_frozen_rewrite(tmp_path):
     assert "snapshot could-not-observe" in str(unobservable.value)
 
 
-def test_moved_head_refuses_a_committed_frozen_rewrite(tmp_path):
+def test_committed_frozen_rewrite_is_refused_against_the_pinned_base(tmp_path):
     root = _repo(tmp_path, {
         "tests/evaluator.py": "assert True\n",
         "app/widget.py": "value = 1\n",
@@ -396,12 +396,13 @@ def test_moved_head_refuses_a_committed_frozen_rewrite(tmp_path):
     subprocess.run(["git", "-c", "user.email=t@example", "-c", "user.name=t",
                     "commit", "-qm", "rewrite evaluator"], cwd=root, check=True)
 
-    with pytest.raises(permissions.SnapshotUnobservable) as moved:
+    with pytest.raises(permissions.PermissionBreach) as moved:
         permissions.enforce(run, None, _agent("builder", None), before, {})
-    assert "armed base identity moved" in str(moved.value)
+    assert "pinned base" in str(moved.value)
+    assert before.base_commit in str(moved.value)
 
 
-def test_unchanged_head_allows_an_ordinary_permitted_edit(tmp_path):
+def test_committed_ordinary_edit_passes_against_the_pinned_base(tmp_path):
     root = _repo(tmp_path, {
         "tests/evaluator.py": "assert True\n",
         "app/widget.py": "value = 1\n",
@@ -409,6 +410,9 @@ def test_unchanged_head_allows_an_ordinary_permitted_edit(tmp_path):
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     before = permissions.snapshot(run)
     (root / "app/widget.py").write_text("value = 2\n")
+    subprocess.run(["git", "add", "app/widget.py"], cwd=root, check=True)
+    subprocess.run(["git", "-c", "user.email=t@example", "-c", "user.name=t",
+                    "commit", "-qm", "update widget"], cwd=root, check=True)
 
     assert permissions.enforce(
         run, None, _agent("builder", None), before, {}

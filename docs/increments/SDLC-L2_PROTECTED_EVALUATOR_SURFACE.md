@@ -127,7 +127,8 @@ Working-tree snapshots apply the same rule: a missing Git executable or a
 nonzero Git enumeration result raises a named could-not-observe refusal, so an
 unobservable post-agent tree cannot be accepted as unchanged. Each snapshot
 also pins the exact commit and tree it armed against; movement of either during
-the phase refuses enforcement instead of silently changing the comparison base.
+the phase remains permitted when its deltas are in scope, while protected-path
+deltas are detected against the pin and an unavailable pin refuses enforcement.
 
 `enforce()` excludes frozen-surface paths from the recovered-slip continuation.
 The rollback still runs and still reports — "it was put back" answers the damage
@@ -136,11 +137,12 @@ message names the frozen paths separately.
 
 ## Proof
 
-`tests/test_protected_evaluator_surface.py` — 12 cases, the law's four required
-fixtures plus the two boundary controls and the shipped-roster non-vacuity
-checks. Every case was observed red against `c192693` before the change, with
+`tests/test_protected_evaluator_surface.py` — 22 cases: the original 12 covering
+the law's four required fixtures, boundary controls, and shipped-roster
+non-vacuity checks, plus 10 focused review regressions. The original acceptance
+cases were observed red against `c192693` before the change, with
 the real failure shape (`permitted()` returning `True`, `DID NOT RAISE
-PermissionBreach`), and green after.
+PermissionBreach`), and green at the original feature head.
 
 | Required fixture | Case | Red at `c192693` |
 |---|---|---|
@@ -168,22 +170,9 @@ surface and freezes the four named graders while leaving
   red on the scout's `context_handoff/findings.md` — the F6 control would
   actually catch the reversal it forbids, and the module was restored.
 
-**Suite and gate at this head.**
-
-```
-PYTHONPATH=.:adws pytest -q tests/
-  before: 57 passed, 1 skipped        after: 69 passed, 1 skipped
-
-python3 tools/ci_gate.py run
-  before: 8 observed-good, 0 observed-bad, 2 could-not-observe, conclusion could-not-observe
-  after:  8 observed-good, 0 observed-bad, 2 could-not-observe, conclusion could-not-observe
-
-python3 docs/validation/check_adw_synchronization.py   PASS, before and after
-```
-
-Both `could-not-observe` rows are `just` being unavailable on this host —
-`sqlite-free-observability-validator` and `inkwell-unit-tests` — unchanged by
-this increment and recorded as unavailable evidence, not as a pass.
+Current-head suite and gate totals are intentionally left to the dedicated test
+phase that observes them after review fixes. Historical pre-review totals are
+not evidence for this head.
 
 ## Known unresolved observations
 

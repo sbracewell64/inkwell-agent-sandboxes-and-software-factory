@@ -112,8 +112,9 @@ red, and reversing the session-runtime-first precedence turns the reportability
 assertion red. An undeclared, unresolvable or unreadable surface is
 `could-not-observe`, never an intact evaluator, and failed Git snapshot
 enumeration refuses enforcement instead of representing an observed-clean tree.
-The snapshot pins its armed commit and tree, so an in-phase commit is likewise
-a named refusal rather than a new implicit comparison baseline.
+The snapshot pins its armed commit and tree. In-phase commits remain ordinary
+work, while committed and uncommitted deltas are both compared with that pin;
+an unavailable pin is a named refusal rather than an implicit new baseline.
 
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and
