@@ -70,9 +70,9 @@ invalidates evidence bound to the old one.
   `SDLC-L1`'s `EXTEND_OWNER` row, not this one. The refusal here is the
   permission decision itself, not a harness-side interception.
 - **No new framework, no second authority.** The roster/permissions owner is
-  extended in place. No validator, no manifest row, no gate runner is added —
-  registering a deterministic config eval for this surface belongs to
-  `SDLC-L3`, which owns `ci/checks.json`.
+  extended in place, and the existing gate runner is unchanged. The repository
+  suite is registered in the existing manifest so this increment's executable
+  controls are actually gated; no separate evaluator authority is introduced.
 - **No roadmap reconciliation.** `docs/development/ROADMAP.md` on `main` carries
   a different item vocabulary from the planning branch and names no `SDLC-L*`
   item. Reconciling the two is its own commissioned work and is not touched
@@ -271,9 +271,6 @@ fsmonitor guard itself stays in place for hosts that do set the bit, and the
   `.claude/skills/sssf/templates/` does not, so a freshly installed factory
   starts with an empty declaration. That template is a different owner and is
   out of this increment's write domain.
-- Nothing yet fails CI when a roster declares an empty surface. The deterministic
-  config eval that would catch it belongs to `SDLC-L3`, which owns
-  `ci/checks.json`.
 - Independent qualification of a *new* evaluator generation stays with the
   review owner. What is mechanical here is that the revision is explicit, that
   it produces a new generation identity, and that evidence bound to the previous
