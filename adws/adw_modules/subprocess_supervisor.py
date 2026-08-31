@@ -317,11 +317,29 @@ class BoundedJournalWriter:
 
     TRUNCATION_TYPE = "sssf_journal_truncated"
 
+    @classmethod
+    def _terminal_record(cls, limit: int, payload_bytes: int) -> str:
+        return json.dumps(
+            {
+                "type": cls.TRUNCATION_TYPE,
+                "limit_bytes": limit,
+                "payload_bytes": payload_bytes,
+                "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
+            },
+            separators=(",", ":"),
+        ) + "\n"
+
     def __init__(self, handle, limit_bytes: int) -> None:
         if not isinstance(limit_bytes, int) or isinstance(limit_bytes, bool) or limit_bytes < 1:
             raise ValueError("bounded journal limit must be a positive integer")
         self._handle = handle
         self.limit = limit_bytes
+        self.terminal_reserve = len(
+            self._terminal_record(limit_bytes, limit_bytes).encode("utf-8")
+        )
+        if self.terminal_reserve >= self.limit:
+            raise ValueError("bounded journal limit cannot hold its terminal record")
+        self.payload_limit = self.limit - self.terminal_reserve
         handle.seek(0, os.SEEK_END)
         self.written = handle.tell()
         self.seen = self.written
@@ -340,7 +358,7 @@ class BoundedJournalWriter:
         """Append one line.  Returns whether the payload was admitted."""
         encoded = len(line.encode("utf-8", "replace"))
         self.seen += encoded
-        if self.truncated or self.written + encoded > self.limit:
+        if self.truncated or self.written + encoded > self.payload_limit:
             self._close_out()
             return False
         self._handle.write(line)
@@ -352,25 +370,18 @@ class BoundedJournalWriter:
         if self.truncated:
             return
         self.truncated = True
-        # The terminal record IS the explicit status: a bounded journal never
-        # simply stops mid-stream with no statement that it did.
-        self._handle.write(
-            json.dumps(
-                {
-                    "type": self.TRUNCATION_TYPE,
-                    "limit_bytes": self.limit,
-                    "retained_bytes": self.written,
-                    "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
-                }
-            )
-            + "\n"
-        )
-        self._handle.flush()
+        record = self._terminal_record(self.limit, self.written)
+        encoded = len(record.encode("utf-8"))
+        if self.written + encoded <= self.limit:
+            self._handle.write(record)
+            self._handle.flush()
+            self.written += encoded
 
     def status(self) -> dict[str, object]:
         return {
             "limit_bytes": self.limit,
             "retained_bytes": self.written,
+            "payload_limit_bytes": self.payload_limit,
             "bytes_seen": self.seen,
             "truncated": self.truncated,
             "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",

@@ -35,7 +35,9 @@ import importlib
 import json
 import os
 import re
+import signal
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -682,6 +684,9 @@ def enforcement_shape_errors(root: Path) -> Result:
             "stderr_reader.start()": "pi stderr is not drained concurrently",
             "**process_group_popen_kwargs()": "pi child lacks process-tree custody",
         },
+        "adws/adw_modules/quality.py": {
+            "**process_group_popen_kwargs()": "quality child lacks process-tree custody",
+        },
         "tools/ci_gate.py": {
             "**process_group_popen_kwargs()": "CI check lacks process-tree custody",
         },
@@ -798,11 +803,13 @@ def bounded_stream_capture_boundary() -> Result:
 def bounded_journal_boundary() -> Result:
     """The journal stops at its ceiling and SAYS it stopped."""
     result = ok()
-    line = "x" * 9 + "\n"  # ten bytes
-    for limit, admits, label in ((11, True, "limit - 1"), (10, True, "limit")):
+    limit = 256
+    probe = BoundedJournalWriter(io.StringIO(), limit)
+    payload_limit = probe.payload_limit
+    for size, label in ((payload_limit - 1, "limit - 1"), (payload_limit, "limit")):
         handle = io.StringIO()
         journal = BoundedJournalWriter(handle, limit)
-        if journal.append(line) is not admits:
+        if not journal.append("x" * size):
             result = result.merge(fail(f"bounded journal: {label} was not admitted"))
         if journal.truncated:
             result = result.merge(fail(f"bounded journal: {label} truncated early"))
@@ -810,29 +817,36 @@ def bounded_journal_boundary() -> Result:
             result = result.merge(
                 fail(f"bounded journal: {label} wrote a truncation record")
             )
-    handle = io.StringIO()
-    journal = BoundedJournalWriter(handle, 9)
-    if journal.append(line):
+    with tempfile.TemporaryDirectory(prefix="sssf-journal-bound-") as raw:
+        path = Path(raw) / "raw.jsonl"
+        with path.open("w+", encoding="utf-8") as handle:
+            journal = BoundedJournalWriter(handle, limit)
+            journal.append("x" * payload_limit)
+            admitted = journal.append("z")
+        written = path.read_text(encoding="utf-8")
+        artifact_size = path.stat().st_size
+    if admitted:
         result = result.merge(fail("bounded journal: limit + 1 was admitted"))
-    written = handle.getvalue()
     if BoundedJournalWriter.TRUNCATION_TYPE not in written:
         result = result.merge(
             fail("bounded journal: limit + 1 stopped silently, with no terminal record")
         )
-    if not journal.truncated or journal.seen != 10:
+    if artifact_size > limit:
+        result = result.merge(fail("bounded journal: terminal status exceeded artifact limit"))
+    if not journal.truncated or journal.seen != payload_limit + 1:
         result = result.merge(fail("bounded journal: status lost the bytes it refused"))
-    if journal.append(line):
+    if journal.append("z"):
         result = result.merge(fail("bounded journal: kept admitting after the ceiling"))
     if written.count(BoundedJournalWriter.TRUNCATION_TYPE) != 1:
         result = result.merge(fail("bounded journal: repeated its terminal record"))
-    handle = io.StringIO("x" * 8)
-    reopened = BoundedJournalWriter(handle, 10)
-    if reopened.append("yy") is not True or reopened.written != 10:
+    handle = io.StringIO("x" * (payload_limit - 2))
+    reopened = BoundedJournalWriter(handle, limit)
+    if reopened.append("yy") is not True or reopened.written != payload_limit:
         result = result.merge(fail("bounded journal: reopen lost existing byte accounting"))
-    reopened = BoundedJournalWriter(handle, 10)
-    if reopened.append("z") or len(handle.getvalue()) != 10:
+    reopened = BoundedJournalWriter(handle, limit)
+    if reopened.append("z") or len(handle.getvalue().encode("utf-8")) > limit:
         result = result.merge(fail("bounded journal: reopen admitted aggregate limit + 1"))
-    for invalid in (0, -1, True):
+    for invalid in (0, -1, True, 32):
         try:
             BoundedJournalWriter(io.StringIO(), invalid)  # type: ignore[arg-type]
         except ValueError:
@@ -929,7 +943,7 @@ def agent_pi_stderr_boundary() -> Result:
         executable.write_text(
             "#!/usr/bin/env python3\n"
             "import json, sys\n"
-            "sys.stderr.write('e' * 65)\n"
+            "sys.stderr.write('e' * (2 * 1024 * 1024))\n"
             "sys.stderr.flush()\n"
             "print(json.dumps({'type':'message_end','message':{'role':'assistant',"
             "'content':[{'type':'text','text':'done'}]}}), flush=True)\n",
@@ -942,7 +956,7 @@ def agent_pi_stderr_boundary() -> Result:
         original_window = agent_pi.context_window
         try:
             agent_pi.PI_PATH = str(executable)
-            agent_pi.STDERR_MAX_BYTES = 64
+            agent_pi.STDERR_MAX_BYTES = 1024 * 1024
             agent_pi.resolve_model = lambda _model: ("stub", "stub")
             agent_pi.context_window = lambda _provider, _model: 1
             request = ControlPiRequest(
@@ -970,6 +984,52 @@ def agent_pi_stderr_boundary() -> Result:
             agent_pi.resolve_model = original_resolve
             agent_pi.context_window = original_window
     return result
+
+
+def quality_descendant_timeout_boundary() -> Result:
+    fake_data_types = types.ModuleType("adws.adw_modules.data_types")
+    for name in (
+        "EventRecord", "QualityCheckResult", "QualityCheckSpec", "QualityResult",
+        "VerifyOutput",
+    ):
+        setattr(fake_data_types, name, type(name, (), {}))
+    module_name = "adws.adw_modules.data_types"
+    saved_data_types = sys.modules.get(module_name)
+    utils_name = "adws.adw_modules.utils"
+    saved_utils = sys.modules.get(utils_name)
+    fake_utils = types.ModuleType(utils_name)
+    fake_utils.now_iso = lambda: "2000-01-01T00:00:00Z"
+    fake_utils.operator_env = lambda: dict(os.environ)
+    sys.modules[module_name] = fake_data_types
+    sys.modules[utils_name] = fake_utils
+    try:
+        quality = importlib.import_module("adws.adw_modules.quality")
+    finally:
+        if saved_data_types is None:
+            del sys.modules[module_name]
+        else:
+            sys.modules[module_name] = saved_data_types
+        if saved_utils is None:
+            del sys.modules[utils_name]
+        else:
+            sys.modules[utils_name] = saved_utils
+    spec = types.SimpleNamespace(
+        argv=[
+            sys.executable, "-c",
+            "import subprocess,sys,time; "
+            "subprocess.Popen([sys.executable,'-c','import time; time.sleep(120)']); "
+            "time.sleep(120)",
+        ],
+        timeout_seconds=0.4,
+    )
+    run = types.SimpleNamespace(repo_root=ROOT)
+    started = time.monotonic()
+    _out, _err, deadline, returncode = quality._bounded_run(spec, run, dict(os.environ))
+    if not deadline.expired.is_set() or returncode == 0:
+        return fail("quality timeout: descendant control did not reach cancellation")
+    if time.monotonic() - started > 10:
+        return fail("quality timeout: descendant-held pipe escaped process-tree cleanup")
+    return ok()
 
 
 def attempt_budget_boundary() -> Result:
@@ -1482,6 +1542,7 @@ BOUNDARY_CONTROLS: tuple[tuple[str, Callable[[], Result]], ...] = (
     ("bounded_journal_boundary", bounded_journal_boundary),
     ("child_deadline_boundary", child_deadline_boundary),
     ("agent_pi_stderr_boundary", agent_pi_stderr_boundary),
+    ("quality_descendant_timeout_boundary", quality_descendant_timeout_boundary),
     ("attempt_budget_boundary", attempt_budget_boundary),
     ("supervisor_required_ceiling_controls", supervisor_required_ceiling_controls),
     ("preserve_capture_boundary", preserve_capture_boundary),
@@ -1748,24 +1809,6 @@ def watched_red_controls() -> list[tuple[str, Callable[[Path], None], str]]:
             "CHILD_MAX_OUTPUT_BYTES = ", "CHILD_MAX_OUTPUT_BYTES_UNUSED = ",
         )
 
-    def reset_journal_on_reopen(root: Path) -> None:
-        mutate_source(
-            root, "adws/adw_modules/subprocess_supervisor.py",
-            "self.written = handle.tell()", "self.written = 0",
-        )
-
-    def serialized_pi_stderr(root: Path) -> None:
-        mutate_source(
-            root, "adws/adw_modules/agent_pi.py",
-            "    stderr_reader.start()", "    stderr_reader_start_removed()",
-        )
-
-    def removed_process_tree_custody(root: Path) -> None:
-        mutate_source(
-            root, "adws/adw_modules/subprocess_supervisor.py",
-            'return {"start_new_session": True}', 'return {"start_new_session": False}',
-        )
-
     def delta_declared_only_in_prose(root: Path) -> None:
         # The protocol's form is a fenced block. Prose that merely names the
         # key is a mention, and an increment whose fences are gone has stopped
@@ -1835,12 +1878,6 @@ def watched_red_controls() -> list[tuple[str, Callable[[Path], None], str]]:
          "sssf.planning.git_wall_clock: limit could not be read"),
         ("removed doctor child output ceiling", removed_doctor_output_ceiling,
          "sssf.windows_host.child_output_capture: limit could not be read"),
-        ("journal accounting reset on reopen", reset_journal_on_reopen,
-         "journal reopen accounting is not enforced"),
-        ("pi stderr drain serialized", serialized_pi_stderr,
-         "pi stderr is not drained concurrently"),
-        ("process-tree custody removed", removed_process_tree_custody,
-         "POSIX process-tree custody is not enabled"),
         ("boundedness delta declared only in prose", delta_declared_only_in_prose,
          f"B1-001_AGENT_DOC_DISCOVERY.md: declares no {DELTA_KEY}"),
     ]
@@ -1891,6 +1928,187 @@ def watched_red_errors() -> Result:
     return result
 
 
+def _behavior_process(root: Path, script: str, timeout: float) -> tuple[int | None, str, bool]:
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(root)
+    process = subprocess.Popen(
+        [sys.executable, "-c", script],
+        cwd=root,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        start_new_session=True,
+    )
+    timed_out = False
+    try:
+        output, _ = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        output = ""
+    finally:
+        if os.name == "posix":
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        elif process.poll() is None:
+            process.kill()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+    return process.returncode, output, timed_out
+
+
+def _copy_behavior_files(root: Path, relative_paths: tuple[str, ...]) -> None:
+    for relative in relative_paths:
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative, target)
+
+
+def behavioral_watched_red_errors() -> Result:
+    if os.name != "posix":
+        return cno("behavioral watched-red process-group controls require POSIX custody")
+    result = ok()
+    with tempfile.TemporaryDirectory(prefix="sssf-bound-behavior-red-") as raw:
+        workspace = Path(raw)
+
+        journal_script = """
+from pathlib import Path
+from adws.adw_modules.subprocess_supervisor import BoundedJournalWriter
+limit = 256
+path = Path('journal.jsonl')
+with path.open('w+', encoding='utf-8') as handle:
+    writer = BoundedJournalWriter(handle, limit)
+    writer.append('x' * limit)
+    writer.append('z')
+if path.stat().st_size > limit:
+    print('journal artifact exceeded declared limit')
+    raise SystemExit(41)
+"""
+        journal_base = workspace / "journal-base"
+        _copy_behavior_files(
+            journal_base, ("adws/adw_modules/subprocess_supervisor.py",)
+        )
+        baseline = _behavior_process(journal_base, journal_script, 5)
+        if baseline[2] or baseline[0] != 0:
+            result = result.merge(cno("journal watched-red baseline owner did not complete"))
+        else:
+            journal_case = workspace / "journal-mutant"
+            shutil.copytree(journal_base, journal_case)
+            mutate_source(
+                journal_case, "adws/adw_modules/subprocess_supervisor.py",
+                "self.written + encoded > self.payload_limit",
+                "self.written + encoded > self.limit",
+            )
+            mutate_source(
+                journal_case, "adws/adw_modules/subprocess_supervisor.py",
+                "if self.written + encoded <= self.limit:", "if True:",
+            )
+            observed = _behavior_process(journal_case, journal_script, 5)
+            if observed[2] or observed[0] != 41 or "journal artifact exceeded" not in observed[1]:
+                result = result.merge(
+                    fail("behavioral watched-red stayed green: journal artifact ceiling")
+                )
+
+        stderr_script = """
+import os, tempfile
+from pathlib import Path
+from adws.adw_modules import agent_pi
+agent_pi.resolve_model = lambda value: ('stub', 'stub')
+agent_pi.context_window = lambda provider, model: 1
+agent_pi.STDERR_MAX_BYTES = 1024 * 1024
+with tempfile.TemporaryDirectory() as raw:
+    root = Path(raw)
+    stub = root / 'pi-stub'
+    stub.write_text("#!/usr/bin/env python3\\nimport json,sys\\nsys.stderr.write('e' * (2 * 1024 * 1024))\\nsys.stderr.flush()\\nprint(json.dumps({'type':'message_end','message':{'role':'assistant','content':[{'type':'text','text':'done'}]}}), flush=True)\\n", encoding='utf-8')
+    stub.chmod(0o755)
+    agent_pi.PI_PATH = str(stub)
+    request = agent_pi.PiRequest(prompt='p', system_prompt='s', model='stub', session_id='s', session_dir=str(root), raw_output_path=str(root / 'raw.jsonl'), cwd=str(root))
+    try:
+        agent_pi.run(request)
+    except RuntimeError as exc:
+        if "'truncated': True" in str(exc):
+            raise SystemExit(0)
+raise SystemExit(42)
+"""
+        stderr_base = workspace / "stderr-base"
+        _copy_behavior_files(
+            stderr_base,
+            (
+                "adws/adw_modules/agent_pi.py",
+                "adws/adw_modules/subprocess_supervisor.py",
+            ),
+        )
+        (stderr_base / "adws/adw_modules/data_types.py").write_text(
+            "class PiRequest:\n"
+            " def __init__(self, **values): self.__dict__.update(values); self.thinking=values.get('thinking','medium'); self.tools=values.get('tools'); self.extensions=values.get('extensions',[])\n"
+            "class Usage:\n def add_turn(self, usage, tokens): pass\n"
+            "class PiResult:\n"
+            " def __init__(self, session_id, context_window): self.session_id=session_id; self.context_window=context_window; self.text=''; self.tokens=0; self.usage=Usage(); self.context_tokens=0; self.cost=0.0; self.returncode=0\n",
+            encoding="utf-8",
+        )
+        (stderr_base / "adws/adw_modules/utils.py").write_text(
+            "import os\ndef now_iso(): return '2000-01-01T00:00:00Z'\ndef operator_env(): return dict(os.environ)\n",
+            encoding="utf-8",
+        )
+        baseline = _behavior_process(stderr_base, stderr_script, 5)
+        if baseline[2] or baseline[0] != 0:
+            result = result.merge(cno("stderr watched-red baseline owner did not complete"))
+        else:
+            stderr_case = workspace / "stderr-mutant"
+            shutil.copytree(stderr_base, stderr_case)
+            mutate_source(
+                stderr_case, "adws/adw_modules/agent_pi.py",
+                "    stderr_reader.start()", "    pass",
+            )
+            mutate_source(
+                stderr_case, "adws/adw_modules/agent_pi.py",
+                "    result.returncode = process.wait()",
+                "    stderr_reader.run()\n    result.returncode = process.wait()",
+            )
+            observed = _behavior_process(stderr_case, stderr_script, 3)
+            if not observed[2]:
+                result = result.merge(
+                    fail("behavioral watched-red stayed green: concurrent stderr drain")
+                )
+
+        process_script = """
+import sys, time
+from tools import ci_gate
+started = time.monotonic()
+result = ci_gate.run_check({'id':'tree', 'command':[sys.executable,'-c',"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c','import time; time.sleep(120)']); time.sleep(120)"], 'timeout_seconds':1})
+elapsed = time.monotonic() - started
+if result.get('reason') != 'check timed out' or elapsed > 3:
+    print('process-tree deadline exceeded')
+    raise SystemExit(43)
+"""
+        process_base = workspace / "process-base"
+        _copy_behavior_files(
+            process_base,
+            ("tools/ci_gate.py", "adws/adw_modules/subprocess_supervisor.py"),
+        )
+        baseline = _behavior_process(process_base, process_script, 8)
+        if baseline[2] or baseline[0] != 0:
+            result = result.merge(cno("process-tree watched-red baseline owner did not complete"))
+        else:
+            process_case = workspace / "process-mutant"
+            shutil.copytree(process_base, process_case)
+            mutate_source(
+                process_case, "adws/adw_modules/subprocess_supervisor.py",
+                'return {"start_new_session": True}', 'return {"start_new_session": False}',
+            )
+            observed = _behavior_process(process_case, process_script, 8)
+            if observed[2] or observed[0] != 43 or "process-tree deadline exceeded" not in observed[1]:
+                result = result.merge(
+                    fail("behavioral watched-red stayed green: process-tree deadline")
+                )
+    return result
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 def main() -> int:
     result = static_errors(ROOT)
@@ -1898,6 +2116,8 @@ def main() -> int:
         result = result.merge(boundary_errors())
     if result.status != "FAIL":
         result = result.merge(watched_red_errors())
+    if result.status != "FAIL":
+        result = result.merge(behavioral_watched_red_errors())
 
     document, _ = load_registry(ROOT)
     surfaces = document["surfaces"] if document else []
@@ -1929,8 +2149,8 @@ def main() -> int:
         f"{len(BOUNDARY_CONTROLS)} real enforcement owners"
     )
     print(
-        f"watched-red: {len(watched_red_controls())} property-specific controls, "
-        f"each watched going red against a clean baseline fixture"
+        f"watched-red: {len(watched_red_controls()) + 3} property-specific controls, "
+        f"including 3 behavioral owner mutations watched going red"
     )
     print("increment protocol: every increment declares a boundedness delta")
     print("provider-calls: 0 (no network, provider, model, or browser side effect)")

@@ -325,10 +325,10 @@ existing owners:
 | Surface | Was | Now |
 | --- | --- | --- |
 | `sssf.permissions.preserve_total_bytes` | per-file ceiling only, so a tree of N dirty paths held N MiB | aggregate ceiling; every declined path is named in a `preserve_bounded` trace event |
-| `sssf.agent_pi.raw_output_journal` | grew with whatever the model emitted | aggregate 64 MiB ceiling preserved across reopens with one terminal truncation record; a truncated journal also fails the turn rather than passing as a complete record |
+| `sssf.agent_pi.raw_output_journal` | grew with whatever the model emitted | aggregate 64 MiB artifact ceiling preserved across reopens; terminal-record space is reserved inside that ceiling and truncation also fails the turn |
 | `sssf.agent_pi.stderr_capture` | `process.stderr.read()` held the whole stream | concurrently drained bounded capture with explicit overflow status |
 | `sssf.agent_pi.turn_wall_clock` | no deadline at all | 3600 s `ChildDeadline`; expiry is stated rather than surfacing as a plain nonzero exit |
-| `sssf.quality.stdout_capture` / `stderr_capture` | `capture_output=True` held whatever a check produced | bounded captures read on the way in; the `[bounded]` note reaches both the log and the builder |
+| `sssf.quality.stdout_capture` / `stderr_capture` | `capture_output=True` held whatever a check produced | bounded captures read on the way in; the `[bounded]` note reaches both the log and the builder; timeout cleanup owns the command process group so descendant-held pipes close |
 | `sssf.ci_gate.check_output_capture` | `communicate()` held the whole log | bounded capture; `output_truncated` / `output_bytes_seen` / `output_limit_bytes` land in the CI evidence |
 | `sssf.evidence.artifact_read_bytes` | read an artifact of any size into memory | 512 MiB ceiling, REJECT rather than truncate, because a digest over a prefix would claim to identify an artifact it never finished reading |
 | `sssf.evidence.artifact_path_depth` | unbounded component walk | 64-component ceiling, refused before the first `open` |
@@ -353,10 +353,17 @@ exists in the combination of the two changes.
 | `sssf.planning.git_wall_clock` | no deadline at all on those same reads | 30 s, CANCEL and then REJECT |
 | `sssf.windows_host.child_output_capture` | the host doctor bounded how long a child could run but never how much it could say inside that window | 8 MiB ceiling, TRUNCATE_WITH_EXPLICIT_STATUS, reusing the CI gate's existing bounded-output owner rather than growing a second one |
 
-Timeout cleanup in the CI gate, planning Git reader, and Windows host child
+Timeout cleanup in the quality runner, CI gate, planning Git reader, and Windows host child
 wrapper owns a fresh process group and terminates that group before joining its
 reader. A descendant that inherits the output pipe therefore cannot extend the
-declared wall-clock ceiling after its immediate parent is stopped.
+declared wall-clock ceiling after its immediate parent is stopped. Planning and
+Windows-host reads that still have a live reader after cleanup return
+could-not-observe instead of parsing a partial capture.
+
+The remediation watched reds execute mutated owners. The journal mutant writes
+past the artifact ceiling, the stderr mutant blocks on an OS-capacity flood,
+and the process-group mutant outlives its deadline; each mutation is required
+to fail for its own behavioral reason after the unmodified owner first passes.
 
 The defect: the host doctor's bounded capture and HD-09's could-not-observe
 reason lines are individually correct and wrong together. HD-09 reads a child's
@@ -373,7 +380,7 @@ before the fix.
 
 | Check | Result |
 | --- | --- |
-| `python3 docs/validation/check_boundedness.py` | PASS — 53 surfaces, 15 boundary owners, 28 watched-red controls |
+| `python3 docs/validation/check_boundedness.py` | PASS — 53 surfaces, 18 boundary owners, 31 watched-red controls, including three executed behavioral owner mutations |
 | `python3 docs/validation/check_ci_contract.py` | PASS — 12 offline checks enumerated |
 | `python3 docs/validation/check_planning_foundation.py` | PASS — 20 tests, in 4.4 s against a 60 s budget, with the bounded git reads in place |
 | `python3 docs/validation/check_adw_synchronization.py` | PASS |

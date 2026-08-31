@@ -18,7 +18,11 @@ from typing import Callable
 
 from .data_types import (EventRecord, QualityCheckResult, QualityCheckSpec, QualityResult,
                          VerifyOutput)
-from .subprocess_supervisor import BoundedStreamCapture, ChildDeadline
+from .subprocess_supervisor import (
+    BoundedStreamCapture,
+    ChildDeadline,
+    process_group_popen_kwargs,
+)
 from .utils import now_iso, operator_env
 
 OXLINT_VERSION = "1.36.0"
@@ -80,11 +84,12 @@ def _bounded_run(
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        **process_group_popen_kwargs(),
     )
     deadline.arm(process)
     readers = [
-        threading.Thread(target=out_capture.read_from, args=(process.stdout,)),
-        threading.Thread(target=err_capture.read_from, args=(process.stderr,)),
+        threading.Thread(target=out_capture.read_from, args=(process.stdout,), daemon=True),
+        threading.Thread(target=err_capture.read_from, args=(process.stderr,), daemon=True),
     ]
     for reader in readers:
         reader.start()
