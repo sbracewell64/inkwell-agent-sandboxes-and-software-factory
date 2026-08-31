@@ -146,8 +146,8 @@ def child_cno_reason(output: str) -> str:
     return "; ".join(reasons)
 
 
-def _stop_process(process: subprocess.Popen[str]) -> None:
-    stop_process_group(process)
+def _stop_process(process: subprocess.Popen[str]) -> bool:
+    return stop_process_group(process)
 
 
 def run_check(check: dict[str, Any]) -> dict[str, Any]:
@@ -180,14 +180,20 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
 
     while True:
         if _CANCEL_REQUESTED:
-            _stop_process(process)
-            result["reason"] = "execution cancelled"
+            cleanup_succeeded = _stop_process(process)
+            result["reason"] = (
+                "execution cancelled" if cleanup_succeeded
+                else "execution cancelled; process-tree cleanup failed"
+            )
             break
 
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            _stop_process(process)
-            result["reason"] = "check timed out"
+            cleanup_succeeded = _stop_process(process)
+            result["reason"] = (
+                "check timed out" if cleanup_succeeded
+                else "check timed out; process-tree cleanup failed"
+            )
             break
 
         try:
@@ -203,11 +209,15 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
 
     reader.join(timeout=max(0.0, deadline - time.monotonic()))
     if reader.is_alive():
-        _stop_process(process)
+        cleanup_succeeded = _stop_process(process)
         reader.join(timeout=2)
-        if reader.is_alive():
+        if reader.is_alive() or not cleanup_succeeded:
             result["status"] = "could-not-observe"
-            result["reason"] = "check output pipe did not close after process-tree cleanup"
+            result["reason"] = (
+                "check output pipe did not close after process-tree cleanup"
+                if reader.is_alive()
+                else "check process-tree cleanup failed"
+            )
     output = capture.text()
     if result.get("returncode") == COULD_NOT_OBSERVE_EXIT:
         # The child names its own could-not-observe reasons on its stdout, so

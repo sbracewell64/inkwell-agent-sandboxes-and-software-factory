@@ -364,6 +364,10 @@ The remediation watched reds execute mutated owners. The journal mutant writes
 past the artifact ceiling, the stderr mutant blocks on an OS-capacity flood,
 and the process-group mutant outlives its deadline; each mutation is required
 to fail for its own behavioral reason after the unmodified owner first passes.
+These controls run on both required CI platforms. Windows launches them through
+the existing `CREATE_NEW_PROCESS_GROUP` and `taskkill /T /F` owner path; a
+missing or nonzero `taskkill` result is cleanup failure, never assumed success,
+and reader shutdown remains bounded while the caller reports could-not-observe.
 
 The defect: the host doctor's bounded capture and HD-09's could-not-observe
 reason lines are individually correct and wrong together. HD-09 reads a child's

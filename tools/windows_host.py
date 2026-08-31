@@ -113,20 +113,21 @@ def _bounded_child(
         **process_group_popen_kwargs(),
     ) as process:
         reader_complete = True
+        cleanup_complete = True
         reader = threading.Thread(target=capture.read_from, args=(process.stdout,), daemon=True)
         reader.start()
         try:
             returncode = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-            stop_process_group(process)
+            cleanup_complete = stop_process_group(process)
             raise
         finally:
             reader.join(timeout=2)
             if reader.is_alive():
-                stop_process_group(process)
+                cleanup_complete = stop_process_group(process)
                 reader.join(timeout=2)
                 reader_complete = not reader.is_alive()
-    if not reader_complete:
+    if not cleanup_complete or not reader_complete:
         raise OSError("child output pipe did not close after process-tree cleanup")
     return subprocess.CompletedProcess(args, returncode)
 

@@ -394,17 +394,21 @@ def process_group_popen_kwargs() -> dict[str, object]:
     return {"start_new_session": True}
 
 
-def stop_process_group(process: subprocess.Popen, grace_seconds: float = 2.0) -> None:
+def stop_process_group(process: subprocess.Popen, grace_seconds: float = 2.0) -> bool:
     if os.name == "nt":
+        cleanup_succeeded = False
         try:
-            subprocess.run(
+            completed = subprocess.run(
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=max(1.0, grace_seconds),
                 check=False,
             )
+            cleanup_succeeded = completed.returncode == 0
         except (OSError, subprocess.TimeoutExpired):
+            cleanup_succeeded = False
+        if not cleanup_succeeded and process.poll() is None:
             process.kill()
     else:
         group_found = True
@@ -422,11 +426,11 @@ def stop_process_group(process: subprocess.Popen, grace_seconds: float = 2.0) ->
             if process.poll() is None:
                 process.kill()
             process.wait()
-            return
+            return True
         try:
             os.killpg(process.pid, 0)
         except ProcessLookupError:
-            return
+            return True
         else:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
@@ -437,6 +441,7 @@ def stop_process_group(process: subprocess.Popen, grace_seconds: float = 2.0) ->
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait()
+    return cleanup_succeeded if os.name == "nt" else True
 
 
 # BOUNDEDNESS-POLICY: sssf.policy.child-wall-clock.v1
@@ -455,13 +460,15 @@ class ChildDeadline:
             raise ValueError("child deadline must be a positive number of seconds")
         self.seconds = float(seconds)
         self.expired = threading.Event()
+        self.cleanup_failed = threading.Event()
         self._timer: threading.Timer | None = None
 
     def arm(self, process) -> "ChildDeadline":
         def fire() -> None:
             self.expired.set()
             try:
-                stop_process_group(process, 1.0)
+                if not stop_process_group(process, 1.0):
+                    self.cleanup_failed.set()
             except (OSError, ValueError):
                 pass
 
@@ -479,6 +486,7 @@ class ChildDeadline:
         return {
             "limit_seconds": self.seconds,
             "expired": self.expired.is_set(),
+            "cleanup_failed": self.cleanup_failed.is_set(),
             "on_limit_behavior": "CANCEL",
         }
 

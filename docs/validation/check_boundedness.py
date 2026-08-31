@@ -35,7 +35,6 @@ import importlib
 import json
 import os
 import re
-import signal
 import shutil
 import subprocess
 import sys
@@ -749,6 +748,8 @@ from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
     ChildDeadline,
     SupervisorRequest,
     _validate,
+    process_group_popen_kwargs,
+    stop_process_group,
 )
 from tools import ci_gate  # noqa: E402
 from tools import evidence_manifest  # noqa: E402
@@ -1938,7 +1939,7 @@ def _behavior_process(root: Path, script: str, timeout: float) -> tuple[int | No
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        start_new_session=True,
+        **process_group_popen_kwargs(),
     )
     timed_out = False
     try:
@@ -1947,13 +1948,13 @@ def _behavior_process(root: Path, script: str, timeout: float) -> tuple[int | No
         timed_out = True
         output = ""
     finally:
-        if os.name == "posix":
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-        elif process.poll() is None:
-            process.kill()
+        cleanup_succeeded = (
+            stop_process_group(process)
+            if timed_out or process.poll() is None
+            else True
+        )
+        if not cleanup_succeeded:
+            output += "\nbehavior harness process-tree cleanup failed"
         try:
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
@@ -1970,8 +1971,6 @@ def _copy_behavior_files(root: Path, relative_paths: tuple[str, ...]) -> None:
 
 
 def behavioral_watched_red_errors() -> Result:
-    if os.name != "posix":
-        return cno("behavioral watched-red process-group controls require POSIX custody")
     result = ok()
     with tempfile.TemporaryDirectory(prefix="sssf-bound-behavior-red-") as raw:
         workspace = Path(raw)
@@ -2015,7 +2014,7 @@ if path.stat().st_size > limit:
                 )
 
         stderr_script = """
-import os, tempfile
+import os, sys, tempfile
 from pathlib import Path
 from adws.adw_modules import agent_pi
 agent_pi.resolve_model = lambda value: ('stub', 'stub')
@@ -2023,9 +2022,15 @@ agent_pi.context_window = lambda provider, model: 1
 agent_pi.STDERR_MAX_BYTES = 1024 * 1024
 with tempfile.TemporaryDirectory() as raw:
     root = Path(raw)
-    stub = root / 'pi-stub'
-    stub.write_text("#!/usr/bin/env python3\\nimport json,sys\\nsys.stderr.write('e' * (2 * 1024 * 1024))\\nsys.stderr.flush()\\nprint(json.dumps({'type':'message_end','message':{'role':'assistant','content':[{'type':'text','text':'done'}]}}), flush=True)\\n", encoding='utf-8')
-    stub.chmod(0o755)
+    stub_py = root / 'pi_stub.py'
+    stub_py.write_text("import json,sys\\nsys.stderr.write('e' * (2 * 1024 * 1024))\\nsys.stderr.flush()\\nprint(json.dumps({'type':'message_end','message':{'role':'assistant','content':[{'type':'text','text':'done'}]}}), flush=True)\\n", encoding='utf-8')
+    if os.name == 'nt':
+        stub = root / 'pi-stub.cmd'
+        stub.write_text('@echo off\\r\\n"' + sys.executable + '" "' + str(stub_py) + '"\\r\\n', encoding='utf-8')
+    else:
+        stub = root / 'pi-stub'
+        stub.write_text('#!/bin/sh\\nexec "' + sys.executable + '" "' + str(stub_py) + '"\\n', encoding='utf-8')
+        stub.chmod(0o755)
     agent_pi.PI_PATH = str(stub)
     request = agent_pi.PiRequest(prompt='p', system_prompt='s', model='stub', session_id='s', session_dir=str(root), raw_output_path=str(root / 'raw.jsonl'), cwd=str(root))
     try:
@@ -2097,12 +2102,24 @@ if result.get('reason') != 'check timed out' or elapsed > 3:
         else:
             process_case = workspace / "process-mutant"
             shutil.copytree(process_base, process_case)
-            mutate_source(
-                process_case, "adws/adw_modules/subprocess_supervisor.py",
-                'return {"start_new_session": True}', 'return {"start_new_session": False}',
-            )
-            observed = _behavior_process(process_case, process_script, 8)
-            if observed[2] or observed[0] != 43 or "process-tree deadline exceeded" not in observed[1]:
+            if os.name == "nt":
+                mutate_source(
+                    process_case, "adws/adw_modules/subprocess_supervisor.py",
+                    '["taskkill", "/PID", str(process.pid), "/T", "/F"]',
+                    '["taskkill-missing", "/PID", str(process.pid), "/T", "/F"]',
+                )
+            else:
+                mutate_source(
+                    process_case, "adws/adw_modules/subprocess_supervisor.py",
+                    'return {"start_new_session": True}',
+                    'return {"start_new_session": False}',
+                )
+            observed = _behavior_process(process_case, process_script, 2.5)
+            if "behavior harness process-tree cleanup failed" in observed[1]:
+                result = result.merge(
+                    cno("process-tree watched-red harness cleanup primitive failed")
+                )
+            elif not observed[2]:
                 result = result.merge(
                     fail("behavioral watched-red stayed green: process-tree deadline")
                 )

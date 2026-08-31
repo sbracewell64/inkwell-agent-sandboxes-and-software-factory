@@ -267,22 +267,23 @@ def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str
             **process_group_popen_kwargs(),
         ) as process:
             reader_complete = True
+            cleanup_complete = True
             reader = threading.Thread(target=capture.read_from, args=(process.stdout,), daemon=True)
             reader.start()
             try:
                 returncode = process.wait(timeout=GIT_OUTPUT_TIMEOUT_SECONDS)
             except subprocess.TimeoutExpired:
-                stop_process_group(process)
+                cleanup_complete = stop_process_group(process)
                 return None
             finally:
                 reader.join(timeout=2)
                 if reader.is_alive():
-                    stop_process_group(process)
+                    cleanup_complete = stop_process_group(process)
                     reader.join(timeout=2)
                     reader_complete = not reader.is_alive()
     except (OSError, ValueError):
         return None
-    if not reader_complete or returncode != 0 or capture.truncated:
+    if not cleanup_complete or not reader_complete or returncode != 0 or capture.truncated:
         return None
     try:
         value = capture.data.decode("utf-8").strip()

@@ -97,8 +97,10 @@ def _bounded_run(
         returncode = process.wait()
     finally:
         for reader in readers:
-            reader.join()
+            reader.join(timeout=2)
         deadline.cancel()
+    if deadline.cleanup_failed.is_set() or any(reader.is_alive() for reader in readers):
+        raise OSError("quality child process-tree cleanup could not be observed")
     return out_capture, err_capture, deadline, returncode
 
 

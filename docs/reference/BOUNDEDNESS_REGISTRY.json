@@ -829,7 +829,7 @@
       "on_limit_behavior": [
         "TRUNCATE_WITH_EXPLICIT_STATUS"
       ],
-      "retention_or_cleanup": "written once to the phase's command.log artifact",
+      "retention_or_cleanup": "written once to the phase's command.log artifact; timeout cleanup failure or a reader still live after its bounded join fails the quality observation",
       "observability": [
         "the [bounded] note in stderr and in the command log"
       ],
@@ -866,7 +866,7 @@
       "on_limit_behavior": [
         "TRUNCATE_WITH_EXPLICIT_STATUS"
       ],
-      "retention_or_cleanup": "written once to the phase's command.log artifact",
+      "retention_or_cleanup": "written once to the phase's command.log artifact; timeout cleanup failure or a reader still live after its bounded join fails the quality observation",
       "observability": [
         "the [bounded] note in stderr and in the command log"
       ],
@@ -1330,10 +1330,11 @@
         "REJECT",
         "CANCEL"
       ],
-      "retention_or_cleanup": "a check past its deadline has its process group terminated and reaped; descendant-held output pipes are closed before return",
+      "retention_or_cleanup": "a check past its deadline has its process tree terminated and reaped; Windows taskkill failure and any descendant-held output pipe that remains open force a bounded could-not-observe result",
       "observability": [
         "ci evidence reason field",
-        "status counts"
+        "status counts",
+        "explicit process-tree cleanup failure"
       ],
       "verification_refs": [
         "docs/validation/check_boundedness.py::probe_resolution_controls",
