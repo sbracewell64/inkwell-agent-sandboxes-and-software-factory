@@ -201,14 +201,34 @@ from absence.
 
 ### Bindings taken at activation
 
-- **Exact SSSF main:** `991d3a64f1b96a8b9637f97060d692af3518228f`
-- **Exact SSSF main tree:** `7b88546cd1f63e8304325ee35be37893268ae0e0`
-- **Accepted implementation owners bound:** the 49 surfaces enumerated in
+Activation bound exact SSSF main `991d3a64f1b96a8b9637f97060d692af3518228f`,
+tree `7b88546cd1f63e8304325ee35be37893268ae0e0`, and 49 surfaces.
+
+### Rebinding, after main moved
+
+The activation transition above stands as taken. Main then moved to
+`8aadd50461b184cede949f21ecf426146f2915a0` while this lineage was held by the
+candidate-publication quarantine, and the audit was re-executed against the
+source owners that move brought in rather than kept against the generation it
+was activated on.
+
+- **Exact SSSF main:** `8aadd50461b184cede949f21ecf426146f2915a0`
+- **Exact SSSF main tree:** `f1b779f73bea2b33810e5663e9dc2f3b82ea9299`
+- **Accepted implementation owners bound:** the 53 surfaces enumerated in
   `docs/reference/BOUNDEDNESS_REGISTRY.json`, each naming one owner file and one
   owner symbol in the current source rather than in a planning or research
   snapshot.
 
-The registry records those two identities in `bound_sssf_main` and
+Five commits landed in that window — PR #25, #30, #31, #33 and #34. PR #25 is
+the one that carries this increment's own specification and
+`docs/development/BOUNDEDNESS_LAW.md` into the repository, so the spec sections
+above are now main's canonical bytes rather than a copy taken from the planning
+blob; this record adds only the activation state to their header. The other four
+landed roughly ten thousand lines of new execution surface, and re-reading them
+is what produced the four surfaces and the defect recorded under
+[What the re-audit added](#what-the-re-audit-added).
+
+The registry records the current two identities in `bound_sssf_main` and
 `bound_sssf_tree`, so a later reader can tell which source generation the audit
 was actually taken against.
 
@@ -217,7 +237,7 @@ was actually taken against.
 ### Registry
 
 `docs/reference/BOUNDEDNESS_REGISTRY.json` — one authoritative,
-repository-contained, machine-readable registry. 49 surfaces: 39
+repository-contained, machine-readable registry. 53 surfaces: 43
 `EXPLICIT_BOUND`, 7 `DERIVED_BOUND`, 3 `SAFE_UNBOUNDED`. Every entry carries a
 stable id, a singular owner, source refs, surface kind, resource dimensions,
 classification, policy identity, admission/backpressure, deterministic
@@ -259,7 +279,7 @@ non-zero exit for CNO so that could-not-observe can never be read as a pass.
 
 ### Dynamic boundary proof
 
-Twelve controls exercise `limit - 1`, `limit`, and `limit + 1` against the real
+Fifteen controls exercise `limit - 1`, `limit`, and `limit + 1` against the real
 enforcement owners — not fixtures built to pass. The `+1` case must produce the
 declared deterministic result:
 
@@ -275,7 +295,7 @@ bounded check output · the evidence-manifest read-byte and path-depth ceilings.
 
 ### Watched-red
 
-Twenty-three property-specific controls, each mutating a copy of the repository
+Twenty-eight property-specific controls, each mutating a copy of the repository
 and each **required to fail for its own reason** — the finding must contain the
 fragment that names the property. A generic "the document changed" failure is
 explicitly not accepted as evidence for any of them. Before any mutation runs,
@@ -292,7 +312,10 @@ the law refuses · CNO narrowed to PASS · derived bound with an orphaned parent
 derived bound with no recorded derivation · increment without a boundedness
 delta · protocol no longer requiring a delta · validator removed from required
 CI · governing law weakened · journal path no longer gitignored · zero bound
-with no declared meaning.
+with no declared meaning · removed durable effect-authority ceiling · removed
+planning git byte ceiling · removed planning git deadline · removed doctor
+child output ceiling · a boundedness delta declared only in prose rather than
+in the fenced form the protocol requires.
 
 ### Bounds the audit had to ADD
 
@@ -317,12 +340,40 @@ One further defect surfaced while proving a boundary rather than while reading
 code: `AttemptBudget(True)` was accepted, because `bool` is an `int` in Python.
 It is now refused, consistent with every other ceiling in the repository.
 
+## What the re-audit added
+
+Re-reading the owners that landed while this lineage was held found four
+governed surfaces the earlier pass could not have seen, and one defect that only
+exists in the combination of the two changes.
+
+| Surface | Was | Now |
+| --- | --- | --- |
+| `sssf.sandbox.effect_authority_state_store` | the durable one-use effect-authority store recorded one entry per live effect, removed none, and re-read the whole file on every verify. Its in-memory sibling has always REJECTed at 4096; the store that actually gates live effects had no ceiling at all | REJECT at 4096, naming the ceiling and the reclaim procedure. Eviction is deliberately refused as a policy here: dropping a `completed` record silently restores a spent authorization's identity to never-seen, which is the exact state one-use authority exists to deny. An identity already recorded stays usable when the store is full, so a live effect is never orphaned behind a ceiling it did not hit |
+| `sssf.planning.git_output_capture` | `capture_output=True` on every git read in the planning validator. This output is not bounded by the checked-out tree: it comes out of an object store the validator does not own | 8 MiB ceiling, REJECT rather than truncate. This validator turns those bytes into authority identities, and a prefix of a ref list is indistinguishable from a complete shorter one, so an over-ceiling read answers nothing and the caller reports could-not-observe |
+| `sssf.planning.git_wall_clock` | no deadline at all on those same reads | 30 s, CANCEL and then REJECT |
+| `sssf.windows_host.child_output_capture` | the host doctor bounded how long a child could run but never how much it could say inside that window | 8 MiB ceiling, TRUNCATE_WITH_EXPLICIT_STATUS, reusing the CI gate's existing bounded-output owner rather than growing a second one |
+
+The defect: the host doctor's bounded capture and HD-09's could-not-observe
+reason lines are individually correct and wrong together. HD-09 reads a child's
+own reason lines out of its output; this increment moved the same output behind
+a reader thread that has not finished draining when those lines were being read.
+The merged result named a variable that did not exist yet, so every child
+reporting the reserved could-not-observe exit code crashed the gate instead of
+being reported. `tools/ci_gate.py` now names the reason after the reader joins,
+and states in the same evidence row when a reason line did not survive the clip.
+Two HD-09 controls cover it, and both were watched failing on the merged bytes
+before the fix.
+
 ## Prove
 
 | Check | Result |
 | --- | --- |
-| `python3 docs/validation/check_boundedness.py` | PASS — 49 surfaces, 12 boundary owners, 23 watched-red controls |
-| `python3 docs/validation/check_ci_contract.py` | PASS — 11 offline checks enumerated |
+| `python3 docs/validation/check_boundedness.py` | PASS — 53 surfaces, 15 boundary owners, 28 watched-red controls |
+| `python3 docs/validation/check_ci_contract.py` | PASS — 12 offline checks enumerated |
+| `python3 docs/validation/check_planning_foundation.py` | PASS — 20 tests, in 4.4 s against a 60 s budget, with the bounded git reads in place |
+| `python3 docs/validation/check_adw_synchronization.py` | PASS |
+| `python3 docs/validation/check_sandbox_source_contract.py` | PASS |
+| `python3 -m pytest tests/ --ignore=tests/test_gate_outcomes.py` | PASS — 106 passed, 1 skipped, including the HD-09 and HD-10 boundary suites over the changed owners |
 | `python3 docs/validation/check_executor_supervisor.py` | PASS |
 | `python3 docs/validation/check_sandbox_provider.py` | PASS |
 | `python3 docs/validation/check_evidence_manifest.py` | PASS — HD-08 recalibrated against the new tool bytes; the prior capture is retained |
@@ -330,10 +381,14 @@ It is now refused, consistent with every other ceiling in the repository.
 | `python3 docs/validation/check_sbx0_inventory.py` | PASS |
 | `python3 docs/validation/check_agent_bootstrap.py` | PASS |
 | `python3 docs/validation/check_line_endings.py --require-worktree-lf` | PASS |
-| `python3 docs/validation/check_obs_query.py` | COULD-NOT-OBSERVE on this host — `just` is not installed. The identical failure reproduces at unmodified base `991d3a64`, so it is an environmental gap rather than a BOUND-1 effect. CI pins `just` 1.58.0. |
+| `python3 docs/validation/check_obs_query.py` | COULD-NOT-OBSERVE on this host — `just` is not installed. The identical failure reproduces in a clean worktree at unmodified `8aadd504`, so it is an environmental gap rather than a BOUND-1 effect. CI pins `just` 1.58.0. |
 | `just inkwell test` | COULD-NOT-OBSERVE on this host — `just`/`bun` absent for the same reason. CI pins `bun` 1.3.14. |
+| `python3 -m pytest tests/test_gate_outcomes.py` | COULD-NOT-OBSERVE on this host — `pydantic` is not installed, so the module cannot be imported. Not a required-CI check on its own; the gate reaches it through the validators. |
+| `python3 docs/validation/check_repository_ownership.py` | COULD-NOT-OBSERVE in this worktree — it reads a `git remote get-url upstream` this disposable worktree does not carry, and raises rather than reporting. The identical crash reproduces at unmodified `8aadd504`. It is not a registered required check. |
 
-Neither could-not-observe is treated as a pass anywhere in this record.
+No could-not-observe is treated as a pass anywhere in this record. Each of the
+four was reproduced at unmodified `8aadd504` in a separate clean worktree before
+being called environmental, rather than assumed to be.
 
 ## Continuous proof obligations, as landed
 
@@ -389,7 +444,10 @@ boundedness_delta:
     sssf.adw.build_review_revision_loops, sssf.adw.build_test_fix_loops,
     sssf.adw.plan_build_test_fix_loops,
     sssf.adw.plan_build_test_quality_fix_loops,
-    sssf.adw.simple_sdlc_fix_loops, sssf.adw.simple_sdlc_revision_loops
+    sssf.adw.simple_sdlc_fix_loops, sssf.adw.simple_sdlc_revision_loops,
+    sssf.sandbox.effect_authority_state_store,
+    sssf.planning.git_output_capture, sssf.planning.git_wall_clock,
+    sssf.windows_host.child_output_capture
   ]
   changed: []
   retired: []

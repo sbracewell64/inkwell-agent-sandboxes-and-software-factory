@@ -2543,6 +2543,19 @@ class JsonFileAuthorizationStateStore:
 
     _STATUSES = ("issued", "reserved", "completed")
 
+    # BOUNDEDNESS-OWNER: sssf.sandbox.effect_authority_state_store
+    # One authorization is recorded per live effect and nothing ever removes a
+    # spent one, so this durable map grows with every effect the host ever
+    # authorizes. The in-memory sibling already REJECTs past its ceiling; the
+    # store that actually runs live effects carries the same one, because a
+    # file re-read in full on every verify is a growing read as well as a
+    # growing file. Eviction is deliberately not the policy here: dropping a
+    # `completed` record silently restores a spent authorization's identity to
+    # "never seen", which is exactly the state one-use authority exists to
+    # deny. Reclaiming is an operator step recorded in
+    # docs/operations/RECOVERY.md.
+    MAX_AUTHORIZATIONS = 4096
+
     def __init__(self, path: "Path | str", *, lock_timeout_seconds: float = 10.0) -> None:
         self._path = Path(path)
         self._lock_path = self._path.with_name(self._path.name + ".lock")
@@ -2654,6 +2667,13 @@ class JsonFileAuthorizationStateStore:
                     "authorization identity was reissued with different provenance"
                 )
             if existing is None:
+                if len(state) >= self.MAX_AUTHORIZATIONS:
+                    raise EffectNotAuthorized(
+                        "effect authority state store is full at "
+                        f"{self.MAX_AUTHORIZATIONS} entries; reclaim spent "
+                        "authorizations before issuing another "
+                        "(docs/operations/RECOVERY.md)"
+                    )
                 state[authorization_id] = {"fingerprint": fingerprint, "status": "issued"}
                 self._write(state)
 

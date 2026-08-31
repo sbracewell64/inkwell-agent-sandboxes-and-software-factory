@@ -3,8 +3,8 @@
   "registry_id": "sssf-boundedness",
   "increment": "BOUND-1",
   "law": "docs/development/BOUNDEDNESS_LAW.md",
-  "bound_sssf_main": "991d3a64f1b96a8b9637f97060d692af3518228f",
-  "bound_sssf_tree": "7b88546cd1f63e8304325ee35be37893268ae0e0",
+  "bound_sssf_main": "8aadd50461b184cede949f21ecf426146f2915a0",
+  "bound_sssf_tree": "f1b779f73bea2b33810e5663e9dc2f3b82ea9299",
   "marker": "BOUNDEDNESS-OWNER",
   "policy_marker": "BOUNDEDNESS-POLICY",
   "classifications": [
@@ -1260,6 +1260,45 @@
       "status": "observed-good"
     },
     {
+      "surface_id": "sssf.sandbox.effect_authority_state_store",
+      "owner": "adws/adw_modules/sandbox_provider.py::JsonFileAuthorizationStateStore.MAX_AUTHORIZATIONS",
+      "owner_path": "adws/adw_modules/sandbox_provider.py",
+      "source_refs": [
+        "adws/adw_modules/sandbox_provider.py",
+        "just/sandbox/lifecycle/authority.just"
+      ],
+      "surface_kind": "durable_record_store",
+      "resource_dimensions": [
+        "count",
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "authorizations",
+        "value": 4096,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/sandbox_provider.py",
+          "class": "JsonFileAuthorizationStateStore",
+          "field": "MAX_AUTHORIZATIONS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "record_issuance refuses a new authorization once the durable store is full; an already-recorded identity is still re-readable, so an in-flight effect is never orphaned by the ceiling",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "operator-reclaimed under docs/operations/RECOVERY.md; eviction is deliberately not the policy, because dropping a completed record silently restores a spent authorization's identity to never-seen, which is what one-use authority exists to deny",
+      "observability": [
+        "the EffectNotAuthorized refusal naming the ceiling and the reclaim procedure"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::durable_authority_store_boundary",
+        "docs/validation/check_sandbox_provider.py"
+      ],
+      "status": "observed-good"
+    },
+    {
       "surface_id": "sssf.ci_gate.check_timeout_seconds",
       "owner": "tools/ci_gate.py::TIMEOUT_MAX_SECONDS",
       "owner_path": "tools/ci_gate.py",
@@ -1446,6 +1485,77 @@
       "notes": "sessions is LIMIT 10 and tail is LIMIT 25; the probe binds the larger of the two cross-run ceilings."
     },
     {
+      "surface_id": "sssf.planning.git_output_capture",
+      "owner": "docs/validation/check_planning_foundation.py::GIT_OUTPUT_MAX_BYTES",
+      "owner_path": "docs/validation/check_planning_foundation.py",
+      "source_refs": [
+        "docs/validation/check_planning_foundation.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 8388608,
+        "probe": {
+          "kind": "module_constant",
+          "path": "docs/validation/check_planning_foundation.py",
+          "name": "GIT_OUTPUT_MAX_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "a reader thread admits chunks against the ceiling as git produces them",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "the bounded bytes live only for the one read that asked for them",
+      "observability": [
+        "the read returns nothing, which the caller already reports as could-not-observe rather than as a shorter answer"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::planning_git_read_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.planning.git_wall_clock",
+      "owner": "docs/validation/check_planning_foundation.py::GIT_OUTPUT_TIMEOUT_SECONDS",
+      "owner_path": "docs/validation/check_planning_foundation.py",
+      "source_refs": [
+        "docs/validation/check_planning_foundation.py"
+      ],
+      "surface_kind": "child_process_duration",
+      "resource_dimensions": [
+        "duration"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "seconds",
+        "value": 30.0,
+        "probe": {
+          "kind": "module_constant",
+          "path": "docs/validation/check_planning_foundation.py",
+          "name": "GIT_OUTPUT_TIMEOUT_SECONDS"
+        }
+      },
+      "policy_identity": "sssf.policy.child-wall-clock.v1",
+      "admission_or_backpressure": "the read waits on the child only until the deadline",
+      "on_limit_behavior": [
+        "CANCEL",
+        "REJECT"
+      ],
+      "retention_or_cleanup": "the child is killed and reaped at the deadline",
+      "observability": [
+        "the read returns nothing, which the caller reports as could-not-observe"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::planning_git_read_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
       "surface_id": "sssf.windows_host.path_entry_set",
       "owner": "tools/windows_host.py::dedupe_paths",
       "owner_path": "tools/windows_host.py",
@@ -1506,6 +1616,42 @@
       ],
       "verification_refs": [
         "docs/validation/check_boundedness.py::enforcement_reference_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.windows_host.child_output_capture",
+      "owner": "tools/windows_host.py::CHILD_MAX_OUTPUT_BYTES",
+      "owner_path": "tools/windows_host.py",
+      "source_refs": [
+        "tools/windows_host.py",
+        "tools/ci_gate.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 8388608,
+        "probe": {
+          "kind": "module_constant",
+          "path": "tools/windows_host.py",
+          "name": "CHILD_MAX_OUTPUT_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-check-output.v1",
+      "admission_or_backpressure": "a reader thread admits chunks against the ceiling while the doctor waits on its deadline",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "the bounded text lives only for the one doctor observation that asked for it",
+      "observability": [
+        "the [bounded] marker carrying the ceiling and the bytes seen, which also explains a child could-not-observe reason line that did not survive the clip"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::windows_host_child_output_boundary"
       ],
       "status": "observed-good"
     },

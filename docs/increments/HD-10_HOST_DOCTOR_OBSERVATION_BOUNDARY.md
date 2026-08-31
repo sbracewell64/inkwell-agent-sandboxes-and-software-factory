@@ -135,3 +135,15 @@ host has no `just`), conclusion still `could-not-observe` and still red. The
 host doctor on the same host moves three rows off a manufactured verdict —
 `just compatibility`, `python compatibility` and `observability query contract`
 become CNO — and now reaches its own terminal verdict instead of crashing.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. The
+  growth surfaces it created were inventoried and bound retrospectively by
+  BOUND-1 against the post-increment source rather than claimed here after the
+  fact: sssf.windows_host.child_output_capture, the doctor child capture this
+  increment introduced with a deadline but no byte ceiling. See docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

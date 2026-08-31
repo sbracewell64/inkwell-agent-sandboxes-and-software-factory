@@ -256,3 +256,15 @@ This branch carries the five commits of immutable predecessor PR #23 in their
 transfer evidence from predecessor head
 `22b312002f7bde05b98ea95b04a45d70b2ba6157`.
 -->
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. The
+  growth surfaces it created were inventoried and bound retrospectively by
+  BOUND-1 against the post-increment source rather than claimed here after the
+  fact: sssf.planning.git_output_capture and sssf.planning.git_wall_clock, the
+  unbounded and undeadlined git reads this increment's validator introduced. See docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

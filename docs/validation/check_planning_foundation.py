@@ -33,10 +33,32 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
+    BoundedStreamCapture,
+)
+
+# BOUNDEDNESS-OWNER: sssf.planning.git_output_capture
+# `capture_output=True` retains whatever git produced. Git output here is not
+# bounded by the checked-out tree: it reads refs, blobs and history out of an
+# object store this validator does not own. A ceiling that TRUNCATED would be
+# worse than none, because this validator parses the bytes into authority
+# identities, and a prefix of a ref list is indistinguishable from a shorter
+# one. Overflow is therefore REJECT: the read reports nothing rather than
+# something incomplete, and the caller already treats that as
+# could-not-observe.
+GIT_OUTPUT_MAX_BYTES = 8 * 1024 * 1024
+
+# BOUNDEDNESS-OWNER: sssf.planning.git_wall_clock
+# The plain read had no deadline at all. A hung or credential-prompting git is
+# then bounded only by the CI job, which is not this surface's bound.
+GIT_OUTPUT_TIMEOUT_SECONDS = 30.0
 
 SURFACE_PATHS = {
     "lifecycle": Path("docs/development/PLANNING_LIFECYCLE.md"),
@@ -225,18 +247,40 @@ class _DuplicateKey(ValueError):
 
 
 def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str | None:
+    """Read one git fact under a byte ceiling and a deadline.
+
+    Returns None for every outcome that is not a complete, in-bound read:
+    an unavailable git, a non-zero exit, a deadline, or output past the
+    ceiling. Callers already read None as could-not-observe, so an incomplete
+    read never becomes a shorter answer that looks whole.
+    """
     prefix = ["--git-dir", str(git_dir)] if git_dir is not None else []
+    capture = BoundedStreamCapture(limit=GIT_OUTPUT_MAX_BYTES)
     try:
-        result = subprocess.run(
+        with subprocess.Popen(
             ["git", *prefix, *arguments],
             cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, UnicodeError, subprocess.CalledProcessError):
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        ) as process:
+            reader = threading.Thread(target=capture.read_from, args=(process.stdout,))
+            reader.start()
+            try:
+                returncode = process.wait(timeout=GIT_OUTPUT_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+                return None
+            finally:
+                reader.join()
+    except (OSError, ValueError):
         return None
-    value = result.stdout.strip()
+    if returncode != 0 or capture.truncated:
+        return None
+    try:
+        value = capture.data.decode("utf-8").strip()
+    except UnicodeError:
+        return None
     return value or None
 
 

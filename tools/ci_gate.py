@@ -74,7 +74,7 @@ def load_checks(path: Path) -> list[dict[str, Any]]:
 
 # BOUNDEDNESS-OWNER: sssf.ci_gate.check_output_capture
 # BOUNDEDNESS-POLICY: sssf.policy.bounded-check-output.v1
-class _BoundedOutput:
+class BoundedOutput:
     """A finite retained-byte ceiling for one check's combined output.
 
     `communicate()` holds whatever the child produced. A check that loops
@@ -119,6 +119,10 @@ class _BoundedOutput:
                 f"({self.seen} bytes seen)"
             )
         return rendered
+
+
+# Retained for the call sites that predate the public name.
+_BoundedOutput = BoundedOutput
 
 
 def _expanded_command(command: list[str]) -> list[str]:
@@ -169,7 +173,7 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
     # A check's own output is unbounded input to this process, so it is held
     # against a ceiling on the way in. Reaching it is stated in the evidence,
     # never a quietly shorter log.
-    capture = _BoundedOutput(CHECK_MAX_OUTPUT_BYTES)
+    capture = BoundedOutput(CHECK_MAX_OUTPUT_BYTES)
     reader = threading.Thread(target=capture.read_from, args=(process.stdout,))
     reader.start()
 
@@ -188,9 +192,7 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
         try:
             process.wait(timeout=min(0.2, remaining))
             result["returncode"] = process.returncode
-            if process.returncode == COULD_NOT_OBSERVE_EXIT:
-                result["reason"] = child_cno_reason(output)
-            else:
+            if process.returncode != COULD_NOT_OBSERVE_EXIT:
                 result["status"] = (
                     "observed-good" if process.returncode == 0 else "observed-bad"
                 )
@@ -200,6 +202,13 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
 
     reader.join(timeout=5)
     output = capture.text()
+    if result.get("returncode") == COULD_NOT_OBSERVE_EXIT:
+        # The child names its own could-not-observe reasons on its stdout, so
+        # they can only be read once the reader has drained it. A capture that
+        # hit its ceiling may have dropped a reason line; child_cno_reason then
+        # falls back to naming the reserved exit code, and output_truncated in
+        # this same row says why the named reason is missing.
+        result["reason"] = child_cno_reason(output)
     if output:
         result["output"] = output.rstrip()
     result["output_limit_bytes"] = capture.limit

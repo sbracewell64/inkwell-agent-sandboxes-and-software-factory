@@ -37,6 +37,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -599,13 +600,13 @@ def protocol_errors(root: Path) -> Result:
         except (OSError, UnicodeError) as exc:
             result = result.merge(cno(f"{relative}: unreadable ({exc})"))
             continue
-        if DELTA_KEY not in text:
+        block = declared_delta_block(text)
+        if block is None:
             result = result.merge(fail(f"{relative}: declares no {DELTA_KEY}"))
             continue
-        block = text.split(DELTA_KEY, 1)[1]
-        head = block[: block.find("```")] if "```" in block else block
+        head = block.split(DELTA_KEY, 1)[1]
         if re.match(r"\s*:\s*none", head):
-            if "boundedness_reason" not in block[:600]:
+            if "boundedness_reason" not in head:
                 result = result.merge(
                     fail(f"{relative}: {DELTA_KEY}: none without a reason")
                 )
@@ -620,6 +621,22 @@ def protocol_errors(root: Path) -> Result:
                 fail(f"{relative}: {DELTA_KEY} cites unknown surface {surface_id}")
             )
     return result
+
+
+def declared_delta_block(text: str) -> str | None:
+    """Return the fenced block that declares the delta, or None.
+
+    A declaration only counts inside a fenced block, which is the form
+    docs/development/INCREMENT_PROTOCOL.md requires. Prose that merely names
+    the key — a spec quoting `boundedness_delta: none`, a review note
+    discussing one — is a mention, not a declaration, and an increment whose
+    only occurrence is prose has not declared anything.
+    """
+    fences = re.findall(r"^```[^\n]*\n(.*?)^```", text, re.S | re.M)
+    for block in fences:
+        if re.search(rf"^\s*{re.escape(DELTA_KEY)}\s*:", block, re.M):
+            return block
+    return None
 
 
 def ci_registration_errors(root: Path) -> Result:
@@ -679,7 +696,9 @@ def static_errors(root: Path = ROOT) -> Result:
 # ─────────────────────────────────────────────────────────────────────────────
 from adws.adw_modules import permissions  # noqa: E402
 from adws.adw_modules.sandbox_provider import (  # noqa: E402
+    EffectNotAuthorized,
     InMemoryDestroyAuthorizationStateStore,
+    JsonFileAuthorizationStateStore,
     ResourceBounds,
 )
 from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
@@ -692,6 +711,10 @@ from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
 )
 from tools import ci_gate  # noqa: E402
 from tools import evidence_manifest  # noqa: E402
+from tools import windows_host  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "docs" / "validation"))
+import check_planning_foundation  # noqa: E402
 
 
 class _Run:
@@ -1088,6 +1111,190 @@ def evidence_ceiling_boundary() -> Result:
     return result
 
 
+
+def durable_authority_store_boundary() -> Result:
+    """The store that actually gates live effects refuses past its ceiling.
+
+    The in-memory sibling has always REJECTed; this is the durable one, whose
+    file is re-read whole on every verify. The limit case must still be
+    admitted, and the limit + 1 case must be a positively observed refusal
+    rather than an eviction, because evicting a spent authorization restores
+    its identity to "never seen".
+    """
+    result = ok()
+    digest = "a" * 64
+    # Both identities are SHA-256 digests in this store, so the fixture uses
+    # real ones rather than readable names the owner would rightly refuse.
+    identity = [f"{index:064x}" for index in range(4)]
+    with tempfile.TemporaryDirectory() as directory:
+        store = JsonFileAuthorizationStateStore(Path(directory) / "authority.json")
+        store.MAX_AUTHORIZATIONS = 3  # instance ceiling; the class default stands
+        for index in range(2):
+            store.record_issuance(identity[index], digest)
+        if not store.verifies(identity[1], digest):
+            result = result.merge(fail("durable authority: limit - 1 was refused"))
+        store.record_issuance(identity[2], digest)
+        if not store.verifies(identity[2], digest):
+            result = result.merge(fail("durable authority: the limit case was refused"))
+        try:
+            store.record_issuance(identity[3], digest)
+        except EffectNotAuthorized as exc:
+            if "full" not in str(exc):
+                result = result.merge(
+                    fail("durable authority: the refusal did not name the ceiling")
+                )
+        else:
+            result = result.merge(fail("durable authority: limit + 1 was admitted"))
+        # A full store must not have quietly dropped anyone to make room.
+        for index in range(3):
+            if not store.verifies(identity[index], digest):
+                result = result.merge(
+                    fail(f"durable authority: entry {index} was evicted at the ceiling")
+                )
+        # An identity already recorded stays usable at the ceiling, so a live
+        # effect is never orphaned by a store that filled up behind it.
+        store.record_issuance(identity[1], digest)
+        if not store.compare_and_swap_reserved(identity[1], digest):
+            result = result.merge(
+                fail("durable authority: a recorded identity could not proceed when full")
+            )
+    return result
+
+
+def _stub_git(directory: Path, body: str) -> dict[str, str]:
+    """A PATH holding one fake `git`, so the real read meets a real child."""
+    (directory / "stub.py").write_text(body, encoding="utf-8")
+    if os.name == "nt":
+        launcher = directory / "git.bat"
+        launcher.write_text(
+            f'@echo off\r\n"{sys.executable}" "{directory / "stub.py"}" %*\r\n',
+            encoding="utf-8",
+        )
+    else:
+        launcher = directory / "git"
+        launcher.write_text(
+            f'#!/bin/sh\nexec "{sys.executable}" "{directory / "stub.py"}" "$@"\n',
+            encoding="utf-8",
+        )
+        launcher.chmod(0o755)
+    environment = dict(os.environ)
+    environment["PATH"] = str(directory) + os.pathsep + environment.get("PATH", "")
+    return environment
+
+
+def planning_git_read_boundary() -> Result:
+    """A git read that overruns its bytes or its deadline answers nothing.
+
+    Truncating would be worse than refusing here: the planning validator turns
+    these bytes into authority identities, and a prefix of a ref list is
+    indistinguishable from a complete shorter one.
+    """
+    result = ok()
+    module = check_planning_foundation
+    limit, deadline = module.GIT_OUTPUT_MAX_BYTES, module.GIT_OUTPUT_TIMEOUT_SECONDS
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+        return fail("planning git read: the byte ceiling is not a positive integer")
+    if not isinstance(deadline, float) or deadline <= 0:
+        return fail("planning git read: the deadline is not a positive number")
+
+    original_environment = dict(os.environ)
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        try:
+            module.GIT_OUTPUT_MAX_BYTES = 64
+            body = (
+                "import os, sys\n"
+                "sys.stdout.buffer.write(b'z' * int(os.environ['STUB_BYTES']))\n"
+            )
+            environment = _stub_git(root, body)
+            os.environ.clear()
+            os.environ.update(environment)
+            for size, expected, label in (
+                (63, "z" * 63, "limit - 1"),
+                (64, "z" * 64, "limit"),
+                (65, None, "limit + 1"),
+            ):
+                os.environ["STUB_BYTES"] = str(size)
+                observed = module._git_output(root, "rev-parse", "HEAD")
+                if observed != expected:
+                    detail = (
+                        "returned a truncated value"
+                        if expected is None
+                        else "answered nothing for an in-bound read"
+                    )
+                    result = result.merge(
+                        fail(f"planning git read: {label} {detail}")
+                    )
+        finally:
+            module.GIT_OUTPUT_MAX_BYTES = limit
+            os.environ.clear()
+            os.environ.update(original_environment)
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        try:
+            module.GIT_OUTPUT_TIMEOUT_SECONDS = 0.4
+            environment = _stub_git(root, "import time\ntime.sleep(120)\n")
+            os.environ.clear()
+            os.environ.update(environment)
+            started = time.monotonic()
+            observed = module._git_output(root, "rev-parse", "HEAD")
+            elapsed = time.monotonic() - started
+            if observed is not None:
+                result = result.merge(
+                    fail("planning git read: an overrunning read still answered")
+                )
+            if elapsed > 30:
+                result = result.merge(
+                    fail(f"planning git read: the deadline did not fire ({elapsed:.1f}s)")
+                )
+        finally:
+            module.GIT_OUTPUT_TIMEOUT_SECONDS = deadline
+            os.environ.clear()
+            os.environ.update(original_environment)
+    return result
+
+
+def windows_host_child_output_boundary() -> Result:
+    """A doctor child that prints past the ceiling is clipped, and says so."""
+    result = ok()
+    ceiling = windows_host.CHILD_MAX_OUTPUT_BYTES
+    if not isinstance(ceiling, int) or isinstance(ceiling, bool) or ceiling < 1:
+        return fail("windows host child output: the ceiling is not a positive integer")
+    try:
+        windows_host.CHILD_MAX_OUTPUT_BYTES = 64
+        for size, truncated, label in (
+            (63, False, "limit - 1"), (64, False, "limit"), (65, True, "limit + 1"),
+        ):
+            observation = windows_host.run(
+                [
+                    sys.executable,
+                    "-c",
+                    f"import sys; sys.stdout.write('z' * {size})",
+                ]
+            )
+            if observation.returncode != 0:
+                result = result.merge(
+                    fail(f"windows host child output: {label} child did not run")
+                )
+                continue
+            clipped = "[bounded]" in observation.stdout
+            if clipped is not truncated:
+                result = result.merge(
+                    fail(f"windows host child output: {label} clipping was {clipped}")
+                )
+            if truncated and f"{size} bytes seen" not in observation.stdout:
+                result = result.merge(
+                    fail(
+                        "windows host child output: a clipped log did not state "
+                        "how much it never kept"
+                    )
+                )
+    finally:
+        windows_host.CHILD_MAX_OUTPUT_BYTES = ceiling
+    return result
+
+
 BOUNDARY_CONTROLS: tuple[tuple[str, Callable[[], Result]], ...] = (
     ("bounded_stream_capture_boundary", bounded_stream_capture_boundary),
     ("bounded_journal_boundary", bounded_journal_boundary),
@@ -1101,6 +1308,9 @@ BOUNDARY_CONTROLS: tuple[tuple[str, Callable[[], Result]], ...] = (
     ("resource_bounds_controls", resource_bounds_controls),
     ("ci_gate_output_boundary", ci_gate_output_boundary),
     ("evidence_ceiling_boundary", evidence_ceiling_boundary),
+    ("durable_authority_store_boundary", durable_authority_store_boundary),
+    ("planning_git_read_boundary", planning_git_read_boundary),
+    ("windows_host_child_output_boundary", windows_host_child_output_boundary),
 )
 
 
@@ -1327,6 +1537,44 @@ def watched_red_controls() -> list[tuple[str, Callable[[Path], None], str]]:
         mutate_source(root, "adws/adw_modules/console.py", "MAX_LINE = 160",
                       "MAX_LINE = 0")
 
+    def removed_durable_authority_ceiling(root: Path) -> None:
+        # Anchored on the comment above it, because the in-memory sibling
+        # carries a field of the same name and the same value.
+        mutate_source(
+            root, "adws/adw_modules/sandbox_provider.py",
+            "    # docs/operations/RECOVERY.md.\n    MAX_AUTHORIZATIONS = 4096",
+            "    # docs/operations/RECOVERY.md.\n    MAX_AUTHORIZATIONS_UNUSED = 4096",
+        )
+
+    def removed_planning_git_ceiling(root: Path) -> None:
+        mutate_source(
+            root, "docs/validation/check_planning_foundation.py",
+            "GIT_OUTPUT_MAX_BYTES = ", "GIT_OUTPUT_MAX_BYTES_UNUSED = ",
+        )
+
+    def removed_planning_git_deadline(root: Path) -> None:
+        mutate_source(
+            root, "docs/validation/check_planning_foundation.py",
+            "GIT_OUTPUT_TIMEOUT_SECONDS = ", "GIT_OUTPUT_TIMEOUT_SECONDS_UNUSED = ",
+        )
+
+    def removed_doctor_output_ceiling(root: Path) -> None:
+        mutate_source(
+            root, "tools/windows_host.py",
+            "CHILD_MAX_OUTPUT_BYTES = ", "CHILD_MAX_OUTPUT_BYTES_UNUSED = ",
+        )
+
+    def delta_declared_only_in_prose(root: Path) -> None:
+        # The protocol's form is a fenced block. Prose that merely names the
+        # key is a mention, and an increment whose fences are gone has stopped
+        # declaring anything even though the words are still there.
+        path = root / INCREMENTS / "B1-001_AGENT_DOC_DISCOVERY.md"
+        text = path.read_text(encoding="utf-8")
+        head, _, tail = text.partition("```text\n" + DELTA_KEY)
+        path.write_text(
+            head + DELTA_KEY + tail.replace("```", "", 1), encoding="utf-8"
+        )
+
     # Each row carries the fragment the finding MUST contain. A control that
     # goes red for some other reason has not proved the property it names, so a
     # generic "something changed" failure cannot stand in for any of these.
@@ -1377,6 +1625,16 @@ def watched_red_controls() -> list[tuple[str, Callable[[Path], None], str]]:
          "SAFE_UNBOUNDED journal path stopped being gitignored: sssf.db"),
         ("zero bound with no declared meaning", zero_bound_without_meaning,
          "a zero bound needs an explicit meaning"),
+        ("removed durable effect-authority ceiling", removed_durable_authority_ceiling,
+         "sssf.sandbox.effect_authority_state_store: limit could not be read"),
+        ("removed planning git byte ceiling", removed_planning_git_ceiling,
+         "sssf.planning.git_output_capture: limit could not be read"),
+        ("removed planning git deadline", removed_planning_git_deadline,
+         "sssf.planning.git_wall_clock: limit could not be read"),
+        ("removed doctor child output ceiling", removed_doctor_output_ceiling,
+         "sssf.windows_host.child_output_capture: limit could not be read"),
+        ("boundedness delta declared only in prose", delta_declared_only_in_prose,
+         f"B1-001_AGENT_DOC_DISCOVERY.md: declares no {DELTA_KEY}"),
     ]
 
 
