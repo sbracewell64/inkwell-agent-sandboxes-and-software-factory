@@ -42,6 +42,8 @@ sys.path.insert(0, str(ROOT))
 
 from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
     BoundedStreamCapture,
+    ReaderThread,
+    join_reader_threads,
     process_group_popen_kwargs,
     stop_process_group,
 )
@@ -259,28 +261,30 @@ def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str
     prefix = ["--git-dir", str(git_dir)] if git_dir is not None else []
     capture = BoundedStreamCapture(limit=GIT_OUTPUT_MAX_BYTES)
     try:
-        with subprocess.Popen(
+        process = subprocess.Popen(
             ["git", *prefix, *arguments],
             cwd=root,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             **process_group_popen_kwargs(),
-        ) as process:
-            reader_complete = True
-            cleanup_complete = True
-            reader = threading.Thread(target=capture.read_from, args=(process.stdout,), daemon=True)
-            reader.start()
-            try:
-                returncode = process.wait(timeout=GIT_OUTPUT_TIMEOUT_SECONDS)
-            except subprocess.TimeoutExpired:
-                cleanup_complete = stop_process_group(process)
-                return None
-            finally:
-                reader.join(timeout=2)
-                if reader.is_alive():
+        )
+        reader_complete = True
+        cleanup_complete = True
+        reader = ReaderThread(capture.read_from, (process.stdout,))
+        reader.start()
+        try:
+            returncode = process.wait(timeout=GIT_OUTPUT_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            cleanup_complete = stop_process_group(process)
+            return None
+        finally:
+            reader_complete = join_reader_threads((reader,), 2.0)
+            if not reader_complete:
+                try:
                     cleanup_complete = stop_process_group(process)
-                    reader.join(timeout=2)
-                    reader_complete = not reader.is_alive()
+                except Exception:
+                    cleanup_complete = False
+                reader_complete = join_reader_threads((reader,), 2.0)
     except (OSError, ValueError):
         return None
     if not cleanup_complete or not reader_complete or returncode != 0 or capture.truncated:

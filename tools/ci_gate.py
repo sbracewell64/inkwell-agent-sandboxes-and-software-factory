@@ -13,6 +13,8 @@ import time
 from typing import Any
 
 from adws.adw_modules.subprocess_supervisor import (
+    ReaderThread,
+    join_reader_threads,
     process_group_popen_kwargs,
     stop_process_group,
 )
@@ -175,7 +177,7 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
     # against a ceiling on the way in. Reaching it is stated in the evidence,
     # never a quietly shorter log.
     capture = BoundedOutput(CHECK_MAX_OUTPUT_BYTES)
-    reader = threading.Thread(target=capture.read_from, args=(process.stdout,), daemon=True)
+    reader = ReaderThread(capture.read_from, (process.stdout,))
     reader.start()
 
     while True:
@@ -207,15 +209,18 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
         except subprocess.TimeoutExpired:
             continue
 
-    reader.join(timeout=max(0.0, deadline - time.monotonic()))
-    if reader.is_alive():
-        cleanup_succeeded = _stop_process(process)
-        reader.join(timeout=2)
-        if reader.is_alive() or not cleanup_succeeded:
+    reader_complete = join_reader_threads((reader,), max(0.0, deadline - time.monotonic()))
+    if not reader_complete:
+        try:
+            cleanup_succeeded = _stop_process(process)
+        except Exception:
+            cleanup_succeeded = False
+        reader_complete = join_reader_threads((reader,), 2.0)
+        if not reader_complete or not cleanup_succeeded:
             result["status"] = "could-not-observe"
             result["reason"] = (
                 "check output pipe did not close after process-tree cleanup"
-                if reader.is_alive()
+                if not reader_complete
                 else "check process-tree cleanup failed"
             )
     output = capture.text()

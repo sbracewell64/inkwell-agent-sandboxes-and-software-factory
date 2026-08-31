@@ -21,7 +21,10 @@ from .data_types import (EventRecord, QualityCheckResult, QualityCheckSpec, Qual
 from .subprocess_supervisor import (
     BoundedStreamCapture,
     ChildDeadline,
+    ReaderThread,
+    join_reader_threads,
     process_group_popen_kwargs,
+    stop_process_group,
 )
 from .utils import now_iso, operator_env
 
@@ -88,18 +91,33 @@ def _bounded_run(
     )
     deadline.arm(process)
     readers = [
-        threading.Thread(target=out_capture.read_from, args=(process.stdout,), daemon=True),
-        threading.Thread(target=err_capture.read_from, args=(process.stderr,), daemon=True),
+        ReaderThread(out_capture.read_from, (process.stdout,)),
+        ReaderThread(err_capture.read_from, (process.stderr,)),
     ]
     for reader in readers:
         reader.start()
     try:
-        returncode = process.wait()
+        try:
+            returncode = process.wait(timeout=spec.timeout_seconds + 3.0)
+        except subprocess.TimeoutExpired:
+            deadline.cleanup_failed.set()
+            try:
+                cleanup_complete = stop_process_group(process)
+            except Exception:
+                cleanup_complete = False
+            returncode = process.poll() if process.poll() is not None else -1
+        else:
+            cleanup_complete = True
     finally:
-        for reader in readers:
-            reader.join(timeout=2)
+        readers_complete = join_reader_threads(readers, 2.0)
         deadline.cancel()
-    if deadline.cleanup_failed.is_set() or any(reader.is_alive() for reader in readers):
+    if not readers_complete:
+        try:
+            cleanup_complete = stop_process_group(process)
+        except Exception:
+            cleanup_complete = False
+        readers_complete = join_reader_threads(readers, 2.0)
+    if deadline.cleanup_failed.is_set() or not cleanup_complete or not readers_complete:
         raise OSError("quality child process-tree cleanup could not be observed")
     return out_capture, err_capture, deadline, returncode
 

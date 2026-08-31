@@ -24,6 +24,8 @@ from tools.ci_gate import (  # noqa: E402
     child_cno_reason,
 )
 from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
+    ReaderThread,
+    join_reader_threads,
     process_group_popen_kwargs,
     stop_process_group,
 )
@@ -105,28 +107,30 @@ def _bounded_child(
     cannot be spawned and `subprocess.TimeoutExpired` when it outlives the
     deadline — so the caller's three-valued handling is unchanged.
     """
-    with subprocess.Popen(
+    process = subprocess.Popen(
         args,
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         **process_group_popen_kwargs(),
-    ) as process:
-        reader_complete = True
-        cleanup_complete = True
-        reader = threading.Thread(target=capture.read_from, args=(process.stdout,), daemon=True)
-        reader.start()
-        try:
-            returncode = process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            cleanup_complete = stop_process_group(process)
-            raise
-        finally:
-            reader.join(timeout=2)
-            if reader.is_alive():
+    )
+    reader_complete = True
+    cleanup_complete = True
+    reader = ReaderThread(capture.read_from, (process.stdout,))
+    reader.start()
+    try:
+        returncode = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        cleanup_complete = stop_process_group(process)
+        raise
+    finally:
+        reader_complete = join_reader_threads((reader,), 2.0)
+        if not reader_complete:
+            try:
                 cleanup_complete = stop_process_group(process)
-                reader.join(timeout=2)
-                reader_complete = not reader.is_alive()
+            except Exception:
+                cleanup_complete = False
+            reader_complete = join_reader_threads((reader,), 2.0)
     if not cleanup_complete or not reader_complete:
         raise OSError("child output pipe did not close after process-tree cleanup")
     return subprocess.CompletedProcess(args, returncode)

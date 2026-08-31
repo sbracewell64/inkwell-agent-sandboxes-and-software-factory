@@ -394,9 +394,56 @@ def process_group_popen_kwargs() -> dict[str, object]:
     return {"start_new_session": True}
 
 
+class ReaderThread(threading.Thread):
+    def __init__(self, target: Callable, args: tuple[object, ...]) -> None:
+        super().__init__(target=target, args=args, daemon=True)
+        self.failure: BaseException | None = None
+
+    def run(self) -> None:
+        try:
+            super().run()
+        except BaseException as exc:
+            self.failure = exc
+
+
+def join_reader_threads(readers: Sequence[ReaderThread], timeout: float) -> bool:
+    deadline = time.monotonic() + max(0.0, timeout)
+    for reader in readers:
+        reader.join(timeout=max(0.0, deadline - time.monotonic()))
+    return all(not reader.is_alive() and reader.failure is None for reader in readers)
+
+
+def _bounded_direct_stop(process: subprocess.Popen, grace_seconds: float) -> bool:
+    succeeded = True
+    if process.poll() is None:
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            pass
+        except Exception:
+            succeeded = False
+    if process.poll() is None:
+        try:
+            process.wait(timeout=max(0.1, grace_seconds))
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            except Exception:
+                succeeded = False
+            try:
+                process.wait(timeout=max(0.1, grace_seconds))
+            except Exception:
+                succeeded = False
+        except Exception:
+            succeeded = False
+    return succeeded and process.poll() is not None
+
+
 def stop_process_group(process: subprocess.Popen, grace_seconds: float = 2.0) -> bool:
+    cleanup_succeeded = True
     if os.name == "nt":
-        cleanup_succeeded = False
         try:
             completed = subprocess.run(
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],
@@ -405,43 +452,31 @@ def stop_process_group(process: subprocess.Popen, grace_seconds: float = 2.0) ->
                 timeout=max(1.0, grace_seconds),
                 check=False,
             )
-            cleanup_succeeded = completed.returncode == 0
-        except (OSError, subprocess.TimeoutExpired):
+            if completed.returncode != 0:
+                cleanup_succeeded = False
+        except Exception:
             cleanup_succeeded = False
-        if not cleanup_succeeded and process.poll() is None:
-            process.kill()
     else:
-        group_found = True
         try:
             os.killpg(process.pid, signal.SIGTERM)
         except ProcessLookupError:
-            group_found = False
-            if process.poll() is None:
-                process.terminate()
-        try:
-            process.wait(timeout=grace_seconds)
-        except subprocess.TimeoutExpired:
             pass
-        if not group_found:
-            if process.poll() is None:
-                process.kill()
-            process.wait()
-            return True
+        except Exception:
+            cleanup_succeeded = False
         try:
             os.killpg(process.pid, 0)
         except ProcessLookupError:
-            return True
+            pass
+        except Exception:
+            cleanup_succeeded = False
         else:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-    try:
-        process.wait(timeout=max(1.0, grace_seconds))
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
-    return cleanup_succeeded if os.name == "nt" else True
+            except Exception:
+                cleanup_succeeded = False
+    return _bounded_direct_stop(process, grace_seconds) and cleanup_succeeded
 
 
 # BOUNDEDNESS-POLICY: sssf.policy.child-wall-clock.v1
@@ -469,8 +504,9 @@ class ChildDeadline:
             try:
                 if not stop_process_group(process, 1.0):
                     self.cleanup_failed.set()
-            except (OSError, ValueError):
-                pass
+            except Exception:
+                self.cleanup_failed.set()
+                _bounded_direct_stop(process, 1.0)
 
         self._timer = threading.Timer(self.seconds, fire)
         self._timer.daemon = True
@@ -480,6 +516,9 @@ class ChildDeadline:
     def cancel(self) -> None:
         if self._timer is not None:
             self._timer.cancel()
+            self._timer.join(timeout=2.0)
+            if self._timer.is_alive():
+                self.cleanup_failed.set()
             self._timer = None
 
     def status(self) -> dict[str, object]:
@@ -761,8 +800,8 @@ def _supervise_linux(
     assert process.stdout is not None and process.stderr is not None
     stdout_capture = _Capture(request.max_stdout_bytes)
     stderr_capture = _Capture(request.max_stderr_bytes)
-    stdout_thread = threading.Thread(target=stdout_capture.read_from, args=(process.stdout,), daemon=True)
-    stderr_thread = threading.Thread(target=stderr_capture.read_from, args=(process.stderr,), daemon=True)
+    stdout_thread = ReaderThread(stdout_capture.read_from, (process.stdout,))
+    stderr_thread = ReaderThread(stderr_capture.read_from, (process.stderr,))
     stdout_thread.start()
     stderr_thread.start()
 
@@ -802,8 +841,9 @@ def _supervise_linux(
         trigger is not None or descendant_leak,
         lambda: _custodied_descendants(process.pid),
     )
-    stdout_thread.join(timeout=max(0.1, request.verification_grace_seconds))
-    stderr_thread.join(timeout=max(0.1, request.verification_grace_seconds))
+    readers_complete = join_reader_threads(
+        (stdout_thread, stderr_thread), max(0.1, request.verification_grace_seconds)
+    )
     if on_exit:
         on_exit(process.pid)
 
@@ -815,7 +855,10 @@ def _supervise_linux(
     cancelled = trigger == "cancelled"
     reason: FailureReason | None
     state: TerminalState
-    if not cleanup.reaped or cleanup.group_absent is not True or cleanup.survivors:
+    if not readers_complete:
+        state = TerminalState.FAILED
+        reason = FailureReason("cleanup-unverified", Observation.COULD_NOT_OBSERVE, "child output readers did not terminate cleanly")
+    elif not cleanup.reaped or cleanup.group_absent is not True or cleanup.survivors:
         state = TerminalState.FAILED
         reason = FailureReason("cleanup-unverified", Observation.COULD_NOT_OBSERVE, cleanup.detail)
     elif overflow:

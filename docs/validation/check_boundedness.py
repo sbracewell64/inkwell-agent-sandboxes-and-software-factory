@@ -1959,7 +1959,10 @@ def _behavior_process(root: Path, script: str, timeout: float) -> tuple[int | No
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
             process.kill()
-            process.wait()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                output += "\nbehavior harness direct fallback failed"
     return process.returncode, output, timed_out
 
 
@@ -2070,15 +2073,55 @@ raise SystemExit(42)
                 stderr_case, "adws/adw_modules/agent_pi.py",
                 "    stderr_reader.start()", "    pass",
             )
-            mutate_source(
-                stderr_case, "adws/adw_modules/agent_pi.py",
-                "    result.returncode = process.wait()",
-                "    stderr_reader.run()\n    result.returncode = process.wait()",
-            )
             observed = _behavior_process(stderr_case, stderr_script, 3)
             if not observed[2]:
                 result = result.merge(
                     fail("behavioral watched-red stayed green: concurrent stderr drain")
+                )
+
+        agent_cleanup_script = """
+import os, sys, tempfile
+from pathlib import Path
+from adws.adw_modules import agent_pi
+agent_pi.resolve_model = lambda value: ('stub', 'stub')
+agent_pi.context_window = lambda provider, model: 1
+agent_pi.stop_process_group = lambda process: False
+with tempfile.TemporaryDirectory() as raw:
+    root = Path(raw)
+    stub_py = root / 'pi_cleanup_stub.py'
+    stub_py.write_text("import json,subprocess,sys\\nsubprocess.Popen([sys.executable,'-c','import time; time.sleep(5)'], stderr=sys.stderr)\\nprint(json.dumps({'type':'message_end','message':{'role':'assistant','content':[{'type':'text','text':'done'}]}}), flush=True)\\n", encoding='utf-8')
+    if os.name == 'nt':
+        stub = root / 'pi-cleanup-stub.cmd'
+        stub.write_text('@echo off\\r\\n"' + sys.executable + '" "' + str(stub_py) + '"\\r\\n', encoding='utf-8')
+    else:
+        stub = root / 'pi-cleanup-stub'
+        stub.write_text('#!/bin/sh\\nexec "' + sys.executable + '" "' + str(stub_py) + '"\\n', encoding='utf-8')
+        stub.chmod(0o755)
+    agent_pi.PI_PATH = str(stub)
+    request = agent_pi.PiRequest(prompt='p', system_prompt='s', model='stub', session_id='s', session_dir=str(root), raw_output_path=str(root / 'raw.jsonl'), cwd=str(root))
+    try:
+        agent_pi.run(request)
+    except RuntimeError as exc:
+        if 'process-tree cleanup failed' in str(exc):
+            raise SystemExit(0)
+raise SystemExit(45)
+"""
+        cleanup_base = workspace / "agent-cleanup-base"
+        shutil.copytree(stderr_base, cleanup_base)
+        baseline = _behavior_process(cleanup_base, agent_cleanup_script, 8)
+        if baseline[2] or baseline[0] != 0:
+            result = result.merge(cno("agent cleanup watched-red baseline owner did not report failure"))
+        else:
+            cleanup_case = workspace / "agent-cleanup-mutant"
+            shutil.copytree(cleanup_base, cleanup_case)
+            mutate_source(
+                cleanup_case, "adws/adw_modules/agent_pi.py",
+                "    if not cleanup_complete or not readers_complete:", "    if False:",
+            )
+            observed = _behavior_process(cleanup_case, agent_cleanup_script, 8)
+            if observed[2] or observed[0] != 45:
+                result = result.merge(
+                    fail("behavioral watched-red stayed green: agent cleanup failure")
                 )
 
         process_script = """
@@ -2123,6 +2166,45 @@ if result.get('reason') != 'check timed out' or elapsed > 3:
                 result = result.merge(
                     fail("behavioral watched-red stayed green: process-tree deadline")
                 )
+
+        deadline_script = """
+import subprocess, sys
+from adws.adw_modules import subprocess_supervisor as owner
+process = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)'])
+def raised(process, grace_seconds=2.0):
+    raise PermissionError('forced tree cleanup failure')
+owner.stop_process_group = raised
+deadline = owner.ChildDeadline(0.2).arm(process)
+try:
+    process.wait(timeout=3)
+except subprocess.TimeoutExpired:
+    import time
+    time.sleep(120)
+deadline.cancel()
+if deadline.cleanup_failed.is_set() and process.poll() is not None:
+    raise SystemExit(0)
+raise SystemExit(46)
+"""
+        deadline_base = workspace / "deadline-base"
+        _copy_behavior_files(
+            deadline_base, ("adws/adw_modules/subprocess_supervisor.py",)
+        )
+        baseline = _behavior_process(deadline_base, deadline_script, 5)
+        if baseline[2] or baseline[0] != 0:
+            result = result.merge(cno("deadline exception baseline owner did not perform fallback"))
+        else:
+            deadline_case = workspace / "deadline-mutant"
+            shutil.copytree(deadline_base, deadline_case)
+            mutate_source(
+                deadline_case, "adws/adw_modules/subprocess_supervisor.py",
+                "            except Exception:\n                self.cleanup_failed.set()\n                _bounded_direct_stop(process, 1.0)",
+                "            except Exception:\n                pass",
+            )
+            observed = _behavior_process(deadline_case, deadline_script, 5)
+            if not observed[2]:
+                result = result.merge(
+                    fail("behavioral watched-red stayed green: deadline cleanup exception")
+                )
     return result
 
 
@@ -2166,8 +2248,8 @@ def main() -> int:
         f"{len(BOUNDARY_CONTROLS)} real enforcement owners"
     )
     print(
-        f"watched-red: {len(watched_red_controls()) + 3} property-specific controls, "
-        f"including 3 behavioral owner mutations watched going red"
+        f"watched-red: {len(watched_red_controls()) + 5} property-specific controls, "
+        f"including 5 behavioral owner mutations watched going red"
     )
     print("increment protocol: every increment declares a boundedness delta")
     print("provider-calls: 0 (no network, provider, model, or browser side effect)")

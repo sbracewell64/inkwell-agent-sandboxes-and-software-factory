@@ -369,6 +369,17 @@ the existing `CREATE_NEW_PROCESS_GROUP` and `taskkill /T /F` owner path; a
 missing or nonzero `taskkill` result is cleanup failure, never assumed success,
 and reader shutdown remains bounded while the caller reports could-not-observe.
 
+The cleanup-class sweep covers the supervisor, pi turn, quality runner, CI
+gate, planning Git reader, and Windows-host child wrapper. They share the
+existing child-wall-clock policy owner: tree cleanup retains every internal
+exception or false result, bounded direct fallback runs, and reader completion
+uses one bounded join contract that includes reader exceptions. Cleanup false,
+a raised cleanup primitive, a failed reader, or a reader still live after the
+final join is FAIL or could-not-observe; no owner returns success or parses
+partial output. Pi and quality waits are independently bounded so failed
+fallback cannot strand their calling thread. Executed watched reds force
+cleanup false, force cleanup to raise, and hold a reader live.
+
 The defect: the host doctor's bounded capture and HD-09's could-not-observe
 reason lines are individually correct and wrong together. HD-09 reads a child's
 own reason lines out of its output; this increment moved the same output behind
@@ -384,7 +395,7 @@ before the fix.
 
 | Check | Result |
 | --- | --- |
-| `python3 docs/validation/check_boundedness.py` | PASS — 53 surfaces, 18 boundary owners, 31 watched-red controls, including three executed behavioral owner mutations |
+| `python3 docs/validation/check_boundedness.py` | PASS — 53 surfaces, 18 boundary owners, 33 watched-red controls, including five executed behavioral owner mutations |
 | `python3 docs/validation/check_ci_contract.py` | PASS — 12 offline checks enumerated |
 | `python3 docs/validation/check_planning_foundation.py` | PASS — 20 tests, in 4.4 s against a 60 s budget, with the bounded git reads in place |
 | `python3 docs/validation/check_adw_synchronization.py` | PASS |

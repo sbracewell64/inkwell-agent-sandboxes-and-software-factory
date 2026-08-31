@@ -22,6 +22,8 @@ from .subprocess_supervisor import (
     BoundedJournalWriter,
     BoundedStreamCapture,
     ChildDeadline,
+    ReaderThread,
+    join_reader_threads,
     process_group_popen_kwargs,
     stop_process_group,
 )
@@ -55,6 +57,36 @@ def _drain_text_stream(pipe, capture: BoundedStreamCapture) -> None:
             if not chunk:
                 break
             capture.feed(chunk.encode("utf-8", "replace"))
+    finally:
+        pipe.close()
+
+
+def _consume_stdout(pipe, journal, result, on_event) -> None:
+    try:
+        for line in pipe:
+            journal.append(line)
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") == "message_end":
+                message = event.get("message", {})
+                if message.get("role") == "assistant":
+                    text = _text_of(message)
+                    if text:
+                        result.text = text
+                    usage = message.get("usage", {}) or {}
+                    turn = _context_tokens(usage)
+                    result.tokens += turn
+                    result.usage.add_turn(usage, turn)
+                    if turn and message.get("stopReason") not in ("aborted", "error"):
+                        result.context_tokens = turn
+                    result.cost += (usage.get("cost", {}) or {}).get("total", 0.0) or 0.0
+            if on_event:
+                on_event(event)
     finally:
         pipe.close()
 
@@ -315,47 +347,38 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
     deadline = ChildDeadline(PI_TURN_MAX_SECONDS).arm(process)
     stderr_capture = BoundedStreamCapture(STDERR_MAX_BYTES)
     assert process.stderr is not None
-    stderr_reader = threading.Thread(
-        target=_drain_text_stream, args=(process.stderr, stderr_capture), daemon=True
-    )
+    stderr_reader = ReaderThread(_drain_text_stream, (process.stderr, stderr_capture))
     stderr_reader.start()
-    with raw_path.open("a+") as raw:
-        journal = BoundedJournalWriter(raw, RAW_OUTPUT_MAX_BYTES)
-        assert process.stdout is not None
-        for line in process.stdout:
-            journal.append(line)             # events land on disk as they happen
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if event.get("type") == "message_end":
-                message = event.get("message", {})
-                if message.get("role") == "assistant":
-                    text = _text_of(message)
-                    if text:
-                        result.text = text   # last assistant message wins
-                    usage = message.get("usage", {}) or {}
-                    turn = _context_tokens(usage)
-                    result.tokens += turn
-                    result.usage.add_turn(usage, turn)
-                    # Occupancy is read off the last VALID assistant turn, the
-                    # way pi does it — an aborted or errored turn reports usage
-                    # you can't trust, so it must not overwrite a good reading.
-                    if turn and message.get("stopReason") not in ("aborted", "error"):
-                        result.context_tokens = turn
-                    result.cost += (usage.get("cost", {}) or {}).get("total", 0.0) or 0.0
-            if on_event:
-                on_event(event)
-
-    result.returncode = process.wait()
+    raw = raw_path.open("a+")
+    journal = BoundedJournalWriter(raw, RAW_OUTPUT_MAX_BYTES)
+    assert process.stdout is not None
+    stdout_reader = ReaderThread(
+        _consume_stdout, (process.stdout, journal, result, on_event)
+    )
+    stdout_reader.start()
+    try:
+        result.returncode = process.wait(timeout=PI_TURN_MAX_SECONDS + 3.0)
+    except subprocess.TimeoutExpired:
+        deadline.cleanup_failed.set()
+        try:
+            cleanup_complete = stop_process_group(process)
+        except Exception:
+            cleanup_complete = False
+        result.returncode = process.poll() if process.poll() is not None else -1
+    else:
+        cleanup_complete = True
     deadline.cancel()
-    stderr_reader.join(timeout=2)
-    if stderr_reader.is_alive():
-        stop_process_group(process)
-        stderr_reader.join(timeout=2)
+    readers = (stdout_reader, stderr_reader)
+    readers_complete = join_reader_threads(readers, 2.0)
+    cleanup_complete = cleanup_complete and not deadline.cleanup_failed.is_set()
+    if not readers_complete:
+        try:
+            cleanup_complete = stop_process_group(process) and cleanup_complete
+        except Exception:
+            cleanup_complete = False
+        readers_complete = join_reader_threads(readers, 2.0)
+    if readers_complete:
+        raw.close()
     stderr = stderr_capture.data.decode("utf-8", "replace")
     if on_exit:
         on_exit(process.pid)
@@ -364,7 +387,13 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
         # nonzero exit that reads like the agent simply failed.
         raise RuntimeError(
             f"pi turn cancelled at the {PI_TURN_MAX_SECONDS:.0f}s wall-clock ceiling "
-            f"(exit {result.returncode}); journal {journal.status()}"
+            f"(exit {result.returncode}); cleanup_complete={cleanup_complete}, "
+            f"readers_complete={readers_complete}; journal {journal.status()}"
+        )
+    if not cleanup_complete or not readers_complete:
+        raise RuntimeError(
+            "pi process-tree cleanup failed; "
+            f"cleanup_complete={cleanup_complete}, readers_complete={readers_complete}"
         )
     if journal.truncated:
         raise RuntimeError(
