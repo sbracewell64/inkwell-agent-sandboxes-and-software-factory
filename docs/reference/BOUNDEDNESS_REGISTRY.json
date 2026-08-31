@@ -392,7 +392,7 @@
         }
       },
       "policy_identity": "sssf.policy.bounded-journal.v1",
-      "admission_or_backpressure": "BoundedJournalWriter admits a line only while the ceiling has room",
+      "admission_or_backpressure": "BoundedJournalWriter initializes retained-byte accounting from the existing append target and admits a line only while the aggregate ceiling has room",
       "on_limit_behavior": [
         "TRUNCATE_WITH_EXPLICIT_STATUS",
         "FAIL"
@@ -406,7 +406,7 @@
         "docs/validation/check_boundedness.py::bounded_journal_boundary"
       ],
       "status": "observed-good",
-      "notes": "Reaching the ceiling also fails the turn: a truncated journal is not a complete record of what the agent did, and must not read as one."
+      "notes": "The ceiling applies across every reopen of the same journal. Reaching it also fails the turn: a truncated journal is not a complete record of what the agent did, and must not read as one."
     },
     {
       "surface_id": "sssf.agent_pi.stderr_capture",
@@ -430,13 +430,14 @@
         }
       },
       "policy_identity": "sssf.policy.bounded-stream-capture.v1",
-      "admission_or_backpressure": "BoundedStreamCapture reads the child's stderr against the ceiling",
+      "admission_or_backpressure": "a concurrent reader drains the child's stderr through BoundedStreamCapture while stdout is processed",
       "on_limit_behavior": [
         "TRUNCATE_WITH_EXPLICIT_STATUS"
       ],
       "retention_or_cleanup": "held only long enough to build the failure message",
       "observability": [
-        "BoundedStreamCapture.status()"
+        "BoundedStreamCapture.status()",
+        "agent_pi.run overflow error"
       ],
       "verification_refs": [
         "docs/validation/check_boundedness.py::bounded_stream_capture_boundary"
@@ -1325,13 +1326,14 @@
         "REJECT",
         "CANCEL"
       ],
-      "retention_or_cleanup": "a check past its deadline is stopped and recorded could-not-observe",
+      "retention_or_cleanup": "a check past its deadline has its process group terminated and reaped; descendant-held output pipes are closed before return",
       "observability": [
         "ci evidence reason field",
         "status counts"
       ],
       "verification_refs": [
         "docs/validation/check_boundedness.py::probe_resolution_controls",
+        "docs/validation/check_boundedness.py::ci_gate_descendant_timeout_boundary",
         "docs/validation/check_ci_contract.py"
       ],
       "status": "observed-good"
@@ -1546,7 +1548,7 @@
         "CANCEL",
         "REJECT"
       ],
-      "retention_or_cleanup": "the child is killed and reaped at the deadline",
+      "retention_or_cleanup": "the child's process group is terminated and reaped at the deadline, including descendants that inherited its output pipe",
       "observability": [
         "the read returns nothing, which the caller reports as could-not-observe"
       ],
@@ -1646,7 +1648,7 @@
       "on_limit_behavior": [
         "TRUNCATE_WITH_EXPLICIT_STATUS"
       ],
-      "retention_or_cleanup": "the bounded text lives only for the one doctor observation that asked for it",
+      "retention_or_cleanup": "the bounded text lives only for the one doctor observation that asked for it; timeout cleanup terminates the child process group and closes descendant-held output pipes",
       "observability": [
         "the [bounded] marker carrying the ceiling and the bytes seen, which also explains a child could-not-observe reason line that did not survive the clip"
       ],

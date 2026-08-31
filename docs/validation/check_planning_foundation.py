@@ -42,6 +42,8 @@ sys.path.insert(0, str(ROOT))
 
 from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
     BoundedStreamCapture,
+    process_group_popen_kwargs,
+    stop_process_group,
 )
 
 # BOUNDEDNESS-OWNER: sssf.planning.git_output_capture
@@ -262,17 +264,20 @@ def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str
             cwd=root,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
+            **process_group_popen_kwargs(),
         ) as process:
-            reader = threading.Thread(target=capture.read_from, args=(process.stdout,))
+            reader = threading.Thread(target=capture.read_from, args=(process.stdout,), daemon=True)
             reader.start()
             try:
                 returncode = process.wait(timeout=GIT_OUTPUT_TIMEOUT_SECONDS)
             except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
+                stop_process_group(process)
                 return None
             finally:
-                reader.join()
+                reader.join(timeout=2)
+                if reader.is_alive():
+                    stop_process_group(process)
+                    reader.join(timeout=2)
     except (OSError, ValueError):
         return None
     if returncode != 0 or capture.truncated:

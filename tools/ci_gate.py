@@ -12,6 +12,11 @@ import threading
 import time
 from typing import Any
 
+from adws.adw_modules.subprocess_supervisor import (
+    process_group_popen_kwargs,
+    stop_process_group,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "ci" / "checks.json"
 DEFAULT_EVIDENCE = ROOT / "ci-evidence.json"
@@ -142,12 +147,7 @@ def child_cno_reason(output: str) -> str:
 
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
-    process.terminate()
-    try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+    stop_process_group(process)
 
 
 def run_check(check: dict[str, Any]) -> dict[str, Any]:
@@ -164,6 +164,7 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
             cwd=ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            **process_group_popen_kwargs(),
         )
     except OSError as exc:
         result["reason"] = f"tool unavailable: {exc}"
@@ -174,7 +175,7 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
     # against a ceiling on the way in. Reaching it is stated in the evidence,
     # never a quietly shorter log.
     capture = BoundedOutput(CHECK_MAX_OUTPUT_BYTES)
-    reader = threading.Thread(target=capture.read_from, args=(process.stdout,))
+    reader = threading.Thread(target=capture.read_from, args=(process.stdout,), daemon=True)
     reader.start()
 
     while True:
@@ -200,7 +201,13 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
         except subprocess.TimeoutExpired:
             continue
 
-    reader.join(timeout=5)
+    reader.join(timeout=max(0.0, deadline - time.monotonic()))
+    if reader.is_alive():
+        _stop_process(process)
+        reader.join(timeout=2)
+        if reader.is_alive():
+            result["status"] = "could-not-observe"
+            result["reason"] = "check output pipe did not close after process-tree cleanup"
     output = capture.text()
     if result.get("returncode") == COULD_NOT_OBSERVE_EXIT:
         # The child names its own could-not-observe reasons on its stdout, so

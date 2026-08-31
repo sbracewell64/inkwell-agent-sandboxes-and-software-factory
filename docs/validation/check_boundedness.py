@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import ast
 import io
+import importlib
 import json
 import os
 import re
@@ -38,6 +39,7 @@ import shutil
 import sys
 import tempfile
 import time
+import types
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -670,6 +672,39 @@ def law_errors(root: Path) -> Result:
     return ok()
 
 
+def enforcement_shape_errors(root: Path) -> Result:
+    required = {
+        "adws/adw_modules/subprocess_supervisor.py": {
+            "self.written = handle.tell()": "journal reopen accounting is not enforced",
+            'return {"start_new_session": True}': "POSIX process-tree custody is not enabled",
+        },
+        "adws/adw_modules/agent_pi.py": {
+            "stderr_reader.start()": "pi stderr is not drained concurrently",
+            "**process_group_popen_kwargs()": "pi child lacks process-tree custody",
+        },
+        "tools/ci_gate.py": {
+            "**process_group_popen_kwargs()": "CI check lacks process-tree custody",
+        },
+        "docs/validation/check_planning_foundation.py": {
+            "**process_group_popen_kwargs()": "planning git child lacks process-tree custody",
+        },
+        "tools/windows_host.py": {
+            "**process_group_popen_kwargs()": "Windows host child lacks process-tree custody",
+        },
+    }
+    result = ok()
+    for relative, fragments in required.items():
+        try:
+            source = (root / relative).read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            result = result.merge(cno(f"enforcement owner unreadable: {relative}: {exc}"))
+            continue
+        for fragment, detail in fragments.items():
+            if fragment not in source:
+                result = result.merge(fail(detail))
+    return result
+
+
 def registry_errors(root: Path = ROOT) -> Result:
     document, load = load_registry(root)
     if document is None:
@@ -688,6 +723,7 @@ def static_errors(root: Path = ROOT) -> Result:
         .merge(protocol_errors(root))
         .merge(ci_registration_errors(root))
         .merge(law_errors(root))
+        .merge(enforcement_shape_errors(root))
     )
 
 
@@ -789,6 +825,13 @@ def bounded_journal_boundary() -> Result:
         result = result.merge(fail("bounded journal: kept admitting after the ceiling"))
     if written.count(BoundedJournalWriter.TRUNCATION_TYPE) != 1:
         result = result.merge(fail("bounded journal: repeated its terminal record"))
+    handle = io.StringIO("x" * 8)
+    reopened = BoundedJournalWriter(handle, 10)
+    if reopened.append("yy") is not True or reopened.written != 10:
+        result = result.merge(fail("bounded journal: reopen lost existing byte accounting"))
+    reopened = BoundedJournalWriter(handle, 10)
+    if reopened.append("z") or len(handle.getvalue()) != 10:
+        result = result.merge(fail("bounded journal: reopen admitted aggregate limit + 1"))
     for invalid in (0, -1, True):
         try:
             BoundedJournalWriter(io.StringIO(), invalid)  # type: ignore[arg-type]
@@ -829,6 +872,103 @@ def child_deadline_boundary() -> Result:
         result = result.merge(fail("child deadline: the overrunning child exited clean"))
     if expired.status()["on_limit_behavior"] != "CANCEL":
         result = result.merge(fail("child deadline: boundary behaviour is undeclared"))
+    return result
+
+
+def agent_pi_stderr_boundary() -> Result:
+    result = ok()
+    fake_data_types = types.ModuleType("adws.adw_modules.data_types")
+
+    class ControlPiRequest:
+        def __init__(self, **values: Any) -> None:
+            self.__dict__.update(values)
+            self.thinking = values.get("thinking", "medium")
+            self.tools = values.get("tools")
+            self.extensions = values.get("extensions", [])
+
+    class ControlUsage:
+        def add_turn(self, _usage: dict[str, Any], _tokens: int) -> None:
+            pass
+
+    class ControlPiResult:
+        def __init__(self, session_id: str, context_window: int) -> None:
+            self.session_id = session_id
+            self.context_window = context_window
+            self.text = ""
+            self.tokens = 0
+            self.usage = ControlUsage()
+            self.context_tokens = 0
+            self.cost = 0.0
+            self.returncode = 0
+
+    fake_data_types.PiRequest = ControlPiRequest
+    fake_data_types.PiResult = ControlPiResult
+    module_name = "adws.adw_modules.data_types"
+    saved_data_types = sys.modules.get(module_name)
+    utils_name = "adws.adw_modules.utils"
+    saved_utils = sys.modules.get(utils_name)
+    fake_utils = types.ModuleType(utils_name)
+    fake_utils.now_iso = lambda: "2000-01-01T00:00:00Z"
+    fake_utils.operator_env = lambda: dict(os.environ)
+    sys.modules[module_name] = fake_data_types
+    sys.modules[utils_name] = fake_utils
+    try:
+        agent_pi = importlib.import_module("adws.adw_modules.agent_pi")
+    finally:
+        if saved_data_types is None:
+            del sys.modules[module_name]
+        else:
+            sys.modules[module_name] = saved_data_types
+        if saved_utils is None:
+            del sys.modules[utils_name]
+        else:
+            sys.modules[utils_name] = saved_utils
+    with tempfile.TemporaryDirectory(prefix="sssf-pi-stderr-") as raw:
+        root = Path(raw)
+        executable = root / "pi-stub"
+        executable.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, sys\n"
+            "sys.stderr.write('e' * 65)\n"
+            "sys.stderr.flush()\n"
+            "print(json.dumps({'type':'message_end','message':{'role':'assistant',"
+            "'content':[{'type':'text','text':'done'}]}}), flush=True)\n",
+            encoding="utf-8",
+        )
+        executable.chmod(0o755)
+        original_path = agent_pi.PI_PATH
+        original_limit = agent_pi.STDERR_MAX_BYTES
+        original_resolve = agent_pi.resolve_model
+        original_window = agent_pi.context_window
+        try:
+            agent_pi.PI_PATH = str(executable)
+            agent_pi.STDERR_MAX_BYTES = 64
+            agent_pi.resolve_model = lambda _model: ("stub", "stub")
+            agent_pi.context_window = lambda _provider, _model: 1
+            request = ControlPiRequest(
+                prompt="p",
+                system_prompt="s",
+                model="stub",
+                session_id="session",
+                session_dir=str(root),
+                raw_output_path=str(root / "raw.jsonl"),
+                cwd=str(root),
+            )
+            try:
+                agent_pi.run(request)
+            except RuntimeError as exc:
+                detail = str(exc)
+                if "stderr" not in detail or "truncated': True" not in detail:
+                    result = result.merge(
+                        fail("agent pi stderr: overflow status was not explicit")
+                    )
+            else:
+                result = result.merge(fail("agent pi stderr: limit + 1 passed silently"))
+        finally:
+            agent_pi.PI_PATH = original_path
+            agent_pi.STDERR_MAX_BYTES = original_limit
+            agent_pi.resolve_model = original_resolve
+            agent_pi.context_window = original_window
     return result
 
 
@@ -1234,7 +1374,12 @@ def planning_git_read_boundary() -> Result:
         root = Path(directory)
         try:
             module.GIT_OUTPUT_TIMEOUT_SECONDS = 0.4
-            environment = _stub_git(root, "import time\ntime.sleep(120)\n")
+            environment = _stub_git(
+                root,
+                "import subprocess, sys, time\n"
+                "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)'])\n"
+                "time.sleep(120)\n",
+            )
             os.environ.clear()
             os.environ.update(environment)
             started = time.monotonic()
@@ -1292,13 +1437,51 @@ def windows_host_child_output_boundary() -> Result:
                 )
     finally:
         windows_host.CHILD_MAX_OUTPUT_BYTES = ceiling
+    started = time.monotonic()
+    observation = windows_host.run(
+        [
+            sys.executable,
+            "-c",
+            "import subprocess,sys,time; "
+            "subprocess.Popen([sys.executable,'-c','import time; time.sleep(120)']); "
+            "time.sleep(120)",
+        ],
+        timeout=0.4,
+    )
+    if observation.observed or time.monotonic() - started > 10:
+        result = result.merge(
+            fail("windows host child output: descendant-held pipe escaped timeout cleanup")
+        )
     return result
+
+
+def ci_gate_descendant_timeout_boundary() -> Result:
+    started = time.monotonic()
+    observed = ci_gate.run_check(
+        {
+            "id": "descendant-timeout-control",
+            "command": [
+                sys.executable,
+                "-c",
+                "import subprocess,sys,time; "
+                "subprocess.Popen([sys.executable,'-c','import time; time.sleep(120)']); "
+                "time.sleep(120)",
+            ],
+            "timeout_seconds": 1,
+        }
+    )
+    if observed.get("reason") != "check timed out":
+        return fail("ci gate timeout: descendant control did not reach the timeout owner")
+    if time.monotonic() - started > 10:
+        return fail("ci gate timeout: descendant-held pipe escaped process-tree cleanup")
+    return ok()
 
 
 BOUNDARY_CONTROLS: tuple[tuple[str, Callable[[], Result]], ...] = (
     ("bounded_stream_capture_boundary", bounded_stream_capture_boundary),
     ("bounded_journal_boundary", bounded_journal_boundary),
     ("child_deadline_boundary", child_deadline_boundary),
+    ("agent_pi_stderr_boundary", agent_pi_stderr_boundary),
     ("attempt_budget_boundary", attempt_budget_boundary),
     ("supervisor_required_ceiling_controls", supervisor_required_ceiling_controls),
     ("preserve_capture_boundary", preserve_capture_boundary),
@@ -1307,6 +1490,7 @@ BOUNDARY_CONTROLS: tuple[tuple[str, Callable[[], Result]], ...] = (
     ("in_memory_store_boundary", in_memory_store_boundary),
     ("resource_bounds_controls", resource_bounds_controls),
     ("ci_gate_output_boundary", ci_gate_output_boundary),
+    ("ci_gate_descendant_timeout_boundary", ci_gate_descendant_timeout_boundary),
     ("evidence_ceiling_boundary", evidence_ceiling_boundary),
     ("durable_authority_store_boundary", durable_authority_store_boundary),
     ("planning_git_read_boundary", planning_git_read_boundary),
@@ -1564,6 +1748,24 @@ def watched_red_controls() -> list[tuple[str, Callable[[Path], None], str]]:
             "CHILD_MAX_OUTPUT_BYTES = ", "CHILD_MAX_OUTPUT_BYTES_UNUSED = ",
         )
 
+    def reset_journal_on_reopen(root: Path) -> None:
+        mutate_source(
+            root, "adws/adw_modules/subprocess_supervisor.py",
+            "self.written = handle.tell()", "self.written = 0",
+        )
+
+    def serialized_pi_stderr(root: Path) -> None:
+        mutate_source(
+            root, "adws/adw_modules/agent_pi.py",
+            "    stderr_reader.start()", "    stderr_reader_start_removed()",
+        )
+
+    def removed_process_tree_custody(root: Path) -> None:
+        mutate_source(
+            root, "adws/adw_modules/subprocess_supervisor.py",
+            'return {"start_new_session": True}', 'return {"start_new_session": False}',
+        )
+
     def delta_declared_only_in_prose(root: Path) -> None:
         # The protocol's form is a fenced block. Prose that merely names the
         # key is a mention, and an increment whose fences are gone has stopped
@@ -1633,6 +1835,12 @@ def watched_red_controls() -> list[tuple[str, Callable[[Path], None], str]]:
          "sssf.planning.git_wall_clock: limit could not be read"),
         ("removed doctor child output ceiling", removed_doctor_output_ceiling,
          "sssf.windows_host.child_output_capture: limit could not be read"),
+        ("journal accounting reset on reopen", reset_journal_on_reopen,
+         "journal reopen accounting is not enforced"),
+        ("pi stderr drain serialized", serialized_pi_stderr,
+         "pi stderr is not drained concurrently"),
+        ("process-tree custody removed", removed_process_tree_custody,
+         "POSIX process-tree custody is not enabled"),
         ("boundedness delta declared only in prose", delta_declared_only_in_prose,
          f"B1-001_AGENT_DOC_DISCOVERY.md: declares no {DELTA_KEY}"),
     ]

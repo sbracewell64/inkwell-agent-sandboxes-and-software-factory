@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import threading
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -21,6 +22,8 @@ from .subprocess_supervisor import (
     BoundedJournalWriter,
     BoundedStreamCapture,
     ChildDeadline,
+    process_group_popen_kwargs,
+    stop_process_group,
 )
 from .utils import now_iso, operator_env
 
@@ -43,6 +46,17 @@ LABEL_CHARS = 80                # "bash: <command>" shown as the event name
 
 # The arg that identifies a call at a glance, in the order tools tend to use.
 PRIMARY_ARGS = ("command", "path", "file_path", "pattern", "query", "url")
+
+
+def _drain_text_stream(pipe, capture: BoundedStreamCapture) -> None:
+    try:
+        while True:
+            chunk = pipe.read(65536)
+            if not chunk:
+                break
+            capture.feed(chunk.encode("utf-8", "replace"))
+    finally:
+        pipe.close()
 
 
 def _count(value: str) -> int:
@@ -292,14 +306,20 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
     process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                text=True, bufsize=1, cwd=request.cwd,
-                               env=operator_env())
+                               env=operator_env(), **process_group_popen_kwargs())
     if on_spawn:
         on_spawn(process.pid)
     # A turn that never ends is unbounded duration, and the raw journal grows
     # with whatever the child emits. Both get a finite ceiling here; neither
     # ceiling is allowed to be reached quietly.
     deadline = ChildDeadline(PI_TURN_MAX_SECONDS).arm(process)
-    with raw_path.open("a") as raw:
+    stderr_capture = BoundedStreamCapture(STDERR_MAX_BYTES)
+    assert process.stderr is not None
+    stderr_reader = threading.Thread(
+        target=_drain_text_stream, args=(process.stderr, stderr_capture), daemon=True
+    )
+    stderr_reader.start()
+    with raw_path.open("a+") as raw:
         journal = BoundedJournalWriter(raw, RAW_OUTPUT_MAX_BYTES)
         assert process.stdout is not None
         for line in process.stdout:
@@ -330,12 +350,13 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
             if on_event:
                 on_event(event)
 
-    stderr_capture = BoundedStreamCapture(STDERR_MAX_BYTES)
-    if process.stderr is not None:
-        stderr_capture.read_from(process.stderr)
-    stderr = stderr_capture.data.decode("utf-8", "replace")
     result.returncode = process.wait()
     deadline.cancel()
+    stderr_reader.join(timeout=2)
+    if stderr_reader.is_alive():
+        stop_process_group(process)
+        stderr_reader.join(timeout=2)
+    stderr = stderr_capture.data.decode("utf-8", "replace")
     if on_exit:
         on_exit(process.pid)
     if deadline.expired.is_set():
@@ -350,6 +371,14 @@ def run(request: PiRequest, on_event: Optional[Callable[[dict], None]] = None,
             f"pi raw output journal reached its {RAW_OUTPUT_MAX_BYTES} byte ceiling "
             f"after {journal.seen} bytes; the turn is not a complete record"
         )
+    if stderr_capture.truncated:
+        raise RuntimeError(
+            f"pi stderr reached its {STDERR_MAX_BYTES} byte ceiling; "
+            f"stderr {stderr_capture.status()}"
+        )
     if result.returncode != 0 and not result.text:
-        raise RuntimeError(f"pi exited {result.returncode}: {stderr.strip()[-800:]}")
+        raise RuntimeError(
+            f"pi exited {result.returncode}: {stderr.strip()[-800:]}; "
+            f"stderr {stderr_capture.status()}"
+        )
     return result

@@ -11,6 +11,7 @@ from __future__ import annotations
 import errno
 import ctypes
 import hashlib
+import io
 import json
 import multiprocessing
 import os
@@ -321,9 +322,19 @@ class BoundedJournalWriter:
             raise ValueError("bounded journal limit must be a positive integer")
         self._handle = handle
         self.limit = limit_bytes
-        self.written = 0
-        self.seen = 0
-        self.truncated = False
+        handle.seek(0, os.SEEK_END)
+        self.written = handle.tell()
+        self.seen = self.written
+        self.truncated = self.written >= self.limit
+        if self.written:
+            tail_size = min(self.written, 4096)
+            try:
+                handle.seek(self.written - tail_size)
+                self.truncated = self.truncated or self.TRUNCATION_TYPE in handle.read(tail_size)
+            except (OSError, io.UnsupportedOperation):
+                pass
+            finally:
+                handle.seek(0, os.SEEK_END)
 
     def append(self, line: str) -> bool:
         """Append one line.  Returns whether the payload was admitted."""
@@ -366,6 +377,57 @@ class BoundedJournalWriter:
         }
 
 
+def process_group_popen_kwargs() -> dict[str, object]:
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def stop_process_group(process: subprocess.Popen, grace_seconds: float = 2.0) -> None:
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=max(1.0, grace_seconds),
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            process.kill()
+    else:
+        group_found = True
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            group_found = False
+            if process.poll() is None:
+                process.terminate()
+        try:
+            process.wait(timeout=grace_seconds)
+        except subprocess.TimeoutExpired:
+            pass
+        if not group_found:
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+            return
+        try:
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            return
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+    try:
+        process.wait(timeout=max(1.0, grace_seconds))
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 # BOUNDEDNESS-POLICY: sssf.policy.child-wall-clock.v1
 class ChildDeadline:
     """A finite wall clock for a child a caller streams itself.
@@ -388,16 +450,9 @@ class ChildDeadline:
         def fire() -> None:
             self.expired.set()
             try:
-                process.terminate()
+                stop_process_group(process, 1.0)
             except (OSError, ValueError):
-                return
-            try:
-                process.wait(timeout=1.0)
-            except Exception:
-                try:
-                    process.kill()
-                except (OSError, ValueError):
-                    pass
+                pass
 
         self._timer = threading.Timer(self.seconds, fire)
         self._timer.daemon = True

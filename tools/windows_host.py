@@ -23,6 +23,10 @@ from tools.ci_gate import (  # noqa: E402
     COULD_NOT_OBSERVE_EXIT,
     child_cno_reason,
 )
+from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
+    process_group_popen_kwargs,
+    stop_process_group,
+)
 
 CANONICAL_ORIGIN = (
     "https://github.com/"
@@ -106,17 +110,20 @@ def _bounded_child(
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        **process_group_popen_kwargs(),
     ) as process:
-        reader = threading.Thread(target=capture.read_from, args=(process.stdout,))
+        reader = threading.Thread(target=capture.read_from, args=(process.stdout,), daemon=True)
         reader.start()
         try:
             returncode = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
+            stop_process_group(process)
             raise
         finally:
-            reader.join()
+            reader.join(timeout=2)
+            if reader.is_alive():
+                stop_process_group(process)
+                reader.join(timeout=2)
     return subprocess.CompletedProcess(args, returncode)
 
 
