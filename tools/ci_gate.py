@@ -273,7 +273,9 @@ def execute(manifest: Path, evidence_path: Path) -> int:
         print(f"::group::{check['id']}", flush=True)
         result = run_check(check)
         if result.get("output"):
-            print(result["output"])
+            output = result["output"]
+            encoding = sys.stdout.encoding or "utf-8"
+            print(output.encode(encoding, errors="backslashreplace").decode(encoding))
         print(f"status: {result['status']}")
         print("::endgroup::", flush=True)
         results.append(result)

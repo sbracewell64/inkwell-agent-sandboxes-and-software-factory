@@ -327,7 +327,7 @@ class BoundedJournalWriter:
                 "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
             },
             separators=(",", ":"),
-        ) + "\n"
+        )
 
     def __init__(self, handle, limit_bytes: int) -> None:
         if not isinstance(limit_bytes, int) or isinstance(limit_bytes, bool) or limit_bytes < 1:

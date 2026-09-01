@@ -132,7 +132,7 @@ def test_deleting_the_frozen_regression_aborts_even_though_rollback_succeeded(tm
                             "app/widget.py": "value = 1\n"})
     run = _Run(root, _cfg(frozen=["tests/test_widget_regression.py"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
 
     (root / "tests/test_widget_regression.py").unlink()
 
@@ -154,7 +154,7 @@ def test_authorized_reviser_cannot_delete_a_still_declared_evaluator(tmp_path):
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     reviser = _agent("reviser", ["tests/evaluator.py"])
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
     target.unlink()
     unauthorized.write_text("value = 2\n")
 
@@ -186,7 +186,7 @@ def test_same_numstat_rewrite_of_dirty_frozen_regression_is_refused(tmp_path):
     target.write_text("assert 0 == 1\n")
     run = _Run(root, _cfg(frozen=["tests/test_widget_regression.py"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
 
     target.write_text("assert 1 == 0\n")
 
@@ -201,7 +201,7 @@ def test_oversized_clean_frozen_evaluator_rolls_back_to_pinned_base(tmp_path):
     target = root / "tests/evaluator.py"
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
     assert "tests/evaluator.py" not in preserved
 
     target.write_text("b" * len(original))
@@ -220,7 +220,7 @@ def test_oversized_dirty_frozen_evaluator_is_left_and_named(tmp_path):
     target.write_text(dirty)
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
     assert "tests/evaluator.py" not in before.base_clean
     assert "tests/evaluator.py" not in preserved
 
@@ -257,7 +257,7 @@ def test_dirty_frozen_pathnames_are_never_misclassified_clean(tmp_path, path):
     target.write_text(dirty)
     run = _Run(root, _cfg(frozen=[path]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
     assert path not in before.base_clean
     assert path not in preserved
 
@@ -350,7 +350,7 @@ def test_dirty_evaluator_mode_and_symlink_are_restored_without_dereferencing(tmp
     link.symlink_to("b.txt")
     run = _Run(root, _cfg(frozen=["tests/"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
 
     target.chmod(0o755)
     link.unlink()
@@ -376,7 +376,7 @@ def test_dirty_evaluator_is_restored_without_writing_through_a_hard_link(tmp_pat
     evaluator.write_text("assert False\n")
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
 
     evaluator.unlink()
     os.link(victim, evaluator)
@@ -497,7 +497,7 @@ def test_gitignore_visibility_change_invalidates_generation_and_rolls_back(tmp_p
     generation = _owner("evaluator_generation")
     before_generation = generation(run)
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
     (root / ".gitignore").write_text("tests/hidden_evaluator.py\n")
 
     assert before_generation is not None and generation(run) is None
@@ -596,7 +596,7 @@ def test_unreadable_member_refuses_after_other_breaches_are_undone(tmp_path):
     unauthorized = root / "app/widget.py"
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
     evaluator.chmod(0)
     unauthorized.write_text("value = 2\n")
 
@@ -617,7 +617,7 @@ def test_unreadable_declared_subtree_refuses_after_other_rollback(
     })
     run = _Run(root, _cfg(frozen=["tests/"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
     unauthorized = root / "app/widget.py"
     unauthorized.write_text("value = 2\n")
     real_walk = permissions.os.walk
@@ -722,7 +722,7 @@ def _assert_index_visibility_flag_is_refused(tmp_path, option, expected):
     })
     run = _Run(root, _cfg(frozen=["tests/evaluator.py"]))
     before = permissions.snapshot(run)
-    preserved = permissions.preserve(run, before)
+    preserved, _ = permissions.preserve(run, before)
     subprocess.run(["git", "update-index", option, "tests/evaluator.py"],
                    cwd=root, check=True)
     (root / "tests/evaluator.py").write_text("assert False\n")

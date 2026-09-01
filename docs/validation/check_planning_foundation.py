@@ -30,6 +30,7 @@ import json
 import os
 import posixpath
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -264,9 +265,13 @@ def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str
     """
     prefix = ["--git-dir", str(git_dir)] if git_dir is not None else []
     capture = BoundedStreamCapture(limit=GIT_OUTPUT_MAX_BYTES)
+    executable = shutil.which("git") or "git"
+    command = [executable, *prefix, *arguments]
+    if os.name == "nt" and Path(executable).suffix.lower() in {".bat", ".cmd"}:
+        command = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", *command]
     try:
         process = subprocess.Popen(
-            ["git", *prefix, *arguments],
+            command,
             cwd=root,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
