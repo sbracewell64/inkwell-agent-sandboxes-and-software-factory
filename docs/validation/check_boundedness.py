@@ -2254,7 +2254,8 @@ import os, sys, tempfile
 from pathlib import Path
 from docs.validation import check_planning_foundation as owner
 owner.GIT_OUTPUT_TIMEOUT_SECONDS = 0.2
-owner.stop_process_group = lambda process: (process.kill(), process.wait(timeout=1), False)[2]
+real_stop_process_group = owner.stop_process_group
+owner.stop_process_group = lambda process: (real_stop_process_group(process), False)[1]
 with tempfile.TemporaryDirectory() as raw:
     bindir = Path(raw)
     stub_py = bindir / 'git_stub.py'
