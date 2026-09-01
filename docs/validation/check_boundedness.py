@@ -2091,13 +2091,21 @@ raise SystemExit(42)
                 )
 
         agent_cleanup_script = """
-import os, sys, tempfile
+import os, sys, tempfile, threading
 from pathlib import Path
 from adws.adw_modules import agent_pi
 agent_pi.resolve_model = lambda value: ('stub', 'stub')
 agent_pi.context_window = lambda provider, model: 1
-agent_pi.stop_process_group = lambda process: False
-agent_pi.join_reader_threads = lambda readers, timeout: False
+# Fault the cleanup signal after the real readers finish so Windows never has
+# to remove the journal while its handle is still open.
+class CleanupFailedDeadline:
+    def __init__(self, timeout):
+        self.expired = threading.Event()
+        self.cleanup_failed = threading.Event()
+        self.cleanup_failed.set()
+    def arm(self, process): return self
+    def cancel(self): pass
+agent_pi.ChildDeadline = CleanupFailedDeadline
 with tempfile.TemporaryDirectory() as raw:
     root = Path(raw)
     stub_py = root / 'pi_cleanup_stub.py'
