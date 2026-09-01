@@ -436,8 +436,9 @@ being called environmental, rather than assumed to be.
 
 - Assignment-distinct semantic review that no material growth owner was omitted.
 - Exact-head CI on the final landed bytes.
-- `LandingAuthorization`, the global SSSF landing freeze, and the
-  candidate-publication quarantine all still govern this branch.
+- `LandingAuthorization` and the global SSSF landing freeze still govern this
+  branch. FirstMate PR #133 (`6dde2417`) cleared the candidate-publication
+  quarantine before the branch's first governed remote mutation.
 - The `SBX-2` hold is unchanged; BOUND-1 does not release it.
 - Windows-host observation of the changed owners; only provider-free,
   network-free, in-process controls were run here.
