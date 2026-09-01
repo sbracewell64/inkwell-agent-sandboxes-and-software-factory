@@ -120,8 +120,10 @@ def _bounded_child(
     reader.start()
     try:
         returncode = process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as exc:
         cleanup_complete = stop_process_group(process)
+        if not cleanup_complete:
+            raise OSError("child process-tree cleanup failed after timeout") from exc
         raise
     finally:
         reader_complete = join_reader_threads((reader,), 2.0)

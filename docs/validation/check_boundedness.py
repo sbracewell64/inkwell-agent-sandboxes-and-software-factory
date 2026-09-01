@@ -2205,6 +2205,106 @@ raise SystemExit(46)
                 result = result.merge(
                     fail("behavioral watched-red stayed green: deadline cleanup exception")
                 )
+
+        windows_timeout_script = """
+import subprocess, sys
+from pathlib import Path
+from tools import windows_host
+windows_host.stop_process_group = lambda process: (process.kill(), process.wait(timeout=1), False)[2]
+observation = windows_host.run([sys.executable, '-c', 'import time; time.sleep(120)'], cwd=Path.cwd(), timeout=0.2)
+if not observation.observed and 'process-tree cleanup failed after timeout' in observation.reason:
+    raise SystemExit(0)
+raise SystemExit(47)
+"""
+        windows_timeout_base = workspace / "windows-timeout-base"
+        _copy_behavior_files(
+            windows_timeout_base,
+            (
+                "tools/windows_host.py",
+                "tools/ci_gate.py",
+                "adws/adw_modules/subprocess_supervisor.py",
+            ),
+        )
+        baseline = _behavior_process(windows_timeout_base, windows_timeout_script, 5)
+        if baseline[2] or baseline[0] != 0:
+            result = result.merge(
+                cno("Windows-host timeout cleanup baseline owner did not report failure")
+            )
+        else:
+            windows_timeout_case = workspace / "windows-timeout-mutant"
+            shutil.copytree(windows_timeout_base, windows_timeout_case)
+            mutate_source(
+                windows_timeout_case,
+                "tools/windows_host.py",
+                "        if not cleanup_complete:\n            raise OSError(\"child process-tree cleanup failed after timeout\") from exc\n",
+                "",
+            )
+            observed = _behavior_process(
+                windows_timeout_case, windows_timeout_script, 5
+            )
+            if observed[2] or observed[0] != 47:
+                result = result.merge(
+                    fail(
+                        "behavioral watched-red stayed green: Windows-host timeout cleanup failure"
+                    )
+                )
+
+        planning_timeout_script = """
+import os, sys, tempfile
+from pathlib import Path
+from docs.validation import check_planning_foundation as owner
+owner.GIT_OUTPUT_TIMEOUT_SECONDS = 0.2
+owner.stop_process_group = lambda process: (process.kill(), process.wait(timeout=1), False)[2]
+with tempfile.TemporaryDirectory() as raw:
+    bindir = Path(raw)
+    stub_py = bindir / 'git_stub.py'
+    stub_py.write_text('import time; time.sleep(120)\\n', encoding='utf-8')
+    if os.name == 'nt':
+        stub = bindir / 'git.cmd'
+        stub.write_text('@echo off\\r\\n"' + sys.executable + '" "' + str(stub_py) + '"\\r\\n', encoding='utf-8')
+    else:
+        stub = bindir / 'git'
+        stub.write_text('#!/bin/sh\\nexec "' + sys.executable + '" "' + str(stub_py) + '"\\n', encoding='utf-8')
+        stub.chmod(0o755)
+    os.environ['PATH'] = str(bindir) + os.pathsep + os.environ.get('PATH', '')
+    try:
+        owner._git_output(Path.cwd(), 'status')
+    except owner._GitCleanupFailure as exc:
+        if 'process-tree cleanup failed after timeout' in str(exc):
+            raise SystemExit(0)
+raise SystemExit(48)
+"""
+        planning_timeout_base = workspace / "planning-timeout-base"
+        _copy_behavior_files(
+            planning_timeout_base,
+            (
+                "docs/validation/check_planning_foundation.py",
+                "adws/adw_modules/subprocess_supervisor.py",
+            ),
+        )
+        baseline = _behavior_process(planning_timeout_base, planning_timeout_script, 5)
+        if baseline[2] or baseline[0] != 0:
+            result = result.merge(
+                cno("planning Git timeout cleanup baseline owner did not report failure")
+            )
+        else:
+            planning_timeout_case = workspace / "planning-timeout-mutant"
+            shutil.copytree(planning_timeout_base, planning_timeout_case)
+            mutate_source(
+                planning_timeout_case,
+                "docs/validation/check_planning_foundation.py",
+                "            if not cleanup_complete:\n                raise _GitCleanupFailure(\n                    \"planning git process-tree cleanup failed after timeout\"\n                )\n",
+                "",
+            )
+            observed = _behavior_process(
+                planning_timeout_case, planning_timeout_script, 5
+            )
+            if observed[2] or observed[0] != 48:
+                result = result.merge(
+                    fail(
+                        "behavioral watched-red stayed green: planning Git timeout cleanup failure"
+                    )
+                )
     return result
 
 
@@ -2248,8 +2348,8 @@ def main() -> int:
         f"{len(BOUNDARY_CONTROLS)} real enforcement owners"
     )
     print(
-        f"watched-red: {len(watched_red_controls()) + 5} property-specific controls, "
-        f"including 5 behavioral owner mutations watched going red"
+        f"watched-red: {len(watched_red_controls()) + 7} property-specific controls, "
+        f"including 7 behavioral owner mutations watched going red"
     )
     print("increment protocol: every increment declares a boundedness delta")
     print("provider-calls: 0 (no network, provider, model, or browser side effect)")

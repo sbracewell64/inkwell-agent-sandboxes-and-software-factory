@@ -250,6 +250,10 @@ class _DuplicateKey(ValueError):
     pass
 
 
+class _GitCleanupFailure(OSError):
+    pass
+
+
 def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str | None:
     """Read one git fact under a byte ceiling and a deadline.
 
@@ -276,6 +280,10 @@ def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str
             returncode = process.wait(timeout=GIT_OUTPUT_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
             cleanup_complete = stop_process_group(process)
+            if not cleanup_complete:
+                raise _GitCleanupFailure(
+                    "planning git process-tree cleanup failed after timeout"
+                )
             return None
         finally:
             reader_complete = join_reader_threads((reader,), 2.0)
@@ -285,6 +293,8 @@ def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str
                 except Exception:
                     cleanup_complete = False
                 reader_complete = join_reader_threads((reader,), 2.0)
+    except _GitCleanupFailure:
+        raise
     except (OSError, ValueError):
         return None
     if not cleanup_complete or not reader_complete or returncode != 0 or capture.truncated:
@@ -1047,14 +1057,27 @@ def load_project(root: Path = ROOT) -> dict[str, Any]:
         assert declaration_error is not None
         authority_declaration_errors.append(declaration_error)
     else:
-        (
-            authority_observation,
-            authority_observation_error,
-            observed_defect,
-        ) = _observe_authoritative_planning_source(root, declaration)
+        try:
+            (
+                authority_observation,
+                authority_observation_error,
+                observed_defect,
+            ) = _observe_authoritative_planning_source(root, declaration)
+        except _GitCleanupFailure as exc:
+            authority_observation_error = str(exc)
+            observed_defect = None
         if observed_defect is not None:
             authority_declaration_errors.append(observed_defect)
-        authority_live_ref = _observe_live_planning_ref(root, declaration)
+        try:
+            authority_live_ref = _observe_live_planning_ref(root, declaration)
+        except _GitCleanupFailure as exc:
+            authority_live_ref = {
+                "tracking_ref": declaration["tracking_ref"],
+                "recorded_commit": declaration["source_commit"],
+                "local_tracking_commit": None,
+                "agreement": "could-not-observe",
+                "advisory": str(exc),
+            }
     return {
         "root": root,
         # Where the authority objects were actually read from. Fixtures may
