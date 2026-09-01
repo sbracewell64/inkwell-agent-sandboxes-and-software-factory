@@ -940,9 +940,8 @@ def agent_pi_stderr_boundary() -> Result:
             sys.modules[utils_name] = saved_utils
     with tempfile.TemporaryDirectory(prefix="sssf-pi-stderr-") as raw:
         root = Path(raw)
-        executable = root / "pi-stub"
-        executable.write_text(
-            "#!/usr/bin/env python3\n"
+        stub_py = root / "pi_stub.py"
+        stub_py.write_text(
             "import json, sys\n"
             "sys.stderr.write('e' * (2 * 1024 * 1024))\n"
             "sys.stderr.flush()\n"
@@ -950,7 +949,19 @@ def agent_pi_stderr_boundary() -> Result:
             "'content':[{'type':'text','text':'done'}]}}), flush=True)\n",
             encoding="utf-8",
         )
-        executable.chmod(0o755)
+        if os.name == "nt":
+            executable = root / "pi-stub.cmd"
+            executable.write_text(
+                f'@echo off\r\n"{sys.executable}" "{stub_py}"\r\n',
+                encoding="utf-8",
+            )
+        else:
+            executable = root / "pi-stub"
+            executable.write_text(
+                f'#!/bin/sh\nexec "{sys.executable}" "{stub_py}"\n',
+                encoding="utf-8",
+            )
+            executable.chmod(0o755)
         original_path = agent_pi.PI_PATH
         original_limit = agent_pi.STDERR_MAX_BYTES
         original_resolve = agent_pi.resolve_model
@@ -2086,10 +2097,11 @@ from adws.adw_modules import agent_pi
 agent_pi.resolve_model = lambda value: ('stub', 'stub')
 agent_pi.context_window = lambda provider, model: 1
 agent_pi.stop_process_group = lambda process: False
+agent_pi.join_reader_threads = lambda readers, timeout: False
 with tempfile.TemporaryDirectory() as raw:
     root = Path(raw)
     stub_py = root / 'pi_cleanup_stub.py'
-    stub_py.write_text("import json,subprocess,sys\\nsubprocess.Popen([sys.executable,'-c','import time; time.sleep(5)'], stderr=sys.stderr)\\nprint(json.dumps({'type':'message_end','message':{'role':'assistant','content':[{'type':'text','text':'done'}]}}), flush=True)\\n", encoding='utf-8')
+    stub_py.write_text("import json\\nprint(json.dumps({'type':'message_end','message':{'role':'assistant','content':[{'type':'text','text':'done'}]}}), flush=True)\\n", encoding='utf-8')
     if os.name == 'nt':
         stub = root / 'pi-cleanup-stub.cmd'
         stub.write_text('@echo off\\r\\n"' + sys.executable + '" "' + str(stub_py) + '"\\r\\n', encoding='utf-8')
