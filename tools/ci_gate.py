@@ -12,14 +12,16 @@ import threading
 import time
 from typing import Any
 
-from adws.adw_modules.subprocess_supervisor import (
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
     ReaderThread,
     join_reader_threads,
     process_group_popen_kwargs,
     stop_process_group,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "ci" / "checks.json"
 DEFAULT_EVIDENCE = ROOT / "ci-evidence.json"
 STATUSES = ("observed-good", "observed-bad", "could-not-observe")
