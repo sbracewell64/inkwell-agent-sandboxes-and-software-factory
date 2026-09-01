@@ -2128,7 +2128,7 @@ raise SystemExit(45)
 import sys, time
 from tools import ci_gate
 started = time.monotonic()
-result = ci_gate.run_check({'id':'tree', 'command':[sys.executable,'-c',"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c','import time; time.sleep(120)']); time.sleep(120)"], 'timeout_seconds':1})
+result = ci_gate.run_check({'id':'tree', 'command':[sys.executable,'-c',"import subprocess,sys,tempfile,time; subprocess.Popen([sys.executable,'-c','import time; time.sleep(5)'], cwd=tempfile.gettempdir()); time.sleep(120)"], 'timeout_seconds':1})
 elapsed = time.monotonic() - started
 if result.get('reason') != 'check timed out' or elapsed > 3:
     print('process-tree deadline exceeded')
