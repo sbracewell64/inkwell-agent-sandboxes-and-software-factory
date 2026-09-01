@@ -56,6 +56,9 @@ EXPECTED_CHECKS = {
     "repository-test-suite": (
         "{python}", "docs/validation/check_repository_test_suite.py"
     ),
+    "boundedness-registry-validator": (
+        "{python}", "docs/validation/check_boundedness.py"
+    ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
 

@@ -27,6 +27,7 @@ from adw_modules.data_types import (AgentCall, BuildOutput, PhaseParams,
                                     ReviewOutput)
 
 REQUIRED_AGENTS = ["builder", "reviewer"]
+# BOUNDEDNESS-OWNER: sssf.adw.build_review_revision_loops
 MAX_REVISION_LOOPS = 3
 
 

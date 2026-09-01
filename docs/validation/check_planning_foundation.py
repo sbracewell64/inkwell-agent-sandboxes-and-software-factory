@@ -30,13 +30,40 @@ import json
 import os
 import posixpath
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
+    BoundedStreamCapture,
+    ReaderThread,
+    join_reader_threads,
+    process_group_popen_kwargs,
+    stop_process_group,
+)
+
+# BOUNDEDNESS-OWNER: sssf.planning.git_output_capture
+# `capture_output=True` retains whatever git produced. Git output here is not
+# bounded by the checked-out tree: it reads refs, blobs and history out of an
+# object store this validator does not own. A ceiling that TRUNCATED would be
+# worse than none, because this validator parses the bytes into authority
+# identities, and a prefix of a ref list is indistinguishable from a shorter
+# one. Overflow is therefore REJECT: the read reports nothing rather than
+# something incomplete, and the caller already treats that as
+# could-not-observe.
+GIT_OUTPUT_MAX_BYTES = 8 * 1024 * 1024
+
+# BOUNDEDNESS-OWNER: sssf.planning.git_wall_clock
+# The plain read had no deadline at all. A hung or credential-prompting git is
+# then bounded only by the CI job, which is not this surface's bound.
+GIT_OUTPUT_TIMEOUT_SECONDS = 30.0
 
 SURFACE_PATHS = {
     "lifecycle": Path("docs/development/PLANNING_LIFECYCLE.md"),
@@ -224,19 +251,63 @@ class _DuplicateKey(ValueError):
     pass
 
 
+class _GitCleanupFailure(OSError):
+    pass
+
+
 def _git_output(root: Path, *arguments: str, git_dir: Path | None = None) -> str | None:
+    """Read one git fact under a byte ceiling and a deadline.
+
+    Returns None for every outcome that is not a complete, in-bound read:
+    an unavailable git, a non-zero exit, a deadline, or output past the
+    ceiling. Callers already read None as could-not-observe, so an incomplete
+    read never becomes a shorter answer that looks whole.
+    """
     prefix = ["--git-dir", str(git_dir)] if git_dir is not None else []
+    capture = BoundedStreamCapture(limit=GIT_OUTPUT_MAX_BYTES)
+    executable = shutil.which("git") or "git"
+    command = [executable, *prefix, *arguments]
+    if os.name == "nt" and Path(executable).suffix.lower() in {".bat", ".cmd"}:
+        command = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", *command]
     try:
-        result = subprocess.run(
-            ["git", *prefix, *arguments],
+        process = subprocess.Popen(
+            command,
             cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            **process_group_popen_kwargs(),
         )
-    except (OSError, UnicodeError, subprocess.CalledProcessError):
+        reader_complete = True
+        cleanup_complete = True
+        reader = ReaderThread(capture.read_from, (process.stdout,))
+        reader.start()
+        try:
+            returncode = process.wait(timeout=GIT_OUTPUT_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            cleanup_complete = stop_process_group(process)
+            if not cleanup_complete:
+                raise _GitCleanupFailure(
+                    "planning git process-tree cleanup failed after timeout"
+                )
+            return None
+        finally:
+            reader_complete = join_reader_threads((reader,), 2.0)
+            if not reader_complete:
+                try:
+                    cleanup_complete = stop_process_group(process)
+                except Exception:
+                    cleanup_complete = False
+                reader_complete = join_reader_threads((reader,), 2.0)
+    except _GitCleanupFailure:
+        raise
+    except (OSError, ValueError):
         return None
-    value = result.stdout.strip()
+    if not cleanup_complete or not reader_complete or returncode != 0 or capture.truncated:
+        return None
+    try:
+        value = capture.data.decode("utf-8").strip()
+    except UnicodeError:
+        return None
     return value or None
 
 
@@ -991,14 +1062,27 @@ def load_project(root: Path = ROOT) -> dict[str, Any]:
         assert declaration_error is not None
         authority_declaration_errors.append(declaration_error)
     else:
-        (
-            authority_observation,
-            authority_observation_error,
-            observed_defect,
-        ) = _observe_authoritative_planning_source(root, declaration)
+        try:
+            (
+                authority_observation,
+                authority_observation_error,
+                observed_defect,
+            ) = _observe_authoritative_planning_source(root, declaration)
+        except _GitCleanupFailure as exc:
+            authority_observation_error = str(exc)
+            observed_defect = None
         if observed_defect is not None:
             authority_declaration_errors.append(observed_defect)
-        authority_live_ref = _observe_live_planning_ref(root, declaration)
+        try:
+            authority_live_ref = _observe_live_planning_ref(root, declaration)
+        except _GitCleanupFailure as exc:
+            authority_live_ref = {
+                "tracking_ref": declaration["tracking_ref"],
+                "recorded_commit": declaration["source_commit"],
+                "local_tracking_commit": None,
+                "agreement": "could-not-observe",
+                "advisory": str(exc),
+            }
     return {
         "root": root,
         # Where the authority objects were actually read from. Fixtures may

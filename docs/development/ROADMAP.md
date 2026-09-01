@@ -109,6 +109,20 @@ This status is implementation-only. Activation, acceptance, certification,
 real-provider proof, supported Windows-host proof, and SBX-2 promotion remain
 CNO or unmet.
 
+## BOUND-1 — Boundedness audit and continuous enforcement (cross-cutting)
+
+Landed implementation: `docs/reference/BOUNDEDNESS_REGISTRY.json` inventories 53
+governed growth surfaces against exact main `8aadd50461b184cede949f21ecf426146f2915a0`
+(tree `f1b779f73bea2b33810e5663e9dc2f3b82ea9299`), and
+`docs/validation/check_boundedness.py` runs in required CI.
+
+BOUND-1 is a landed implementation. BOUND-1 is not accepted, not certified, and
+not PROVEN. It does not unlock SBX-2 and it does not change the Docker →
+baseline → Wayfinder → DSH sequence; it is a pre-SBX-2 cross-cutting gate only.
+Assignment-distinct semantic review, exact-head CI on the landed bytes,
+LandingAuthorization, and Windows-host observation of the changed owners all
+remain CNO. A complete re-audit is due before SBX-8, DSH-3, DSH-5, and DSH-8.
+
 ## B6 / SBX-2+ — Free/local sandbox implementation (held)
 
 **Planning state: `HELD`.**

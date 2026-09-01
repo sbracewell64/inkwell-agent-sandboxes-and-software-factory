@@ -52,8 +52,10 @@ import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
-from .data_types import AgentConfig, SSSFConfig
+if TYPE_CHECKING:                      # annotations only; keeps this module
+    from .data_types import AgentConfig, SSSFConfig   # importable stdlib-only
 
 
 class PermissionBreach(RuntimeError):
@@ -84,11 +86,22 @@ RECOVERED = {"deleted", "rolled back", "restored"}
 
 # ...but only as a slip. One phase producing more than this many out-of-scope
 # writes is a pattern, not an accident, and stops being forgiven.
+# BOUNDEDNESS-OWNER: sssf.permissions.recovered_breach_allowance
 RECOVERED_LIMIT = 3
 
 # Per-file ceiling on what `preserve` will hold in memory for the length of a
 # phase. Anything larger keeps the old behaviour — reported, not restorable.
+# BOUNDEDNESS-OWNER: sssf.permissions.preserve_per_file_bytes
 PRESERVE_MAX_BYTES = 1 << 20
+
+# ...and a ceiling on the WHOLE capture. The per-file limit alone bounds one
+# entry, not the map: a tree with ten thousand dirty paths under a megabyte
+# each is still ten gigabytes held for the length of a phase. Past this the
+# capture stops admitting paths and NAMES the ones it declined, so an
+# unpreserved path is a reported fact rather than a silent gap that only
+# surfaces later as "uncommitted work lost".
+# BOUNDEDNESS-OWNER: sssf.permissions.preserve_total_bytes
+PRESERVE_TOTAL_MAX_BYTES = 64 << 20
 
 
 @dataclass(frozen=True)
@@ -860,7 +873,7 @@ def evidence_is_current(recorded: str | None, run) -> bool | None:
     return recorded == current
 
 
-def preserve(run, tree: TreeSnapshot) -> dict[str, PreservedPath]:
+def preserve(run, tree: TreeSnapshot) -> tuple[dict[str, PreservedPath], list[str]]:
     """Capture every restorable already-dirty path before an agent runs.
 
     Without this, the module can only undo what an agent INTRODUCED — unlink a
@@ -873,23 +886,39 @@ def preserve(run, tree: TreeSnapshot) -> dict[str, PreservedPath]:
 
     Reading is best-effort: a path that vanishes between snapshot and read, or
     is too large to hold, simply is not preserved and keeps the old behaviour.
+
+    Returns the captured bytes and the paths it declined, in the deterministic
+    order it walked them. Both ceilings — per file and for the whole capture —
+    are TRUNCATE_WITH_EXPLICIT_STATUS: what is not held is always named.
     """
     kept: dict[str, PreservedPath] = {}
-    for path in tree:
+    declined: list[str] = []
+    total = 0
+    for path in sorted(tree):
         target = Path(run.repo_root) / path
         try:
             metadata = target.lstat()
             mode = stat.S_IMODE(metadata.st_mode)
             if stat.S_ISLNK(metadata.st_mode):
                 body = os.fsencode(os.readlink(target))
-                if len(body) <= PRESERVE_MAX_BYTES:
+                if (len(body) <= PRESERVE_MAX_BYTES
+                        and total + len(body) <= PRESERVE_TOTAL_MAX_BYTES):
                     kept[path] = PreservedPath("symlink", body, mode)
+                    total += len(body)
+                else:
+                    declined.append(path)
             elif (stat.S_ISREG(metadata.st_mode)
-                  and metadata.st_size <= PRESERVE_MAX_BYTES):
-                kept[path] = PreservedPath("file", target.read_bytes(), mode)
+                  and metadata.st_size <= PRESERVE_MAX_BYTES
+                  and total + metadata.st_size <= PRESERVE_TOTAL_MAX_BYTES):
+                body = target.read_bytes()
+                kept[path] = PreservedPath("file", body, mode)
+                total += len(body)
+            elif stat.S_ISREG(metadata.st_mode):
+                declined.append(path)
         except OSError:
+            declined.append(path)
             continue
-    return kept
+    return kept, declined
 
 
 def _restore(run, path: str, preserved: dict[str, PreservedPath]) -> bool:

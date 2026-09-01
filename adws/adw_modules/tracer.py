@@ -1,5 +1,10 @@
 """Tracer: every event lands in JSONL and SQLite AS IT HAPPENS.
 
+The journal itself is a retained set with a declared growth contract; see
+`sssf.tracer.durable_journal` in `docs/reference/BOUNDEDNESS_REGISTRY.json`
+and the reclaim procedure in `docs/operations/RECOVERY.md`.
+
+
 Files are the raw record; sssf.db is the queryable mirror the UI polls.
 No push transport — the flow is always: agents -> sqlite -> web ui.
 WAL mode so the UI can read while ADW processes write.
@@ -21,6 +26,9 @@ from .data_types import (
     Phase,
 )
 from .utils import ensure_dir, new_id, now_iso
+
+# The recorded launch command is a label, not the command's own storage.
+PROCESS_COMMAND_MAX_CHARS = 500
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -121,6 +129,7 @@ MIGRATIONS = [("agent_sessions", "color", "TEXT"),
               ("gate_results", "nonempty_required", "INTEGER")]
 
 
+# BOUNDEDNESS-OWNER: sssf.tracer.durable_journal
 class Tracer:
     def __init__(self, db_path: str | Path, events_jsonl: str | Path):
         ensure_dir(Path(db_path).parent)
@@ -193,6 +202,7 @@ class Tracer:
         )
 
     # ── events ──────────────────────────────────────────────────────────────
+    # BOUNDEDNESS-OWNER: sssf.tracer.event_payload_bytes
     def event(self, record: EventRecord) -> str:
         event_id = f"evt_{new_id(12)}"
         ts = now_iso()
@@ -256,7 +266,8 @@ class Tracer:
         self.conn.execute(
             "INSERT INTO processes (adw_id, kind, name, pid, command, started_at)"
             " VALUES (?,?,?,?,?,?)",
-            (adw_id, kind, name, pid, command[:500], now_iso()),
+            # BOUNDEDNESS-OWNER: sssf.tracer.process_command_text
+            (adw_id, kind, name, pid, command[:PROCESS_COMMAND_MAX_CHARS], now_iso()),
         )
 
     def process_end(self, adw_id: str, pid: int) -> None:

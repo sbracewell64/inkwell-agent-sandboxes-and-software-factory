@@ -8,6 +8,7 @@ import sys
 
 DEFAULT_DB = "adws/adw_data/sssf.db"
 
+# BOUNDEDNESS-OWNER: sssf.obs_query.result_sets
 QUERIES: dict[str, tuple[str, str]] = {
     "sessions": (
         """

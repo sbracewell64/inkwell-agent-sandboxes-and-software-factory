@@ -23,6 +23,7 @@ from adw_modules import agents, gates, git_helper, quality, session, utils
 from adw_modules.data_types import AgentCall, BuildOutput, PhaseParams, PlanOutput
 
 REQUIRED_AGENTS = ["planner", "builder"]
+# BOUNDEDNESS-OWNER: sssf.adw.plan_build_test_quality_fix_loops
 MAX_FIX_LOOPS = 3
 
 

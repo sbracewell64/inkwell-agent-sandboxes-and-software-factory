@@ -63,3 +63,15 @@ The correction preserves the B2-002 runtime candidate at `0ad16d939366ad0b6bb9c2
 No B2-002 history was rewritten.
 
 **Result: PASS**
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

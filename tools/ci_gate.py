@@ -8,10 +8,20 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import threading
 import time
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
+    ReaderThread,
+    join_reader_threads,
+    process_group_popen_kwargs,
+    stop_process_group,
+)
+
 DEFAULT_MANIFEST = ROOT / "ci" / "checks.json"
 DEFAULT_EVIDENCE = ROOT / "ci-evidence.json"
 STATUSES = ("observed-good", "observed-bad", "could-not-observe")
@@ -24,6 +34,10 @@ COULD_NOT_OBSERVE_EXIT = 125
 # Validators name each reason on its own line using this prefix, the shape
 # docs/validation/check_line_endings.py already prints.
 CNO_REASON_PREFIX = "could-not-observe: "
+# BOUNDEDNESS-OWNER: sssf.ci_gate.check_timeout_seconds
+TIMEOUT_MIN_SECONDS = 1
+TIMEOUT_MAX_SECONDS = 300
+CHECK_MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 _CANCEL_REQUESTED = False
 
 
@@ -58,10 +72,66 @@ def load_checks(path: Path) -> list[dict[str, Any]]:
             or not all(isinstance(part, str) and part for part in command)
         ):
             raise ValueError(f"{check_id}: command must be a nonempty string list")
-        if not isinstance(timeout, int) or not 1 <= timeout <= 300:
-            raise ValueError(f"{check_id}: timeout_seconds must be 1..300")
+        if not isinstance(timeout, int) or not TIMEOUT_MIN_SECONDS <= timeout <= TIMEOUT_MAX_SECONDS:
+            raise ValueError(
+                f"{check_id}: timeout_seconds must be "
+                f"{TIMEOUT_MIN_SECONDS}..{TIMEOUT_MAX_SECONDS}"
+            )
 
     return checks
+
+
+# BOUNDEDNESS-OWNER: sssf.ci_gate.check_output_capture
+# BOUNDEDNESS-POLICY: sssf.policy.bounded-check-output.v1
+class BoundedOutput:
+    """A finite retained-byte ceiling for one check's combined output.
+
+    `communicate()` holds whatever the child produced. A check that loops
+    printing is then bounded only by the gate's own memory, which is not a
+    bound. Retention stops at `limit`; `seen` keeps counting, so the evidence
+    can always say a log was clipped rather than simply being shorter.
+    """
+
+    def __init__(self, limit: int) -> None:
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+            raise ValueError("check output limit must be a positive integer")
+        self.limit = limit
+        self.seen = 0
+        self.truncated = False
+        self._data = bytearray()
+
+    def feed(self, chunk: bytes) -> None:
+        if not chunk:
+            return
+        self.seen += len(chunk)
+        remaining = self.limit - len(self._data)
+        if remaining > 0:
+            self._data.extend(chunk[:remaining])
+        if len(chunk) > remaining:
+            self.truncated = True
+
+    def read_from(self, pipe) -> None:
+        try:
+            while True:
+                chunk = pipe.read(65536)
+                if not chunk:
+                    break
+                self.feed(chunk)
+        finally:
+            pipe.close()
+
+    def text(self) -> str:
+        rendered = self._data.decode("utf-8", "replace")
+        if self.truncated:
+            rendered += (
+                f"\n[bounded] output truncated at {self.limit} bytes "
+                f"({self.seen} bytes seen)"
+            )
+        return rendered
+
+
+# Retained for the call sites that predate the public name.
+_BoundedOutput = BoundedOutput
 
 
 def _expanded_command(command: list[str]) -> list[str]:
@@ -80,13 +150,8 @@ def child_cno_reason(output: str) -> str:
     return "; ".join(reasons)
 
 
-def _stop_process(process: subprocess.Popen[str]) -> None:
-    process.terminate()
-    try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+def _stop_process(process: subprocess.Popen[str]) -> bool:
+    return stop_process_group(process)
 
 
 def run_check(check: dict[str, Any]) -> dict[str, Any]:
@@ -103,33 +168,42 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
             cwd=ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
+            **process_group_popen_kwargs(),
         )
     except OSError as exc:
         result["reason"] = f"tool unavailable: {exc}"
         return result
 
     deadline = time.monotonic() + check["timeout_seconds"]
-    output = ""
+    # A check's own output is unbounded input to this process, so it is held
+    # against a ceiling on the way in. Reaching it is stated in the evidence,
+    # never a quietly shorter log.
+    capture = BoundedOutput(CHECK_MAX_OUTPUT_BYTES)
+    reader = ReaderThread(capture.read_from, (process.stdout,))
+    reader.start()
 
     while True:
         if _CANCEL_REQUESTED:
-            _stop_process(process)
-            result["reason"] = "execution cancelled"
+            cleanup_succeeded = _stop_process(process)
+            result["reason"] = (
+                "execution cancelled" if cleanup_succeeded
+                else "execution cancelled; process-tree cleanup failed"
+            )
             break
 
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            _stop_process(process)
-            result["reason"] = "check timed out"
+            cleanup_succeeded = _stop_process(process)
+            result["reason"] = (
+                "check timed out" if cleanup_succeeded
+                else "check timed out; process-tree cleanup failed"
+            )
             break
 
         try:
-            output, _ = process.communicate(timeout=min(0.2, remaining))
+            process.wait(timeout=min(0.2, remaining))
             result["returncode"] = process.returncode
-            if process.returncode == COULD_NOT_OBSERVE_EXIT:
-                result["reason"] = child_cno_reason(output)
-            else:
+            if process.returncode != COULD_NOT_OBSERVE_EXIT:
                 result["status"] = (
                     "observed-good" if process.returncode == 0 else "observed-bad"
                 )
@@ -137,8 +211,33 @@ def run_check(check: dict[str, Any]) -> dict[str, Any]:
         except subprocess.TimeoutExpired:
             continue
 
+    reader_complete = join_reader_threads((reader,), max(0.0, deadline - time.monotonic()))
+    if not reader_complete:
+        try:
+            cleanup_succeeded = _stop_process(process)
+        except Exception:
+            cleanup_succeeded = False
+        reader_complete = join_reader_threads((reader,), 2.0)
+        if not reader_complete or not cleanup_succeeded:
+            result["status"] = "could-not-observe"
+            result["reason"] = (
+                "check output pipe did not close after process-tree cleanup"
+                if not reader_complete
+                else "check process-tree cleanup failed"
+            )
+    output = capture.text()
+    if result.get("returncode") == COULD_NOT_OBSERVE_EXIT:
+        # The child names its own could-not-observe reasons on its stdout, so
+        # they can only be read once the reader has drained it. A capture that
+        # hit its ceiling may have dropped a reason line; child_cno_reason then
+        # falls back to naming the reserved exit code, and output_truncated in
+        # this same row says why the named reason is missing.
+        result["reason"] = child_cno_reason(output)
     if output:
         result["output"] = output.rstrip()
+    result["output_limit_bytes"] = capture.limit
+    result["output_bytes_seen"] = capture.seen
+    result["output_truncated"] = capture.truncated
     return result
 
 
@@ -174,7 +273,9 @@ def execute(manifest: Path, evidence_path: Path) -> int:
         print(f"::group::{check['id']}", flush=True)
         result = run_check(check)
         if result.get("output"):
-            print(result["output"])
+            output = result["output"]
+            encoding = sys.stdout.encoding or "utf-8"
+            print(output.encode(encoding, errors="backslashreplace").decode(encoding))
         print(f"status: {result['status']}")
         print("::endgroup::", flush=True)
         results.append(result)

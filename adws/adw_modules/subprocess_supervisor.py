@@ -11,6 +11,8 @@ from __future__ import annotations
 import errno
 import ctypes
 import hashlib
+import io
+import json
 import multiprocessing
 import os
 import re
@@ -94,11 +96,19 @@ class SupervisedResult:
         return max(0.0, self.ended_monotonic - self.started_monotonic)
 
 
+# BOUNDEDNESS-OWNER: sssf.supervisor.attempt_budget
 class AttemptBudget:
-    """Thread-safe shared native-process budget."""
+    """Thread-safe shared native-process budget.
+
+    ``claim`` returns ``None`` once ``total`` attempts are spent: the declared
+    boundary behaviour is REJECT, and spent work is never uncharged to make the
+    accounting pass.
+    """
 
     def __init__(self, total: int) -> None:
-        if not isinstance(total, int) or total < 1:
+        if not isinstance(total, int) or isinstance(total, bool) or total < 1:
+            # bool is an int in Python, and AttemptBudget(True) would be a
+            # one-attempt budget nobody meant to ask for.
             raise ValueError("attempt budget must be a positive integer")
         self.total = total
         self._used = 0
@@ -139,10 +149,13 @@ class SupervisorRequest:
     cwd: str
     environment: Mapping[str, str]
     environment_allowlist: frozenset[str]
+    # BOUNDEDNESS-OWNER: sssf.supervisor.child_wall_clock
     timeout_seconds: float
     term_grace_seconds: float = 1.0
     verification_grace_seconds: float = 1.0
+    # BOUNDEDNESS-OWNER: sssf.supervisor.stdout_capture
     max_stdout_bytes: int = 4 * 1024 * 1024
+    # BOUNDEDNESS-OWNER: sssf.supervisor.stderr_capture
     max_stderr_bytes: int = 1024 * 1024
     poll_interval_seconds: float = 0.02
     # Test-only platform injection also makes the refusal contract executable
@@ -226,12 +239,55 @@ def _validate(request: SupervisorRequest) -> str | None:
     return None
 
 
+# BOUNDEDNESS-POLICY: sssf.policy.bounded-stream-capture.v1
 @dataclass
-class _Capture:
+class BoundedStreamCapture:
+    """One retained-byte ceiling for a child stream, with explicit overflow.
+
+    This is the repository's single owner of "hold at most N bytes of a child
+    process stream".  ``limit`` bounds what is RETAINED; ``seen`` keeps counting
+    what actually arrived, so a truncated capture can never be mistaken for a
+    complete one.  Reaching the ceiling sets ``overflowed`` — the declared
+    boundary behaviour is TRUNCATE_WITH_EXPLICIT_STATUS, never a silent drop.
+
+    Callers that stream a child's output themselves (quality checks, the pi
+    turn, the CI gate) bind their ceiling here rather than growing a private
+    unbounded buffer.
+    """
+
     limit: int
     data: bytearray = field(default_factory=bytearray)
     seen: int = 0
     overflowed: threading.Event = field(default_factory=threading.Event)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.limit, int) or isinstance(self.limit, bool) or self.limit < 1:
+            raise ValueError("bounded stream capture limit must be a positive integer")
+
+    def feed(self, chunk: bytes) -> None:
+        """Admit one chunk against the ceiling.  Overflow is recorded, not hidden."""
+        if not chunk:
+            return
+        self.seen += len(chunk)
+        remaining = self.limit - len(self.data)
+        if remaining > 0:
+            self.data.extend(chunk[:remaining])
+        if len(chunk) > remaining:
+            self.overflowed.set()
+
+    @property
+    def truncated(self) -> bool:
+        return self.overflowed.is_set()
+
+    def status(self) -> dict[str, object]:
+        """The facts a caller must carry so truncation is never silent."""
+        return {
+            "limit_bytes": self.limit,
+            "retained_bytes": len(self.data),
+            "bytes_seen": self.seen,
+            "truncated": self.truncated,
+            "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
+        }
 
     def read_from(self, pipe) -> None:
         try:
@@ -239,14 +295,239 @@ class _Capture:
                 chunk = pipe.read(65536)
                 if not chunk:
                     break
-                self.seen += len(chunk)
-                remaining = self.limit - len(self.data)
-                if remaining > 0:
-                    self.data.extend(chunk[:remaining])
-                if len(chunk) > remaining:
-                    self.overflowed.set()
+                self.feed(chunk)
         finally:
             pipe.close()
+
+
+# Retained for the internal call sites that predate the public name.
+_Capture = BoundedStreamCapture
+
+
+# BOUNDEDNESS-POLICY: sssf.policy.bounded-journal.v1
+class BoundedJournalWriter:
+    """An append-only child-output journal with a finite byte ceiling.
+
+    A raw agent journal grows with whatever the child decides to emit, so the
+    file needs its own bound rather than inheriting the child's appetite.  At
+    the ceiling the writer stops appending payload and writes ONE terminal
+    record naming the limit and the bytes it stopped accepting, so a reader can
+    always tell a complete journal from a bounded one.
+    """
+
+    TRUNCATION_TYPE = "sssf_journal_truncated"
+
+    @classmethod
+    def _terminal_record(cls, limit: int, payload_bytes: int) -> str:
+        return json.dumps(
+            {
+                "type": cls.TRUNCATION_TYPE,
+                "limit_bytes": limit,
+                "payload_bytes": payload_bytes,
+                "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
+            },
+            separators=(",", ":"),
+        )
+
+    def __init__(self, handle, limit_bytes: int) -> None:
+        if not isinstance(limit_bytes, int) or isinstance(limit_bytes, bool) or limit_bytes < 1:
+            raise ValueError("bounded journal limit must be a positive integer")
+        self._handle = handle
+        self.limit = limit_bytes
+        self.terminal_reserve = len(
+            self._terminal_record(limit_bytes, limit_bytes).encode("utf-8")
+        )
+        if self.terminal_reserve >= self.limit:
+            raise ValueError("bounded journal limit cannot hold its terminal record")
+        self.payload_limit = self.limit - self.terminal_reserve
+        handle.seek(0, os.SEEK_END)
+        self.written = handle.tell()
+        self.seen = self.written
+        self.truncated = self.written >= self.limit
+        if self.written:
+            tail_size = min(self.written, 4096)
+            try:
+                handle.seek(self.written - tail_size)
+                self.truncated = self.truncated or self.TRUNCATION_TYPE in handle.read(tail_size)
+            except (OSError, io.UnsupportedOperation):
+                pass
+            finally:
+                handle.seek(0, os.SEEK_END)
+
+    def append(self, line: str) -> bool:
+        """Append one line.  Returns whether the payload was admitted."""
+        encoded = len(line.encode("utf-8", "replace"))
+        self.seen += encoded
+        if self.truncated or self.written + encoded > self.payload_limit:
+            self._close_out()
+            return False
+        self._handle.write(line)
+        self._handle.flush()
+        self.written += encoded
+        return True
+
+    def _close_out(self) -> None:
+        if self.truncated:
+            return
+        self.truncated = True
+        record = self._terminal_record(self.limit, self.written)
+        encoded = len(record.encode("utf-8"))
+        if self.written + encoded <= self.limit:
+            self._handle.write(record)
+            self._handle.flush()
+            self.written += encoded
+
+    def status(self) -> dict[str, object]:
+        return {
+            "limit_bytes": self.limit,
+            "retained_bytes": self.written,
+            "payload_limit_bytes": self.payload_limit,
+            "bytes_seen": self.seen,
+            "truncated": self.truncated,
+            "on_limit_behavior": "TRUNCATE_WITH_EXPLICIT_STATUS",
+        }
+
+
+def process_group_popen_kwargs() -> dict[str, object]:
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+class ReaderThread(threading.Thread):
+    def __init__(self, target: Callable, args: tuple[object, ...]) -> None:
+        super().__init__(target=target, args=args, daemon=True)
+        self.failure: BaseException | None = None
+
+    def run(self) -> None:
+        try:
+            super().run()
+        except BaseException as exc:
+            self.failure = exc
+
+
+def join_reader_threads(readers: Sequence[ReaderThread], timeout: float) -> bool:
+    deadline = time.monotonic() + max(0.0, timeout)
+    for reader in readers:
+        reader.join(timeout=max(0.0, deadline - time.monotonic()))
+    return all(not reader.is_alive() and reader.failure is None for reader in readers)
+
+
+def _bounded_direct_stop(process: subprocess.Popen, grace_seconds: float) -> bool:
+    succeeded = True
+    if process.poll() is None:
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            pass
+        except Exception:
+            succeeded = False
+    if process.poll() is None:
+        try:
+            process.wait(timeout=max(0.1, grace_seconds))
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            except Exception:
+                succeeded = False
+            try:
+                process.wait(timeout=max(0.1, grace_seconds))
+            except Exception:
+                succeeded = False
+        except Exception:
+            succeeded = False
+    return succeeded and process.poll() is not None
+
+
+def stop_process_group(process: subprocess.Popen, grace_seconds: float = 2.0) -> bool:
+    cleanup_succeeded = True
+    if os.name == "nt":
+        try:
+            completed = subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=max(1.0, grace_seconds),
+                check=False,
+            )
+            if completed.returncode != 0:
+                cleanup_succeeded = False
+        except Exception:
+            cleanup_succeeded = False
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        except Exception:
+            cleanup_succeeded = False
+        try:
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            pass
+        except Exception:
+            cleanup_succeeded = False
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except Exception:
+                cleanup_succeeded = False
+    return _bounded_direct_stop(process, grace_seconds) and cleanup_succeeded
+
+
+# BOUNDEDNESS-POLICY: sssf.policy.child-wall-clock.v1
+class ChildDeadline:
+    """A finite wall clock for a child a caller streams itself.
+
+    ``supervise`` owns the deadline for children it launches; a caller that
+    reads a child's pipes directly (the pi turn, a quality check) still needs
+    one, because an agent that never terminates is unbounded duration.  At the
+    deadline the child is asked to stop (SIGTERM), then made to (SIGKILL), and
+    ``expired`` records that the outcome is a CANCEL rather than a completion.
+    """
+
+    def __init__(self, seconds: float) -> None:
+        if not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0:
+            raise ValueError("child deadline must be a positive number of seconds")
+        self.seconds = float(seconds)
+        self.expired = threading.Event()
+        self.cleanup_failed = threading.Event()
+        self._timer: threading.Timer | None = None
+
+    def arm(self, process) -> "ChildDeadline":
+        def fire() -> None:
+            self.expired.set()
+            try:
+                if not stop_process_group(process, 1.0):
+                    self.cleanup_failed.set()
+            except Exception:
+                self.cleanup_failed.set()
+                _bounded_direct_stop(process, 1.0)
+
+        self._timer = threading.Timer(self.seconds, fire)
+        self._timer.daemon = True
+        self._timer.start()
+        return self
+
+    def cancel(self) -> None:
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer.join(timeout=2.0)
+            if self._timer.is_alive():
+                self.cleanup_failed.set()
+            self._timer = None
+
+    def status(self) -> dict[str, object]:
+        return {
+            "limit_seconds": self.seconds,
+            "expired": self.expired.is_set(),
+            "cleanup_failed": self.cleanup_failed.is_set(),
+            "on_limit_behavior": "CANCEL",
+        }
 
 
 def _linux_identity(pid: int) -> ProcessIdentity | None:
@@ -281,6 +562,7 @@ def _linux_ppids() -> dict[int, int]:
     return found
 
 
+# BOUNDEDNESS-OWNER: sssf.supervisor.descendant_custody_set
 def _descendants(root_pid: int) -> list[ProcessIdentity]:
     if not sys_platform_linux():
         return []
@@ -518,8 +800,8 @@ def _supervise_linux(
     assert process.stdout is not None and process.stderr is not None
     stdout_capture = _Capture(request.max_stdout_bytes)
     stderr_capture = _Capture(request.max_stderr_bytes)
-    stdout_thread = threading.Thread(target=stdout_capture.read_from, args=(process.stdout,), daemon=True)
-    stderr_thread = threading.Thread(target=stderr_capture.read_from, args=(process.stderr,), daemon=True)
+    stdout_thread = ReaderThread(stdout_capture.read_from, (process.stdout,))
+    stderr_thread = ReaderThread(stderr_capture.read_from, (process.stderr,))
     stdout_thread.start()
     stderr_thread.start()
 
@@ -559,8 +841,9 @@ def _supervise_linux(
         trigger is not None or descendant_leak,
         lambda: _custodied_descendants(process.pid),
     )
-    stdout_thread.join(timeout=max(0.1, request.verification_grace_seconds))
-    stderr_thread.join(timeout=max(0.1, request.verification_grace_seconds))
+    readers_complete = join_reader_threads(
+        (stdout_thread, stderr_thread), max(0.1, request.verification_grace_seconds)
+    )
     if on_exit:
         on_exit(process.pid)
 
@@ -572,7 +855,10 @@ def _supervise_linux(
     cancelled = trigger == "cancelled"
     reason: FailureReason | None
     state: TerminalState
-    if not cleanup.reaped or cleanup.group_absent is not True or cleanup.survivors:
+    if not readers_complete:
+        state = TerminalState.FAILED
+        reason = FailureReason("cleanup-unverified", Observation.COULD_NOT_OBSERVE, "child output readers did not terminate cleanly")
+    elif not cleanup.reaped or cleanup.group_absent is not True or cleanup.survivors:
         state = TerminalState.FAILED
         reason = FailureReason("cleanup-unverified", Observation.COULD_NOT_OBSERVE, cleanup.detail)
     elif overflow:

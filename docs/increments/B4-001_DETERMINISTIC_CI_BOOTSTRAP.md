@@ -178,3 +178,15 @@ future check is inferred from run `31907345967`.
 Workflow run `31907345967` proves these criteria for reviewed implementation
 head `29819d98ea2b046bc432bde2a3e9cd42be7640a4`. The closure successor and
 post-merge `main` push retain their independent exact-head check requirements.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

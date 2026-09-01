@@ -1,0 +1,1948 @@
+{
+  "schema_version": "sssf.boundedness-registry.v1",
+  "registry_id": "sssf-boundedness",
+  "increment": "BOUND-1",
+  "law": "docs/development/BOUNDEDNESS_LAW.md",
+  "bound_sssf_main": "8aadd50461b184cede949f21ecf426146f2915a0",
+  "bound_sssf_tree": "f1b779f73bea2b33810e5663e9dc2f3b82ea9299",
+  "marker": "BOUNDEDNESS-OWNER",
+  "policy_marker": "BOUNDEDNESS-POLICY",
+  "classifications": [
+    "EXPLICIT_BOUND",
+    "DERIVED_BOUND",
+    "SAFE_UNBOUNDED"
+  ],
+  "overflow_vocabulary": [
+    "REJECT",
+    "BACKPRESSURE",
+    "BLOCK_WAIT_WITH_TIMEOUT",
+    "DEFER",
+    "EVICT_OLDEST",
+    "EVICT_POLICY",
+    "TRUNCATE_WITH_EXPLICIT_STATUS",
+    "SPILL_TO_BOUNDED_EXTERNAL_STORE",
+    "CANCEL",
+    "FAIL",
+    "COULD_NOT_OBSERVE"
+  ],
+  "scope_exclusions": [
+    {
+      "path": "apps/inkwell/",
+      "reason": "The demonstration application is the factory's WORKLOAD, not an SSSF execution surface. The boundedness law scopes SSSF, providers, agent backends, validators and evidence stores. Inkwell's own growth surfaces belong to Inkwell's own increments."
+    },
+    {
+      "path": ".claude/skills/sssf/templates/",
+      "reason": "Templates are copied into a target repository by the installer and become that repository's owners. The installed copies under adws/ are the surfaces this registry binds."
+    }
+  ],
+  "surfaces": [
+    {
+      "surface_id": "sssf.supervisor.stdout_capture",
+      "owner": "adws/adw_modules/subprocess_supervisor.py::SupervisorRequest.max_stdout_bytes",
+      "owner_path": "adws/adw_modules/subprocess_supervisor.py",
+      "source_refs": [
+        "adws/adw_modules/subprocess_supervisor.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 4194304,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/subprocess_supervisor.py",
+          "class": "SupervisorRequest",
+          "field": "max_stdout_bytes"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "reader thread admits chunks against the retained-byte ceiling",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "retained bytes live only for the supervised call; nothing persists",
+      "observability": [
+        "SupervisedResult.output_overflowed",
+        "SupervisedResult.stdout_bytes_seen",
+        "BoundedStreamCapture.status()"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::bounded_stream_capture_boundary",
+        "docs/validation/check_executor_supervisor.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.supervisor.stderr_capture",
+      "owner": "adws/adw_modules/subprocess_supervisor.py::SupervisorRequest.max_stderr_bytes",
+      "owner_path": "adws/adw_modules/subprocess_supervisor.py",
+      "source_refs": [
+        "adws/adw_modules/subprocess_supervisor.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 1048576,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/subprocess_supervisor.py",
+          "class": "SupervisorRequest",
+          "field": "max_stderr_bytes"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "reader thread admits chunks against the retained-byte ceiling",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "retained bytes live only for the supervised call; nothing persists",
+      "observability": [
+        "SupervisedResult.output_overflowed",
+        "SupervisedResult.stderr_bytes_seen"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::bounded_stream_capture_boundary",
+        "docs/validation/check_executor_supervisor.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.supervisor.child_wall_clock",
+      "owner": "adws/adw_modules/subprocess_supervisor.py::SupervisorRequest.timeout_seconds",
+      "owner_path": "adws/adw_modules/subprocess_supervisor.py",
+      "source_refs": [
+        "adws/adw_modules/subprocess_supervisor.py"
+      ],
+      "surface_kind": "child_duration",
+      "resource_dimensions": [
+        "duration"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "seconds",
+        "value": null,
+        "caller_supplied": true,
+        "enforcement_ref": "_validate"
+      },
+      "policy_identity": "sssf.policy.child-wall-clock.v1",
+      "admission_or_backpressure": "_validate refuses a non-positive deadline before any child is launched",
+      "on_limit_behavior": [
+        "CANCEL"
+      ],
+      "retention_or_cleanup": "the child and its custodied descendants are terminated and reaped",
+      "observability": [
+        "SupervisedResult.timed_out",
+        "SupervisedResult.duration_seconds",
+        "CleanupResult.detail"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::supervisor_required_ceiling_controls",
+        "docs/validation/check_executor_supervisor.py"
+      ],
+      "status": "observed-good",
+      "notes": "Caller-supplied per launch; there is no default, and a request without a positive deadline is refused rather than run unbounded."
+    },
+    {
+      "surface_id": "sssf.supervisor.attempt_budget",
+      "owner": "adws/adw_modules/subprocess_supervisor.py::AttemptBudget",
+      "owner_path": "adws/adw_modules/subprocess_supervisor.py",
+      "source_refs": [
+        "adws/adw_modules/subprocess_supervisor.py"
+      ],
+      "surface_kind": "retry_chain",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "attempts",
+        "value": null,
+        "caller_supplied": true,
+        "enforcement_ref": "AttemptBudget"
+      },
+      "policy_identity": "sssf.policy.shared-attempt-budget.v1",
+      "admission_or_backpressure": "claim() hands out an attempt only while the shared budget has one left",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "spent attempts are never uncharged; the budget only moves forward",
+      "observability": [
+        "AttemptBudget.used",
+        "SupervisedResult.attempt_number",
+        "SupervisedResult.attempt_budget"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::attempt_budget_boundary",
+        "docs/validation/check_executor_supervisor.py"
+      ],
+      "status": "observed-good",
+      "notes": "Total is caller-supplied through correction_attempt_budget(retries); construction refuses a non-positive total."
+    },
+    {
+      "surface_id": "sssf.supervisor.descendant_custody_set",
+      "owner": "adws/adw_modules/subprocess_supervisor.py::_descendants",
+      "owner_path": "adws/adw_modules/subprocess_supervisor.py",
+      "source_refs": [
+        "adws/adw_modules/subprocess_supervisor.py"
+      ],
+      "surface_kind": "process_concurrency_set",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "DERIVED_BOUND",
+      "derivation": {
+        "parent_surface_ids": [
+          "sssf.supervisor.child_wall_clock"
+        ],
+        "expression": "rescans occur only inside the term/verification grace deadlines at poll_interval_seconds, and each scan can only name live PIDs, so the custody map is bounded by (grace seconds / poll interval) x live PID space"
+      },
+      "policy_identity": "sssf.policy.deadline-bounded-rescan.v1",
+      "admission_or_backpressure": "refresh() only runs inside a deadline-bounded loop",
+      "on_limit_behavior": [
+        "COULD_NOT_OBSERVE"
+      ],
+      "retention_or_cleanup": "the map is discarded with the SupervisedResult",
+      "observability": [
+        "CleanupResult.observed",
+        "CleanupResult.survivors",
+        "CleanupResult.detail"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::derivation_graph_controls",
+        "docs/validation/check_executor_supervisor.py"
+      ],
+      "status": "observed-good",
+      "notes": "A tree that will not empty inside the deadline is reported as an explicit could-not-observe cleanup, never as a clean one."
+    },
+    {
+      "surface_id": "sssf.pi_adapter.stdout_bytes",
+      "owner": "adws/adw_modules/pi_json_adapter.py::PiAdapterRequest.max_stdout_bytes",
+      "owner_path": "adws/adw_modules/pi_json_adapter.py",
+      "source_refs": [
+        "adws/adw_modules/pi_json_adapter.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 4194304,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/pi_json_adapter.py",
+          "class": "PiAdapterRequest",
+          "field": "max_stdout_bytes"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "the supervised launch carries the ceiling; the adapter refuses an event payload larger than the stream it was read from",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "held only for the duration of one adapter call",
+      "observability": [
+        "PiTerminalResult stdout overflow facts"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls",
+        "docs/validation/check_production_extension_path.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.pi_adapter.stderr_bytes",
+      "owner": "adws/adw_modules/pi_json_adapter.py::PiAdapterRequest.max_stderr_bytes",
+      "owner_path": "adws/adw_modules/pi_json_adapter.py",
+      "source_refs": [
+        "adws/adw_modules/pi_json_adapter.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 1048576,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/pi_json_adapter.py",
+          "class": "PiAdapterRequest",
+          "field": "max_stderr_bytes"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "the supervised launch carries the ceiling; the adapter refuses an event payload larger than the stream it was read from",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "held only for the duration of one adapter call",
+      "observability": [
+        "PiTerminalResult stderr overflow facts"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls",
+        "docs/validation/check_production_extension_path.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.pi_adapter.event_bytes",
+      "owner": "adws/adw_modules/pi_json_adapter.py::PiAdapterRequest.max_event_bytes",
+      "owner_path": "adws/adw_modules/pi_json_adapter.py",
+      "source_refs": [
+        "adws/adw_modules/pi_json_adapter.py"
+      ],
+      "surface_kind": "event_stream",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 4194304,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/pi_json_adapter.py",
+          "class": "PiAdapterRequest",
+          "field": "max_event_bytes"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "the supervised launch carries the ceiling; the adapter refuses an event payload larger than the stream it was read from",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "held only for the duration of one adapter call",
+      "observability": [
+        "the adapter refusal naming max_event_bytes"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls",
+        "docs/validation/check_production_extension_path.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.pi_adapter.turn_wall_clock",
+      "owner": "adws/adw_modules/pi_json_adapter.py::PiAdapterRequest.timeout_seconds",
+      "owner_path": "adws/adw_modules/pi_json_adapter.py",
+      "source_refs": [
+        "adws/adw_modules/pi_json_adapter.py"
+      ],
+      "surface_kind": "child_duration",
+      "resource_dimensions": [
+        "duration"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "seconds",
+        "value": 120.0,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/pi_json_adapter.py",
+          "class": "PiAdapterRequest",
+          "field": "timeout_seconds"
+        }
+      },
+      "policy_identity": "sssf.policy.child-wall-clock.v1",
+      "admission_or_backpressure": "the deadline is handed to the owned supervisor before launch",
+      "on_limit_behavior": [
+        "CANCEL"
+      ],
+      "retention_or_cleanup": "the supervisor terminates and reaps the child tree",
+      "observability": [
+        "SupervisedResult.timed_out"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls",
+        "docs/validation/check_production_extension_path.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.agent_pi.raw_output_journal",
+      "owner": "adws/adw_modules/agent_pi.py::RAW_OUTPUT_MAX_BYTES",
+      "owner_path": "adws/adw_modules/agent_pi.py",
+      "source_refs": [
+        "adws/adw_modules/agent_pi.py"
+      ],
+      "surface_kind": "retained_artifact",
+      "resource_dimensions": [
+        "bytes",
+        "disk footprint"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 67108864,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/agent_pi.py",
+          "name": "RAW_OUTPUT_MAX_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-journal.v1",
+      "admission_or_backpressure": "BoundedJournalWriter initializes retained-byte accounting from the existing append target and reserves terminal-record bytes inside the aggregate artifact ceiling before admitting payload",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS",
+        "FAIL"
+      ],
+      "retention_or_cleanup": "one journal per agent phase under the gitignored session runtime",
+      "observability": [
+        "sssf_journal_truncated terminal record",
+        "BoundedJournalWriter.status()"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::bounded_journal_boundary",
+        "docs/validation/check_boundedness.py::behavioral_watched_red_errors"
+      ],
+      "status": "observed-good",
+      "notes": "The single ceiling includes payload and terminal status across every reopen. Reaching the reserved payload boundary writes status without taking the artifact past 64 MiB and also fails the turn."
+    },
+    {
+      "surface_id": "sssf.agent_pi.stderr_capture",
+      "owner": "adws/adw_modules/agent_pi.py::STDERR_MAX_BYTES",
+      "owner_path": "adws/adw_modules/agent_pi.py",
+      "source_refs": [
+        "adws/adw_modules/agent_pi.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 1048576,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/agent_pi.py",
+          "name": "STDERR_MAX_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "a concurrent reader drains the child's stderr through BoundedStreamCapture while stdout is processed",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "held only long enough to build the failure message; cleanup false or exception, reader failure, or a reader still live after the final bounded join fails the turn",
+      "observability": [
+        "BoundedStreamCapture.status()",
+        "agent_pi.run overflow error"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::agent_pi_stderr_boundary",
+        "docs/validation/check_boundedness.py::behavioral_watched_red_errors"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.agent_pi.turn_wall_clock",
+      "owner": "adws/adw_modules/agent_pi.py::PI_TURN_MAX_SECONDS",
+      "owner_path": "adws/adw_modules/agent_pi.py",
+      "source_refs": [
+        "adws/adw_modules/agent_pi.py"
+      ],
+      "surface_kind": "child_duration",
+      "resource_dimensions": [
+        "duration"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "seconds",
+        "value": 3600.0,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/agent_pi.py",
+          "name": "PI_TURN_MAX_SECONDS"
+        }
+      },
+      "policy_identity": "sssf.policy.child-wall-clock.v1",
+      "admission_or_backpressure": "ChildDeadline is armed before the caller starts streaming the child",
+      "on_limit_behavior": [
+        "CANCEL"
+      ],
+      "retention_or_cleanup": "tree cleanup records every failure, bounded direct fallback runs, and the turn uses a bounded wait then raises rather than trusting incomplete cleanup",
+      "observability": [
+        "ChildDeadline.status()",
+        "tracer process_start/process_end rows"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::child_deadline_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.agents.json_fix_attempts",
+      "owner": "adws/adw_modules/agents.py::JSON_FIX_ATTEMPTS",
+      "owner_path": "adws/adw_modules/agents.py",
+      "source_refs": [
+        "adws/adw_modules/agents.py"
+      ],
+      "surface_kind": "retry_chain",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "attempts",
+        "value": 2,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/agents.py",
+          "name": "JSON_FIX_ATTEMPTS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "malformed output re-prompts the same session a fixed number of times",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "no state is retained past the phase",
+      "observability": [
+        "envelope attempt column",
+        "tracer envelope rows"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.agents.gate_correction_attempts",
+      "owner": "adws/adw_modules/agents.py::execute gate-correction loop",
+      "owner_path": "adws/adw_modules/agents.py",
+      "source_refs": [
+        "adws/adw_modules/agents.py"
+      ],
+      "surface_kind": "retry_chain",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "attempts",
+        "value": null,
+        "caller_supplied": true,
+        "enforcement_ref": "phase.params.retries"
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the loop runs at most phase.params.retries + 1 times",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "no state is retained past the phase",
+      "observability": [
+        "gate_results.attempt",
+        "tracer retry console line"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::enforcement_reference_controls"
+      ],
+      "status": "observed-good",
+      "notes": "Caller-supplied per phase; range() makes the ceiling structural, so an unbounded correction chain is not expressible here."
+    },
+    {
+      "surface_id": "sssf.permissions.preserve_per_file_bytes",
+      "owner": "adws/adw_modules/permissions.py::PRESERVE_MAX_BYTES",
+      "owner_path": "adws/adw_modules/permissions.py",
+      "source_refs": [
+        "adws/adw_modules/permissions.py"
+      ],
+      "surface_kind": "in_memory_collection",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 1048576,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/permissions.py",
+          "name": "PRESERVE_MAX_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "a path larger than the ceiling is not admitted to the capture",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "the capture is discarded at the end of the agent phase",
+      "observability": [
+        "preserve_bounded tracer event",
+        "_roll_back outcome text"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::preserve_capture_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.permissions.preserve_total_bytes",
+      "owner": "adws/adw_modules/permissions.py::PRESERVE_TOTAL_MAX_BYTES",
+      "owner_path": "adws/adw_modules/permissions.py",
+      "source_refs": [
+        "adws/adw_modules/permissions.py"
+      ],
+      "surface_kind": "in_memory_collection",
+      "resource_dimensions": [
+        "bytes",
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 67108864,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/permissions.py",
+          "name": "PRESERVE_TOTAL_MAX_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "admission stops once the whole capture would exceed the ceiling",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "the capture is discarded at the end of the agent phase",
+      "observability": [
+        "preserve_bounded tracer event naming every declined path"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::preserve_capture_boundary"
+      ],
+      "status": "observed-good",
+      "notes": "The per-file ceiling bounds one entry, not the map; this bounds the map."
+    },
+    {
+      "surface_id": "sssf.permissions.recovered_breach_allowance",
+      "owner": "adws/adw_modules/permissions.py::RECOVERED_LIMIT",
+      "owner_path": "adws/adw_modules/permissions.py",
+      "source_refs": [
+        "adws/adw_modules/permissions.py"
+      ],
+      "surface_kind": "retry_chain",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "paths",
+        "value": 3,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/permissions.py",
+          "name": "RECOVERED_LIMIT"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "a phase may have this many fully recovered out-of-scope writes forgiven",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "offending paths are rolled back before the decision",
+      "observability": [
+        "PermissionBreach message",
+        "permission console note"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::recovered_allowance_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.run.phase_list",
+      "owner": "adws/adw_modules/runner.py::Run.phases",
+      "owner_path": "adws/adw_modules/runner.py",
+      "source_refs": [
+        "adws/adw_modules/runner.py"
+      ],
+      "surface_kind": "in_memory_collection",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "DERIVED_BOUND",
+      "derivation": {
+        "parent_surface_ids": [
+          "sssf.adw.build_review_revision_loops",
+          "sssf.adw.build_test_fix_loops",
+          "sssf.adw.plan_build_test_fix_loops",
+          "sssf.adw.plan_build_test_quality_fix_loops",
+          "sssf.adw.simple_sdlc_fix_loops",
+          "sssf.adw.simple_sdlc_revision_loops"
+        ],
+        "expression": "each ADW script opens a statically written set of phases plus at most its own declared fix/revision loop ceiling, so the list is bounded by the script text and those constants"
+      },
+      "policy_identity": "sssf.policy.structural-bound.v1",
+      "admission_or_backpressure": "only run.phase() appends, and only from a workflow script",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "discarded with the process; the durable copy is the phases table",
+      "observability": [
+        "phases table",
+        "console phase lines"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::derivation_graph_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.run.agent_map",
+      "owner": "adws/adw_modules/runner.py::Run.agent_map",
+      "owner_path": "adws/adw_modules/runner.py",
+      "source_refs": [
+        "adws/adw_modules/runner.py"
+      ],
+      "surface_kind": "durable_map",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "DERIVED_BOUND",
+      "derivation": {
+        "parent_surface_ids": [
+          "sssf.run.phase_list"
+        ],
+        "expression": "one entry per agent name, and agent names come from the roster in sssf.config.yaml, so the map cannot exceed the configured roster"
+      },
+      "policy_identity": "sssf.policy.structural-bound.v1",
+      "admission_or_backpressure": "save_agent_map writes one keyed entry per agent",
+      "on_limit_behavior": [
+        "EVICT_POLICY"
+      ],
+      "retention_or_cleanup": "overwritten in place per agent; the file lives in the session runtime",
+      "observability": [
+        "agent_map.json",
+        "agent_sessions table"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::derivation_graph_controls"
+      ],
+      "status": "observed-good",
+      "notes": "Keyed by agent name, so a re-run of the same agent replaces rather than appends."
+    },
+    {
+      "surface_id": "sssf.run.phase_error_text",
+      "owner": "adws/adw_modules/runner.py::PHASE_ERROR_MAX_CHARS",
+      "owner_path": "adws/adw_modules/runner.py",
+      "source_refs": [
+        "adws/adw_modules/runner.py"
+      ],
+      "surface_kind": "log_record",
+      "resource_dimensions": [
+        "characters"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "characters",
+        "value": 1000,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/runner.py",
+          "name": "PHASE_ERROR_MAX_CHARS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "_bounded_error clips a longer message and says that it did",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "stored once on the phase row",
+      "observability": [
+        "the truncation marker carrying the original character count"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::phase_error_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.run.session_runtime_dir",
+      "owner": "adws/adw_modules/runner.py::Run.session_dir",
+      "owner_path": "adws/adw_modules/runner.py",
+      "source_refs": [
+        "adws/adw_modules/runner.py"
+      ],
+      "surface_kind": "retained_artifact",
+      "resource_dimensions": [
+        "disk footprint",
+        "count"
+      ],
+      "classification": "SAFE_UNBOUNDED",
+      "policy_identity": "sssf.policy.operator-reclaimed-journal.v1",
+      "admission_or_backpressure": "one directory per adw_id; nothing rewrites another run's directory",
+      "on_limit_behavior": [
+        "COULD_NOT_OBSERVE"
+      ],
+      "retention_or_cleanup": "retained until an operator reclaims it; see docs/operations/RECOVERY.md",
+      "observability": [
+        "obs_query sessions",
+        "the directory itself"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::safe_unbounded_justification_controls"
+      ],
+      "safety_invariant": "Each run writes only under its own adw_id directory, and no factory decision ever reads a previous run's directory, so growth is additive and inert rather than compounding.",
+      "why_no_finite_local_bound_is_required": "A finite local cap would have to delete a completed run's envelopes, handoff and raw journals - the exact record an operator opens when asking why a run failed - and deleting proof to satisfy a size target is the harm this repository's evidence discipline exists to prevent.",
+      "failure_consequence": "Local disk grows linearly with the number of runs an operator starts. It cannot affect a run's outcome, and the path is gitignored, so it never reaches a commit, a proof, or CI.",
+      "archive_strategy": "Move the directory aside under a timestamp, per the reclaim procedure in docs/operations/RECOVERY.md; a new run recreates what it needs.",
+      "falsification_test_or_review": "check_boundedness.py fails if the reclaim procedure disappears from docs/operations/RECOVERY.md or if the path stops being gitignored.",
+      "authority": "BOUND-1 under Browser Sol standing authority; recorded in docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md",
+      "status": "observed-good",
+      "archive_strategy_ref": "docs/operations/RECOVERY.md#reclaiming-the-trace-journal"
+    },
+    {
+      "surface_id": "sssf.quality.stdout_capture",
+      "owner": "adws/adw_modules/quality.py::CHECK_MAX_STDOUT_BYTES",
+      "owner_path": "adws/adw_modules/quality.py",
+      "source_refs": [
+        "adws/adw_modules/quality.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 8388608,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/quality.py",
+          "name": "CHECK_MAX_STDOUT_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "a reader thread admits chunks against the ceiling as they arrive",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "written once to the phase's command.log artifact; cleanup false or exception, reader failure, or a reader still live after the final bounded join fails the quality observation",
+      "observability": [
+        "the [bounded] note in stderr and in the command log"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::bounded_stream_capture_boundary",
+        "docs/validation/check_boundedness.py::quality_descendant_timeout_boundary",
+        "docs/validation/check_boundedness.py::enforcement_reference_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.quality.stderr_capture",
+      "owner": "adws/adw_modules/quality.py::CHECK_MAX_STDERR_BYTES",
+      "owner_path": "adws/adw_modules/quality.py",
+      "source_refs": [
+        "adws/adw_modules/quality.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 2097152,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/quality.py",
+          "name": "CHECK_MAX_STDERR_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "a reader thread admits chunks against the ceiling as they arrive",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "written once to the phase's command.log artifact; cleanup false or exception, reader failure, or a reader still live after the final bounded join fails the quality observation",
+      "observability": [
+        "the [bounded] note in stderr and in the command log"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::bounded_stream_capture_boundary",
+        "docs/validation/check_boundedness.py::quality_descendant_timeout_boundary",
+        "docs/validation/check_boundedness.py::enforcement_reference_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.quality.output_tail",
+      "owner": "adws/adw_modules/quality.py::TAIL_CHARS",
+      "owner_path": "adws/adw_modules/quality.py",
+      "source_refs": [
+        "adws/adw_modules/quality.py"
+      ],
+      "surface_kind": "agent_context_projection",
+      "resource_dimensions": [
+        "characters"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "characters",
+        "value": 4000,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/quality.py",
+          "name": "TAIL_CHARS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "only the tail rides back inside the envelope; the artifact keeps the rest",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "the full bounded output stays in the command.log artifact",
+      "observability": [
+        "QualityCheckResult.output_artifact alongside output_tail"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.quality.command_log_artifact",
+      "owner": "adws/adw_modules/quality.py::_run command.log",
+      "owner_path": "adws/adw_modules/quality.py",
+      "source_refs": [
+        "adws/adw_modules/quality.py"
+      ],
+      "surface_kind": "retained_artifact",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "DERIVED_BOUND",
+      "derivation": {
+        "parent_surface_ids": [
+          "sssf.quality.stdout_capture",
+          "sssf.quality.stderr_capture"
+        ],
+        "expression": "the artifact holds only the bounded captures plus a fixed header, so its size cannot exceed the two stream ceilings plus a constant"
+      },
+      "policy_identity": "sssf.policy.structural-bound.v1",
+      "admission_or_backpressure": "written once, after both captures have already been bounded",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "lives under the gitignored session runtime",
+      "observability": [
+        "the [bounded] note recorded in the log itself"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::derivation_graph_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.tracer.event_payload_bytes",
+      "owner": "adws/adw_modules/tracer.py::Tracer.event",
+      "owner_path": "adws/adw_modules/tracer.py",
+      "source_refs": [
+        "adws/adw_modules/tracer.py"
+      ],
+      "surface_kind": "event_stream",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "DERIVED_BOUND",
+      "derivation": {
+        "parent_surface_ids": [
+          "sssf.agent_pi.raw_output_journal",
+          "sssf.quality.output_tail",
+          "sssf.run.phase_error_text"
+        ],
+        "expression": "every payload is assembled from agent output that entered through a bounded turn journal, from an already-bounded quality tail, or from a bounded repository fact, so one event cannot exceed those ceilings"
+      },
+      "policy_identity": "sssf.policy.structural-bound.v1",
+      "admission_or_backpressure": "payloads are built by the caller from already-bounded inputs",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "appended to the journal; see sssf.tracer.durable_journal",
+      "observability": [
+        "events.payload_json",
+        "events.jsonl"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::derivation_graph_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.tracer.process_command_text",
+      "owner": "adws/adw_modules/tracer.py::PROCESS_COMMAND_MAX_CHARS",
+      "owner_path": "adws/adw_modules/tracer.py",
+      "source_refs": [
+        "adws/adw_modules/tracer.py"
+      ],
+      "surface_kind": "log_record",
+      "resource_dimensions": [
+        "characters"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "characters",
+        "value": 500,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/tracer.py",
+          "name": "PROCESS_COMMAND_MAX_CHARS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the recorded launch command is a label, clipped on write",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "one row per launched process",
+      "observability": [
+        "processes.command",
+        "obs_query procs"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good",
+      "notes": "The authoritative command is the argv the supervisor was handed; this column is a human label for `obs_query procs`."
+    },
+    {
+      "surface_id": "sssf.tracer.durable_journal",
+      "owner": "adws/adw_modules/tracer.py::Tracer",
+      "owner_path": "adws/adw_modules/tracer.py",
+      "source_refs": [
+        "adws/adw_modules/tracer.py"
+      ],
+      "surface_kind": "evidence_journal",
+      "resource_dimensions": [
+        "disk footprint",
+        "count"
+      ],
+      "classification": "SAFE_UNBOUNDED",
+      "policy_identity": "sssf.policy.operator-reclaimed-journal.v1",
+      "admission_or_backpressure": "append-only; a run never rewrites or evicts another run's rows",
+      "on_limit_behavior": [
+        "COULD_NOT_OBSERVE"
+      ],
+      "retention_or_cleanup": "retained until an operator reclaims it; see docs/operations/RECOVERY.md",
+      "observability": [
+        "obs_query sessions/tail",
+        "the visualizer UI"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::safe_unbounded_justification_controls"
+      ],
+      "safety_invariant": "The journal is written but never read to decide anything: no gate, acceptance, retry, or CI result consults prior rows, so its size cannot change any outcome.",
+      "why_no_finite_local_bound_is_required": "Any finite cap would evict completed sessions, and silent eviction of the one record an operator reads to diagnose a run is precisely the harm this law forbids. Bounding by deletion would trade a size property for a provable loss of diagnostic history.",
+      "failure_consequence": "Local disk grows linearly with operator-initiated runs. The paths are gitignored, never accepted evidence, and never reach CI.",
+      "archive_strategy": "Move sssf.db and the sessions directory aside under a timestamp, per the reclaim procedure in docs/operations/RECOVERY.md.",
+      "falsification_test_or_review": "check_boundedness.py fails if the reclaim procedure disappears from docs/operations/RECOVERY.md or if the journal paths stop being gitignored; either would remove the oversight this justification depends on.",
+      "authority": "BOUND-1 under Browser Sol standing authority; recorded in docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md",
+      "status": "observed-good",
+      "archive_strategy_ref": "docs/operations/RECOVERY.md#reclaiming-the-trace-journal"
+    },
+    {
+      "surface_id": "sssf.changes.diff_lines",
+      "owner": "adws/adw_modules/changes.py::collect diff truncation",
+      "owner_path": "adws/adw_modules/changes.py",
+      "source_refs": [
+        "adws/adw_modules/changes.py"
+      ],
+      "surface_kind": "agent_context_projection",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "lines",
+        "value": null,
+        "caller_supplied": true,
+        "enforcement_ref": "max_diff_lines"
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the diff handed to an agent stops at the caller's declared line ceiling",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "not retained beyond the phase",
+      "observability": [
+        "the explicit [truncated at N lines] marker appended to the diff"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::enforcement_reference_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.console.line_length",
+      "owner": "adws/adw_modules/console.py::MAX_LINE",
+      "owner_path": "adws/adw_modules/console.py",
+      "source_refs": [
+        "adws/adw_modules/console.py"
+      ],
+      "surface_kind": "log_record",
+      "resource_dimensions": [
+        "characters"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "characters",
+        "value": 160,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_modules/console.py",
+          "name": "MAX_LINE"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "_clip shortens dynamic text before it reaches the terminal",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "terminal output only",
+      "observability": [
+        "the ellipsis the clip leaves behind"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.console.phase_results",
+      "owner": "adws/adw_modules/console.py::Console.results",
+      "owner_path": "adws/adw_modules/console.py",
+      "source_refs": [
+        "adws/adw_modules/console.py"
+      ],
+      "surface_kind": "in_memory_collection",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "DERIVED_BOUND",
+      "derivation": {
+        "parent_surface_ids": [
+          "sssf.run.phase_list"
+        ],
+        "expression": "one status per completed phase, so it is exactly as bounded as the phase list it mirrors"
+      },
+      "policy_identity": "sssf.policy.structural-bound.v1",
+      "admission_or_backpressure": "appended once per phase end",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "discarded with the process",
+      "observability": [
+        "the session summary line"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::derivation_graph_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.sandbox.resource_bounds",
+      "owner": "adws/adw_modules/sandbox_provider.py::ResourceBounds",
+      "owner_path": "adws/adw_modules/sandbox_provider.py",
+      "source_refs": [
+        "adws/adw_modules/sandbox_provider.py"
+      ],
+      "surface_kind": "provider_resource_ceiling",
+      "resource_dimensions": [
+        "cpu millis",
+        "bytes",
+        "count",
+        "disk footprint",
+        "duration"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "mixed",
+        "value": null,
+        "caller_supplied": true,
+        "enforcement_ref": "ResourceBounds"
+      },
+      "policy_identity": "sssf.policy.provider-resource-bounds.v1",
+      "admission_or_backpressure": "__post_init__ refuses a non-positive ceiling on construction",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "the bounds travel with the sandbox spec for its whole life",
+      "observability": [
+        "SandboxSpec.resource_bounds",
+        "lifecycle operation records"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::resource_bounds_controls",
+        "docs/validation/check_sandbox_provider.py"
+      ],
+      "status": "observed-good",
+      "notes": "cpu_millis, memory_bytes, pids and disk_bytes must be positive; wall_seconds must be positive; network_bytes may be zero because zero denies network rather than granting unlimited network."
+    },
+    {
+      "surface_id": "sssf.sandbox.lifecycle_record_store",
+      "owner": "adws/adw_modules/sandbox_provider.py::InMemoryLifecycleRecordStore.MAX_RECORDS",
+      "owner_path": "adws/adw_modules/sandbox_provider.py",
+      "source_refs": [
+        "adws/adw_modules/sandbox_provider.py"
+      ],
+      "surface_kind": "in_memory_collection",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "records",
+        "value": 4096,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/sandbox_provider.py",
+          "class": "InMemoryLifecycleRecordStore",
+          "field": "MAX_RECORDS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "_admit refuses an append once the store is full",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "the store lives only as long as the process that made it",
+      "observability": [
+        "the refusal message naming the ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::in_memory_store_boundary",
+        "docs/validation/check_sandbox_provider.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.sandbox.destroy_authorization_store",
+      "owner": "adws/adw_modules/sandbox_provider.py::InMemoryDestroyAuthorizationStateStore.MAX_AUTHORIZATIONS",
+      "owner_path": "adws/adw_modules/sandbox_provider.py",
+      "source_refs": [
+        "adws/adw_modules/sandbox_provider.py"
+      ],
+      "surface_kind": "in_memory_collection",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "authorizations",
+        "value": 4096,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/sandbox_provider.py",
+          "class": "InMemoryDestroyAuthorizationStateStore",
+          "field": "MAX_AUTHORIZATIONS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "record_issuance refuses a new authorization once the store is full",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "the store lives only as long as the process that made it",
+      "observability": [
+        "the refusal message naming the ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::in_memory_store_boundary",
+        "docs/validation/check_sandbox_provider.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.sandbox.effect_authority_state_store",
+      "owner": "adws/adw_modules/sandbox_provider.py::JsonFileAuthorizationStateStore.MAX_AUTHORIZATIONS",
+      "owner_path": "adws/adw_modules/sandbox_provider.py",
+      "source_refs": [
+        "adws/adw_modules/sandbox_provider.py",
+        "just/sandbox/lifecycle/authority.just"
+      ],
+      "surface_kind": "durable_record_store",
+      "resource_dimensions": [
+        "count",
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "authorizations",
+        "value": 4096,
+        "probe": {
+          "kind": "class_field_default",
+          "path": "adws/adw_modules/sandbox_provider.py",
+          "class": "JsonFileAuthorizationStateStore",
+          "field": "MAX_AUTHORIZATIONS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "record_issuance refuses a new authorization once the durable store is full; an already-recorded identity is still re-readable, so an in-flight effect is never orphaned by the ceiling",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "operator-reclaimed under docs/operations/RECOVERY.md; eviction is deliberately not the policy, because dropping a completed record silently restores a spent authorization's identity to never-seen, which is what one-use authority exists to deny",
+      "observability": [
+        "the EffectNotAuthorized refusal naming the ceiling and the reclaim procedure"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::durable_authority_store_boundary",
+        "docs/validation/check_sandbox_provider.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.ci_gate.check_timeout_seconds",
+      "owner": "tools/ci_gate.py::TIMEOUT_MAX_SECONDS",
+      "owner_path": "tools/ci_gate.py",
+      "source_refs": [
+        "tools/ci_gate.py"
+      ],
+      "surface_kind": "child_duration",
+      "resource_dimensions": [
+        "duration"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "seconds",
+        "value": 300,
+        "probe": {
+          "kind": "module_constant",
+          "path": "tools/ci_gate.py",
+          "name": "TIMEOUT_MAX_SECONDS"
+        }
+      },
+      "policy_identity": "sssf.policy.child-wall-clock.v1",
+      "admission_or_backpressure": "load_checks refuses a manifest whose timeout is outside the range",
+      "on_limit_behavior": [
+        "REJECT",
+        "CANCEL"
+      ],
+      "retention_or_cleanup": "a check past its deadline has bounded tree and direct fallback cleanup; false or exceptional cleanup and any failed or still-live output reader force could-not-observe, including timeout early-return and re-raise paths even when pipes close promptly",
+      "observability": [
+        "ci evidence reason field",
+        "status counts",
+        "explicit process-tree cleanup failure"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls",
+        "docs/validation/check_boundedness.py::ci_gate_descendant_timeout_boundary",
+        "docs/validation/check_boundedness.py::behavioral_watched_red_errors",
+        "docs/validation/check_ci_contract.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.ci_gate.check_output_capture",
+      "owner": "tools/ci_gate.py::CHECK_MAX_OUTPUT_BYTES",
+      "owner_path": "tools/ci_gate.py",
+      "source_refs": [
+        "tools/ci_gate.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 8388608,
+        "probe": {
+          "kind": "module_constant",
+          "path": "tools/ci_gate.py",
+          "name": "CHECK_MAX_OUTPUT_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-check-output.v1",
+      "admission_or_backpressure": "a reader thread admits chunks against the ceiling as they arrive",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "the bounded text is written once into the CI evidence file",
+      "observability": [
+        "output_truncated",
+        "output_bytes_seen",
+        "output_limit_bytes"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::ci_gate_output_boundary",
+        "docs/validation/check_ci_contract.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.evidence.artifact_read_bytes",
+      "owner": "tools/evidence_manifest.py::MAX_ARTIFACT_BYTES",
+      "owner_path": "tools/evidence_manifest.py",
+      "source_refs": [
+        "tools/evidence_manifest.py"
+      ],
+      "surface_kind": "retained_artifact",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 536870912,
+        "probe": {
+          "kind": "module_constant",
+          "path": "tools/evidence_manifest.py",
+          "name": "MAX_ARTIFACT_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.reject-not-truncate.v1",
+      "admission_or_backpressure": "the descriptor read stops and refuses once the ceiling is passed",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "nothing is retained; the refusal carries a typed observation",
+      "observability": [
+        "ArtifactRefusal observation and message"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::evidence_ceiling_boundary",
+        "docs/validation/check_evidence_manifest.py"
+      ],
+      "status": "observed-good",
+      "notes": "Truncation is forbidden here specifically: a digest over a prefix would claim to identify an artifact it never finished reading."
+    },
+    {
+      "surface_id": "sssf.evidence.artifact_path_depth",
+      "owner": "tools/evidence_manifest.py::MAX_ARTIFACT_PATH_DEPTH",
+      "owner_path": "tools/evidence_manifest.py",
+      "source_refs": [
+        "tools/evidence_manifest.py"
+      ],
+      "surface_kind": "retained_artifact",
+      "resource_dimensions": [
+        "depth"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "path components",
+        "value": 64,
+        "probe": {
+          "kind": "module_constant",
+          "path": "tools/evidence_manifest.py",
+          "name": "MAX_ARTIFACT_PATH_DEPTH"
+        }
+      },
+      "policy_identity": "sssf.policy.reject-not-truncate.v1",
+      "admission_or_backpressure": "the traversal refuses before opening the first component",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "no descriptors are opened for a refused path",
+      "observability": [
+        "ArtifactRefusal observation and message"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::evidence_ceiling_boundary",
+        "docs/validation/check_evidence_manifest.py"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.obs_query.result_sets",
+      "owner": "tools/obs_query.py::QUERIES",
+      "owner_path": "tools/obs_query.py",
+      "source_refs": [
+        "tools/obs_query.py"
+      ],
+      "surface_kind": "list_accumulator",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "rows",
+        "value": 25,
+        "probe": {
+          "kind": "regex",
+          "path": "tools/obs_query.py",
+          "pattern": "LIMIT (\\d+)\\n\\s+\\\"\\\"\\\",\\n\\s+\\\"\\|\\\",\\n\\s+\\),\\n\\s+\\\"procs\\\""
+        }
+      },
+      "policy_identity": "sssf.policy.query-limit.v1",
+      "admission_or_backpressure": "the cross-run listings carry a SQL LIMIT; per-run listings are keyed by one adw_id and so inherit that run's own bounded phase and process sets",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "read-only; the reader retains nothing",
+      "observability": [
+        "the fixed row count the listing prints"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls",
+        "docs/validation/check_obs_query.py"
+      ],
+      "status": "observed-good",
+      "notes": "sessions is LIMIT 10 and tail is LIMIT 25; the probe binds the larger of the two cross-run ceilings."
+    },
+    {
+      "surface_id": "sssf.planning.git_output_capture",
+      "owner": "docs/validation/check_planning_foundation.py::GIT_OUTPUT_MAX_BYTES",
+      "owner_path": "docs/validation/check_planning_foundation.py",
+      "source_refs": [
+        "docs/validation/check_planning_foundation.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 8388608,
+        "probe": {
+          "kind": "module_constant",
+          "path": "docs/validation/check_planning_foundation.py",
+          "name": "GIT_OUTPUT_MAX_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-stream-capture.v1",
+      "admission_or_backpressure": "a reader thread admits chunks against the ceiling as git produces them",
+      "on_limit_behavior": [
+        "REJECT"
+      ],
+      "retention_or_cleanup": "the bounded bytes live only for the one read that asked for them",
+      "observability": [
+        "the read returns nothing, which the caller already reports as could-not-observe rather than as a shorter answer"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::planning_git_read_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.planning.git_wall_clock",
+      "owner": "docs/validation/check_planning_foundation.py::GIT_OUTPUT_TIMEOUT_SECONDS",
+      "owner_path": "docs/validation/check_planning_foundation.py",
+      "source_refs": [
+        "docs/validation/check_planning_foundation.py"
+      ],
+      "surface_kind": "child_process_duration",
+      "resource_dimensions": [
+        "duration"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "seconds",
+        "value": 30.0,
+        "probe": {
+          "kind": "module_constant",
+          "path": "docs/validation/check_planning_foundation.py",
+          "name": "GIT_OUTPUT_TIMEOUT_SECONDS"
+        }
+      },
+      "policy_identity": "sssf.policy.child-wall-clock.v1",
+      "admission_or_backpressure": "the read waits on the child only until the deadline",
+      "on_limit_behavior": [
+        "CANCEL",
+        "REJECT"
+      ],
+      "retention_or_cleanup": "bounded tree and direct fallback cleanup run at the deadline; false or exceptional cleanup and any failed or still-live reader report could-not-observe, including timeout early returns when the pipe closes promptly",
+      "observability": [
+        "ordinary timeout, truncation, and nonzero exit return nothing; cleanup failure is retained as an explicit could-not-observe reason and no partial authority value is parsed"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::planning_git_read_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.windows_host.path_entry_set",
+      "owner": "tools/windows_host.py::dedupe_paths",
+      "owner_path": "tools/windows_host.py",
+      "source_refs": [
+        "tools/windows_host.py"
+      ],
+      "surface_kind": "in_memory_collection",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "DERIVED_BOUND",
+      "derivation": {
+        "parent_surface_ids": [
+          "sssf.windows_host.git_candidate_set"
+        ],
+        "expression": "the deduped list is a subset of PATH, which the host process supplies once at startup and which the tool never appends to"
+      },
+      "policy_identity": "sssf.policy.structural-bound.v1",
+      "admission_or_backpressure": "one pass over PATH, keyed by normalized path",
+      "on_limit_behavior": [
+        "EVICT_POLICY"
+      ],
+      "retention_or_cleanup": "not retained beyond the doctor run",
+      "observability": [
+        "the doctor report"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::derivation_graph_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.windows_host.git_candidate_set",
+      "owner": "tools/windows_host.py::discover_git_root",
+      "owner_path": "tools/windows_host.py",
+      "source_refs": [
+        "tools/windows_host.py"
+      ],
+      "surface_kind": "in_memory_collection",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "candidates",
+        "value": 3,
+        "caller_supplied": true,
+        "enforcement_ref": "discover_git_root"
+      },
+      "policy_identity": "sssf.policy.structural-bound.v1",
+      "admission_or_backpressure": "the candidate list is written out literally: which(git) plus two known install locations",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "not retained beyond the doctor run",
+      "observability": [
+        "the doctor report"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::enforcement_reference_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.windows_host.child_output_capture",
+      "owner": "tools/windows_host.py::CHILD_MAX_OUTPUT_BYTES",
+      "owner_path": "tools/windows_host.py",
+      "source_refs": [
+        "tools/windows_host.py",
+        "tools/ci_gate.py"
+      ],
+      "surface_kind": "process_output_buffer",
+      "resource_dimensions": [
+        "bytes"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "bytes",
+        "value": 8388608,
+        "probe": {
+          "kind": "module_constant",
+          "path": "tools/windows_host.py",
+          "name": "CHILD_MAX_OUTPUT_BYTES"
+        }
+      },
+      "policy_identity": "sssf.policy.bounded-check-output.v1",
+      "admission_or_backpressure": "a reader thread admits chunks against the ceiling while the doctor waits on its deadline",
+      "on_limit_behavior": [
+        "TRUNCATE_WITH_EXPLICIT_STATUS"
+      ],
+      "retention_or_cleanup": "the bounded text lives only for one observation; false or exceptional cleanup and any failed or still-live reader force could-not-observe after bounded joins, including timeout re-raises when the pipe closes promptly",
+      "observability": [
+        "the [bounded] marker carrying the ceiling and the bytes seen, which also explains a child could-not-observe reason line that did not survive the clip"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::windows_host_child_output_boundary"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.reap.provider_key_page",
+      "owner": "just/sandbox/manage/reap.just::KEY_PAGE_CEILING",
+      "owner_path": "just/sandbox/manage/reap.just",
+      "source_refs": [
+        "just/sandbox/manage/reap.just"
+      ],
+      "surface_kind": "api_list_accumulator",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "keys",
+        "value": 200,
+        "probe": {
+          "kind": "regex",
+          "path": "just/sandbox/manage/reap.just",
+          "pattern": "KEY_PAGE_CEILING=(\\d+)"
+        }
+      },
+      "policy_identity": "sssf.policy.reject-not-truncate.v1",
+      "admission_or_backpressure": "reap refuses when the provider returns a list at or above the page ceiling, because the API exposes no pagination cursor",
+      "on_limit_behavior": [
+        "FAIL",
+        "COULD_NOT_OBSERVE"
+      ],
+      "retention_or_cleanup": "nothing is revoked on a refusal; keys keep their existing state",
+      "observability": [
+        "the refusal text naming the observed count and the ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good",
+      "notes": "Previously an unverified assumption in a comment. A silently truncated key list looks exactly like a fleet with nothing to reap, so the ambiguity is now a refusal rather than a guess."
+    },
+    {
+      "surface_id": "sssf.sandbox_mount.run_record_store",
+      "owner": "sandbox_mount/host/run_record.py::RUNS_DIR",
+      "owner_path": "sandbox_mount/host/run_record.py",
+      "source_refs": [
+        "sandbox_mount/host/run_record.py"
+      ],
+      "surface_kind": "durable_store",
+      "resource_dimensions": [
+        "count",
+        "disk footprint"
+      ],
+      "classification": "SAFE_UNBOUNDED",
+      "policy_identity": "sssf.policy.revocation-custody.v1",
+      "admission_or_backpressure": "one JSON file per run_id, written atomically; no run rewrites another",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "retained deliberately; `just sbx manage reap` revokes keys but does not delete records",
+      "observability": [
+        "run_record.py list",
+        "just sbx manage list"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::safe_unbounded_justification_controls"
+      ],
+      "safety_invariant": "A run record is the only durable link between a provisioned OpenRouter key and the run that owns it, and list_runs() raises rather than skipping an unreadable record, so no record can leave the set silently.",
+      "why_no_finite_local_bound_is_required": "A cap would have to delete records, and a deleted record is a key nobody can revoke: OpenRouter keys have no TTL, so the deleted record keeps spending forever. The bound that matters here is on live keys, which reap enforces, not on the custody records that make revocation possible.",
+      "failure_consequence": "Local disk grows by one small JSON file per sandbox mount, under a gitignored .sandbox/ directory.",
+      "archive_strategy": "An operator deletes a record only after reap confirms its key is revoked and its VM is gone; `just sbx manage reap` is the procedure that establishes both.",
+      "falsification_test_or_review": "check_boundedness.py fails if list_runs() stops raising on an unreadable record, because silently dropping a record would break the invariant this justification rests on.",
+      "authority": "BOUND-1 under Browser Sol standing authority; recorded in docs/increments/BOUND-1_BOUNDEDNESS_AUDIT_AND_ENFORCEMENT.md",
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.adw.build_review_revision_loops",
+      "owner": "adws/adw_build_review.py::MAX_REVISION_LOOPS",
+      "owner_path": "adws/adw_build_review.py",
+      "source_refs": [
+        "adws/adw_build_review.py"
+      ],
+      "surface_kind": "repair_loop",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "rounds",
+        "value": 3,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_build_review.py",
+          "name": "MAX_REVISION_LOOPS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the workflow runs at most this many reviewer revision rounds",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "no state is retained past the run",
+      "observability": [
+        "run.finish reason naming the exhausted ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.adw.build_test_fix_loops",
+      "owner": "adws/adw_build_test.py::MAX_FIX_LOOPS",
+      "owner_path": "adws/adw_build_test.py",
+      "source_refs": [
+        "adws/adw_build_test.py"
+      ],
+      "surface_kind": "repair_loop",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "rounds",
+        "value": 3,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_build_test.py",
+          "name": "MAX_FIX_LOOPS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the workflow runs at most this many test-repair rounds",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "no state is retained past the run",
+      "observability": [
+        "run.finish reason naming the exhausted ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.adw.plan_build_test_fix_loops",
+      "owner": "adws/adw_plan_build_test.py::MAX_FIX_LOOPS",
+      "owner_path": "adws/adw_plan_build_test.py",
+      "source_refs": [
+        "adws/adw_plan_build_test.py"
+      ],
+      "surface_kind": "repair_loop",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "rounds",
+        "value": 3,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_plan_build_test.py",
+          "name": "MAX_FIX_LOOPS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the workflow runs at most this many test-repair rounds",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "no state is retained past the run",
+      "observability": [
+        "run.finish reason naming the exhausted ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.adw.plan_build_test_quality_fix_loops",
+      "owner": "adws/adw_plan_build_test_quality.py::MAX_FIX_LOOPS",
+      "owner_path": "adws/adw_plan_build_test_quality.py",
+      "source_refs": [
+        "adws/adw_plan_build_test_quality.py"
+      ],
+      "surface_kind": "repair_loop",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "rounds",
+        "value": 3,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_plan_build_test_quality.py",
+          "name": "MAX_FIX_LOOPS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the workflow runs at most this many verify/test repair rounds",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "no state is retained past the run",
+      "observability": [
+        "run.finish reason naming the exhausted ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.adw.simple_sdlc_fix_loops",
+      "owner": "adws/adw_simple_sdlc.py::MAX_FIX_LOOPS",
+      "owner_path": "adws/adw_simple_sdlc.py",
+      "source_refs": [
+        "adws/adw_simple_sdlc.py"
+      ],
+      "surface_kind": "repair_loop",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "rounds",
+        "value": 3,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_simple_sdlc.py",
+          "name": "MAX_FIX_LOOPS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the workflow runs at most this many test-repair rounds",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "no state is retained past the run",
+      "observability": [
+        "run.finish reason naming the exhausted ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    },
+    {
+      "surface_id": "sssf.adw.simple_sdlc_revision_loops",
+      "owner": "adws/adw_simple_sdlc.py::MAX_REVISION_LOOPS",
+      "owner_path": "adws/adw_simple_sdlc.py",
+      "source_refs": [
+        "adws/adw_simple_sdlc.py"
+      ],
+      "surface_kind": "repair_loop",
+      "resource_dimensions": [
+        "count"
+      ],
+      "classification": "EXPLICIT_BOUND",
+      "limit": {
+        "unit": "rounds",
+        "value": 2,
+        "probe": {
+          "kind": "module_constant",
+          "path": "adws/adw_simple_sdlc.py",
+          "name": "MAX_REVISION_LOOPS"
+        }
+      },
+      "policy_identity": "sssf.policy.local-ceiling.v1",
+      "admission_or_backpressure": "the workflow runs at most this many reviewer revision rounds",
+      "on_limit_behavior": [
+        "FAIL"
+      ],
+      "retention_or_cleanup": "no state is retained past the run",
+      "observability": [
+        "run.finish reason naming the exhausted ceiling"
+      ],
+      "verification_refs": [
+        "docs/validation/check_boundedness.py::probe_resolution_controls"
+      ],
+      "status": "observed-good"
+    }
+  ]
+}

@@ -55,3 +55,15 @@ Root agent entrypoints route to `docs/README.md` and `docs/baseline/BASELINE.md`
 ## Result
 
 Repository-level agents now have durable bootstrap entrypoints that route through the documentation index and frozen baseline. Claude Code, `/prime`, `/sssf`, and `/sssf-sandbox-orchestrator` discover the local system record without recursively loading the documentation tree. Stale pre-B0 bootstrap claims were corrected.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

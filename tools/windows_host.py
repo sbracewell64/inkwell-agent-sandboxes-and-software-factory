@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -17,9 +18,16 @@ sys.path.insert(
 )
 
 from tools.ci_gate import (  # noqa: E402
+    BoundedOutput,
     CNO_REASON_PREFIX,
     COULD_NOT_OBSERVE_EXIT,
     child_cno_reason,
+)
+from adws.adw_modules.subprocess_supervisor import (  # noqa: E402
+    ReaderThread,
+    join_reader_threads,
+    process_group_popen_kwargs,
+    stop_process_group,
 )
 
 CANONICAL_ORIGIN = (
@@ -31,6 +39,14 @@ MIN_PYTHON = (3, 11)
 MIN_JUST = (1, 56, 0)
 
 DEFAULT_CHILD_TIMEOUT_SECONDS = 30.0
+
+# BOUNDEDNESS-OWNER: sssf.windows_host.child_output_capture
+# The doctor's deadline bounded how long a child could run, never how much it
+# could say inside that window. A child that prints in a loop was held whole in
+# the doctor's memory. Retention stops here; the deadline stays the duration
+# bound, and truncation is stated in the text the doctor carries so a clipped
+# log is never mistaken for a short one.
+CHILD_MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 
 
 def child_timeout_seconds() -> float:
@@ -78,6 +94,50 @@ class ChildObservation:
         return self.returncode is not None
 
 
+def _bounded_child(
+    args: list[str],
+    *,
+    cwd: Path,
+    timeout: float,
+    capture: BoundedOutput,
+) -> "subprocess.CompletedProcess[bytes]":
+    """Spawn one child, streaming its merged output against `capture`.
+
+    Raises the same two failures the plain call did — `OSError` when the child
+    cannot be spawned and `subprocess.TimeoutExpired` when it outlives the
+    deadline — so the caller's three-valued handling is unchanged.
+    """
+    process = subprocess.Popen(
+        args,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        **process_group_popen_kwargs(),
+    )
+    reader_complete = True
+    cleanup_complete = True
+    reader = ReaderThread(capture.read_from, (process.stdout,))
+    reader.start()
+    try:
+        returncode = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        cleanup_complete = stop_process_group(process)
+        if not cleanup_complete:
+            raise OSError("child process-tree cleanup failed after timeout") from exc
+        raise
+    finally:
+        reader_complete = join_reader_threads((reader,), 2.0)
+        if not reader_complete:
+            try:
+                cleanup_complete = stop_process_group(process)
+            except Exception:
+                cleanup_complete = False
+            reader_complete = join_reader_threads((reader,), 2.0)
+    if not cleanup_complete or not reader_complete:
+        raise OSError("child output pipe did not close after process-tree cleanup")
+    return subprocess.CompletedProcess(args, returncode)
+
+
 def run(
     args: list[str],
     *,
@@ -98,15 +158,9 @@ def run(
     """
     tool = args[0] if args else "<no command>"
 
+    capture = BoundedOutput(CHILD_MAX_OUTPUT_BYTES)
     try:
-        completed = subprocess.run(
-            args,
-            cwd=cwd,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=timeout,
-        )
+        completed = _bounded_child(args, cwd=cwd, timeout=timeout, capture=capture)
     except OSError as exc:
         return ChildObservation(
             None,
@@ -124,7 +178,7 @@ def run(
             ),
         )
 
-    output = completed.stdout or ""
+    output = capture.text()
 
     if (
         completed.returncode
@@ -157,6 +211,7 @@ def path_entries() -> list[str]:
     ]
 
 
+# BOUNDEDNESS-OWNER: sssf.windows_host.path_entry_set
 def dedupe_paths(entries: list[str]) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
@@ -173,6 +228,7 @@ def dedupe_paths(entries: list[str]) -> list[str]:
     return result
 
 
+# BOUNDEDNESS-OWNER: sssf.windows_host.git_candidate_set
 def discover_git_root() -> Path | None:
     candidates: list[Path] = []
 

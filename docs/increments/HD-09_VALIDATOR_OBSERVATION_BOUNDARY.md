@@ -87,3 +87,17 @@ Offline gate at this head, on a host without `just`:
 other row unchanged, and the gate conclusion remains `could-not-observe` with a
 nonzero exit. On a host with `just` and `python` the same row is
 `observed-good`.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. The
+  growth surfaces it created were inventoried and bound retrospectively by
+  BOUND-1 against the post-increment source rather than claimed here after the
+  fact: no surface of its own; this increment changed how tools/ci_gate.py
+  reports an unobservable child, and the gate's own bounded surfaces
+  sssf.ci_gate.check_output_capture and sssf.ci_gate.check_timeout_seconds are
+  unchanged by it. See docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

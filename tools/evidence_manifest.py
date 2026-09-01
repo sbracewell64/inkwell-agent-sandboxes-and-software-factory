@@ -24,6 +24,15 @@ TERMINAL_OUTCOMES = frozenset({"succeeded", "failed", "cancelled", "cno"})
 EVIDENCE_CLASSES = frozenset({"qualifying", "diagnostic"})
 ARTIFACT_TYPES = frozenset({"binary", "json", "jsonl", "sqlite3", "text"})
 
+# A manifest names artifacts a run produced, so both the bytes it reads and the
+# directory chain it walks to reach them are attacker- and accident-reachable
+# growth. Neither is truncated: exceeding either ceiling is a typed refusal,
+# because a partially-read artifact must never digest as a whole one.
+# BOUNDEDNESS-OWNER: sssf.evidence.artifact_read_bytes
+MAX_ARTIFACT_BYTES = 512 * 1024 * 1024
+# BOUNDEDNESS-OWNER: sssf.evidence.artifact_path_depth
+MAX_ARTIFACT_PATH_DEPTH = 64
+
 # This executable module is the only schema/serialization/validation owner.
 # The schema command emits this projection for tooling and documentation.
 EVIDENCE_MANIFEST_SCHEMA: dict[str, Any] = {
@@ -427,12 +436,99 @@ def _path_open_error(
     )
 
 
-def _read_frozen_artifact(root: Path, relative: str) -> bytes:
-    if not _descriptor_primitives_available():
+def _read_frozen_artifact_portable(
+    root: Path, relative: str, parts: tuple[str, ...],
+) -> bytes:
+    """Windows fallback where dir-fd/no-follow primitives are unavailable.
+
+    Every component and the opened file are identity-checked. A reparse point
+    is refused before reading, and any identity movement becomes CNO.
+    """
+    try:
+        root_before = root.lstat()
+        if stat.S_ISLNK(root_before.st_mode):
+            raise ArtifactRefusal(
+                Observation.OBSERVED_BAD, "artifact root is a symlink"
+            )
+        if not stat.S_ISDIR(root_before.st_mode):
+            raise ArtifactRefusal(
+                Observation.CNO, "artifact root is not a directory"
+            )
+        parents: list[tuple[Path, os.stat_result]] = [(root, root_before)]
+        current = root
+        for component in parts[:-1]:
+            current = current / component
+            before = current.lstat()
+            if stat.S_ISLNK(before.st_mode):
+                raise ArtifactRefusal(
+                    Observation.OBSERVED_BAD,
+                    f"symlink artifact/path component refused: {relative}",
+                )
+            if not stat.S_ISDIR(before.st_mode):
+                raise ArtifactRefusal(
+                    Observation.CNO,
+                    f"artifact path component is not a directory: {relative}",
+                )
+            parents.append((current, before))
+        target = current / parts[-1]
+        path_before = target.lstat()
+        if stat.S_ISLNK(path_before.st_mode):
+            raise ArtifactRefusal(
+                Observation.OBSERVED_BAD, f"symlink artifact refused: {relative}"
+            )
+        if not stat.S_ISREG(path_before.st_mode):
+            raise ArtifactRefusal(
+                Observation.CNO, f"artifact is not a regular file: {relative}"
+            )
+        if path_before.st_nlink != 1:
+            raise ArtifactRefusal(
+                Observation.CNO, f"artifact link count is not exactly one: {relative}"
+            )
+        with target.open("rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if _changed_identity(path_before, opened):
+                raise ArtifactRefusal(
+                    Observation.CNO,
+                    f"artifact identity changed while being opened: {relative}",
+                )
+            body = stream.read(MAX_ARTIFACT_BYTES + 1)
+            after_read = os.fstat(stream.fileno())
+        if len(body) > MAX_ARTIFACT_BYTES:
+            raise ArtifactRefusal(
+                Observation.OBSERVED_BAD,
+                f"artifact exceeds the {MAX_ARTIFACT_BYTES} byte read ceiling: {relative}",
+            )
+        if (
+            _changed_identity(opened, after_read)
+            or opened.st_size != after_read.st_size
+        ):
+            raise ArtifactRefusal(
+                Observation.CNO, f"artifact identity changed while being read: {relative}"
+            )
+        for directory, before in parents:
+            if _changed_identity(before, directory.lstat()):
+                raise ArtifactRefusal(
+                    Observation.CNO,
+                    f"artifact directory identity changed while being read: {relative}",
+                )
+        return body
+    except ArtifactRefusal:
+        raise
+    except OSError as exc:
         raise ArtifactRefusal(
-            Observation.CNO,
-            "host lacks descriptor-relative no-follow artifact primitives",
+            Observation.CNO, f"artifact component is unavailable: {relative}: {exc}"
+        ) from exc
+
+
+def _read_frozen_artifact(root: Path, relative: str) -> bytes:
+    parts = PurePosixPath(relative).parts
+    if len(parts) > MAX_ARTIFACT_PATH_DEPTH:
+        raise ArtifactRefusal(
+            Observation.OBSERVED_BAD,
+            f"artifact path depth exceeds {MAX_ARTIFACT_PATH_DEPTH}: {relative}",
         )
+    if not _descriptor_primitives_available():
+        return _read_frozen_artifact_portable(root, relative, parts)
     try:
         root_before = root.lstat()
     except (FileNotFoundError, PermissionError, OSError) as exc:
@@ -485,7 +581,6 @@ def _read_frozen_artifact(root: Path, relative: str) -> bytes:
             )
 
         current_descriptor = root_descriptor
-        parts = PurePosixPath(relative).parts
         for component in parts[:-1]:
             try:
                 before = os.stat(
@@ -583,11 +678,20 @@ def _read_frozen_artifact(root: Path, relative: str) -> bytes:
             )
 
         chunks: list[bytes] = []
+        read_bytes = 0
         try:
             while True:
                 chunk = os.read(artifact_descriptor, 1024 * 1024)
                 if not chunk:
                     break
+                read_bytes += len(chunk)
+                if read_bytes > MAX_ARTIFACT_BYTES:
+                    # REJECT, not truncate: a digest over a prefix would claim
+                    # to identify an artifact it never finished reading.
+                    raise ArtifactRefusal(
+                        Observation.OBSERVED_BAD,
+                        f"artifact exceeds the {MAX_ARTIFACT_BYTES} byte read ceiling: {relative}",
+                    )
                 chunks.append(chunk)
             after_read = os.fstat(artifact_descriptor)
         except OSError as exc:

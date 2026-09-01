@@ -123,6 +123,7 @@ class WorkspaceMode(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
+# BOUNDEDNESS-OWNER: sssf.sandbox.resource_bounds
 class ResourceBounds:
     """Finite provider resource ceilings; zero is never an implicit unlimited value."""
 
@@ -1138,8 +1139,16 @@ class DestroyAuthorizationStateStore(Protocol):
         ...
 
 
+# BOUNDEDNESS-OWNER: sssf.sandbox.destroy_authorization_store
 class InMemoryDestroyAuthorizationStateStore:
-    """Deterministic test store for the durable atomic authorization state seam."""
+    """Deterministic test store for the durable atomic authorization state seam.
+
+    Authorizations accumulate one per destroy attempt, so the map carries a
+    finite ceiling and REJECTs a new issuance past it rather than growing with
+    every retry.
+    """
+
+    MAX_AUTHORIZATIONS = 4096
 
     def __init__(self, state: MutableMapping[str, MutableMapping[str, object]] | None = None) -> None:
         self._state = state if state is not None else {}
@@ -1157,6 +1166,10 @@ class InMemoryDestroyAuthorizationStateStore:
             existing = self._state.get(authorization_id)
             if existing is not None and existing["fingerprint"] != fingerprint:
                 raise ValueError("authorization identity was reissued with different provenance")
+            if existing is None and len(self._state) >= self.MAX_AUTHORIZATIONS:
+                raise ValueError(
+                    f"destroy authorization store is full at {self.MAX_AUTHORIZATIONS} entries"
+                )
             self._state.setdefault(authorization_id, {"fingerprint": fingerprint, "status": "issued"})
 
     def verifies(self, authorization_id: str, fingerprint: str) -> bool:
@@ -1335,8 +1348,16 @@ class LifecycleRecordStore(Protocol):
         ...
 
 
+# BOUNDEDNESS-OWNER: sssf.sandbox.lifecycle_record_store
 class InMemoryLifecycleRecordStore:
-    """Deterministic test store; production must bind the SSSF-owned store."""
+    """Deterministic test store; production must bind the SSSF-owned store.
+
+    Even a test store is a monotone collection, so it carries a finite ceiling.
+    At the ceiling the append is REJECTed: a lifecycle stream that outgrows its
+    store must stop rather than quietly consume the host.
+    """
+
+    MAX_RECORDS = 4096
 
     def __init__(self) -> None:
         self._records: list[LifecycleOperationRecord] = []
@@ -1350,6 +1371,7 @@ class InMemoryLifecycleRecordStore:
         version = 0 if current is None else current.version + 1
         if record.version != version:
             raise ValueError("append version does not match the durable record sequence")
+        self._admit()
         self._records.append(record)
         return version
 
@@ -1367,8 +1389,15 @@ class InMemoryLifecycleRecordStore:
             raise RuntimeError("lifecycle record compare-and-swap lost its owner")
         if record.version != expected_version + 1:
             raise ValueError("CAS record must advance exactly one version")
+        self._admit()
         self._records.append(record)
         return record.version
+
+    def _admit(self) -> None:
+        if len(self._records) >= self.MAX_RECORDS:
+            raise ValueError(
+                f"lifecycle record store is full at {self.MAX_RECORDS} records"
+            )
 
     def latest(self, run_id: str, operation_id: str) -> LifecycleOperationRecord | None:
         matches = [
@@ -2514,6 +2543,19 @@ class JsonFileAuthorizationStateStore:
 
     _STATUSES = ("issued", "reserved", "completed")
 
+    # BOUNDEDNESS-OWNER: sssf.sandbox.effect_authority_state_store
+    # One authorization is recorded per live effect and nothing ever removes a
+    # spent one, so this durable map grows with every effect the host ever
+    # authorizes. The in-memory sibling already REJECTs past its ceiling; the
+    # store that actually runs live effects carries the same one, because a
+    # file re-read in full on every verify is a growing read as well as a
+    # growing file. Eviction is deliberately not the policy here: dropping a
+    # `completed` record silently restores a spent authorization's identity to
+    # "never seen", which is exactly the state one-use authority exists to
+    # deny. Reclaiming is an operator step recorded in
+    # docs/operations/RECOVERY.md.
+    MAX_AUTHORIZATIONS = 4096
+
     def __init__(self, path: "Path | str", *, lock_timeout_seconds: float = 10.0) -> None:
         self._path = Path(path)
         self._lock_path = self._path.with_name(self._path.name + ".lock")
@@ -2625,6 +2667,13 @@ class JsonFileAuthorizationStateStore:
                     "authorization identity was reissued with different provenance"
                 )
             if existing is None:
+                if len(state) >= self.MAX_AUTHORIZATIONS:
+                    raise EffectNotAuthorized(
+                        "effect authority state store is full at "
+                        f"{self.MAX_AUTHORIZATIONS} entries; reclaim spent "
+                        "authorizations before issuing another "
+                        "(docs/operations/RECOVERY.md)"
+                    )
                 state[authorization_id] = {"fingerprint": fingerprint, "status": "issued"}
                 self._write(state)
 

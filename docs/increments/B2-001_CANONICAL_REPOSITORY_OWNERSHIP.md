@@ -56,3 +56,15 @@ Establish `sbracewell64/inkwell-agent-sandboxes-and-software-factory` as the wri
 The operator-owned GitHub fork is now the canonical writable source for the evolving SSSF. Disler's repository remains available as a reference-only upstream. Accepted platform history can now advance through exact proven commits without rewriting B0 or B1.
 
 Sandbox source selection is intentionally not included in this increment. B2-002 will make the sandbox repository URL and exact source revision explicit inputs.
+
+## Boundedness delta
+
+```text
+boundedness_delta: none
+boundedness_reason: this increment predates the boundedness registry. Its
+  growth surfaces, where it created any, were inventoried and bound
+  retrospectively by BOUND-1 against the post-increment source rather than
+  claimed here after the fact. See
+  docs/reference/BOUNDEDNESS_REGISTRY.json and
+  docs/development/BOUNDEDNESS_LAW.md.
+```

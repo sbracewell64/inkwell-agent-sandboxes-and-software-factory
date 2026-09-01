@@ -317,3 +317,20 @@ import in place of modules that are gone. They were removed, not excused.
   review owner. What is mechanical here is that the revision is explicit, that
   it produces a new generation identity, and that evidence bound to the previous
   identity reports as not current.
+
+## Boundedness delta
+
+```text
+boundedness_delta:
+  added: []
+  changed: [
+    sssf.permissions.preserve_per_file_bytes,
+    sssf.permissions.recovered_breach_allowance
+  ]
+  retired: []
+```
+
+The evaluator-surface extension changes the preservation representation and
+removes frozen evaluator writes from the recovered-breach allowance. It does
+not add another queue, registry, scheduler, or independently growing runtime
+surface; the repository-sized snapshot remains invocation-scoped.
