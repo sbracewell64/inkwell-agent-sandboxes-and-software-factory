@@ -37,7 +37,7 @@ def git(*args: str) -> str:
             timeout=CHILD_TIMEOUT_SECONDS,
         ).strip()
     except OSError as exc:
-        raise Unobservable(f"tool unavailable: {exc}") from exc
+        raise Unobservable(f"tool unavailable: git: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
         raise Unobservable(f"check timed out: git {' '.join(args)}") from exc
 

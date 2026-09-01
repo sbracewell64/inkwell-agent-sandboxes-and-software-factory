@@ -45,6 +45,17 @@ Never hand-edit session evidence.
   the host doctor, including the controls that a present-but-failing tool is
   still FAIL and that a present tool is really executed
 
+## Frozen evaluator surface
+
+- `adws/adw_sssf_config/*.yaml` — `defaults.protected_evaluator_paths`, the
+  acceptance surface frozen for the active task generation
+- `adws/adw_modules/permissions.py` — the refusal, the explicit-revision rule,
+  and the three-valued evaluator generation identity
+- `docs/increments/SDLC-L2_PROTECTED_EVALUATOR_SURFACE.md` — the law, its two
+  ruled boundaries, and the proof
+- `tests/test_protected_evaluator_surface.py` — the four required fixtures plus
+  the precedence and over-freeze negative controls
+
 ## Sandbox contract and orchestration
 
 - `docs/reference/SBX-0_SEMANTICS_INVENTORY.json` — durable SBX-0 source-generation/content-digest handoff and classification-compatible owner-per-fact inventory

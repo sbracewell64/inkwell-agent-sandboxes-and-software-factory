@@ -123,6 +123,7 @@ def _run_handoff(
 
 
 class WindowsFrontDoorContractTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "could-not-observe: POSIX shell fixture unavailable")
     def test_identity_output_executes_attached_and_detached_checkout_fixtures(self) -> None:
         _, handoff = _launcher_shell_commands()
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -147,6 +148,7 @@ class WindowsFrontDoorContractTests(unittest.TestCase):
             )
             self.assertNotIn(f"head={head} branch=detached", defective.stdout)
 
+    @unittest.skipUnless(os.name == "posix", "could-not-observe: POSIX shell fixture unavailable")
     def test_dependency_preflight_executes_missing_bash_git_and_grep_fixtures(self) -> None:
         bash_preflight, handoff = _launcher_shell_commands()
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -227,6 +229,8 @@ class WindowsFrontDoorContractTests(unittest.TestCase):
             self.skipTest(
                 "could-not-observe: Windows interop or two independent caller directories unavailable"
             )
+        if os.name == "nt" and not Path(CANONICAL_WINDOWS_ROOT).is_dir():
+            self.skipTest("could-not-observe: canonical E:\\SSSF checkout unavailable")
 
         for caller in callers[:2]:
             result = subprocess.run(
@@ -253,6 +257,8 @@ class WindowsFrontDoorContractTests(unittest.TestCase):
         callers = _caller_directories()
         if not cmd or not launcher or not callers:
             self.skipTest("could-not-observe: Windows command host unavailable")
+        if os.name == "nt" and not Path(CANONICAL_WINDOWS_ROOT).is_dir():
+            self.skipTest("could-not-observe: canonical E:\\SSSF checkout unavailable")
 
         result = subprocess.run(
             [

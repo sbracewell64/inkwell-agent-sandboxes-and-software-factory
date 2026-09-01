@@ -49,7 +49,14 @@ agents:
 | `harness_engineering` | list[string] | Coding-agent extensions. Pi: extension names. Claude Code: reserved (MCP, hooks). |
 | `tools` | list[string] | Roster-wide tool allowlist. Every agent that omits its own `tools` inherits this. Unset = all tools usable. |
 | `protected_files` | list[string] | Paths **no** agent may modify unless it names them in its own `writes`. Default: `adws/adw_modules/`, `adws/adw_sssf_config/`, `adws/adw_*.py` — an agent must not be able to edit the machinery that decides whether its work passed. |
+| `protected_evaluator_paths` | list[string] | Property-scoped acceptance paths frozen for the active task generation. A broad parent in `writes` does not unlock them; an entry scoped inside the frozen surface is an explicit evaluator revision and changes the generation identity. Empty means the surface could not be observed, never that it was intact. |
 | `data_dir` | path | Runtime home. Sessions land at `{data_dir}/sessions/{adw_id}/{agent_name}/`. Default `adws/adw_data`. |
+
+`protected_evaluator_paths` is implemented by this repository's live factory.
+The installer template has not adopted this increment yet; factories generated
+from `.claude/skills/sssf/templates/` do not provide the frozen-evaluator
+contract. Track that separate owner gap in
+[`docs/increments/SDLC-L2_PROTECTED_EVALUATOR_SURFACE.md`](../../../../docs/increments/SDLC-L2_PROTECTED_EVALUATOR_SURFACE.md#known-unresolved-observations).
 
 ### `observability`
 
@@ -69,7 +76,7 @@ agents:
 | `color` | no | Hex swatch (`"#a78bfa"`) for this agent's lane in the visualizer. Travels config → `agent_sessions.color` → `/api/sessions/:adw_id`, and rides the `agent_start` event so a lane is colored while the agent is still running. Unset = the UI's fallback palette. |
 | `coding_agent`, `model`, `thinking`, `color`, `harness_engineering` | no | Override the corresponding `defaults` key. |
 | `tools` | no | Allowlist. **Omitting the key means all tools usable.** A capability list, not a boundary — see `writes`. |
-| `writes` | no | What this agent may modify **in the repo**, enforced after every call. Omitted = unrestricted (still barred from `protected_files`). `[]` = no repo writes at all. A list = only those paths: a trailing `/` is a directory prefix, `*` matches within one path segment, `**` crosses segments, anything else is an exact path. Naming a `protected_files` path here is what unlocks it. **The session runtime under `data_dir` is always writable** — `writes: []` means read-only with respect to the repo, not unable to write its own report. |
+| `writes` | no | What this agent may modify **in the repo**, enforced after every call. Omitted = unrestricted (still barred from protected paths). `[]` = no repo writes at all. A list = only those paths: a trailing `/` is a directory prefix, `*` matches within one path segment, `**` crosses segments, anything else is an exact path. Naming a `protected_files` path unlocks it; a frozen evaluator requires a declaration scoped inside its surface. **The session runtime under `{data_dir}/sessions/` is always writable** — `writes: []` means read-only with respect to the repo, not unable to write its own report. |
 
 Output types are deliberately absent: config defines who an agent *is*; the ADW call site defines how it's *used*. One agent serves many calls — same system prompt, different user prompt + output type per call.
 
@@ -146,14 +153,17 @@ redo; a write has already happened, so re-prompting fixes nothing. Instead:
 
 1. every unauthorized change the agent **introduced** is rolled back — tracked
    files with `git checkout --`, untracked files by deletion;
-2. a path that was **already dirty** before the agent ran is left untouched. The
-   operator had uncommitted work there, and discarding it to tidy up would be
-   the same harm this module exists to prevent;
-3. the phase fails and names every path with what happened to it.
+2. restorable state for paths that were **already dirty** before the agent ran
+   is preserved and restored, including regular-file mode and symlink target;
+   state that cannot be preserved remains an unrecovered breach;
+3. a small, fully recovered ordinary slip may continue; frozen, unrecovered,
+   or patterned breaches fail the phase and name every path with what happened
+   to it.
 
 ```yaml
 defaults:
   protected_files: [adws/adw_modules/, adws/adw_sssf_config/, "adws/adw_*.py"]
+  protected_evaluator_paths: [docs/validation/, ci/checks.json, tools/ci_gate.py]
 
 agents:
   - name: builder      # no `writes` key -> unrestricted, minus protected_files
@@ -165,12 +175,21 @@ agents:
     writes: [app_docs/, docs/, "**/*.md", "*.md"]
 ```
 
-**The session runtime under `data_dir` is always writable, for every agent.**
+**The session runtime under `{data_dir}/sessions/` is always writable, for every agent.**
 `context_handoff/` is how agents hand work to each other, and each agent's
 prompts, `raw_output.jsonl`, and `envelope.json` sit beside it. That grant comes
-from `data_dir` rather than from `.gitignore`: the runtime is normally ignored,
+from `{data_dir}/sessions/` rather than from `.gitignore`: the runtime is normally ignored,
 so it never even appears in a snapshot, but an agent's ability to record its own
 work must not depend on a gitignore line someone can delete.
+
+`protected_evaluator_paths` is narrower than a file category: declare the
+validators, scorer, fixtures, or regression that grade this generation, not all
+tests forever. A broad grant such as `docs/` does not authorize a validator
+under `docs/validation/`. A roster declaration inside that frozen surface is
+the explicit revision path; changing either the declaration or a member changes
+`evaluator_generation()`, so evidence recorded against the previous identity is
+no longer current. Snapshot and rollback remain damage containment after a
+breach, not the authority that makes a frozen evaluator writable.
 
 Narrow by role, not by reflex. Anything that must produce a `context_handoff/` artifact needs `write`, or it will resort to a `bash` heredoc. Withhold `edit`/`write` only where the restriction *is* the guarantee — a reviewer that cannot edit cannot quietly fix what it was asked to report.
 

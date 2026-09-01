@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import os
 import re
 from pathlib import Path
 
@@ -1043,10 +1044,14 @@ def test_remote_reference_syntax_cannot_alias_a_local_repository_path(
 ) -> None:
     project, root = _temporary_project(tmp_path)
     host = "local-alias.invalid"
-    alias = root / "https:" / host
-    alias.mkdir(parents=True)
-    (alias / "authority.md").write_text("local alias", encoding="utf-8")
-    (alias / "proof.json").write_text("local alias", encoding="utf-8")
+    if os.name != "nt":
+        # Windows rejects the colon before the validator can exercise the
+        # remote-reference rule; POSIX proves that even a representable local
+        # alias cannot turn URL syntax into repository evidence.
+        alias = root / "https:" / host
+        alias.mkdir(parents=True)
+        (alias / "authority.md").write_text("local alias", encoding="utf-8")
+        (alias / "proof.json").write_text("local alias", encoding="utf-8")
 
     active = _VALIDATOR._active_state_fixture(project)
     active_record = next(item for item in active["records"] if item["item_id"] == "FUT-003")

@@ -101,6 +101,23 @@ a nonempty `harness_engineering` agent, then drives each one through the real
 configured extension is forwarded as `-e`. It exists because a strict-adapter
 rewrite once rejected those extensions and the rest of the gate did not notice.
 
+`tests/test_protected_evaluator_surface.py` proves the frozen evaluator
+surface: a maker or optimizer is refused the acceptance machinery that grades
+it, a legitimate evaluator change is an explicit roster revision that starts a
+new generation and reports evidence bound to the old one as no longer current,
+and a file outside the declared property scope stays ordinary work. It carries
+its own negative controls, because two of its claims are properties to
+*preserve*: over-freezing the declaration turns the property-scope assertion
+red, and reversing the session-runtime-first precedence turns the reportability
+assertion red. An undeclared, unresolvable or unreadable surface is
+`could-not-observe`, never an intact evaluator, and failed Git snapshot
+enumeration refuses enforcement instead of representing an observed-clean tree.
+The snapshot pins its armed commit and tree. In-phase commits remain ordinary
+work, while committed and uncommitted deltas are both compared with that pin;
+an unavailable pin is a named refusal rather than an implicit new baseline.
+Every declared evaluator member is hashed independently of diff visibility;
+assume-unchanged, skip-worktree, and equivalent visibility flags are refusals.
+
 `docs/validation/check_repository_ownership.py` is intentionally not in this
 offline gate because it queries GitHub and the canonical remote. Repository and
 sandbox source invariants that do not need the network remain enumerated.

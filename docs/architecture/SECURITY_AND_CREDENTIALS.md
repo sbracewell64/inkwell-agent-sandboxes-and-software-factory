@@ -55,7 +55,14 @@ An agent with `bash` or `write` can potentially touch broad paths. Therefore SSS
 
 - `writes:` per agent,
 - `protected_files` roster-wide,
-- post-call rollback of unauthorized writes.
+- `protected_evaluator_paths` for the property-scoped acceptance surface, and
+- post-call rollback of unauthorized writes as damage containment.
+
+Frozen evaluator paths require an explicit declaration scoped inside the
+surface; broad parent grants do not unlock them. A frozen, unrecovered, or
+patterned breach refuses the phase. The detailed configuration and generation
+semantics are owned by
+[`../../.claude/skills/sssf/references/config.md`](../../.claude/skills/sssf/references/config.md#write-permissions--writes-and-protected_files).
 
 The baseline proved rollback of an unauthorized planner edit to the Inkwell app.
 
