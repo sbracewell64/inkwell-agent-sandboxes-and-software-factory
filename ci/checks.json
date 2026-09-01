@@ -1,5 +1,31 @@
 {
   "schema_version": 1,
+  "verification_contract": {
+    "schema_version": 1,
+    "proof_subjects": [
+      {
+        "id": "B4-002-production-integration-boundary",
+        "evidence_kind": "historical-byte-identity",
+        "repository": "https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git",
+        "evaluation": {
+          "head": "923c0e4ce6be4ed3a141d3ee2fb7f186962c37ae",
+          "tree": "6e840e665ffc043c3ad3778f68876f5d85ae3303",
+          "canonical_main": "a984f6cf0a89503d3db8855ccd820b83e9ee60a1",
+          "files": [
+            "adws/adw_modules/agent_pi.py",
+            "adws/adw_modules/agents.py",
+            "adws/adw_modules/data_types.py",
+            "adws/adw_modules/console.py",
+            "adws/adw_modules/gates.py",
+            "adws/adw_modules/permissions.py"
+          ]
+        },
+        "authorization_scope": "historical-b4-002-increment-boundary-only",
+        "current_production_qualification": "NON_PASS",
+        "global_production_qualification": "NON_PASS"
+      }
+    ]
+  },
   "checks": [
     {
       "id": "ci-contract-and-watched-red-controls",

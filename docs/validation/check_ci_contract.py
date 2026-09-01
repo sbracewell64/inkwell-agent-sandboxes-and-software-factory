@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 import re
@@ -22,6 +23,30 @@ EXPECTED_ACTIONS = {
     "oven-sh/setup-bun": "735343b667d3e6f658f44d0eca948eb6282f2b76",
     "extractions/setup-just": "dd310ad5a97d8e7b41793f8ef055398d51ad4de6",
 }
+B4_002_SCOPE_SUBJECT = {
+    "id": "B4-002-production-integration-boundary",
+    "evidence_kind": "historical-byte-identity",
+    "repository": "https://github.com/sbracewell64/inkwell-agent-sandboxes-and-software-factory.git",
+    "evaluation": {
+        "head": "923c0e4ce6be4ed3a141d3ee2fb7f186962c37ae",
+        "tree": "6e840e665ffc043c3ad3778f68876f5d85ae3303",
+        "canonical_main": "a984f6cf0a89503d3db8855ccd820b83e9ee60a1",
+        "files": [
+            "adws/adw_modules/agent_pi.py",
+            "adws/adw_modules/agents.py",
+            "adws/adw_modules/data_types.py",
+            "adws/adw_modules/console.py",
+            "adws/adw_modules/gates.py",
+            "adws/adw_modules/permissions.py",
+        ],
+    },
+    "authorization_scope": "historical-b4-002-increment-boundary-only",
+    "current_production_qualification": "NON_PASS",
+    "global_production_qualification": "NON_PASS",
+}
+B4_002_HISTORICAL_CONSUMPTION = "historical-b4-002-increment-boundary-only"
+
+
 EXPECTED_CHECKS = {
     "ci-contract-and-watched-red-controls": (
         "{python}", "docs/validation/check_ci_contract.py"
@@ -58,6 +83,34 @@ EXPECTED_CHECKS = {
     ),
     "inkwell-unit-tests": ("just", "inkwell", "test"),
 }
+
+
+def b4_002_scope_authorization(subject: object, consumption: str) -> str:
+    """Return PASS only for the immutable B4-002 historical subject boundary."""
+    if subject != B4_002_SCOPE_SUBJECT:
+        return "NON_PASS"
+    if consumption != B4_002_HISTORICAL_CONSUMPTION:
+        return "NON_PASS"
+    return "PASS"
+
+
+def proof_scope_errors(document: object) -> list[str]:
+    if not isinstance(document, dict):
+        return ["verification contract document is not an object"]
+    contract = document.get("verification_contract")
+    if not isinstance(contract, dict) or contract.get("schema_version") != 1:
+        return ["verification contract is missing or has an unsupported schema"]
+    subjects = contract.get("proof_subjects")
+    if not isinstance(subjects, list) or len(subjects) != 1:
+        return ["verification contract must declare exactly one B4-002 proof subject"]
+    subject = subjects[0]
+    if b4_002_scope_authorization(subject, B4_002_HISTORICAL_CONSUMPTION) != "PASS":
+        return ["B4-002 proof subject does not bind the exact historical repository/head/tree/file scope"]
+    errors = []
+    for consumption in ("current-production-qualification", "global-production-qualification"):
+        if b4_002_scope_authorization(subject, consumption) == "PASS":
+            errors.append(f"B4-002 historical evidence authorized {consumption}")
+    return errors
 
 
 def contract_errors(root: Path) -> list[str]:
@@ -115,6 +168,12 @@ def contract_errors(root: Path) -> list[str]:
         errors.append("an action is unpinned or an unexpected action was added")
 
     manifest_path = root / MANIFEST
+    try:
+        document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"verification contract could not be observed: {exc}")
+        return errors
+    errors.extend(proof_scope_errors(document))
     try:
         checks = ci_gate.load_checks(manifest_path)
     except ValueError as exc:
@@ -281,6 +340,25 @@ def watched_red_errors() -> list[str]:
         shutil.copy2(ROOT / WORKFLOW, contract_root / ".github" / "workflows" / "drift.yml")
         if not contract_errors(contract_root):
             errors.append("workflow path drift did not go red")
+
+        contract_document = json.loads((contract_root / MANIFEST).read_text(encoding="utf-8"))
+        bad_head = copy.deepcopy(contract_document)
+        bad_head["verification_contract"]["proof_subjects"][0]["evaluation"]["head"] = "0" * 40
+        if b4_002_scope_authorization(
+            bad_head["verification_contract"]["proof_subjects"][0],
+            B4_002_HISTORICAL_CONSUMPTION,
+        ) == "PASS":
+            errors.append("B4-002 head-scope drift did not go red")
+
+        global_claim = copy.deepcopy(contract_document)
+        global_claim["verification_contract"]["proof_subjects"][0][
+            "authorization_scope"
+        ] = "global-production-qualification"
+        if b4_002_scope_authorization(
+            global_claim["verification_contract"]["proof_subjects"][0],
+            "global-production-qualification",
+        ) == "PASS":
+            errors.append("B4-002 global production consumption did not go red")
 
     return errors
 
